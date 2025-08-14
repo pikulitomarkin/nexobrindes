@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -7,7 +8,13 @@ import {
   DollarSign, 
   Users,
   Eye,
-  Send
+  Send,
+  Plus,
+  UserPlus,
+  Factory,
+  TrendingUp,
+  FileText,
+  Archive
 } from "lucide-react";
 
 export default function AdminPanel() {
@@ -132,12 +139,74 @@ export default function AdminPanel() {
         </Card>
       </div>
 
+      {/* Management Sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Gerenciar Usuários
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/vendors">
+              <Button className="w-full justify-start gradient-bg text-white">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Vendedores ({stats?.totalVendors || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/clients">
+              <Button variant="outline" className="w-full justify-start">
+                <Users className="h-4 w-4 mr-2" />
+                Clientes ({stats?.totalClients || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/producers">
+              <Button variant="outline" className="w-full justify-start">
+                <Factory className="h-4 w-4 mr-2" />
+                Produtores ({stats?.totalProducers || 0})
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              Operacional
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/orders">
+              <Button className="w-full justify-start gradient-bg text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Gerenciar Pedidos ({stats?.totalOrders || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/finance">
+              <Button variant="outline" className="w-full justify-start">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Visão Financeira
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Recent Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-gray-900">
-            Pedidos Recentes
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              Pedidos Recentes
+            </CardTitle>
+            <Link href="/admin/orders">
+              <Button variant="outline" size="sm">
+                Ver Todos
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -165,7 +234,7 @@ export default function AdminPanel() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders?.map((order: any) => (
+                {orders?.slice(0, 5).map((order: any) => (
                   <tr key={order.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {order.orderNumber}

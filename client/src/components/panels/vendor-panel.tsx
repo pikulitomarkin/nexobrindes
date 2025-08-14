@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy } from "lucide-react";
+import { Copy, ShoppingCart, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function VendorPanel() {
@@ -124,12 +125,60 @@ export default function VendorPanel() {
         </Card>
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              Meus Pedidos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/vendor/orders">
+              <Button className="w-full justify-start gradient-bg text-white">
+                Ver Todos os Pedidos ({orders?.length || 0})
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Meus Clientes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/vendor/clients">
+              <Button variant="outline" className="w-full justify-start">
+                Ver Meus Clientes
+              </Button>
+            </Link>
+            <Link href="/vendor/commissions">
+              <Button variant="outline" className="w-full justify-start">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Ver Comissões
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* My Orders */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-gray-900">
-            Meus Pedidos
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              Pedidos Recentes
+            </CardTitle>
+            <Link href="/vendor/orders">
+              <Button variant="outline" size="sm">
+                Ver Todos
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -157,7 +206,7 @@ export default function VendorPanel() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders?.map((order: any) => (
+                {orders?.slice(0, 5).map((order: any) => (
                   <tr key={order.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {order.orderNumber}
