@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/sidebar";
 import AdminPanel from "@/components/panels/admin-panel";
 import VendorPanel from "@/components/panels/vendor-panel";
@@ -27,11 +29,13 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      <Sidebar activePanel={activePanel} onPanelChange={setActivePanel} />
-      <div className="flex-1 overflow-auto">
-        {renderPanel()}
+    <QueryClientProvider client={queryClient}>
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar activePanel={activePanel} onPanelChange={setActivePanel} />
+        <div className="flex-1 overflow-auto">
+          {renderPanel()}
+        </div>
       </div>
-    </div>
+    </QueryClientProvider>
   );
 }
