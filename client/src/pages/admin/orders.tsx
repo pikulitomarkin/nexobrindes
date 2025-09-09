@@ -3,33 +3,37 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Plus, Eye, Send, Filter, Search } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Plus, Eye, Send, Filter, Search, Calculator, Package, Percent, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-
-const orderFormSchema = z.object({
-  clientId: z.string().min(1, "Cliente é obrigatório"),
-  vendorId: z.string().min(1, "Vendedor é obrigatório"),
-  product: z.string().min(2, "Produto é obrigatório"),
-  description: z.string().min(5, "Descrição é obrigatória"),
-  totalValue: z.string().min(1, "Valor é obrigatório"),
-  deadline: z.string().optional(),
-});
-
-type OrderFormValues = z.infer<typeof orderFormSchema>;
 
 export default function AdminOrders() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [orderProductSearch, setOrderProductSearch] = useState("");
+  const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
   const { toast } = useToast();
+
+  // Order form state
+  const [orderForm, setOrderForm] = useState({
+    product: "",
+    description: "",
+    clientId: "",
+    vendorId: "",
+    deadline: "",
+    hasCustomization: false,
+    customizationPercentage: "10.00",
+    customizationDescription: "",
+    items: [] as any[],
+    photos: [] as string[]
+  });
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders"],
@@ -43,24 +47,93 @@ export default function AdminOrders() {
     queryKey: ["/api/vendors"],
   });
 
-  const form = useForm<OrderFormValues>({
-    resolver: zodResolver(orderFormSchema),
-    defaultValues: {
-      clientId: "",
-      vendorId: "",
-      product: "",
-      description: "",
-      totalValue: "",
-      deadline: "",
+  const { data: productsData } = useQuery({
+    queryKey: ["/api/products", { limit: 9999 }],
+    queryFn: async () => {
+      const response = await fetch('/api/products?limit=9999');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
     },
   });
 
+  const products = productsData?.products || [];
+  const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+
+  // Order functions
+  const addProductToOrder = (product: any) => {
+    const newItem = {
+      productId: product.id,
+      productName: product.name,
+      quantity: "1",
+      unitPrice: product.basePrice,
+      totalPrice: product.basePrice,
+      hasItemCustomization: false,
+      itemCustomizationPercentage: "0.00",
+      itemCustomizationDescription: ""
+    };
+    setOrderForm(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  const removeProductFromOrder = (index: number) => {
+    setOrderForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const calculateOrderTotal = () => {
+    const itemsTotal = orderForm.items.reduce((sum, item) => {
+      const itemPrice = parseFloat(item.totalPrice || '0');
+      
+      // Apply item customization
+      if (item.hasItemCustomization) {
+        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
+        const customizationAmount = itemPrice * (customizationPercentage / 100);
+        return sum + itemPrice + customizationAmount;
+      }
+      
+      return sum + itemPrice;
+    }, 0);
+
+    // Apply global customization
+    if (orderForm.hasCustomization) {
+      const customizationPercentage = parseFloat(orderForm.customizationPercentage || '0');
+      const customizationAmount = itemsTotal * (customizationPercentage / 100);
+      return itemsTotal + customizationAmount;
+    }
+
+    return itemsTotal;
+  };
+
+  const resetOrderForm = () => {
+    setOrderForm({
+      product: "",
+      description: "",
+      clientId: "",
+      vendorId: "",
+      deadline: "",
+      hasCustomization: false,
+      customizationPercentage: "10.00",
+      customizationDescription: "",
+      items: [],
+      photos: []
+    });
+  };
+
   const createOrderMutation = useMutation({
-    mutationFn: async (data: OrderFormValues) => {
+    mutationFn: async (data: any) => {
+      const orderData = {
+        ...data,
+        totalValue: calculateOrderTotal().toFixed(2),
+        product: data.items.map((item: any) => item.productName).join(", ") || "Pedido Personalizado"
+      };
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(orderData),
       });
       if (!response.ok) throw new Error("Erro ao criar pedido");
       return response.json();
@@ -68,7 +141,9 @@ export default function AdminOrders() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
-      form.reset();
+      resetOrderForm();
+      setOrderProductSearch("");
+      setOrderCategoryFilter("all");
       toast({
         title: "Sucesso!",
         description: "Pedido criado com sucesso",
@@ -94,9 +169,31 @@ export default function AdminOrders() {
     },
   });
 
-  const onSubmit = (data: OrderFormValues) => {
-    createOrderMutation.mutate(data);
+  const handleOrderSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (orderForm.items.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Adicione pelo menos um produto ao pedido",
+        variant: "destructive"
+      });
+      return;
+    }
+    createOrderMutation.mutate(orderForm);
   };
+
+  // Filter products for order creation
+  const filteredOrderProducts = products.filter((product: any) => {
+    const matchesSearch = !orderProductSearch || 
+      product.name.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
+      product.description?.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
+      product.id.toLowerCase().includes(orderProductSearch.toLowerCase());
+    
+    const matchesCategory = orderCategoryFilter === "all" || 
+      product.category === orderCategoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
@@ -158,135 +255,259 @@ export default function AdminOrders() {
               Novo Pedido
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Novo Pedido</DialogTitle>
               <DialogDescription>
-                Preencha os dados do pedido
+                Crie um pedido personalizado com produtos do catálogo
               </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="clientId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cliente</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um cliente" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {clients?.map((client: any) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="vendorId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Vendedor</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um vendedor" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {vendors?.map((vendor: any) => (
-                            <SelectItem key={vendor.id} value={vendor.id}>
-                              {vendor.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="product"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Produto</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Mesa de Jantar Personalizada" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descrição</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Detalhes do produto..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="totalValue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Valor Total</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="2450.00" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="deadline"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prazo</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+            <form onSubmit={handleOrderSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="order-description">Descrição do Pedido</Label>
+                  <Textarea
+                    id="order-description"
+                    rows={2}
+                    value={orderForm.description}
+                    onChange={(e) => setOrderForm({ ...orderForm, description: e.target.value })}
+                    placeholder="Descrição detalhada do pedido..."
                   />
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="gradient-bg text-white"
-                    disabled={createOrderMutation.isPending}
-                  >
-                    {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
-                  </Button>
+                <div>
+                  <Label htmlFor="order-deadline">Prazo de Entrega</Label>
+                  <Input
+                    id="order-deadline"
+                    type="date"
+                    value={orderForm.deadline}
+                    onChange={(e) => setOrderForm({ ...orderForm, deadline: e.target.value })}
+                  />
                 </div>
-              </form>
-            </Form>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="order-client">Cliente</Label>
+                  <Select value={orderForm.clientId} onValueChange={(value) => setOrderForm({ ...orderForm, clientId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients?.map((client: any) => (
+                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="order-vendor">Vendedor</Label>
+                  <Select value={orderForm.vendorId} onValueChange={(value) => setOrderForm({ ...orderForm, vendorId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors?.map((vendor: any) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Customization Options */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="order-customization"
+                    checked={orderForm.hasCustomization}
+                    onCheckedChange={(checked) => setOrderForm({ ...orderForm, hasCustomization: checked })}
+                  />
+                  <Label htmlFor="order-customization" className="flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Aplicar Personalização Global
+                  </Label>
+                </div>
+                
+                {orderForm.hasCustomization && (
+                  <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+                    <div>
+                      <Label htmlFor="order-customization-percentage">Percentual (%)</Label>
+                      <Input
+                        id="order-customization-percentage"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={orderForm.customizationPercentage}
+                        onChange={(e) => setOrderForm({ ...orderForm, customizationPercentage: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="order-customization-description">Descrição da Personalização</Label>
+                      <Input
+                        id="order-customization-description"
+                        value={orderForm.customizationDescription}
+                        onChange={(e) => setOrderForm({ ...orderForm, customizationDescription: e.target.value })}
+                        placeholder="Ex: Gravação personalizada, cor especial..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Product Selection */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Produtos do Pedido</h3>
+                
+                {/* Selected Products */}
+                {orderForm.items.length > 0 && (
+                  <div className="space-y-2">
+                    {orderForm.items.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded">
+                        <div>
+                          <p className="font-medium">{item.productName}</p>
+                          <p className="text-sm text-gray-500">
+                            {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
+                            R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeProductFromOrder(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Products */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Order Product Search */}
+                    <div className="mb-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Buscar produtos..."
+                            value={orderProductSearch}
+                            onChange={(e) => setOrderProductSearch(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-order-product-search"
+                          />
+                        </div>
+                        <Select value={orderCategoryFilter} onValueChange={setOrderCategoryFilter}>
+                          <SelectTrigger data-testid="select-order-category">
+                            <SelectValue placeholder="Categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category === "all" ? "Todas as Categorias" : category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <span>{filteredOrderProducts.length} produtos encontrados</span>
+                        {(orderProductSearch || orderCategoryFilter !== "all") && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setOrderProductSearch("");
+                              setOrderCategoryFilter("all");
+                            }}
+                          >
+                            Limpar filtros
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                      {filteredOrderProducts.length === 0 ? (
+                        <div className="col-span-full text-center py-8">
+                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500">
+                            {orderProductSearch || orderCategoryFilter !== "all" ? 
+                              "Nenhum produto encontrado com os filtros aplicados" : 
+                              "Nenhum produto disponível"}
+                          </p>
+                        </div>
+                      ) : (
+                        filteredOrderProducts.map((product: any) => (
+                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
+                               onClick={() => addProductToOrder(product)}>
+                            <div className="flex items-center gap-2">
+                              {product.imageLink ? (
+                                <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                  <Package className="h-4 w-4 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{product.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Total */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center text-lg font-semibold">
+                  <span>Total do Pedido:</span>
+                  <span className="text-green-600">
+                    R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {orderForm.hasCustomization && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Inclui {orderForm.customizationPercentage}% de personalização
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    resetOrderForm();
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createOrderMutation.isPending || orderForm.items.length === 0}
+                  className="gradient-bg text-white"
+                >
+                  {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
