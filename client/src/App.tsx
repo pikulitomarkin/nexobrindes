@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import MainLayout from "@/components/layout/main-layout";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 
@@ -34,38 +35,40 @@ import FinanceReconciliation from "@/pages/finance/reconciliation";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
+    <MainLayout>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/dashboard" component={Dashboard} />
 
-      {/* Admin Routes */}
-      <Route path="/admin/products" component={AdminProducts} />
-      <Route path="/admin/budgets" component={AdminBudgets} />
-      <Route path="/admin/orders" component={AdminOrders} />
-      <Route path="/admin/vendors" component={AdminVendors} />
-      <Route path="/admin/clients" component={AdminClients} />
-      <Route path="/admin/producers" component={AdminProducers} />
-      <Route path="/admin/finance" component={AdminFinance} />
+        {/* Admin Routes */}
+        <Route path="/admin/products" component={AdminProducts} />
+        <Route path="/admin/budgets" component={AdminBudgets} />
+        <Route path="/admin/orders" component={AdminOrders} />
+        <Route path="/admin/vendors" component={AdminVendors} />
+        <Route path="/admin/clients" component={AdminClients} />
+        <Route path="/admin/producers" component={AdminProducers} />
+        <Route path="/admin/finance" component={AdminFinance} />
 
-      {/* Vendor Routes */}
-      <Route path="/vendor/products" component={VendorProducts} />
-      <Route path="/vendor/budgets" component={VendorBudgets} />
-      <Route path="/vendor/orders" component={VendorOrders} />
-      <Route path="/vendor/clients" component={VendorClients} />
-      <Route path="/vendor/commissions" component={VendorCommissions} />
+        {/* Vendor Routes */}
+        <Route path="/vendor/products" component={VendorProducts} />
+        <Route path="/vendor/budgets" component={VendorBudgets} />
+        <Route path="/vendor/orders" component={VendorOrders} />
+        <Route path="/vendor/clients" component={VendorClients} />
+        <Route path="/vendor/commissions" component={VendorCommissions} />
 
-      {/* Client Routes */}
-      <Route path="/client/orders" component={ClientOrders} />
+        {/* Client Routes */}
+        <Route path="/client/orders" component={ClientOrders} />
 
-      {/* Producer Routes */}
-      <Route path="/producer/orders" component={ProducerOrders} />
+        {/* Producer Routes */}
+        <Route path="/producer/orders" component={ProducerOrders} />
 
-      {/* Finance Routes */}
-      <Route path="/finance/payments" component={FinancePayments} />
-      <Route path="/finance/reconciliation" component={FinanceReconciliation} />
+        {/* Finance Routes */}
+        <Route path="/finance/payments" component={FinancePayments} />
+        <Route path="/finance/reconciliation" component={FinanceReconciliation} />
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </MainLayout>
   );
 }
 

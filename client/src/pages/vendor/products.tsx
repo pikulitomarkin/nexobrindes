@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Package } from "lucide-react";
 
 export default function VendorProducts() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,7 +42,7 @@ export default function VendorProducts() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Catálogo de Produtos</h1>
