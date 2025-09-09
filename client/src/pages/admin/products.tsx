@@ -1,54 +1,85 @@
-
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Plus, Upload, FileSpreadsheet, Search, Edit, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Plus, Upload, FileText, Search, Edit, Trash2, Package, 
+  Calculator, Eye, Users, ShoppingCart, Image, Percent
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-const productFormSchema = z.object({
-  name: z.string().min(2, "Nome é obrigatório"),
-  description: z.string().optional(),
-  category: z.string().min(1, "Categoria é obrigatória"),
-  basePrice: z.string().min(1, "Preço é obrigatório"),
-  unit: z.string().default("un"),
-});
-
-type ProductFormValues = z.infer<typeof productFormSchema>;
-
 export default function AdminProducts() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("products");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: products, isLoading } = useQuery({
+  // Product form state
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    category: "",
+    basePrice: "",
+    unit: "un",
+    isActive: true,
+    weight: "",
+    height: "",
+    width: "",
+    depth: "",
+    imageLink: "",
+    mainColor: "",
+    secondaryColor: ""
+  });
+
+  // Budget form state
+  const [budgetForm, setBudgetForm] = useState({
+    title: "",
+    description: "",
+    clientId: "",
+    vendorId: "",
+    validUntil: "",
+    hasCustomization: false,
+    customizationPercentage: "10.00",
+    customizationDescription: "",
+    items: [] as any[],
+    photos: [] as string[]
+  });
+
+  // Queries
+  const productsQuery = useQuery({
     queryKey: ["/api/products"],
   });
 
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      category: "",
-      basePrice: "",
-      unit: "un",
-    },
+  const budgetsQuery = useQuery({
+    queryKey: ["/api/budgets"],
   });
 
+  const usersQuery = useQuery({
+    queryKey: ["/api/users"],
+  });
+
+  // Mutations
   const createProductMutation = useMutation({
-    mutationFn: async (data: ProductFormValues) => {
+    mutationFn: async (data: typeof productForm) => {
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -58,46 +89,72 @@ export default function AdminProducts() {
       return response.json();
     },
     onSuccess: () => {
+      toast({ title: "Sucesso", description: "Produto criado com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      setIsCreateDialogOpen(false);
-      form.reset();
-      toast({
-        title: "Sucesso!",
-        description: "Produto criado com sucesso",
+      resetProductForm();
+      setIsProductDialogOpen(false);
+    },
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof productForm }) => {
+      const response = await fetch(`/api/products/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Erro ao atualizar produto");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      resetProductForm();
+      setEditingProduct(null);
+      setIsProductDialogOpen(false);
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Erro ao deletar produto");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Produto deletado com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
   });
 
   const importProductsMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append('file', file);
       
-      const response = await fetch("/api/products/import", {
-        method: "POST",
+      const response = await fetch('/api/products/import', {
+        method: 'POST',
         body: formData,
       });
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao importar produtos");
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao importar produtos');
       }
+      
       return response.json();
     },
     onSuccess: (data) => {
+      toast({
+        title: "Importação Concluída",
+        description: `${data.imported} produtos importados com sucesso!`,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setIsImportDialogOpen(false);
-      
-      let description = `${data.imported} de ${data.total} produtos importados com sucesso`;
-      if (data.errors && data.errors.length > 0) {
-        description += `. ${data.errors.length} erros encontrados.`;
-      }
-      
-      toast({
-        title: "Importação Concluída!",
-        description,
-      });
+      setImportFile(null);
+      setImportProgress(0);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Erro na Importação",
         description: error.message,
@@ -106,32 +163,192 @@ export default function AdminProducts() {
     },
   });
 
-  const onSubmit = (data: ProductFormValues) => {
-    createProductMutation.mutate(data);
+  const createBudgetMutation = useMutation({
+    mutationFn: async (data: typeof budgetForm) => {
+      const response = await fetch("/api/budgets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao criar orçamento");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Orçamento criado com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      resetBudgetForm();
+      setIsBudgetDialogOpen(false);
+    },
+  });
+
+  const convertBudgetMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}/convert`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Erro ao converter orçamento");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Orçamento convertido em pedido!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+  });
+
+  // Helper functions
+  const resetProductForm = () => {
+    setProductForm({
+      name: "",
+      description: "",
+      category: "",
+      basePrice: "",
+      unit: "un",
+      isActive: true,
+      weight: "",
+      height: "",
+      width: "",
+      depth: "",
+      imageLink: "",
+      mainColor: "",
+      secondaryColor: ""
+    });
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      importProductsMutation.mutate(file);
+  const resetBudgetForm = () => {
+    setBudgetForm({
+      title: "",
+      description: "",
+      clientId: "",
+      vendorId: "",
+      validUntil: "",
+      hasCustomization: false,
+      customizationPercentage: "10.00",
+      customizationDescription: "",
+      items: [],
+      photos: []
+    });
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setProductForm(product);
+    setIsProductDialogOpen(true);
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    if (confirm('Tem certeza que deseja deletar este produto?')) {
+      deleteProductMutation.mutate(id);
     }
   };
 
-  const categories = Array.from(new Set(products?.map((p: any) => p.category) || []));
+  const handleProductSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProduct) {
+      updateProductMutation.mutate({ id: editingProduct.id, data: productForm });
+    } else {
+      createProductMutation.mutate(productForm);
+    }
+  };
 
-  const filteredProducts = products?.filter((product: any) => {
+  const handleBudgetSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createBudgetMutation.mutate(budgetForm);
+  };
+
+  const handleImport = () => {
+    if (importFile) {
+      setImportProgress(25);
+      importProductsMutation.mutate(importFile);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/json' || file.name.endsWith('.json')) {
+        setImportFile(file);
+        setImportProgress(10);
+      } else {
+        toast({
+          title: "Arquivo Inválido",
+          description: "Por favor, selecione um arquivo JSON.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const addProductToBudget = (product: any) => {
+    const newItem = {
+      productId: product.id,
+      productName: product.name,
+      quantity: "1",
+      unitPrice: product.basePrice,
+      totalPrice: product.basePrice,
+      hasItemCustomization: false,
+      itemCustomizationPercentage: "0.00",
+      itemCustomizationDescription: ""
+    };
+    setBudgetForm(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  const removeProductFromBudget = (index: number) => {
+    setBudgetForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const calculateBudgetTotal = () => {
+    const itemsTotal = budgetForm.items.reduce((sum, item) => {
+      const itemPrice = parseFloat(item.totalPrice || '0');
+      
+      // Apply item customization
+      if (item.hasItemCustomization) {
+        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
+        const customizationAmount = itemPrice * (customizationPercentage / 100);
+        return sum + itemPrice + customizationAmount;
+      }
+      
+      return sum + itemPrice;
+    }, 0);
+
+    // Apply global customization
+    if (budgetForm.hasCustomization) {
+      const customizationPercentage = parseFloat(budgetForm.customizationPercentage || '0');
+      const customizationAmount = itemsTotal * (customizationPercentage / 100);
+      return itemsTotal + customizationAmount;
+    }
+
+    return itemsTotal;
+  };
+
+  // Data processing
+  const products = productsQuery.data || [];
+  const budgets = budgetsQuery.data || [];
+  const users = usersQuery.data || [];
+  const clients = users.filter((u: any) => u.role === 'client');
+  const vendors = users.filter((u: any) => u.role === 'vendor');
+  
+  const categories = ['all', ...new Set(products.map((product: any) => product.category).filter(Boolean))];
+  
+  const filteredProducts = products.filter((product: any) => {
     const matchesSearch = searchTerm === "" || 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  if (isLoading) {
+  if (productsQuery.isLoading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
           <div className="h-64 bg-gray-200 rounded-xl"></div>
         </div>
       </div>
@@ -139,324 +356,748 @@ export default function AdminProducts() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Produtos</h1>
-          <p className="text-gray-600">Gerencie o catálogo de produtos para orçamentos</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Importar Produtos</DialogTitle>
-                <DialogDescription>
-                  Faça upload de um arquivo JSON com os produtos. O sistema suporta a estrutura do XBZ Brindes.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6">
-                  <div className="text-center">
-                    <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="mt-4">
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="mt-2 block text-sm font-medium text-gray-900">
-                          {importProductsMutation.isPending ? "Importando..." : "Clique para fazer upload"}
-                        </span>
-                      </label>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        accept=".json"
-                        className="sr-only"
-                        onChange={handleFileImport}
-                        disabled={importProductsMutation.isPending}
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Arquivo JSON até 10MB
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Formato JSON Esperado:</h4>
-                  <div className="text-xs text-blue-800 bg-blue-100 p-3 rounded font-mono overflow-x-auto">
-                    {`[
-  {
-    "Nome": "Nome do Produto",
-    "Descricao": "Descrição do produto",
-    "WebTipo": "Categoria",
-    "PrecoVenda": 10.90
-  }
-]`}
-                  </div>
-                  <p className="text-xs text-blue-700 mt-2">
-                    Campos obrigatórios: <strong>Nome</strong> e <strong>PrecoVenda</strong>
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-2"
-                    onClick={() => {
-                      const exampleData = [
-                        {
-                          "Nome": "Caneca Personalizada",
-                          "Descricao": "Caneca de cerâmica branca 325ml para sublimação",
-                          "WebTipo": "Brindes",
-                          "PrecoVenda": 12.50
-                        },
-                        {
-                          "Nome": "Camiseta Básica",
-                          "Descricao": "Camiseta 100% algodão, disponível em várias cores",
-                          "WebTipo": "Vestuário",
-                          "PrecoVenda": 25.90
-                        }
-                      ];
-                      const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'exemplo-produtos.json';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    Baixar Exemplo JSON
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-bg text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Criar Novo Produto</DialogTitle>
-                <DialogDescription>
-                  Preencha os dados do produto
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome do Produto</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Mesa de Jantar" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Categoria</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Móveis" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descrição</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Descrição detalhada do produto..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="basePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Preço Base</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" placeholder="1200.00" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="unit"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Unidade</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="un">Unidade</SelectItem>
-                              <SelectItem value="m2">Metro²</SelectItem>
-                              <SelectItem value="m">Metro</SelectItem>
-                              <SelectItem value="kg">Quilograma</SelectItem>
-                              <SelectItem value="pc">Peça</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsCreateDialogOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="gradient-bg text-white"
-                      disabled={createProductMutation.isPending}
-                    >
-                      {createProductMutation.isPending ? "Criando..." : "Criar Produto"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+          <h1 className="text-3xl font-bold gradient-text">Gestão de Produtos & Orçamentos</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Gerencie produtos, crie orçamentos com personalização e converta em pedidos
+          </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar produtos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Categorias</SelectItem>
-                  {categories.map((category: string) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Produtos
+          </TabsTrigger>
+          <TabsTrigger value="budgets" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Orçamentos
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Products Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Produtos ({filteredProducts?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nome
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoria
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Preço Base
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Unidade
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProducts?.map((product: any) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                        <div className="text-sm text-gray-500">{product.description}</div>
+        <TabsContent value="products" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Catálogo de Produtos</h2>
+            <div className="flex gap-2">
+              <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar JSON
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Importar Produtos</DialogTitle>
+                    <DialogDescription>
+                      Faça upload de um arquivo JSON com os produtos
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="file">Arquivo JSON</Label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={handleFileChange}
+                        className="w-full mt-1 p-2 border rounded-md"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Selecione um arquivo JSON com a estrutura de produtos
+                      </p>
+                    </div>
+                    {importFile && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Arquivo selecionado:</span>
+                          <span className="font-medium">{importFile.name}</span>
+                        </div>
+                        <Progress value={importProgress} className="w-full" />
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.unit}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`status-badge ${product.isActive ? 'status-confirmed' : 'status-cancelled'}`}>
-                        {product.isActive ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Button variant="ghost" size="sm" className="mr-2">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Editar
+                    )}
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setIsImportDialogOpen(false);
+                          setImportFile(null);
+                          setImportProgress(0);
+                        }}
+                        disabled={importProductsMutation.isPending}
+                      >
+                        Cancelar
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-900">
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Excluir
+                      <Button 
+                        onClick={handleImport}
+                        disabled={!importFile || importProductsMutation.isPending}
+                        className="flex-1"
+                      >
+                        {importProductsMutation.isPending ? 'Importando...' : 'Importar'}
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-bg text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Produto
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingProduct ? 'Editar Produto' : 'Criar Novo Produto'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleProductSubmit} className="space-y-6">
+                    <Tabs defaultValue="basic" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
+                        <TabsTrigger value="details">Detalhes</TabsTrigger>
+                        <TabsTrigger value="appearance">Aparência</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="basic" className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="name">Nome do Produto</Label>
+                            <Input
+                              id="name"
+                              value={productForm.name}
+                              onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="category">Categoria</Label>
+                            <Input
+                              id="category"
+                              value={productForm.category}
+                              onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="description">Descrição</Label>
+                          <Textarea
+                            id="description"
+                            rows={3}
+                            value={productForm.description}
+                            onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="basePrice">Preço Base (R$)</Label>
+                            <Input
+                              id="basePrice"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={productForm.basePrice}
+                              onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="unit">Unidade</Label>
+                            <Select value={productForm.unit} onValueChange={(value) => setProductForm({ ...productForm, unit: value })}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="un">Unidade</SelectItem>
+                                <SelectItem value="kg">Quilograma</SelectItem>
+                                <SelectItem value="m">Metro</SelectItem>
+                                <SelectItem value="m2">Metro²</SelectItem>
+                                <SelectItem value="l">Litro</SelectItem>
+                                <SelectItem value="cx">Caixa</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-end">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="isActive"
+                                checked={productForm.isActive}
+                                onCheckedChange={(checked) => setProductForm({ ...productForm, isActive: checked })}
+                              />
+                              <Label htmlFor="isActive">Ativo</Label>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="details" className="space-y-4">
+                        <div className="grid grid-cols-4 gap-4">
+                          <div>
+                            <Label htmlFor="weight">Peso (g)</Label>
+                            <Input
+                              id="weight"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={productForm.weight}
+                              onChange={(e) => setProductForm({ ...productForm, weight: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="height">Altura (cm)</Label>
+                            <Input
+                              id="height"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={productForm.height}
+                              onChange={(e) => setProductForm({ ...productForm, height: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="width">Largura (cm)</Label>
+                            <Input
+                              id="width"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={productForm.width}
+                              onChange={(e) => setProductForm({ ...productForm, width: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="depth">Profundidade (cm)</Label>
+                            <Input
+                              id="depth"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={productForm.depth}
+                              onChange={(e) => setProductForm({ ...productForm, depth: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="appearance" className="space-y-4">
+                        <div>
+                          <Label htmlFor="imageLink">URL da Imagem</Label>
+                          <Input
+                            id="imageLink"
+                            type="url"
+                            value={productForm.imageLink}
+                            onChange={(e) => setProductForm({ ...productForm, imageLink: e.target.value })}
+                            placeholder="https://exemplo.com/imagem.jpg"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="mainColor">Cor Principal</Label>
+                            <Input
+                              id="mainColor"
+                              value={productForm.mainColor}
+                              onChange={(e) => setProductForm({ ...productForm, mainColor: e.target.value })}
+                              placeholder="Ex: Azul, Vermelho"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="secondaryColor">Cor Secundária</Label>
+                            <Input
+                              id="secondaryColor"
+                              value={productForm.secondaryColor}
+                              onChange={(e) => setProductForm({ ...productForm, secondaryColor: e.target.value })}
+                              placeholder="Ex: Branco, Preto"
+                            />
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button 
+                        variant="outline" 
+                        type="button" 
+                        onClick={() => {
+                          setIsProductDialogOpen(false);
+                          setEditingProduct(null);
+                          resetProductForm();
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={createProductMutation.isPending || updateProductMutation.isPending}
+                      >
+                        {(createProductMutation.isPending || updateProductMutation.isPending) 
+                          ? (editingProduct ? "Salvando..." : "Criando...") 
+                          : (editingProduct ? "Salvar" : "Criar")}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-4 items-center">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Buscar produtos por nome, descrição ou categoria..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as categorias</SelectItem>
+                    {categories.slice(1).map((category: string) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Products Table */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Produtos ({filteredProducts.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Nenhum produto encontrado
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    {searchTerm || selectedCategory !== 'all' 
+                      ? 'Tente ajustar os filtros de busca.' 
+                      : 'Comece adicionando seu primeiro produto ou importando de um arquivo JSON.'}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16"></TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Preço</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-32">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((product: any) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          {product.imageLink ? (
+                            <img 
+                              src={product.imageLink} 
+                              alt={product.name}
+                              className="w-12 h-12 object-cover rounded"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+                              <Package className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-gray-500 line-clamp-1">
+                              {product.description}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{product.category || 'Sem categoria'}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">
+                            R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </p>
+                          <p className="text-sm text-gray-500">por {product.unit}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={product.isActive ? "default" : "secondary"}>
+                            {product.isActive ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEditProduct(product)}
+                              data-testid={`edit-product-${product.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              data-testid={`delete-product-${product.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="budgets" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Orçamentos</h2>
+            <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-bg text-white">
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Novo Orçamento
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Orçamento</DialogTitle>
+                  <DialogDescription>
+                    Crie um orçamento personalizado com produtos do catálogo
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleBudgetSubmit} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="budget-title">Título do Orçamento</Label>
+                      <Input
+                        id="budget-title"
+                        value={budgetForm.title}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, title: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="budget-validUntil">Válido Até</Label>
+                      <Input
+                        id="budget-validUntil"
+                        type="date"
+                        value={budgetForm.validUntil}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, validUntil: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="budget-description">Descrição</Label>
+                    <Textarea
+                      id="budget-description"
+                      rows={2}
+                      value={budgetForm.description}
+                      onChange={(e) => setBudgetForm({ ...budgetForm, description: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="budget-client">Cliente</Label>
+                      <Select value={budgetForm.clientId} onValueChange={(value) => setBudgetForm({ ...budgetForm, clientId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client: any) => (
+                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="budget-vendor">Vendedor</Label>
+                      <Select value={budgetForm.vendorId} onValueChange={(value) => setBudgetForm({ ...budgetForm, vendorId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um vendedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((vendor: any) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Customization Options */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="budget-customization"
+                        checked={budgetForm.hasCustomization}
+                        onCheckedChange={(checked) => setBudgetForm({ ...budgetForm, hasCustomization: checked })}
+                      />
+                      <Label htmlFor="budget-customization" className="flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        Aplicar Personalização Global
+                      </Label>
+                    </div>
+                    
+                    {budgetForm.hasCustomization && (
+                      <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
+                        <div>
+                          <Label htmlFor="budget-customization-percentage">Percentual (%)</Label>
+                          <Input
+                            id="budget-customization-percentage"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={budgetForm.customizationPercentage}
+                            onChange={(e) => setBudgetForm({ ...budgetForm, customizationPercentage: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="budget-customization-description">Descrição da Personalização</Label>
+                          <Input
+                            id="budget-customization-description"
+                            value={budgetForm.customizationDescription}
+                            onChange={(e) => setBudgetForm({ ...budgetForm, customizationDescription: e.target.value })}
+                            placeholder="Ex: Gravação personalizada, cor especial..."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Product Selection */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
+                    
+                    {/* Selected Products */}
+                    {budgetForm.items.length > 0 && (
+                      <div className="space-y-2">
+                        {budgetForm.items.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                            <div>
+                              <p className="font-medium">{item.productName}</p>
+                              <p className="text-sm text-gray-500">
+                                {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
+                                R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeProductFromBudget(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Products */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                          {products.map((product: any) => (
+                            <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
+                                 onClick={() => addProductToBudget(product)}>
+                              <div className="flex items-center gap-2">
+                                {product.imageLink ? (
+                                  <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                    <Package className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Budget Total */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center text-lg font-semibold">
+                      <span>Total do Orçamento:</span>
+                      <span className="text-blue-600">
+                        R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {budgetForm.hasCustomization && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Inclui {budgetForm.customizationPercentage}% de personalização
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      variant="outline" 
+                      type="button" 
+                      onClick={() => {
+                        setIsBudgetDialogOpen(false);
+                        resetBudgetForm();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={createBudgetMutation.isPending || budgetForm.items.length === 0}
+                    >
+                      {createBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Budgets List */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Lista de Orçamentos ({budgets.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {budgets.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calculator className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Nenhum orçamento criado
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    Comece criando seu primeiro orçamento usando os produtos do catálogo.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {budgets.map((budget: any) => (
+                    <Card key={budget.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{budget.title}</CardTitle>
+                            <p className="text-sm text-gray-500">#{budget.budgetNumber}</p>
+                          </div>
+                          <Badge variant={
+                            budget.status === 'approved' ? 'default' : 
+                            budget.status === 'sent' ? 'secondary' : 
+                            budget.status === 'converted' ? 'outline' : 'secondary'
+                          }>
+                            {budget.status === 'draft' ? 'Rascunho' :
+                             budget.status === 'sent' ? 'Enviado' :
+                             budget.status === 'approved' ? 'Aprovado' :
+                             budget.status === 'converted' ? 'Convertido' : budget.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Valor Total:</span>
+                            <span className="font-semibold text-green-600">
+                              R$ {parseFloat(budget.totalValue || '0').toLocaleString('pt-BR', { 
+                                minimumFractionDigits: 2 
+                              })}
+                            </span>
+                          </div>
+                          {budget.hasCustomization && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Personalização:</span>
+                              <span className="text-sm font-medium">
+                                {budget.customizationPercentage}%
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Status:</span>
+                            <span className="text-sm">{budget.status}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-4">
+                          <Button size="sm" variant="outline" className="flex-1">
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                          {budget.status === 'approved' && (
+                            <Button 
+                              size="sm" 
+                              onClick={() => convertBudgetMutation.mutate(budget.id)}
+                              disabled={convertBudgetMutation.isPending}
+                              className="flex-1"
+                            >
+                              <ShoppingCart className="h-4 w-4 mr-1" />
+                              {convertBudgetMutation.isPending ? 'Convertendo...' : 'Converter'}
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
