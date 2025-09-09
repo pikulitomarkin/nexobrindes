@@ -77,15 +77,31 @@ export default function AdminProducts() {
         method: "POST",
         body: formData,
       });
-      if (!response.ok) throw new Error("Erro ao importar produtos");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao importar produtos");
+      }
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setIsImportDialogOpen(false);
+      
+      let description = `${data.imported} de ${data.total} produtos importados com sucesso`;
+      if (data.errors && data.errors.length > 0) {
+        description += `. ${data.errors.length} erros encontrados.`;
+      }
+      
       toast({
-        title: "Sucesso!",
-        description: `${data.imported} produtos importados com sucesso`,
+        title: "Importação Concluída!",
+        description,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro na Importação",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -137,11 +153,11 @@ export default function AdminProducts() {
                 Importar
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Importar Produtos</DialogTitle>
                 <DialogDescription>
-                  Faça upload de um arquivo JSON ou Excel com os produtos
+                  Faça upload de um arquivo JSON com os produtos. O sistema suporta a estrutura do XBZ Brindes.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -151,22 +167,70 @@ export default function AdminProducts() {
                     <div className="mt-4">
                       <label htmlFor="file-upload" className="cursor-pointer">
                         <span className="mt-2 block text-sm font-medium text-gray-900">
-                          Clique para fazer upload
+                          {importProductsMutation.isPending ? "Importando..." : "Clique para fazer upload"}
                         </span>
                       </label>
                       <input
                         id="file-upload"
                         name="file-upload"
                         type="file"
-                        accept=".json,.xlsx,.xls"
+                        accept=".json"
                         className="sr-only"
                         onChange={handleFileImport}
+                        disabled={importProductsMutation.isPending}
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      JSON, XLSX ou XLS até 10MB
+                      Arquivo JSON até 10MB
                     </p>
                   </div>
+                </div>
+                
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Formato JSON Esperado:</h4>
+                  <div className="text-xs text-blue-800 bg-blue-100 p-3 rounded font-mono overflow-x-auto">
+                    {`[
+  {
+    "Nome": "Nome do Produto",
+    "Descricao": "Descrição do produto",
+    "WebTipo": "Categoria",
+    "PrecoVenda": 10.90
+  }
+]`}
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Campos obrigatórios: <strong>Nome</strong> e <strong>PrecoVenda</strong>
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={() => {
+                      const exampleData = [
+                        {
+                          "Nome": "Caneca Personalizada",
+                          "Descricao": "Caneca de cerâmica branca 325ml para sublimação",
+                          "WebTipo": "Brindes",
+                          "PrecoVenda": 12.50
+                        },
+                        {
+                          "Nome": "Camiseta Básica",
+                          "Descricao": "Camiseta 100% algodão, disponível em várias cores",
+                          "WebTipo": "Vestuário",
+                          "PrecoVenda": 25.90
+                        }
+                      ];
+                      const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'exemplo-produtos.json';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Baixar Exemplo JSON
+                  </Button>
                 </div>
               </div>
             </DialogContent>

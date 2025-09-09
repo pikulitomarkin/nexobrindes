@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const users = await storage.getUsers();
       const vendors = users.filter(user => user.role === 'vendor');
-      
+
       const vendorsWithInfo = await Promise.all(
         vendors.map(async (vendor) => {
           const vendorInfo = await storage.getVendor(vendor.id);
@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vendors", async (req, res) => {
     try {
       const { name, email, username, commissionRate } = req.body;
-      
+
       // Create user
       const user = await storage.createUser({
         username,
@@ -201,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const { commissionRate } = req.body;
-      
+
       await storage.updateVendorCommission(vendorId, commissionRate);
       res.json({ success: true });
     } catch (error) {
@@ -308,6 +308,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch producer stats" });
+    }
+  });
+
+  // Products
+  app.get("/api/products", async (req, res) => {
+    try {
+      const products = await storage.getProducts();
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const productData = req.body;
+      const newProduct = await storage.createProduct(productData);
+      res.json(newProduct);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create product" });
+    }
+  });
+
+  app.post("/api/products/import", async (req, res) => {
+    try {
+      const multer = require('multer');
+      const upload = multer({ 
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+      });
+
+      // Use multer middleware for file upload
+      upload.single('file')(req, res, async (err) => {
+        if (err) {
+          return res.status(400).json({ error: "File upload error" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        try {
+          let productsData;
+          const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
+
+          if (fileExtension === 'json') {
+            // Parse JSON file
+            const fileContent = req.file.buffer.toString('utf8');
+            productsData = JSON.parse(fileContent);
+          } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+            // For Excel files, we'll need to install xlsx package
+            // For now, return an error asking for JSON
+            return res.status(400).json({ error: "Excel import not yet implemented. Please use JSON format." });
+          } else {
+            return res.status(400).json({ error: "Unsupported file format. Use JSON or Excel files." });
+          }
+
+          if (!Array.isArray(productsData)) {
+            return res.status(400).json({ error: "JSON file must contain an array of products" });
+          }
+
+          let imported = 0;
+          let errors = [];
+
+          for (const item of productsData) {
+            try {
+              // Map the JSON structure to our product schema
+              const productData = {
+                name: item.Nome || item.name || 'Produto Sem Nome',
+                description: item.Descricao || item.description || '',
+                category: item.WebTipo || item.category || 'Sem Categoria',
+                basePrice: (item.PrecoVenda || item.basePrice || 0).toString(),
+                unit: 'un', // Default unit
+                isActive: true
+              };
+
+              // Validate required fields
+              if (!productData.name || !productData.basePrice || productData.basePrice === '0') {
+                errors.push(`Produto "${productData.name}" ignorado: dados insuficientes`);
+                continue;
+              }
+
+              await storage.createProduct(productData);
+              imported++;
+            } catch (productError) {
+              errors.push(`Erro ao importar produto "${item.Nome || item.name}": ${productError.message}`);
+            }
+          }
+
+          res.json({
+            imported,
+            total: productsData.length,
+            errors: errors.slice(0, 10) // Limit error messages
+          });
+
+        } catch (parseError) {
+          res.status(400).json({ error: "Error parsing file: " + parseError.message });
+        }
+      });
+
+    } catch (error) {
+      res.status(500).json({ error: "Failed to import products" });
     }
   });
 

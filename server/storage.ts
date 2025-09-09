@@ -434,9 +434,10 @@ export class MemStorage implements IStorage {
 
   async createProduct(productData: any): Promise<any> {
     const newProduct = {
-      id: `product-${Date.now()}`,
+      id: `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...productData,
-      isActive: true,
+      basePrice: productData.basePrice.toString(), // Ensure it's a string
+      isActive: productData.isActive !== undefined ? productData.isActive : true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

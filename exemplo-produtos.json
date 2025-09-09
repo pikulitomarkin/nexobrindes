@@ -1,0 +1,21 @@
+
+[
+  {
+    "Nome": "Caneca Personalizada",
+    "Descricao": "Caneca de cerâmica branca 325ml para sublimação",
+    "WebTipo": "Brindes",
+    "PrecoVenda": 12.50
+  },
+  {
+    "Nome": "Camiseta Básica",
+    "Descricao": "Camiseta 100% algodão, disponível em várias cores",
+    "WebTipo": "Vestuário",
+    "PrecoVenda": 25.90
+  },
+  {
+    "Nome": "Mouse Pad Personalizado",
+    "Descricao": "Mouse pad retangular 23x19cm para sublimação",
+    "WebTipo": "Informática",
+    "PrecoVenda": 8.75
+  }
+]
