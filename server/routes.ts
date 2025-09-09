@@ -683,6 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendors = await storage.getVendors();
       res.json(vendors);
     } catch (error) {
+      console.log(error);
       res.status(500).json({ error: "Failed to fetch vendors" });
     }
   });
@@ -692,16 +693,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newVendor = await storage.createVendor(req.body);
       res.json(newVendor);
     } catch (error) {
+      console.log(error);
       res.status(500).json({ error: "Failed to create vendor" });
     }
   });
 
-  // Client routes
+  // Client routes  
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();
       res.json(clients);
     } catch (error) {
+      console.log(error);
       res.status(500).json({ error: "Failed to fetch clients" });
     }
   });
@@ -711,6 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newClient = await storage.createClient(req.body);
       res.json(newClient);
     } catch (error) {
+      console.log(error);
       res.status(500).json({ error: "Failed to create client" });
     }
   });

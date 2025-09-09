@@ -371,6 +371,7 @@ export class MemStorage implements IStorage {
       phone: null,
       vendorId: null,
       isActive: true,
+      email: vendorData.email || null,
       ...vendorData
     };
     
@@ -380,7 +381,7 @@ export class MemStorage implements IStorage {
     const vendorProfile: Vendor = {
       id: `vendor-profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId: newUser.id,
-      salesLink: null,
+      salesLink: vendorData.salesLink || null,
       commissionRate: vendorData.commissionRate || "10.00",
       isActive: true
     };
@@ -400,6 +401,7 @@ export class MemStorage implements IStorage {
       role: 'client',
       phone: null,
       isActive: true,
+      email: clientData.email || null,
       ...clientData
     };
     
