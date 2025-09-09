@@ -10,6 +10,9 @@ export const users = pgTable("users", {
   role: text("role").notNull(), // 'admin', 'vendor', 'client', 'producer', 'finance'
   name: text("name").notNull(),
   email: text("email"),
+  phone: text("phone"),
+  vendorId: varchar("vendor_id").references(() => users.id), // For clients: link to their assigned vendor
+  isActive: boolean("is_active").default(true),
 });
 
 export const orders = pgTable("orders", {
