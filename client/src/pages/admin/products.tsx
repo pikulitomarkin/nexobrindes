@@ -34,6 +34,9 @@ export default function AdminProducts() {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isVendorDialogOpen, setIsVendorDialogOpen] = useState(false);
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState(0);
@@ -68,6 +71,40 @@ export default function AdminProducts() {
     customizationDescription: "",
     items: [] as any[],
     photos: [] as string[]
+  });
+
+  // Vendor form state
+  const [vendorForm, setVendorForm] = useState({
+    name: "",
+    username: "",
+    password: "",
+    email: "",
+    phone: "",
+    commissionRate: "10.00",
+    isActive: true
+  });
+
+  // Client form state
+  const [clientForm, setClientForm] = useState({
+    name: "",
+    username: "",
+    password: "",
+    email: "",
+    phone: "",
+    vendorId: "",
+    isActive: true
+  });
+
+  // Order form state (reuse budget form structure but for direct orders)
+  const [orderForm, setOrderForm] = useState({
+    clientId: "",
+    vendorId: "",
+    description: "",
+    deadline: "",
+    hasCustomization: false,
+    customizationPercentage: "0",
+    customizationDescription: "",
+    items: [] as any[]
   });
 
   // Queries
@@ -276,6 +313,88 @@ export default function AdminProducts() {
         variant: "destructive"
       });
     }
+  });
+
+  // Vendor mutations
+  const createVendorMutation = useMutation({
+    mutationFn: async (vendorData: any) => {
+      const response = await fetch("/api/vendors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vendorData),
+      });
+      if (!response.ok) throw new Error("Erro ao criar vendedor");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Vendedor criado com sucesso!" });
+      setVendorForm({
+        name: "",
+        username: "",
+        password: "",
+        email: "",
+        phone: "",
+        commissionRate: "10.00",
+        isActive: true
+      });
+      setIsVendorDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+  });
+
+  // Client mutations
+  const createClientMutation = useMutation({
+    mutationFn: async (clientData: any) => {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clientData),
+      });
+      if (!response.ok) throw new Error("Erro ao criar cliente");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Cliente criado com sucesso!" });
+      setClientForm({
+        name: "",
+        username: "",
+        password: "",
+        email: "",
+        phone: "",
+        vendorId: "",
+        isActive: true
+      });
+      setIsClientDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+  });
+
+  // Order mutations
+  const createOrderMutation = useMutation({
+    mutationFn: async (orderData: any) => {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
+      if (!response.ok) throw new Error("Erro ao criar pedido");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Pedido criado com sucesso!" });
+      setOrderForm({
+        clientId: "",
+        vendorId: "",
+        description: "",
+        deadline: "",
+        hasCustomization: false,
+        customizationPercentage: "0",
+        customizationDescription: "",
+        items: []
+      });
+      setIsOrderDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
   });
 
   // Helper functions
@@ -491,7 +610,7 @@ export default function AdminProducts() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Produtos
@@ -499,6 +618,18 @@ export default function AdminProducts() {
           <TabsTrigger value="budgets" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Orçamentos
+          </TabsTrigger>
+          <TabsTrigger value="vendors" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Vendedores
+          </TabsTrigger>
+          <TabsTrigger value="clients" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Clientes
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Pedidos
           </TabsTrigger>
         </TabsList>
 
@@ -1363,6 +1494,507 @@ export default function AdminProducts() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Vendors Tab */}
+        <TabsContent value="vendors" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Gestão de Vendedores</h2>
+            <Dialog open={isVendorDialogOpen} onOpenChange={setIsVendorDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Vendedor
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Cadastrar Vendedor</DialogTitle>
+                  <DialogDescription>
+                    Adicione um novo vendedor ao sistema
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  createVendorMutation.mutate(vendorForm);
+                }} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="vendor-name">Nome</Label>
+                      <Input
+                        id="vendor-name"
+                        value={vendorForm.name}
+                        onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="vendor-username">Usuário</Label>
+                      <Input
+                        id="vendor-username"
+                        value={vendorForm.username}
+                        onChange={(e) => setVendorForm({ ...vendorForm, username: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="vendor-password">Senha</Label>
+                    <Input
+                      id="vendor-password"
+                      type="password"
+                      value={vendorForm.password}
+                      onChange={(e) => setVendorForm({ ...vendorForm, password: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="vendor-email">Email</Label>
+                      <Input
+                        id="vendor-email"
+                        type="email"
+                        value={vendorForm.email}
+                        onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="vendor-phone">Telefone</Label>
+                      <Input
+                        id="vendor-phone"
+                        value={vendorForm.phone}
+                        onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="vendor-commission">Taxa de Comissão (%)</Label>
+                    <Input
+                      id="vendor-commission"
+                      type="number"
+                      step="0.01"
+                      value={vendorForm.commissionRate}
+                      onChange={(e) => setVendorForm({ ...vendorForm, commissionRate: e.target.value })}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={createVendorMutation.isPending}>
+                    {createVendorMutation.isPending ? "Criando..." : "Criar Vendedor"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lista de Vendedores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {vendors.map((vendor: any) => (
+                  <Card key={vendor.id}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{vendor.name}</CardTitle>
+                      <Badge variant={vendor.isActive ? "default" : "secondary"}>
+                        {vendor.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Email:</span>
+                          <span className="text-sm">{vendor.email || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Telefone:</span>
+                          <span className="text-sm">{vendor.phone || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-500">Comissão:</span>
+                          <span className="text-sm">{vendor.commissionRate || "10.00"}%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Clients Tab */}
+        <TabsContent value="clients" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Gestão de Clientes</h2>
+            <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Cliente
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Cadastrar Cliente</DialogTitle>
+                  <DialogDescription>
+                    Adicione um novo cliente vinculado a um vendedor
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  createClientMutation.mutate(clientForm);
+                }} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="client-name">Nome</Label>
+                      <Input
+                        id="client-name"
+                        value={clientForm.name}
+                        onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="client-username">Usuário</Label>
+                      <Input
+                        id="client-username"
+                        value={clientForm.username}
+                        onChange={(e) => setClientForm({ ...clientForm, username: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="client-password">Senha</Label>
+                    <Input
+                      id="client-password"
+                      type="password"
+                      value={clientForm.password}
+                      onChange={(e) => setClientForm({ ...clientForm, password: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="client-vendor">Vendedor Responsável</Label>
+                    <Select value={clientForm.vendorId} onValueChange={(value) => setClientForm({ ...clientForm, vendorId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um vendedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendors.map((vendor: any) => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="client-email">Email</Label>
+                      <Input
+                        id="client-email"
+                        type="email"
+                        value={clientForm.email}
+                        onChange={(e) => setClientForm({ ...clientForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="client-phone">Telefone</Label>
+                      <Input
+                        id="client-phone"
+                        value={clientForm.phone}
+                        onChange={(e) => setClientForm({ ...clientForm, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={createClientMutation.isPending}>
+                    {createClientMutation.isPending ? "Criando..." : "Criar Cliente"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lista de Clientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {clients.map((client: any) => {
+                  const clientVendor = vendors.find((v: any) => v.id === client.vendorId);
+                  return (
+                    <Card key={client.id}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">{client.name}</CardTitle>
+                        <Badge variant={client.isActive ? "default" : "secondary"}>
+                          {client.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Email:</span>
+                            <span className="text-sm">{client.email || "N/A"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Telefone:</span>
+                            <span className="text-sm">{client.phone || "N/A"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Vendedor:</span>
+                            <span className="text-sm">{clientVendor?.name || "N/A"}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Orders Tab */}
+        <TabsContent value="orders" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Gestão de Pedidos</h2>
+            <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-orange-600 hover:bg-orange-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Pedido
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Pedido</DialogTitle>
+                  <DialogDescription>
+                    Crie um pedido usando os produtos do catálogo
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  createOrderMutation.mutate({
+                    ...orderForm,
+                    totalValue: orderForm.items.reduce((sum, item) => sum + parseFloat(item.totalPrice || '0'), 0)
+                  });
+                }} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="order-client">Cliente</Label>
+                      <Select value={orderForm.clientId} onValueChange={(value) => setOrderForm({ ...orderForm, clientId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client: any) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="order-vendor">Vendedor</Label>
+                      <Select value={orderForm.vendorId} onValueChange={(value) => setOrderForm({ ...orderForm, vendorId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um vendedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((vendor: any) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              {vendor.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="order-description">Descrição</Label>
+                    <Textarea
+                      id="order-description"
+                      value={orderForm.description}
+                      onChange={(e) => setOrderForm({ ...orderForm, description: e.target.value })}
+                      placeholder="Descreva os detalhes do pedido..."
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="order-deadline">Prazo de Entrega</Label>
+                    <Input
+                      id="order-deadline"
+                      type="datetime-local"
+                      value={orderForm.deadline}
+                      onChange={(e) => setOrderForm({ ...orderForm, deadline: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Customization Section - Same as Budget */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="order-customization"
+                        checked={orderForm.hasCustomization}
+                        onCheckedChange={(checked) => setOrderForm({ ...orderForm, hasCustomization: checked })}
+                      />
+                      <Label htmlFor="order-customization" className="flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        Aplicar Personalização
+                      </Label>
+                    </div>
+                    
+                    {orderForm.hasCustomization && (
+                      <div className="grid grid-cols-2 gap-4 bg-orange-50 p-4 rounded-lg">
+                        <div>
+                          <Label htmlFor="order-customization-percentage">Percentual (%)</Label>
+                          <Input
+                            id="order-customization-percentage"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={orderForm.customizationPercentage}
+                            onChange={(e) => setOrderForm({ ...orderForm, customizationPercentage: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="order-customization-description">Descrição da Personalização</Label>
+                          <Input
+                            id="order-customization-description"
+                            value={orderForm.customizationDescription}
+                            onChange={(e) => setOrderForm({ ...orderForm, customizationDescription: e.target.value })}
+                            placeholder="Ex: Gravação personalizada, cor especial..."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Product Selection - Reuse from Budget */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Produtos do Pedido</h3>
+                    
+                    {orderForm.items.length > 0 && (
+                      <div className="space-y-2">
+                        {orderForm.items.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                            <div>
+                              <p className="font-medium">{item.productName}</p>
+                              <p className="text-sm text-gray-500">
+                                {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
+                                R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setOrderForm({
+                                ...orderForm,
+                                items: orderForm.items.filter((_, i) => i !== index)
+                              })}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                          {products.map((product: any) => (
+                            <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
+                                 onClick={() => {
+                                   const existingItemIndex = orderForm.items.findIndex(item => item.productId === product.id);
+                                   if (existingItemIndex >= 0) {
+                                     const newItems = [...orderForm.items];
+                                     newItems[existingItemIndex].quantity += 1;
+                                     newItems[existingItemIndex].totalPrice = (newItems[existingItemIndex].quantity * parseFloat(product.basePrice)).toString();
+                                     setOrderForm({ ...orderForm, items: newItems });
+                                   } else {
+                                     setOrderForm({
+                                       ...orderForm,
+                                       items: [...orderForm.items, {
+                                         productId: product.id,
+                                         productName: product.name,
+                                         quantity: 1,
+                                         unitPrice: product.basePrice,
+                                         totalPrice: product.basePrice
+                                       }]
+                                     });
+                                   }
+                                 }}>
+                              <div className="flex items-center gap-2">
+                                {product.imageLink ? (
+                                  <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                    <Package className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center text-lg font-semibold">
+                      <span>Total do Pedido:</span>
+                      <span className="text-orange-600">
+                        R$ {orderForm.items.reduce((sum, item) => {
+                          const itemTotal = parseFloat(item.totalPrice || '0');
+                          const customizationAmount = orderForm.hasCustomization ? 
+                            itemTotal * (parseFloat(orderForm.customizationPercentage) / 100) : 0;
+                          return sum + itemTotal + customizationAmount;
+                        }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {orderForm.hasCustomization && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Inclui {orderForm.customizationPercentage}% de personalização
+                      </p>
+                    )}
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={createOrderMutation.isPending}>
+                    {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lista de Pedidos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Show orders here - need to fetch from API */}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
