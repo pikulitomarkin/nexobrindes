@@ -549,6 +549,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Budget PDF data endpoint
+  app.get("/api/budgets/:id/pdf-data", async (req, res) => {
+    try {
+      const budget = await storage.getBudget(req.params.id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Get budget items
+      const items = await storage.getBudgetItems(req.params.id);
+      
+      // Enrich items with product data
+      const enrichedItems = await Promise.all(
+        items.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          return {
+            ...item,
+            product: product || { name: 'Produto não encontrado', description: '', category: '' }
+          };
+        })
+      );
+
+      // Get client and vendor data
+      const client = await storage.getUser(budget.clientId);
+      const vendor = await storage.getUser(budget.vendorId);
+
+      res.json({
+        budget,
+        items: enrichedItems,
+        client: client || { name: 'Cliente não encontrado' },
+        vendor: vendor || { name: 'Vendedor não encontrado' }
+      });
+    } catch (error) {
+      console.error('Error fetching budget PDF data:', error);
+      res.status(500).json({ error: "Failed to fetch budget PDF data" });
+    }
+  });
+
   // Budget Items routes
   app.get("/api/budgets/:budgetId/items", async (req, res) => {
     try {

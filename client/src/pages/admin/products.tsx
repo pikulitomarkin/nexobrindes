@@ -15,10 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { 
   Plus, Upload, FileText, Search, Edit, Trash2, Package, 
-  Calculator, Eye, Users, ShoppingCart, Image, Percent
+  Calculator, Eye, Users, ShoppingCart, Image, Percent,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { PDFGenerator, type BudgetPDFData } from "@/utils/pdfGenerator";
 
 export default function AdminProducts() {
   const { toast } = useToast();
@@ -232,6 +234,46 @@ export default function AdminProducts() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     },
+  });
+
+  const generatePDFMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}/pdf-data`);
+      if (!response.ok) throw new Error("Erro ao buscar dados do orçamento");
+      return response.json() as BudgetPDFData;
+    },
+    onSuccess: async (data) => {
+      try {
+        const pdfGenerator = new PDFGenerator();
+        const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
+        
+        // Create download link
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `orcamento-${data.budget.budgetNumber}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({ title: "Sucesso", description: "PDF gerado com sucesso!" });
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao gerar PDF. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar dados do orçamento.",
+        variant: "destructive"
+      });
+    }
   });
 
   // Helper functions
@@ -1224,6 +1266,17 @@ export default function AdminProducts() {
                           <Button size="sm" variant="outline" className="flex-1">
                             <Eye className="h-4 w-4 mr-1" />
                             Ver
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => generatePDFMutation.mutate(budget.id)}
+                            disabled={generatePDFMutation.isPending}
+                            className="flex-1"
+                            data-testid={`button-pdf-${budget.id}`}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            {generatePDFMutation.isPending ? 'Gerando...' : 'PDF'}
                           </Button>
                           {budget.status === 'approved' && (
                             <Button 
