@@ -24,6 +24,7 @@ let mockBudgetPhotos: any[] = [];
 
 export interface IStorage {
   // Users
+  getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -347,6 +348,11 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  // User methods
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
