@@ -7,35 +7,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
       const orders = await storage.getOrders();
-      const users = await storage.getUsersByRole("vendor");
+      const users = await storage.getUsers();
       const payments = await storage.getPayments();
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const ordersToday = orders.filter(order => {
-        const orderDate = new Date(order.createdAt);
-        orderDate.setHours(0, 0, 0, 0);
-        return orderDate.getTime() === today.getTime();
-      }).length;
+      const products = await storage.getProducts();
+      const budgets = await storage.getBudgets();
 
-      const inProduction = orders.filter(order => order.status === "production").length;
-      
+      const today = new Date().toDateString();
+      const ordersToday = orders.filter(order => 
+        new Date(order.createdAt).toDateString() === today
+      ).length;
+
+      const inProduction = orders.filter(order => 
+        order.status === 'production'
+      ).length;
+
       const monthlyRevenue = orders
         .filter(order => {
           const orderMonth = new Date(order.createdAt).getMonth();
           const currentMonth = new Date().getMonth();
-          return orderMonth === currentMonth;
+          return orderMonth === currentMonth && order.status !== 'cancelled';
         })
         .reduce((total, order) => total + parseFloat(order.totalValue), 0);
 
-      const activeVendors = users.length;
+      const pendingPayments = payments
+        .filter(payment => payment.status === 'pending')
+        .reduce((total, payment) => total + parseFloat(payment.amount), 0);
 
       res.json({
         ordersToday,
-        inProduction, 
+        inProduction,
         monthlyRevenue,
-        activeVendors
+        pendingPayments,
+        totalOrders: orders.length,
+        totalClients: users.filter(u => u.role === 'client').length,
+        totalVendors: users.filter(u => u.role === 'vendor').length,
+        totalProducers: users.filter(u => u.role === 'producer').length,
+        totalProducts: products.length,
+        totalBudgets: budgets.length
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
@@ -46,14 +54,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
-      
+
       // Enrich with user data
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           return {
             ...order,
             clientName: client?.name || 'Unknown',
@@ -62,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch orders" });
@@ -73,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const orders = await storage.getOrdersByVendor(vendorId);
-      
+
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
@@ -83,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor orders" });
@@ -94,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
       const orders = await storage.getOrdersByClient(clientId);
-      
+
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const vendor = await storage.getUser(order.vendorId);
@@ -106,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client orders" });
@@ -118,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { producerId } = req.params;
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      
+
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
           const order = await storage.getOrder(po.orderId);
@@ -129,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch production orders" });
@@ -143,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendor = await storage.getVendor(userId);
       const orders = await storage.getOrdersByVendor(userId);
       const commissions = await storage.getCommissionsByVendor(userId);
-      
+
       const monthlySales = orders
         .filter(order => {
           const orderMonth = new Date(order.createdAt).getMonth();
@@ -172,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orders = await storage.getOrders();
       const payments = await storage.getPayments();
       const commissions = await storage.getCommissionsByVendor("");
-      
+
       const receivables = orders
         .filter(order => order.status !== 'cancelled')
         .reduce((total, order) => total + (parseFloat(order.totalValue) - parseFloat(order.paidValue)), 0);
@@ -197,12 +205,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/payments", async (req, res) => {
     try {
       const payments = await storage.getPayments();
-      
+
       const enrichedPayments = await Promise.all(
         payments.map(async (payment) => {
           const order = await storage.getOrder(payment.orderId);
           const client = order ? await storage.getUser(order.clientId) : null;
-          
+
           return {
             ...payment,
             orderNumber: order?.orderNumber || 'Unknown',
@@ -211,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedPayments);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch payments" });
@@ -223,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { producerId } = req.params;
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      
+
       const activeOrders = productionOrders.filter(po => po.status === 'production' || po.status === 'accepted').length;
       const pendingOrders = productionOrders.filter(po => po.status === 'pending').length;
       const completedOrders = productionOrders.filter(po => po.status === 'completed').length;

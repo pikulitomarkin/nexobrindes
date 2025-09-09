@@ -14,6 +14,12 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
+// Mock data for orders, budgets, and products (to be replaced with actual storage operations)
+let mockOrders: Order[] = [];
+let mockBudgets: any[] = [];
+let mockProducts: any[] = [];
+
+
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -47,6 +53,16 @@ export interface IStorage {
   // Vendors
   getVendor(userId: string): Promise<Vendor | undefined>;
   createVendor(vendor: InsertVendor): Promise<Vendor>;
+
+  // Products
+  getProducts(): Promise<any[]>;
+  createProduct(productData: any): Promise<any>;
+
+  // Budgets
+  getBudgets(): Promise<any[]>;
+  getBudgetsByVendor(vendorId: string): Promise<any[]>;
+  createBudget(budgetData: any): Promise<any>;
+  convertBudgetToOrder(budgetId: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -129,7 +145,7 @@ export class MemStorage implements IStorage {
     this.vendors.set(vendor.id, vendor);
 
     // Create sample orders
-    const sampleOrders: Order[] = [
+    mockOrders = [
       {
         id: "order-1",
         orderNumber: "#12345",
@@ -162,7 +178,7 @@ export class MemStorage implements IStorage {
       }
     ];
 
-    sampleOrders.forEach(order => {
+    mockOrders.forEach(order => {
       this.orders.set(order.id, order);
     });
 
@@ -204,6 +220,70 @@ export class MemStorage implements IStorage {
       createdAt: new Date("2024-11-15")
     };
     this.commissions.set(commission.id, commission);
+
+    // Initialize mock budgets
+    mockBudgets = [
+      {
+        id: 'budget-1',
+        budgetNumber: 'ORC-001',
+        clientId: 'client-1',
+        vendorId: 'vendor-1',
+        title: 'Móveis para Sala de Jantar',
+        description: 'Conjunto completo para sala de jantar',
+        totalValue: '8500.00',
+        status: 'sent',
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'budget-2',
+        budgetNumber: 'ORC-002',
+        clientId: 'client-2',
+        vendorId: 'vendor-1',
+        title: 'Estante Personalizada',
+        description: 'Estante sob medida para escritório',
+        totalValue: '3200.00',
+        status: 'approved',
+        validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // Initialize mock products
+    mockProducts = [
+      {
+        id: 'product-1',
+        name: 'Mesa de Jantar Clássica',
+        description: 'Mesa de madeira maciça com acabamento premium',
+        category: 'Móveis',
+        basePrice: '2500.00',
+        unit: 'un',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'product-2',
+        name: 'Cadeira Estofada',
+        description: 'Cadeira com estofado em couro sintético',
+        category: 'Móveis',
+        basePrice: '450.00',
+        unit: 'un',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'product-3',
+        name: 'Estante Modular',
+        description: 'Estante com módulos personalizáveis',
+        category: 'Móveis',
+        basePrice: '1200.00',
+        unit: 'm',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      }
+    ];
   }
 
   // User methods
@@ -337,6 +417,72 @@ export class MemStorage implements IStorage {
     const vendor: Vendor = { ...insertVendor, id };
     this.vendors.set(id, vendor);
     return vendor;
+  }
+
+  // Product methods
+  async getProducts(): Promise<any[]> {
+    return mockProducts;
+  }
+
+  async createProduct(productData: any): Promise<any> {
+    const newProduct = {
+      id: `product-${Date.now()}`,
+      ...productData,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    mockProducts.push(newProduct); // Add to mockProducts
+    return newProduct;
+  }
+
+  // Budget methods
+  async getBudgets(): Promise<any[]> {
+    return mockBudgets;
+  }
+
+  async getBudgetsByVendor(vendorId: string): Promise<any[]> {
+    return mockBudgets.filter(budget => budget.vendorId === vendorId);
+  }
+
+  async createBudget(budgetData: any): Promise<any> {
+    const newBudget = {
+      id: `budget-${Date.now()}`,
+      budgetNumber: `ORC-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+      ...budgetData,
+      totalValue: '0.00',
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    mockBudgets.push(newBudget); // Add to mockBudgets
+    return newBudget;
+  }
+
+  async convertBudgetToOrder(budgetId: string): Promise<any> {
+    const budget = mockBudgets.find(b => b.id === budgetId);
+
+    if (!budget) {
+      throw new Error('Budget not found');
+    }
+
+    const newOrder: Order = {
+      id: `order-${Date.now()}`,
+      orderNumber: `#${Math.floor(Math.random() * 100000)}`,
+      clientId: budget.clientId,
+      vendorId: budget.vendorId,
+      product: budget.title,
+      description: budget.description,
+      totalValue: budget.totalValue,
+      paidValue: '0',
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    mockOrders.push(newOrder); // Add to mockOrders
+    this.orders.set(newOrder.id, newOrder); // Also update the map
+    return newOrder;
   }
 }
 

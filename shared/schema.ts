@@ -69,6 +69,42 @@ export const vendors = pgTable("vendors", {
   isActive: boolean("is_active").default(true),
 });
 
+export const products = pgTable("products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
+  unit: text("unit").default('un'),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const budgets = pgTable("budgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetNumber: text("budget_number").notNull().unique(),
+  clientId: varchar("client_id").references(() => users.id).notNull(),
+  vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default('draft'), // 'draft', 'sent', 'approved', 'rejected', 'converted'
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const budgetItems = pgTable("budget_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").references(() => budgets.id).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
@@ -76,6 +112,9 @@ export const insertProductionOrderSchema = createInsertSchema(productionOrders).
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 export const insertCommissionSchema = createInsertSchema(commissions).omit({ id: true, createdAt: true });
 export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true });
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -90,3 +129,9 @@ export type Commission = typeof commissions.$inferSelect;
 export type InsertCommission = z.infer<typeof insertCommissionSchema>;
 export type Vendor = typeof vendors.$inferSelect;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Budget = typeof budgets.$inferSelect;
+export type InsertBudget = z.infer<typeof insertBudgetSchema>;
+export type BudgetItem = typeof budgetItems.$inferSelect;
+export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;

@@ -14,7 +14,8 @@ import {
   Factory,
   TrendingUp,
   FileText,
-  Archive
+  Archive,
+  Package
 } from "lucide-react";
 
 export default function AdminPanel() {
@@ -34,7 +35,7 @@ export default function AdminPanel() {
       cancelled: "status-badge status-cancelled",
       confirmed: "status-badge status-confirmed",
     };
-    
+
     const statusLabels = {
       pending: "Aguardando",
       production: "Em Produção",
@@ -42,7 +43,7 @@ export default function AdminPanel() {
       cancelled: "Cancelado",
       confirmed: "Confirmado",
     };
-    
+
     return (
       <span className={statusClasses[status as keyof typeof statusClasses] || "status-badge"}>
         {statusLabels[status as keyof typeof statusLabels] || status}
@@ -173,21 +174,27 @@ export default function AdminPanel() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              Operacional
+              <Package className="h-5 w-5 mr-2" />
+              Gestão de Vendas
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Link href="/admin/orders">
+            <Link href="/admin/products">
               <Button className="w-full justify-start gradient-bg text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Gerenciar Pedidos ({stats?.totalOrders || 0})
+                <Package className="h-4 w-4 mr-2" />
+                Produtos ({stats?.totalProducts || 0})
               </Button>
             </Link>
-            <Link href="/admin/finance">
+            <Link href="/admin/budgets">
               <Button variant="outline" className="w-full justify-start">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Visão Financeira
+                <FileText className="h-4 w-4 mr-2" />
+                Orçamentos ({stats?.totalBudgets || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/orders">
+              <Button variant="outline" className="w-full justify-start">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Pedidos ({stats?.totalOrders || 0})
               </Button>
             </Link>
           </CardContent>

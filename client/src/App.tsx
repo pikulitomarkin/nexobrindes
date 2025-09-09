@@ -12,11 +12,15 @@ import AdminClients from "@/pages/admin/clients";
 import AdminOrders from "@/pages/admin/orders";
 import AdminProducers from "@/pages/admin/producers";
 import AdminFinance from "@/pages/admin/finance";
+import AdminProducts from "@/pages/admin/products";
+import AdminBudgets from "@/pages/admin/budgets";
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
 import VendorClients from "@/pages/vendor/clients";
 import VendorCommissions from "@/pages/vendor/commissions";
+import VendorProducts from "@/pages/vendor/products";
+import VendorBudgets from "@/pages/vendor/budgets";
 
 // Client pages
 import ClientOrders from "@/pages/client/orders";
@@ -33,29 +37,33 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/dashboard" component={Dashboard} />
-      
+
       {/* Admin Routes */}
+      <Route path="/admin/products" component={AdminProducts} />
+      <Route path="/admin/budgets" component={AdminBudgets} />
+      <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/vendors" component={AdminVendors} />
       <Route path="/admin/clients" component={AdminClients} />
-      <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/producers" component={AdminProducers} />
       <Route path="/admin/finance" component={AdminFinance} />
-      
+
       {/* Vendor Routes */}
+      <Route path="/vendor/products" component={VendorProducts} />
+      <Route path="/vendor/budgets" component={VendorBudgets} />
       <Route path="/vendor/orders" component={VendorOrders} />
       <Route path="/vendor/clients" component={VendorClients} />
       <Route path="/vendor/commissions" component={VendorCommissions} />
-      
+
       {/* Client Routes */}
       <Route path="/client/orders" component={ClientOrders} />
-      
+
       {/* Producer Routes */}
       <Route path="/producer/orders" component={ProducerOrders} />
-      
+
       {/* Finance Routes */}
       <Route path="/finance/payments" component={FinancePayments} />
       <Route path="/finance/reconciliation" component={FinanceReconciliation} />
-      
+
       <Route component={NotFound} />
     </Switch>
   );

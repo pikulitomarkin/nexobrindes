@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, ShoppingCart, Users, DollarSign } from "lucide-react";
+import { Copy, ShoppingCart, Users, DollarSign, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function VendorPanel() {
@@ -131,13 +131,32 @@ export default function VendorPanel() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <ShoppingCart className="h-5 w-5 mr-2" />
-              Meus Pedidos
+              Vendas & Orçamentos
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Link href="/vendor/orders">
+            <Link href="/vendor/products">
               <Button className="w-full justify-start gradient-bg text-white">
-                Ver Todos os Pedidos ({(orders as any)?.length || 0})
+                <Package className="h-4 w-4 mr-2" />
+                Catálogo de Produtos
+              </Button>
+            </Link>
+            <Link href="/vendor/budgets">
+              <Button variant="outline" className="w-full justify-start">
+                <FileText className="h-4 w-4 mr-2" />
+                Meus Orçamentos
+              </Button>
+            </Link>
+            <Link href="/vendor/orders">
+              <Button variant="outline" className="w-full justify-start">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Pedidos ({vendorInfo?.confirmedOrders || 0})
+              </Button>
+            </Link>
+            <Link href="/vendor/commissions">
+              <Button variant="outline" className="w-full justify-start">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Comissões
               </Button>
             </Link>
           </CardContent>
