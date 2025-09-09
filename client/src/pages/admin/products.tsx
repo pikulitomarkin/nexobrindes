@@ -29,6 +29,8 @@ export default function AdminProducts() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [budgetProductSearch, setBudgetProductSearch] = useState("");
+  const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -434,6 +436,19 @@ export default function AdminProducts() {
   const products = productsData?.products || [];
   const totalProducts = productsData?.total || 0;
   const totalPages = productsData?.totalPages || 1;
+
+  // Filter products for budget creation
+  const filteredBudgetProducts = products.filter((product: any) => {
+    const matchesSearch = !budgetProductSearch || 
+      product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+      product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+      product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
+    
+    const matchesCategory = budgetCategoryFilter === "all" || 
+      product.category === budgetCategoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
   
   const budgets = budgetsQuery.data || [];
   const users = usersQuery.data || [];
@@ -1133,27 +1148,80 @@ export default function AdminProducts() {
                         <CardTitle className="text-base">Adicionar Produtos</CardTitle>
                       </CardHeader>
                       <CardContent>
+                        {/* Budget Product Search */}
+                        <div className="mb-4 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                              <Input
+                                placeholder="Buscar produtos..."
+                                value={budgetProductSearch}
+                                onChange={(e) => setBudgetProductSearch(e.target.value)}
+                                className="pl-9"
+                                data-testid="input-budget-product-search"
+                              />
+                            </div>
+                            <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
+                              <SelectTrigger data-testid="select-budget-category">
+                                <SelectValue placeholder="Categoria" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.map((category) => (
+                                  <SelectItem key={category} value={category}>
+                                    {category === "all" ? "Todas as Categorias" : category}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-500">
+                            <span>{filteredBudgetProducts.length} produtos encontrados</span>
+                            {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                  setBudgetProductSearch("");
+                                  setBudgetCategoryFilter("all");
+                                }}
+                              >
+                                Limpar filtros
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                          {products.map((product: any) => (
-                            <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
-                                 onClick={() => addProductToBudget(product)}>
-                              <div className="flex items-center gap-2">
-                                {product.imageLink ? (
-                                  <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
-                                ) : (
-                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                    <Package className="h-4 w-4 text-gray-400" />
+                          {filteredBudgetProducts.length === 0 ? (
+                            <div className="col-span-full text-center py-8">
+                              <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                              <p className="text-gray-500">
+                                {budgetProductSearch || budgetCategoryFilter !== "all" ? 
+                                  "Nenhum produto encontrado com os filtros aplicados" : 
+                                  "Nenhum produto disponível"}
+                              </p>
+                            </div>
+                          ) : (
+                            filteredBudgetProducts.map((product: any) => (
+                              <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
+                                   onClick={() => addProductToBudget(product)}>
+                                <div className="flex items-center gap-2">
+                                  {product.imageLink ? (
+                                    <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                      <Package className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{product.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
                                   </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{product.name}</p>
-                                  <p className="text-xs text-gray-500">
-                                    R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                  </p>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ))
+                          )}
                         </div>
                       </CardContent>
                     </Card>
