@@ -338,6 +338,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
   });
 
+  // Additional product routes
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    try {
+      const updatedProduct = await storage.updateProduct(req.params.id, req.body);
+      res.json(updatedProduct);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProduct(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
   app.post("/api/products/import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
@@ -348,7 +382,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
 
       if (fileExtension === 'json') {
-        // Parse JSON file
         const fileContent = req.file.buffer.toString('utf8');
         productsData = JSON.parse(fileContent);
       } else {
@@ -359,43 +392,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "O arquivo JSON deve conter um array de produtos" });
       }
 
-      let imported = 0;
-      let errors = [];
-
-      for (const item of productsData) {
-        try {
-          // Map the JSON structure to our product schema
-          const productData = {
-            name: item.Nome || item.name || 'Produto Sem Nome',
-            description: item.Descricao || item.description || '',
-            category: item.WebTipo || item.category || 'Sem Categoria',
-            basePrice: (item.PrecoVenda || item.basePrice || 0).toString(),
-            unit: 'un', // Default unit
-            isActive: true
-          };
-
-          // Validate required fields
-          if (!productData.name || !productData.basePrice || productData.basePrice === '0') {
-            errors.push(`Produto "${productData.name}" ignorado: dados insuficientes`);
-            continue;
-          }
-
-          await storage.createProduct(productData);
-          imported++;
-        } catch (productError) {
-          errors.push(`Erro ao importar produto "${item.Nome || item.name}": ${productError.message}`);
-        }
-      }
-
+      const result = await storage.importProducts(productsData);
       res.json({
-        imported,
-        total: productsData.length,
-        errors: errors.slice(0, 10) // Limit error messages
+        message: `${result.imported} produtos importados com sucesso`,
+        imported: result.imported,
+        errors: result.errors
       });
+    } catch (error) {
+      res.status(400).json({ 
+        error: "Erro ao processar arquivo JSON",
+        details: (error as Error).message
+      });
+    }
+  });
 
-    } catch (parseError) {
-      console.error('Import error:', parseError);
-      res.status(400).json({ error: "Erro ao processar arquivo: " + parseError.message });
+  // Budget routes
+  app.get("/api/budgets", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgets();
+      res.json(budgets);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch budgets" });
+    }
+  });
+
+  app.get("/api/budgets/:id", async (req, res) => {
+    try {
+      const budget = await storage.getBudget(req.params.id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+      
+      // Include items and photos
+      const items = await storage.getBudgetItems(req.params.id);
+      const photos = await storage.getBudgetPhotos(req.params.id);
+      
+      res.json({
+        ...budget,
+        items,
+        photos
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch budget" });
+    }
+  });
+
+  app.post("/api/budgets", async (req, res) => {
+    try {
+      const newBudget = await storage.createBudget(req.body);
+      res.json(newBudget);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create budget" });
+    }
+  });
+
+  app.put("/api/budgets/:id", async (req, res) => {
+    try {
+      const updatedBudget = await storage.updateBudget(req.params.id, req.body);
+      res.json(updatedBudget);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update budget" });
+    }
+  });
+
+  app.delete("/api/budgets/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBudget(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete budget" });
+    }
+  });
+
+  app.post("/api/budgets/:id/convert", async (req, res) => {
+    try {
+      const order = await storage.convertBudgetToOrder(req.params.id);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to convert budget to order" });
+    }
+  });
+
+  // Budget Items routes
+  app.get("/api/budgets/:budgetId/items", async (req, res) => {
+    try {
+      const items = await storage.getBudgetItems(req.params.budgetId);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch budget items" });
+    }
+  });
+
+  app.post("/api/budgets/:budgetId/items", async (req, res) => {
+    try {
+      const newItem = await storage.createBudgetItem(req.params.budgetId, req.body);
+      res.json(newItem);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create budget item" });
+    }
+  });
+
+  app.put("/api/budget-items/:id", async (req, res) => {
+    try {
+      const updatedItem = await storage.updateBudgetItem(req.params.id, req.body);
+      res.json(updatedItem);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update budget item" });
+    }
+  });
+
+  app.delete("/api/budget-items/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBudgetItem(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Item não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete budget item" });
+    }
+  });
+
+  // Budget Photos routes
+  app.get("/api/budgets/:budgetId/photos", async (req, res) => {
+    try {
+      const photos = await storage.getBudgetPhotos(req.params.budgetId);
+      res.json(photos);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch budget photos" });
+    }
+  });
+
+  app.post("/api/budgets/:budgetId/photos", async (req, res) => {
+    try {
+      const newPhoto = await storage.createBudgetPhoto(req.params.budgetId, req.body);
+      res.json(newPhoto);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create budget photo" });
+    }
+  });
+
+  app.delete("/api/budget-photos/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBudgetPhoto(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Foto não encontrada" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete budget photo" });
+    }
+  });
+
+  // Routes by role
+  app.get("/api/vendor/:vendorId/budgets", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
+      res.json(budgets);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch vendor budgets" });
+    }
+  });
+
+  app.get("/api/client/:clientId/budgets", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgetsByClient(req.params.clientId);
+      res.json(budgets);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch client budgets" });
     }
   });
 

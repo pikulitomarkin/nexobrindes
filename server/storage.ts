@@ -18,6 +18,8 @@ import { randomUUID } from "crypto";
 let mockOrders: Order[] = [];
 let mockBudgets: any[] = [];
 let mockProducts: any[] = [];
+let mockBudgetItems: any[] = [];
+let mockBudgetPhotos: any[] = [];
 
 
 export interface IStorage {
@@ -451,6 +453,10 @@ export class MemStorage implements IStorage {
     return mockProducts;
   }
 
+  async getProduct(id: string): Promise<any> {
+    return mockProducts.find(product => product.id === id);
+  }
+
   async createProduct(productData: any): Promise<any> {
     const newProduct = {
       id: `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -464,13 +470,92 @@ export class MemStorage implements IStorage {
     return newProduct;
   }
 
+  async updateProduct(id: string, productData: any): Promise<any> {
+    const productIndex = mockProducts.findIndex(product => product.id === id);
+    if (productIndex === -1) {
+      throw new Error('Product not found');
+    }
+
+    const updatedProduct = {
+      ...mockProducts[productIndex],
+      ...productData,
+      updatedAt: new Date().toISOString()
+    };
+    mockProducts[productIndex] = updatedProduct;
+    return updatedProduct;
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    const productIndex = mockProducts.findIndex(product => product.id === id);
+    if (productIndex === -1) {
+      return false;
+    }
+
+    mockProducts.splice(productIndex, 1);
+    return true;
+  }
+
+  async importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }> {
+    let imported = 0;
+    const errors: any[] = [];
+
+    for (const item of productsData) {
+      try {
+        // Map the JSON structure to our product schema
+        const productData = {
+          name: item.Nome || item.name || 'Produto Sem Nome',
+          description: item.Descricao || item.description || '',
+          category: item.WebTipo || item.category || 'Sem Categoria',
+          basePrice: (item.PrecoVenda || item.basePrice || 0).toString(),
+          unit: 'un',
+          isActive: true,
+          
+          // Campos específicos do JSON XBZ
+          externalId: item.IdProduto?.toString(),
+          externalCode: item.CodigoXbz,
+          compositeCode: item.CodigoComposto,
+          friendlyCode: item.CodigoAmigavel,
+          siteLink: item.SiteLink,
+          imageLink: item.ImageLink,
+          mainColor: item.CorWebPrincipal,
+          secondaryColor: item.CorWebSecundaria,
+          weight: item.Peso?.toString(),
+          height: item.Altura?.toString(),
+          width: item.Largura?.toString(),
+          depth: item.Profundidade?.toString(),
+          availableQuantity: item.QuantidadeDisponivel,
+          stockStatus: item.StatusConfiabilidade,
+          ncm: item.Ncm
+        };
+
+        await this.createProduct(productData);
+        imported++;
+      } catch (error) {
+        errors.push({
+          item: item.Nome || item.name || 'Produto sem nome',
+          error: (error as Error).message
+        });
+      }
+    }
+
+    return { imported, errors };
+  }
+
   // Budget methods
   async getBudgets(): Promise<any[]> {
     return mockBudgets;
   }
 
+  async getBudget(id: string): Promise<any> {
+    return mockBudgets.find(budget => budget.id === id);
+  }
+
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
     return mockBudgets.filter(budget => budget.vendorId === vendorId);
+  }
+
+  async getBudgetsByClient(clientId: string): Promise<any[]> {
+    return mockBudgets.filter(budget => budget.clientId === clientId);
   }
 
   async createBudget(budgetData: any): Promise<any> {
@@ -478,13 +563,45 @@ export class MemStorage implements IStorage {
       id: `budget-${Date.now()}`,
       budgetNumber: `ORC-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
       ...budgetData,
-      totalValue: '0.00',
-      status: 'draft',
+      totalValue: budgetData.totalValue || '0.00',
+      status: budgetData.status || 'draft',
+      hasCustomization: budgetData.hasCustomization || false,
+      customizationPercentage: budgetData.customizationPercentage || '0.00',
+      customizationValue: budgetData.customizationValue || '0.00',
+      customizationDescription: budgetData.customizationDescription || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    mockBudgets.push(newBudget); // Add to mockBudgets
+    mockBudgets.push(newBudget);
     return newBudget;
+  }
+
+  async updateBudget(id: string, budgetData: any): Promise<any> {
+    const budgetIndex = mockBudgets.findIndex(budget => budget.id === id);
+    if (budgetIndex === -1) {
+      throw new Error('Budget not found');
+    }
+
+    const updatedBudget = {
+      ...mockBudgets[budgetIndex],
+      ...budgetData,
+      updatedAt: new Date().toISOString()
+    };
+    mockBudgets[budgetIndex] = updatedBudget;
+    return updatedBudget;
+  }
+
+  async deleteBudget(id: string): Promise<boolean> {
+    const budgetIndex = mockBudgets.findIndex(budget => budget.id === id);
+    if (budgetIndex === -1) {
+      return false;
+    }
+
+    // Also delete related items and photos
+    mockBudgetItems = mockBudgetItems.filter(item => item.budgetId !== id);
+    mockBudgetPhotos = mockBudgetPhotos.filter(photo => photo.budgetId !== id);
+    mockBudgets.splice(budgetIndex, 1);
+    return true;
   }
 
   async convertBudgetToOrder(budgetId: string): Promise<any> {
@@ -493,6 +610,9 @@ export class MemStorage implements IStorage {
     if (!budget) {
       throw new Error('Budget not found');
     }
+
+    // Mark budget as converted
+    await this.updateBudget(budgetId, { status: 'converted' });
 
     const newOrder: Order = {
       id: `order-${Date.now()}`,
@@ -508,9 +628,128 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    mockOrders.push(newOrder); // Add to mockOrders
-    this.orders.set(newOrder.id, newOrder); // Also update the map
+    mockOrders.push(newOrder);
+    this.orders.set(newOrder.id, newOrder);
     return newOrder;
+  }
+
+  // Budget Items methods
+  async getBudgetItems(budgetId: string): Promise<any[]> {
+    return mockBudgetItems.filter(item => item.budgetId === budgetId);
+  }
+
+  async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
+    const newItem = {
+      id: `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      budgetId,
+      ...itemData,
+      hasItemCustomization: itemData.hasItemCustomization || false,
+      itemCustomizationPercentage: itemData.itemCustomizationPercentage || '0.00',
+      itemCustomizationDescription: itemData.itemCustomizationDescription || ''
+    };
+    mockBudgetItems.push(newItem);
+
+    // Recalculate budget total
+    await this.recalculateBudgetTotal(budgetId);
+    
+    return newItem;
+  }
+
+  async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
+    const itemIndex = mockBudgetItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+      throw new Error('Budget item not found');
+    }
+
+    const updatedItem = {
+      ...mockBudgetItems[itemIndex],
+      ...itemData
+    };
+    mockBudgetItems[itemIndex] = updatedItem;
+
+    // Recalculate budget total
+    await this.recalculateBudgetTotal(updatedItem.budgetId);
+    
+    return updatedItem;
+  }
+
+  async deleteBudgetItem(itemId: string): Promise<boolean> {
+    const itemIndex = mockBudgetItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+      return false;
+    }
+
+    const budgetId = mockBudgetItems[itemIndex].budgetId;
+    mockBudgetItems.splice(itemIndex, 1);
+
+    // Recalculate budget total
+    await this.recalculateBudgetTotal(budgetId);
+    
+    return true;
+  }
+
+  // Budget Photos methods
+  async getBudgetPhotos(budgetId: string): Promise<any[]> {
+    return mockBudgetPhotos.filter(photo => photo.budgetId === budgetId);
+  }
+
+  async createBudgetPhoto(budgetId: string, photoData: any): Promise<any> {
+    const newPhoto = {
+      id: `budget-photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      budgetId,
+      ...photoData,
+      uploadedAt: new Date().toISOString()
+    };
+    mockBudgetPhotos.push(newPhoto);
+    return newPhoto;
+  }
+
+  async deleteBudgetPhoto(photoId: string): Promise<boolean> {
+    const photoIndex = mockBudgetPhotos.findIndex(photo => photo.id === photoId);
+    if (photoIndex === -1) {
+      return false;
+    }
+
+    mockBudgetPhotos.splice(photoIndex, 1);
+    return true;
+  }
+
+  // Helper method to recalculate budget total
+  private async recalculateBudgetTotal(budgetId: string): Promise<void> {
+    const budget = await this.getBudget(budgetId);
+    const items = await this.getBudgetItems(budgetId);
+    
+    if (!budget) return;
+
+    let subtotal = items.reduce((sum, item) => {
+      const itemPrice = parseFloat(item.totalPrice || '0');
+      
+      // Apply item customization if applicable
+      if (item.hasItemCustomization) {
+        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
+        const customizationAmount = itemPrice * (customizationPercentage / 100);
+        return sum + itemPrice + customizationAmount;
+      }
+      
+      return sum + itemPrice;
+    }, 0);
+
+    // Apply global customization if applicable
+    if (budget.hasCustomization) {
+      const customizationPercentage = parseFloat(budget.customizationPercentage || '0');
+      const customizationAmount = subtotal * (customizationPercentage / 100);
+      subtotal += customizationAmount;
+      
+      // Update customization value
+      await this.updateBudget(budgetId, {
+        customizationValue: customizationAmount.toFixed(2),
+        totalValue: subtotal.toFixed(2)
+      });
+    } else {
+      await this.updateBudget(budgetId, {
+        totalValue: subtotal.toFixed(2)
+      });
+    }
   }
 }
 
