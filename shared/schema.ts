@@ -77,6 +77,24 @@ export const products = pgTable("products", {
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
   unit: text("unit").default('un'),
   isActive: boolean("is_active").default(true),
+  
+  // Campos adicionais do JSON XBZ
+  externalId: text("external_id"), // IdProduto
+  externalCode: text("external_code"), // CodigoXbz
+  compositeCode: text("composite_code"), // CodigoComposto
+  friendlyCode: text("friendly_code"), // CodigoAmigavel
+  siteLink: text("site_link"), // SiteLink
+  imageLink: text("image_link"), // ImageLink
+  mainColor: text("main_color"), // CorWebPrincipal
+  secondaryColor: text("secondary_color"), // CorWebSecundaria
+  weight: decimal("weight", { precision: 8, scale: 2 }), // Peso
+  height: decimal("height", { precision: 8, scale: 2 }), // Altura
+  width: decimal("width", { precision: 8, scale: 2 }), // Largura
+  depth: decimal("depth", { precision: 8, scale: 2 }), // Profundidade
+  availableQuantity: integer("available_quantity"), // QuantidadeDisponivel
+  stockStatus: text("stock_status"), // StatusConfiabilidade
+  ncm: text("ncm"), // Ncm
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -91,6 +109,13 @@ export const budgets = pgTable("budgets", {
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default('draft'), // 'draft', 'sent', 'approved', 'rejected', 'converted'
   validUntil: timestamp("valid_until"),
+  
+  // Campos para personalização
+  hasCustomization: boolean("has_customization").default(false),
+  customizationPercentage: decimal("customization_percentage", { precision: 5, scale: 2 }).default('0.00'),
+  customizationValue: decimal("customization_value", { precision: 10, scale: 2 }).default('0.00'),
+  customizationDescription: text("customization_description"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -103,6 +128,20 @@ export const budgetItems = pgTable("budget_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   notes: text("notes"),
+  
+  // Campos para personalização do item
+  hasItemCustomization: boolean("has_item_customization").default(false),
+  itemCustomizationPercentage: decimal("item_customization_percentage", { precision: 5, scale: 2 }).default('0.00'),
+  itemCustomizationDescription: text("item_customization_description"),
+});
+
+// Nova tabela para armazenar fotos dos orçamentos
+export const budgetPhotos = pgTable("budget_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").references(() => budgets.id).notNull(),
+  photoUrl: text("photo_url").notNull(),
+  description: text("description"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
 // Insert schemas
@@ -115,6 +154,7 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true })
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });
+export const insertBudgetPhotoSchema = createInsertSchema(budgetPhotos).omit({ id: true, uploadedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -135,3 +175,5 @@ export type Budget = typeof budgets.$inferSelect;
 export type InsertBudget = z.infer<typeof insertBudgetSchema>;
 export type BudgetItem = typeof budgetItems.$inferSelect;
 export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;
+export type BudgetPhoto = typeof budgetPhotos.$inferSelect;
+export type InsertBudgetPhoto = z.infer<typeof insertBudgetPhotoSchema>;

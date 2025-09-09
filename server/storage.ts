@@ -56,13 +56,32 @@ export interface IStorage {
 
   // Products
   getProducts(): Promise<any[]>;
+  getProduct(id: string): Promise<any>;
   createProduct(productData: any): Promise<any>;
+  updateProduct(id: string, productData: any): Promise<any>;
+  deleteProduct(id: string): Promise<boolean>;
+  importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }>;
 
   // Budgets
   getBudgets(): Promise<any[]>;
+  getBudget(id: string): Promise<any>;
   getBudgetsByVendor(vendorId: string): Promise<any[]>;
+  getBudgetsByClient(clientId: string): Promise<any[]>;
   createBudget(budgetData: any): Promise<any>;
+  updateBudget(id: string, budgetData: any): Promise<any>;
+  deleteBudget(id: string): Promise<boolean>;
   convertBudgetToOrder(budgetId: string): Promise<any>;
+  
+  // Budget Items
+  getBudgetItems(budgetId: string): Promise<any[]>;
+  createBudgetItem(budgetId: string, itemData: any): Promise<any>;
+  updateBudgetItem(itemId: string, itemData: any): Promise<any>;
+  deleteBudgetItem(itemId: string): Promise<boolean>;
+  
+  // Budget Photos
+  getBudgetPhotos(budgetId: string): Promise<any[]>;
+  createBudgetPhoto(budgetId: string, photoData: any): Promise<any>;
+  deleteBudgetPhoto(photoId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
