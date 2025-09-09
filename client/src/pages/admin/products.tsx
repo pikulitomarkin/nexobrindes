@@ -129,6 +129,11 @@ export default function AdminProducts() {
 
   const importProductsMutation = useMutation({
     mutationFn: async (file: File) => {
+      // Check file size on client side
+      if (file.size > 50 * 1024 * 1024) {
+        throw new Error('Arquivo muito grande. O limite é de 50MB.');
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       
@@ -137,24 +142,37 @@ export default function AdminProducts() {
         body: formData,
       });
       
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao importar produtos');
+        throw new Error(responseData.error || 'Erro ao importar produtos');
       }
       
-      return response.json();
+      return responseData;
     },
     onSuccess: (data) => {
+      const hasErrors = data.errors && data.errors.length > 0;
+      
       toast({
-        title: "Importação Concluída",
-        description: `${data.imported} produtos importados com sucesso!`,
+        title: hasErrors ? "Importação Concluída com Avisos" : "Importação Concluída",
+        description: hasErrors 
+          ? `${data.imported} de ${data.total} produtos importados. ${data.errors.length} produtos tiveram problemas.`
+          : `${data.imported} produtos importados com sucesso!`,
+        variant: hasErrors ? "default" : "default",
       });
+
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setIsImportDialogOpen(false);
       setImportFile(null);
       setImportProgress(0);
+      
+      // Log errors for debugging
+      if (hasErrors) {
+        console.log('Import errors:', data.errors);
+      }
     },
     onError: (error: any) => {
+      setImportProgress(0);
       toast({
         title: "Erro na Importação",
         description: error.message,
@@ -266,16 +284,38 @@ export default function AdminProducts() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === 'application/json' || file.name.endsWith('.json')) {
-        setImportFile(file);
-        setImportProgress(10);
-      } else {
+      // Validate file type
+      if (!file.type.includes('json') && !file.name.toLowerCase().endsWith('.json')) {
         toast({
           title: "Arquivo Inválido",
-          description: "Por favor, selecione um arquivo JSON.",
+          description: "Por favor, selecione um arquivo JSON (.json).",
           variant: "destructive",
         });
+        return;
       }
+
+      // Validate file size
+      if (file.size > 50 * 1024 * 1024) {
+        toast({
+          title: "Arquivo Muito Grande",
+          description: "O arquivo deve ter no máximo 50MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file not empty
+      if (file.size === 0) {
+        toast({
+          title: "Arquivo Vazio",
+          description: "O arquivo JSON não pode estar vazio.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setImportFile(file);
+      setImportProgress(10);
     }
   };
 
