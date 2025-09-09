@@ -144,6 +144,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendors
+  app.get("/api/vendors", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const vendors = users.filter(user => user.role === 'vendor');
+      
+      const vendorsWithInfo = await Promise.all(
+        vendors.map(async (vendor) => {
+          const vendorInfo = await storage.getVendor(vendor.id);
+          return {
+            id: vendor.id,
+            name: vendor.name,
+            email: vendor.email,
+            username: vendor.username,
+            commissionRate: vendorInfo?.commissionRate || '10.00',
+            isActive: vendorInfo?.isActive || true
+          };
+        })
+      );
+
+      res.json(vendorsWithInfo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch vendors" });
+    }
+  });
+
+  app.post("/api/vendors", async (req, res) => {
+    try {
+      const { name, email, username, commissionRate } = req.body;
+      
+      // Create user
+      const user = await storage.createUser({
+        username,
+        password: "123456", // Default password
+        role: "vendor",
+        name,
+        email
+      });
+
+      // Create vendor info
+      await storage.createVendor({
+        userId: user.id,
+        commissionRate: commissionRate || '10.00',
+        isActive: true,
+        salesLink: null
+      });
+
+      res.json({ success: true, user });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create vendor" });
+    }
+  });
+
+  app.put("/api/vendors/:vendorId/commission", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const { commissionRate } = req.body;
+      
+      await storage.updateVendorCommission(vendorId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update vendor commission" });
+    }
+  });
+
   // Vendor info
   app.get("/api/vendor/:userId", async (req, res) => {
     try {

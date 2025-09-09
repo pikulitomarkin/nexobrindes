@@ -48,6 +48,8 @@ function Router() {
         <Route path="/admin/clients" component={AdminClients} />
         <Route path="/admin/producers" component={AdminProducers} />
         <Route path="/admin/finance" component={AdminFinance} />
+        <Route path="/admin/commission-settings" component={lazy(() => import("@/pages/admin/commission-settings"))} />
+
 
         {/* Vendor Routes */}
         <Route path="/vendor/products" component={VendorProducts} />

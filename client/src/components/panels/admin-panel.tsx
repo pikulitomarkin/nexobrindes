@@ -2,10 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  ShoppingCart, 
-  Settings, 
-  DollarSign, 
+import {
+  ShoppingCart,
+  Settings,
+  DollarSign,
   Users,
   Eye,
   Send,
@@ -30,7 +30,7 @@ export default function AdminPanel() {
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       pending: "status-badge status-pending",
-      production: "status-badge status-production", 
+      production: "status-badge status-production",
       completed: "status-badge status-completed",
       cancelled: "status-badge status-cancelled",
       confirmed: "status-badge status-confirmed",
@@ -39,7 +39,7 @@ export default function AdminPanel() {
     const statusLabels = {
       pending: "Aguardando",
       production: "Em Produção",
-      completed: "Concluído", 
+      completed: "Concluído",
       cancelled: "Cancelado",
       confirmed: "Confirmado",
     };
@@ -146,7 +146,7 @@ export default function AdminPanel() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Users className="h-5 w-5 mr-2" />
-              Gerenciar Usuários
+              Gerenciamento
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -159,13 +159,19 @@ export default function AdminPanel() {
             <Link href="/admin/clients">
               <Button variant="outline" className="w-full justify-start">
                 <Users className="h-4 w-4 mr-2" />
-                Clientes ({stats?.totalClients || 0})
+                Gerenciar Clientes ({stats?.totalClients || 0})
               </Button>
             </Link>
             <Link href="/admin/producers">
               <Button variant="outline" className="w-full justify-start">
                 <Factory className="h-4 w-4 mr-2" />
-                Produtores ({stats?.totalProducers || 0})
+                Gerenciar Produtores ({stats?.totalProducers || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/commission-settings">
+              <Button variant="outline" className="w-full justify-start">
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar Comissões
               </Button>
             </Link>
           </CardContent>

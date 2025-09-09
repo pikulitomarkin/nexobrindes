@@ -419,6 +419,14 @@ export class MemStorage implements IStorage {
     return vendor;
   }
 
+  async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
+    const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
+    if (vendor) {
+      const updatedVendor = { ...vendor, commissionRate };
+      this.vendors.set(vendor.id, updatedVendor);
+    }
+  }
+
   // Product methods
   async getProducts(): Promise<any[]> {
     return mockProducts;
