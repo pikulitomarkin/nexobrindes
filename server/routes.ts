@@ -315,10 +315,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Products
   app.get("/api/products", async (req, res) => {
     try {
-      const products = await storage.getProducts();
-      res.json(products);
+      const { page, limit, search, category } = req.query;
+      const options = {
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 20,
+        search: search as string,
+        category: category as string
+      };
+      
+      const result = await storage.getProducts(options);
+      res.json(result);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  // Product search endpoint
+  app.get("/api/products/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q) {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+      
+      const products = await storage.searchProducts(q as string);
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search products" });
     }
   });
 

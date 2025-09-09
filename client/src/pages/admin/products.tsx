@@ -25,6 +25,8 @@ export default function AdminProducts() {
   const [activeTab, setActiveTab] = useState("products");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -66,7 +68,25 @@ export default function AdminProducts() {
 
   // Queries
   const productsQuery = useQuery({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/products", { 
+      page: currentPage, 
+      limit: pageSize,
+      search: searchTerm || undefined,
+      category: selectedCategory !== "all" ? selectedCategory : undefined
+    }],
+    queryFn: async ({ queryKey }) => {
+      const [, params] = queryKey as [string, any];
+      const searchParams = new URLSearchParams();
+      
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.category) searchParams.append('category', params.category);
+      
+      const response = await fetch(`/api/products?${searchParams}`);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
   const budgetsQuery = useQuery({
@@ -368,21 +388,28 @@ export default function AdminProducts() {
   };
 
   // Data processing
-  const products = productsQuery.data || [];
+  const productsData = productsQuery.data;
+  const products = productsData?.products || [];
+  const totalProducts = productsData?.total || 0;
+  const totalPages = productsData?.totalPages || 1;
+  
   const budgets = budgetsQuery.data || [];
   const users = usersQuery.data || [];
   const clients = users.filter((u: any) => u.role === 'client');
   const vendors = users.filter((u: any) => u.role === 'vendor');
   
-  const categories = ['all', ...new Set(products.map((product: any) => product.category).filter(Boolean))];
-  
-  const filteredProducts = products.filter((product: any) => {
-    const matchesSearch = searchTerm === "" || 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  // For categories, we'll get them from all products (not just current page)
+  const allProductsQuery = useQuery({
+    queryKey: ["/api/products/all-categories"],
+    queryFn: async () => {
+      const response = await fetch('/api/products?limit=9999');
+      if (!response.ok) throw new Error('Failed to fetch all products');
+      const data = await response.json();
+      return data.products || [];
+    },
   });
+  
+  const categories = ['all', ...new Set((allProductsQuery.data || []).map((product: any) => product.category).filter(Boolean))];
 
   if (productsQuery.isLoading) {
     return (
@@ -697,12 +724,19 @@ export default function AdminProducts() {
                     <Input
                       placeholder="Buscar produtos por nome, descrição ou categoria..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1); // Reset to first page when searching
+                      }}
                       className="pl-10"
+                      data-testid="input-product-search"
                     />
                   </div>
                 </div>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select value={selectedCategory} onValueChange={(value) => {
+                  setSelectedCategory(value);
+                  setCurrentPage(1); // Reset to first page when changing category
+                }}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Categoria" />
                   </SelectTrigger>
@@ -711,6 +745,20 @@ export default function AdminProducts() {
                     {categories.slice(1).map((category: string) => (
                       <SelectItem key={category} value={category}>{category}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={pageSize.toString()} onValueChange={(value) => {
+                  setPageSize(parseInt(value, 10));
+                  setCurrentPage(1); // Reset to first page when changing page size
+                }}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 por página</SelectItem>
+                    <SelectItem value="20">20 por página</SelectItem>
+                    <SelectItem value="50">50 por página</SelectItem>
+                    <SelectItem value="100">100 por página</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -723,12 +771,12 @@ export default function AdminProducts() {
               <div className="flex justify-between items-center">
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Produtos ({filteredProducts.length})
+                  Produtos ({totalProducts})
                 </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
-              {filteredProducts.length === 0 ? (
+              {products.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -753,7 +801,7 @@ export default function AdminProducts() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((product: any) => (
+                    {products.map((product: any) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           {product.imageLink ? (
@@ -820,6 +868,66 @@ export default function AdminProducts() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, totalProducts)} de {totalProducts} produtos
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      data-testid="button-previous-page"
+                    >
+                      Anterior
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const page = i + 1;
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-8 h-8 p-0"
+                            data-testid={`button-page-${page}`}
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+                      {totalPages > 5 && (
+                        <>
+                          <span className="px-2 text-gray-400">...</span>
+                          <Button
+                            variant={currentPage === totalPages ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="w-8 h-8 p-0"
+                            data-testid={`button-page-${totalPages}`}
+                          >
+                            {totalPages}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      data-testid="button-next-page"
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

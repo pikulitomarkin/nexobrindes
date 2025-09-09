@@ -57,12 +57,18 @@ export interface IStorage {
   createVendor(vendor: InsertVendor): Promise<Vendor>;
 
   // Products
-  getProducts(): Promise<any[]>;
+  getProducts(options?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string;
+    category?: string;
+  }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }>;
   getProduct(id: string): Promise<any>;
   createProduct(productData: any): Promise<any>;
   updateProduct(id: string, productData: any): Promise<any>;
   deleteProduct(id: string): Promise<boolean>;
   importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }>;
+  searchProducts(query: string): Promise<any[]>;
 
   // Budgets
   getBudgets(): Promise<any[]>;
@@ -449,8 +455,45 @@ export class MemStorage implements IStorage {
   }
 
   // Product methods
-  async getProducts(): Promise<any[]> {
-    return mockProducts;
+  async getProducts(options?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string;
+    category?: string;
+  }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
+    let filteredProducts = [...mockProducts];
+
+    // Apply search filter
+    if (options?.search) {
+      const searchLower = options.search.toLowerCase();
+      filteredProducts = filteredProducts.filter(product =>
+        (product.name?.toLowerCase() || '').includes(searchLower) ||
+        (product.description?.toLowerCase() || '').includes(searchLower) ||
+        (product.category?.toLowerCase() || '').includes(searchLower) ||
+        (product.externalCode?.toLowerCase() || '').includes(searchLower) ||
+        (product.compositeCode?.toLowerCase() || '').includes(searchLower) ||
+        (product.friendlyCode?.toLowerCase() || '').includes(searchLower)
+      );
+    }
+
+    // Apply category filter
+    if (options?.category) {
+      filteredProducts = filteredProducts.filter(product =>
+        product.category === options.category
+      );
+    }
+
+    const total = filteredProducts.length;
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const totalPages = Math.ceil(total / limit);
+    
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const products = filteredProducts.slice(startIndex, endIndex);
+
+    return { products, total, page, totalPages };
   }
 
   async getProduct(id: string): Promise<any> {
@@ -539,6 +582,20 @@ export class MemStorage implements IStorage {
     }
 
     return { imported, errors };
+  }
+
+  async searchProducts(query: string): Promise<any[]> {
+    if (!query) return mockProducts;
+    
+    const searchLower = query.toLowerCase();
+    return mockProducts.filter(product =>
+      (product.name?.toLowerCase() || '').includes(searchLower) ||
+      (product.description?.toLowerCase() || '').includes(searchLower) ||
+      (product.category?.toLowerCase() || '').includes(searchLower) ||
+      (product.externalCode?.toLowerCase() || '').includes(searchLower) ||
+      (product.compositeCode?.toLowerCase() || '').includes(searchLower) ||
+      (product.friendlyCode?.toLowerCase() || '').includes(searchLower)
+    );
   }
 
   // Budget methods
