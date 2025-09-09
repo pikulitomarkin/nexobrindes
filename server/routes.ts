@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from 'multer';
 import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -332,7 +333,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Configure multer for file uploads
-  const multer = require('multer');
   const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
