@@ -53,8 +53,13 @@ export interface IStorage {
   createCommission(commission: InsertCommission): Promise<Commission>;
 
   // Vendors
+  getVendors(): Promise<User[]>;
   getVendor(userId: string): Promise<Vendor | undefined>;
-  createVendor(vendor: InsertVendor): Promise<Vendor>;
+  createVendor(vendorData: any): Promise<User>;
+
+  // Clients
+  getClients(): Promise<User[]>;
+  createClient(clientData: any): Promise<User>;
 
   // Products
   getProducts(options?: { 
@@ -118,7 +123,10 @@ export class MemStorage implements IStorage {
       password: "123",
       role: "admin",
       name: "Administrador",
-      email: "admin@erp.com"
+      email: "admin@erp.com",
+      phone: null,
+      vendorId: null,
+      isActive: true
     };
 
     const vendorUser: User = {
@@ -127,7 +135,10 @@ export class MemStorage implements IStorage {
       password: "123",
       role: "vendor",
       name: "Maria Santos",
-      email: "maria@erp.com"
+      email: "maria@erp.com",
+      phone: null,
+      vendorId: null,
+      isActive: true
     };
 
     const clientUser: User = {
@@ -136,7 +147,10 @@ export class MemStorage implements IStorage {
       password: "123", 
       role: "client",
       name: "João Silva",
-      email: "joao@gmail.com"
+      email: "joao@gmail.com",
+      phone: null,
+      vendorId: "vendor-1",
+      isActive: true
     };
 
     const producerUser: User = {
@@ -145,7 +159,10 @@ export class MemStorage implements IStorage {
       password: "123",
       role: "producer", 
       name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com"
+      email: "contato@marcenariasantos.com",
+      phone: null,
+      vendorId: null,
+      isActive: true
     };
 
     const financeUser: User = {
@@ -154,7 +171,10 @@ export class MemStorage implements IStorage {
       password: "123",
       role: "finance",
       name: "Departamento Financeiro", 
-      email: "financeiro@erp.com"
+      email: "financeiro@erp.com",
+      phone: null,
+      vendorId: null,
+      isActive: true
     };
 
     [adminUser, vendorUser, clientUser, producerUser, financeUser].forEach(user => {
@@ -331,6 +351,54 @@ export class MemStorage implements IStorage {
 
   async getUsersByRole(role: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(user => user.role === role);
+  }
+
+  // Vendor methods
+  async getVendors(): Promise<User[]> {
+    return Array.from(this.users.values()).filter(user => user.role === 'vendor');
+  }
+
+  async createVendor(vendorData: any): Promise<User> {
+    const newUser: User = {
+      id: `vendor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role: 'vendor',
+      phone: null,
+      vendorId: null,
+      isActive: true,
+      ...vendorData
+    };
+    
+    this.users.set(newUser.id, newUser);
+    
+    // Also create vendor profile
+    const vendorProfile: Vendor = {
+      id: `vendor-profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId: newUser.id,
+      salesLink: null,
+      commissionRate: vendorData.commissionRate || "10.00",
+      isActive: true
+    };
+    
+    this.vendors.set(vendorProfile.id, vendorProfile);
+    return newUser;
+  }
+
+  // Client methods
+  async getClients(): Promise<User[]> {
+    return Array.from(this.users.values()).filter(user => user.role === 'client');
+  }
+
+  async createClient(clientData: any): Promise<User> {
+    const newUser: User = {
+      id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role: 'client',
+      phone: null,
+      isActive: true,
+      ...clientData
+    };
+    
+    this.users.set(newUser.id, newUser);
+    return newUser;
   }
 
   // Order methods

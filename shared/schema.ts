@@ -11,7 +11,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
-  vendorId: varchar("vendor_id").references(() => users.id), // For clients: link to their assigned vendor
+  vendorId: varchar("vendor_id"), // For clients: link to their assigned vendor
   isActive: boolean("is_active").default(true),
 });
 
