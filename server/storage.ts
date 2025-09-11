@@ -1,6 +1,8 @@
 import { 
   type User, 
   type InsertUser, 
+  type Client,
+  type InsertClient,
   type Order, 
   type InsertOrder,
   type ProductionOrder,
@@ -59,8 +61,11 @@ export interface IStorage {
   createVendor(vendorData: any): Promise<User>;
 
   // Clients
-  getClients(): Promise<User[]>;
-  createClient(clientData: any): Promise<User>;
+  getClients(): Promise<Client[]>;
+  getClient(id: string): Promise<Client | undefined>;
+  createClient(clientData: InsertClient): Promise<Client>;
+  updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<boolean>;
 
   // Products
   getProducts(options?: { 
@@ -100,6 +105,7 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
+  private clients: Map<string, Client>;
   private orders: Map<string, Order>;
   private productionOrders: Map<string, ProductionOrder>;
   private payments: Map<string, Payment>;
@@ -108,6 +114,7 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.users = new Map();
+    this.clients = new Map();
     this.orders = new Map();
     this.productionOrders = new Map();
     this.payments = new Map();
@@ -191,6 +198,23 @@ export class MemStorage implements IStorage {
       isActive: true
     };
     this.vendors.set(vendor.id, vendor);
+
+    // Create sample clients
+    const sampleClient: Client = {
+      id: "client-1",
+      userId: "client-1", 
+      name: "João Silva",
+      email: "joao@gmail.com",
+      phone: "(11) 98765-4321",
+      whatsapp: "(11) 98765-4321",
+      cpfCnpj: "123.456.789-00",
+      address: "Rua das Flores, 123, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.clients.set(sampleClient.id, sampleClient);
 
     // Create sample orders
     mockOrders = [
@@ -391,22 +415,42 @@ export class MemStorage implements IStorage {
   }
 
   // Client methods
-  async getClients(): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.role === 'client');
+  async getClients(): Promise<Client[]> {
+    return Array.from(this.clients.values());
   }
 
-  async createClient(clientData: any): Promise<User> {
-    const newUser: User = {
-      id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      role: 'client',
-      phone: null,
-      isActive: true,
-      email: clientData.email || null,
-      ...clientData
+  async getClient(id: string): Promise<Client | undefined> {
+    return this.clients.get(id);
+  }
+
+  async createClient(clientData: InsertClient): Promise<Client> {
+    const id = randomUUID();
+    const client: Client = {
+      ...clientData,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    
-    this.users.set(newUser.id, newUser);
-    return newUser;
+    this.clients.set(id, client);
+    return client;
+  }
+
+  async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
+    const client = this.clients.get(id);
+    if (client) {
+      const updatedClient = {
+        ...client,
+        ...clientData,
+        updatedAt: new Date()
+      };
+      this.clients.set(id, updatedClient);
+      return updatedClient;
+    }
+    return undefined;
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    return this.clients.delete(id);
   }
 
   // Order methods

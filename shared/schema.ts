@@ -15,10 +15,25 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").default(true),
 });
 
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  whatsapp: text("whatsapp"),
+  cpfCnpj: text("cpf_cnpj"),
+  address: text("address"),
+  vendorId: varchar("vendor_id").references(() => users.id), // Vendedor responsável
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull().unique(),
-  clientId: varchar("client_id").references(() => users.id).notNull(),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
   producerId: varchar("producer_id").references(() => users.id),
   product: text("product").notNull(),
@@ -105,7 +120,7 @@ export const products = pgTable("products", {
 export const budgets = pgTable("budgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   budgetNumber: text("budget_number").notNull().unique(),
-  clientId: varchar("client_id").references(() => users.id).notNull(),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description"),
@@ -149,6 +164,7 @@ export const budgetPhotos = pgTable("budget_photos", {
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductionOrderSchema = createInsertSchema(productionOrders).omit({ id: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
@@ -162,6 +178,8 @@ export const insertBudgetPhotoSchema = createInsertSchema(budgetPhotos).omit({ i
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type ProductionOrder = typeof productionOrders.$inferSelect;

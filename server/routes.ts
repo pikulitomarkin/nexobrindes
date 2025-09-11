@@ -709,6 +709,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clients/:id", async (req, res) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch client" });
+    }
+  });
+
+  app.get("/api/clients/:id/orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrdersByClient(req.params.id);
+      res.json(orders);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch client orders" });
+    }
+  });
+
   app.post("/api/clients", async (req, res) => {
     try {
       const newClient = await storage.createClient(req.body);
@@ -716,6 +739,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      const updatedClient = await storage.updateClient(req.params.id, req.body);
+      if (!updatedClient) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(updatedClient);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteClient(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to delete client" });
     }
   });
 
