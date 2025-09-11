@@ -12,9 +12,16 @@ export default function VendorProducts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["/api/products"],
+  const { data: productsData, isLoading } = useQuery({
+    queryKey: ["/api/products", { limit: 9999 }],
+    queryFn: async () => {
+      const response = await fetch('/api/products?limit=9999');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
+
+  const products = productsData?.products || [];
 
   const categories = Array.from(new Set(products?.map((p: any) => p.category) || []));
 

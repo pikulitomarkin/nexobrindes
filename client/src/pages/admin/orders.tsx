@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Eye, Send, Filter, Search, Calculator, Package, Percent, Trash2 } from "lucide-react";
+import { Plus, FileText, Eye, Search, ShoppingCart, Package, Percent, Trash2, Calendar, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -17,38 +18,51 @@ export default function AdminOrders() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [orderProductSearch, setOrderProductSearch] = useState("");
-  const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
+  const [productSearch, setProductSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const { toast } = useToast();
 
-  // Order form state
-  const [orderForm, setOrderForm] = useState({
-    product: "",
-    description: "",
+  // Admin order form state - independent from other forms
+  const [adminOrderForm, setAdminOrderForm] = useState({
     clientId: "",
     vendorId: "",
+    description: "",
     deadline: "",
-    hasCustomization: false,
-    customizationPercentage: "10.00",
-    customizationDescription: "",
     items: [] as any[],
-    photos: [] as string[]
+    notes: ""
   });
 
   const { data: orders, isLoading } = useQuery({
-    queryKey: ["/api/orders"],
+    queryKey: ["/api/orders/admin"],
+    queryFn: async () => {
+      const response = await fetch('/api/orders');
+      if (!response.ok) throw new Error('Failed to fetch orders');
+      return response.json();
+    },
   });
 
   const { data: clients } = useQuery({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients/admin"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'client');
+    },
   });
 
   const { data: vendors } = useQuery({
-    queryKey: ["/api/vendors"],
+    queryKey: ["/api/vendors/admin"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'vendor');
+    },
   });
 
   const { data: productsData } = useQuery({
-    queryKey: ["/api/products", { limit: 9999 }],
+    queryKey: ["/api/products/admin-orders", { limit: 9999 }],
     queryFn: async () => {
       const response = await fetch('/api/products?limit=9999');
       if (!response.ok) throw new Error('Failed to fetch products');
@@ -59,76 +73,82 @@ export default function AdminOrders() {
   const products = productsData?.products || [];
   const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
 
-  // Order functions
-  const addProductToOrder = (product: any) => {
+  // Admin order functions
+  const addProductToAdminOrder = (product: any) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
-      quantity: "1",
-      unitPrice: product.basePrice,
-      totalPrice: product.basePrice,
+      quantity: 1,
+      unitPrice: parseFloat(product.basePrice),
+      totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
-      itemCustomizationPercentage: "0.00",
+      itemCustomizationValue: 0,
       itemCustomizationDescription: ""
     };
-    setOrderForm(prev => ({
+    setAdminOrderForm(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
   };
 
-  const removeProductFromOrder = (index: number) => {
-    setOrderForm(prev => ({
+  const updateAdminOrderItem = (index: number, field: string, value: any) => {
+    setAdminOrderForm(prev => {
+      const newItems = [...prev.items];
+      const item = { ...newItems[index] };
+      
+      if (field === 'quantity') {
+        const quantity = parseInt(value) || 1;
+        item.quantity = quantity;
+        item.totalPrice = item.unitPrice * quantity;
+      } else if (field === 'itemCustomizationValue') {
+        item[field] = parseFloat(value) || 0;
+      } else {
+        item[field] = value;
+      }
+      
+      newItems[index] = item;
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const removeProductFromAdminOrder = (index: number) => {
+    setAdminOrderForm(prev => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index)
     }));
   };
 
-  const calculateOrderTotal = () => {
-    const itemsTotal = orderForm.items.reduce((sum, item) => {
-      const itemPrice = parseFloat(item.totalPrice || '0');
-      
-      // Apply item customization
-      if (item.hasItemCustomization) {
-        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
-        const customizationAmount = itemPrice * (customizationPercentage / 100);
-        return sum + itemPrice + customizationAmount;
-      }
-      
-      return sum + itemPrice;
+  const calculateAdminOrderTotal = () => {
+    return adminOrderForm.items.reduce((total, item) => {
+      const basePrice = item.unitPrice * item.quantity;
+      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+      return total + basePrice + customizationValue;
     }, 0);
-
-    // Apply global customization
-    if (orderForm.hasCustomization) {
-      const customizationPercentage = parseFloat(orderForm.customizationPercentage || '0');
-      const customizationAmount = itemsTotal * (customizationPercentage / 100);
-      return itemsTotal + customizationAmount;
-    }
-
-    return itemsTotal;
   };
 
-  const resetOrderForm = () => {
-    setOrderForm({
-      product: "",
-      description: "",
+  const calculateAdminOrderItemTotal = (item: any) => {
+    const basePrice = item.unitPrice * item.quantity;
+    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+    return basePrice + customizationValue;
+  };
+
+  const resetAdminOrderForm = () => {
+    setAdminOrderForm({
       clientId: "",
       vendorId: "",
+      description: "",
       deadline: "",
-      hasCustomization: false,
-      customizationPercentage: "10.00",
-      customizationDescription: "",
       items: [],
-      photos: []
+      notes: ""
     });
   };
 
-  const createOrderMutation = useMutation({
+  const createAdminOrderMutation = useMutation({
     mutationFn: async (data: any) => {
       const orderData = {
         ...data,
-        totalValue: calculateOrderTotal().toFixed(2),
-        product: data.items.map((item: any) => item.productName).join(", ") || "Pedido Personalizado"
+        totalValue: calculateAdminOrderTotal().toFixed(2),
+        status: 'pending'
       };
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -139,11 +159,11 @@ export default function AdminOrders() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/admin"] });
       setIsCreateDialogOpen(false);
-      resetOrderForm();
-      setOrderProductSearch("");
-      setOrderCategoryFilter("all");
+      resetAdminOrderForm();
+      setProductSearch("");
+      setCategoryFilter("all");
       toast({
         title: "Sucesso!",
         description: "Pedido criado com sucesso",
@@ -151,27 +171,28 @@ export default function AdminOrders() {
     },
   });
 
-  const sendToProductionMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
-        method: "POST",
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
       });
-      if (!response.ok) throw new Error("Erro ao enviar para produção");
+      if (!response.ok) throw new Error("Erro ao atualizar status");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/admin"] });
       toast({
         title: "Sucesso!",
-        description: "Pedido enviado para produção",
+        description: "Status atualizado com sucesso",
       });
     },
   });
 
-  const handleOrderSubmit = (e: React.FormEvent) => {
+  const handleAdminOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (orderForm.items.length === 0) {
+    if (adminOrderForm.items.length === 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao pedido",
@@ -179,18 +200,18 @@ export default function AdminOrders() {
       });
       return;
     }
-    createOrderMutation.mutate(orderForm);
+    createAdminOrderMutation.mutate(adminOrderForm);
   };
 
-  // Filter products for order creation
-  const filteredOrderProducts = products.filter((product: any) => {
-    const matchesSearch = !orderProductSearch || 
-      product.name.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
-      product.description?.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
-      product.id.toLowerCase().includes(orderProductSearch.toLowerCase());
+  // Filter products for admin order creation
+  const filteredAdminOrderProducts = products.filter((product: any) => {
+    const matchesSearch = !productSearch || 
+      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.description?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      product.id.toLowerCase().includes(productSearch.toLowerCase());
     
-    const matchesCategory = orderCategoryFilter === "all" || 
-      product.category === orderCategoryFilter;
+    const matchesCategory = categoryFilter === "all" || 
+      product.category === categoryFilter;
     
     return matchesSearch && matchesCategory;
   });
@@ -200,17 +221,15 @@ export default function AdminOrders() {
       pending: "status-badge status-pending",
       confirmed: "status-badge status-confirmed",
       production: "status-badge status-production",
-      shipped: "status-badge status-production",
-      delivered: "status-badge status-completed",
+      completed: "status-badge status-completed",
       cancelled: "status-badge status-cancelled",
     };
 
     const statusLabels = {
-      pending: "Aguardando",
+      pending: "Pendente",
       confirmed: "Confirmado",
       production: "Em Produção",
-      shipped: "Enviado",
-      delivered: "Entregue",
+      completed: "Concluído",
       cancelled: "Cancelado",
     };
 
@@ -224,9 +243,9 @@ export default function AdminOrders() {
   const filteredOrders = orders?.filter((order: any) => {
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesSearch = searchTerm === "" || 
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product.toLowerCase().includes(searchTerm.toLowerCase());
+      order.vendorName?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -245,8 +264,8 @@ export default function AdminOrders() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gerenciar Pedidos</h1>
-          <p className="text-gray-600">Controle completo de todos os pedidos do sistema</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Pedidos - Admin</h1>
+          <p className="text-gray-600">Crie e gerencie pedidos para todos os vendedores e clientes</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -259,36 +278,14 @@ export default function AdminOrders() {
             <DialogHeader>
               <DialogTitle>Criar Novo Pedido</DialogTitle>
               <DialogDescription>
-                Crie um pedido personalizado com produtos do catálogo
+                Crie um pedido direto com produtos do catálogo
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleOrderSubmit} className="space-y-6">
+            <form onSubmit={handleAdminOrderSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="order-description">Descrição do Pedido</Label>
-                  <Textarea
-                    id="order-description"
-                    rows={2}
-                    value={orderForm.description}
-                    onChange={(e) => setOrderForm({ ...orderForm, description: e.target.value })}
-                    placeholder="Descrição detalhada do pedido..."
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="order-deadline">Prazo de Entrega</Label>
-                  <Input
-                    id="order-deadline"
-                    type="date"
-                    value={orderForm.deadline}
-                    onChange={(e) => setOrderForm({ ...orderForm, deadline: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="order-client">Cliente</Label>
-                  <Select value={orderForm.clientId} onValueChange={(value) => setOrderForm({ ...orderForm, clientId: value })}>
+                  <Label htmlFor="admin-order-client">Cliente</Label>
+                  <Select value={adminOrderForm.clientId} onValueChange={(value) => setAdminOrderForm({ ...adminOrderForm, clientId: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um cliente" />
                     </SelectTrigger>
@@ -300,8 +297,8 @@ export default function AdminOrders() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="order-vendor">Vendedor</Label>
-                  <Select value={orderForm.vendorId} onValueChange={(value) => setOrderForm({ ...orderForm, vendorId: value })}>
+                  <Label htmlFor="admin-order-vendor">Vendedor</Label>
+                  <Select value={adminOrderForm.vendorId} onValueChange={(value) => setAdminOrderForm({ ...adminOrderForm, vendorId: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um vendedor" />
                     </SelectTrigger>
@@ -314,47 +311,36 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              <Separator />
+              <div>
+                <Label htmlFor="admin-order-description">Descrição do Pedido</Label>
+                <Textarea
+                  id="admin-order-description"
+                  rows={2}
+                  value={adminOrderForm.description}
+                  onChange={(e) => setAdminOrderForm({ ...adminOrderForm, description: e.target.value })}
+                  placeholder="Descreva os detalhes do pedido..."
+                />
+              </div>
 
-              {/* Customization Options */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="order-customization"
-                    checked={orderForm.hasCustomization}
-                    onCheckedChange={(checked) => setOrderForm({ ...orderForm, hasCustomization: checked })}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="admin-order-deadline">Prazo de Entrega</Label>
+                  <Input
+                    id="admin-order-deadline"
+                    type="datetime-local"
+                    value={adminOrderForm.deadline}
+                    onChange={(e) => setAdminOrderForm({ ...adminOrderForm, deadline: e.target.value })}
                   />
-                  <Label htmlFor="order-customization" className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Aplicar Personalização Global
-                  </Label>
                 </div>
-                
-                {orderForm.hasCustomization && (
-                  <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
-                    <div>
-                      <Label htmlFor="order-customization-percentage">Percentual (%)</Label>
-                      <Input
-                        id="order-customization-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={orderForm.customizationPercentage}
-                        onChange={(e) => setOrderForm({ ...orderForm, customizationPercentage: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="order-customization-description">Descrição da Personalização</Label>
-                      <Input
-                        id="order-customization-description"
-                        value={orderForm.customizationDescription}
-                        onChange={(e) => setOrderForm({ ...orderForm, customizationDescription: e.target.value })}
-                        placeholder="Ex: Gravação personalizada, cor especial..."
-                      />
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <Label htmlFor="admin-order-notes">Observações</Label>
+                  <Input
+                    id="admin-order-notes"
+                    value={adminOrderForm.notes}
+                    onChange={(e) => setAdminOrderForm({ ...adminOrderForm, notes: e.target.value })}
+                    placeholder="Observações adicionais..."
+                  />
+                </div>
               </div>
 
               <Separator />
@@ -364,25 +350,95 @@ export default function AdminOrders() {
                 <h3 className="text-lg font-medium">Produtos do Pedido</h3>
                 
                 {/* Selected Products */}
-                {orderForm.items.length > 0 && (
-                  <div className="space-y-2">
-                    {orderForm.items.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded">
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-500">
-                            {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
-                            R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
+                {adminOrderForm.items.length > 0 && (
+                  <div className="space-y-4">
+                    {adminOrderForm.items.map((item, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium">{item.productName}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeProductFromAdminOrder(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeProductFromOrder(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`admin-order-quantity-${index}`}>Quantidade</Label>
+                            <Input
+                              id={`admin-order-quantity-${index}`}
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateAdminOrderItem(index, 'quantity', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-order-unit-price-${index}`}>Preço Unitário</Label>
+                            <Input
+                              id={`admin-order-unit-price-${index}`}
+                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-order-subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
+                            <Input
+                              id={`admin-order-subtotal-${index}`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`admin-order-item-customization-${index}`}
+                            checked={item.hasItemCustomization}
+                            onCheckedChange={(checked) => updateAdminOrderItem(index, 'hasItemCustomization', checked)}
+                          />
+                          <Label htmlFor={`admin-order-item-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização do Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemCustomization && (
+                          <div className="grid grid-cols-2 gap-3 bg-orange-50 p-3 rounded mb-3">
+                            <div>
+                              <Label htmlFor={`admin-order-item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                              <Input
+                                id={`admin-order-item-customization-value-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.itemCustomizationValue}
+                                onChange={(e) => updateAdminOrderItem(index, 'itemCustomizationValue', e.target.value)}
+                                placeholder="0,00"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`admin-order-item-customization-description-${index}`}>Descrição</Label>
+                              <Input
+                                id={`admin-order-item-customization-description-${index}`}
+                                value={item.itemCustomizationDescription}
+                                onChange={(e) => updateAdminOrderItem(index, 'itemCustomizationDescription', e.target.value)}
+                                placeholder="Ex: Gravação, cor especial..."
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Subtotal:</span>
+                          <span className="font-medium">
+                            R$ {calculateAdminOrderItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -394,21 +450,20 @@ export default function AdminOrders() {
                     <CardTitle className="text-base">Adicionar Produtos</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Order Product Search */}
+                    {/* Admin Order Product Search */}
                     <div className="mb-4 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                           <Input
                             placeholder="Buscar produtos..."
-                            value={orderProductSearch}
-                            onChange={(e) => setOrderProductSearch(e.target.value)}
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
                             className="pl-9"
-                            data-testid="input-order-product-search"
                           />
                         </div>
-                        <Select value={orderCategoryFilter} onValueChange={setOrderCategoryFilter}>
-                          <SelectTrigger data-testid="select-order-category">
+                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                          <SelectTrigger>
                             <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
@@ -421,14 +476,14 @@ export default function AdminOrders() {
                         </Select>
                       </div>
                       <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{filteredOrderProducts.length} produtos encontrados</span>
-                        {(orderProductSearch || orderCategoryFilter !== "all") && (
+                        <span>{filteredAdminOrderProducts.length} produtos encontrados</span>
+                        {(productSearch || categoryFilter !== "all") && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => {
-                              setOrderProductSearch("");
-                              setOrderCategoryFilter("all");
+                              setProductSearch("");
+                              setCategoryFilter("all");
                             }}
                           >
                             Limpar filtros
@@ -437,19 +492,19 @@ export default function AdminOrders() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {filteredOrderProducts.length === 0 ? (
+                      {filteredAdminOrderProducts.length === 0 ? (
                         <div className="col-span-full text-center py-8">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500">
-                            {orderProductSearch || orderCategoryFilter !== "all" ? 
+                            {productSearch || categoryFilter !== "all" ? 
                               "Nenhum produto encontrado com os filtros aplicados" : 
                               "Nenhum produto disponível"}
                           </p>
                         </div>
                       ) : (
-                        filteredOrderProducts.map((product: any) => (
+                        filteredAdminOrderProducts.map((product: any) => (
                           <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
-                               onClick={() => addProductToOrder(product)}>
+                               onClick={() => addProductToAdminOrder(product)}>
                             <div className="flex items-center gap-2">
                               {product.imageLink ? (
                                 <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
@@ -477,15 +532,10 @@ export default function AdminOrders() {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span>Total do Pedido:</span>
-                  <span className="text-green-600">
-                    R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <span className="text-orange-600">
+                    R$ {calculateAdminOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {orderForm.hasCustomization && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Inclui {orderForm.customizationPercentage}% de personalização
-                  </p>
-                )}
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -494,22 +544,104 @@ export default function AdminOrders() {
                   type="button" 
                   onClick={() => {
                     setIsCreateDialogOpen(false);
-                    resetOrderForm();
+                    resetAdminOrderForm();
                   }}
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={createOrderMutation.isPending || orderForm.items.length === 0}
-                  className="gradient-bg text-white"
+                  disabled={createAdminOrderMutation.isPending || adminOrderForm.items.length === 0}
                 >
-                  {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
+                  {createAdminOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {orders?.length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <ShoppingCart className="h-6 w-6 text-gray-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pendentes</p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {orders?.filter((o: any) => o.status === 'pending').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Em Produção</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {orders?.filter((o: any) => o.status === 'production').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Package className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Concluídos</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {orders?.filter((o: any) => o.status === 'completed').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                <p className="text-lg font-bold gradient-text">
+                  R$ {orders?.reduce((total: number, o: any) => total + parseFloat(o.totalValue || '0'), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                </p>
+              </div>
+              <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">R$</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -520,7 +652,7 @@ export default function AdminOrders() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Buscar por número, cliente ou produto..."
+                  placeholder="Buscar por número, cliente ou vendedor..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -534,11 +666,10 @@ export default function AdminOrders() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="pending">Aguardando</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
                   <SelectItem value="confirmed">Confirmado</SelectItem>
                   <SelectItem value="production">Em Produção</SelectItem>
-                  <SelectItem value="shipped">Enviado</SelectItem>
-                  <SelectItem value="delivered">Entregue</SelectItem>
+                  <SelectItem value="completed">Concluído</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
@@ -567,13 +698,13 @@ export default function AdminOrders() {
                     Vendedor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Data
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
@@ -584,7 +715,7 @@ export default function AdminOrders() {
                 {filteredOrders?.map((order: any) => (
                   <tr key={order.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {order.orderNumber}
+                      #{order.orderNumber || order.id.slice(0, 8)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {order.clientName}
@@ -593,31 +724,33 @@ export default function AdminOrders() {
                       {order.vendorName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.product}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {parseFloat(order.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(order.status)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Button variant="ghost" size="sm" className="mr-2">
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver
-                      </Button>
-                      {(order.status === "confirmed" || order.status === "pending") && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-green-600 hover:text-green-900"
-                          onClick={() => sendToProductionMutation.mutate(order.id)}
-                          disabled={sendToProductionMutation.isPending}
-                        >
-                          <Send className="h-4 w-4 mr-1" />
-                          Enviar
+                      <div className="flex space-x-1">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
                         </Button>
-                      )}
+                        <Select value={order.status} onValueChange={(value) => updateOrderStatusMutation.mutate({ orderId: order.id, status: value })}>
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pendente</SelectItem>
+                            <SelectItem value="confirmed">Confirmado</SelectItem>
+                            <SelectItem value="production">Em Produção</SelectItem>
+                            <SelectItem value="completed">Concluído</SelectItem>
+                            <SelectItem value="cancelled">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </td>
                   </tr>
                 ))}

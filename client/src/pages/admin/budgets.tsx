@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { PDFGenerator } from "@/utils/pdfGenerator";
 
 export default function AdminBudgets() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -22,34 +23,48 @@ export default function AdminBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const { toast } = useToast();
 
-  // Budget form state
-  const [budgetForm, setBudgetForm] = useState({
+  // Admin budget form state - independent from vendor
+  const [adminBudgetForm, setAdminBudgetForm] = useState({
     title: "",
     description: "",
     clientId: "",
     vendorId: "",
     validUntil: "",
-    hasCustomization: false,
-    customizationPercentage: "10.00",
-    customizationDescription: "",
     items: [] as any[],
     photos: [] as string[]
   });
 
   const { data: budgets, isLoading } = useQuery({
-    queryKey: ["/api/budgets"],
+    queryKey: ["/api/budgets/admin"],
+    queryFn: async () => {
+      const response = await fetch('/api/budgets');
+      if (!response.ok) throw new Error('Failed to fetch budgets');
+      return response.json();
+    },
   });
 
   const { data: clients } = useQuery({
     queryKey: ["/api/clients"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'client');
+    },
   });
 
   const { data: vendors } = useQuery({
     queryKey: ["/api/vendors"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'vendor');
+    },
   });
 
   const { data: productsData } = useQuery({
-    queryKey: ["/api/products", { limit: 9999 }],
+    queryKey: ["/api/products/admin", { limit: 9999 }],
     queryFn: async () => {
       const response = await fetch('/api/products?limit=9999');
       if (!response.ok) throw new Error('Failed to fetch products');
@@ -60,8 +75,8 @@ export default function AdminBudgets() {
   const products = productsData?.products || [];
   const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
 
-  // Budget functions
-  const addProductToBudget = (product: any) => {
+  // Admin budget functions
+  const addProductToAdminBudget = (product: any) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
@@ -69,17 +84,17 @@ export default function AdminBudgets() {
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
-      itemCustomizationPercentage: 0,
+      itemCustomizationValue: 0,
       itemCustomizationDescription: ""
     };
-    setBudgetForm(prev => ({
+    setAdminBudgetForm(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
   };
 
-  const updateBudgetItem = (index: number, field: string, value: any) => {
-    setBudgetForm(prev => {
+  const updateAdminBudgetItem = (index: number, field: string, value: any) => {
+    setAdminBudgetForm(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
       
@@ -87,7 +102,7 @@ export default function AdminBudgets() {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
         item.totalPrice = item.unitPrice * quantity;
-      } else if (field === 'itemCustomizationPercentage') {
+      } else if (field === 'itemCustomizationValue') {
         item[field] = parseFloat(value) || 0;
       } else {
         item[field] = value;
@@ -98,68 +113,44 @@ export default function AdminBudgets() {
     });
   };
 
-  const removeProductFromBudget = (index: number) => {
-    setBudgetForm(prev => ({
+  const removeProductFromAdminBudget = (index: number) => {
+    setAdminBudgetForm(prev => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index)
     }));
   };
 
-  const calculateBudgetTotal = () => {
-    let itemsTotal = 0;
-    
-    // Calculate each item total including its customization
-    budgetForm.items.forEach(item => {
+  const calculateAdminBudgetTotal = () => {
+    return adminBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
-      let itemTotal = basePrice;
-      
-      // Apply item-level customization
-      if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
-        const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
-        itemTotal = basePrice + customizationAmount;
-      }
-      
-      itemsTotal += itemTotal;
-    });
-
-    // Apply global customization on top of everything
-    if (budgetForm.hasCustomization && parseFloat(budgetForm.customizationPercentage) > 0) {
-      const globalCustomizationAmount = itemsTotal * (parseFloat(budgetForm.customizationPercentage) / 100);
-      itemsTotal += globalCustomizationAmount;
-    }
-
-    return itemsTotal;
+      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+      return total + basePrice + customizationValue;
+    }, 0);
   };
 
-  const calculateItemTotal = (item: any) => {
+  const calculateAdminItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
-      const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
-      return basePrice + customizationAmount;
-    }
-    return basePrice;
+    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+    return basePrice + customizationValue;
   };
 
-  const resetBudgetForm = () => {
-    setBudgetForm({
+  const resetAdminBudgetForm = () => {
+    setAdminBudgetForm({
       title: "",
       description: "",
       clientId: "",
       vendorId: "",
       validUntil: "",
-      hasCustomization: false,
-      customizationPercentage: "10.00",
-      customizationDescription: "",
       items: [],
       photos: []
     });
   };
 
-  const createBudgetMutation = useMutation({
+  const createAdminBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateBudgetTotal().toFixed(2)
+        totalValue: calculateAdminBudgetTotal().toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -170,9 +161,9 @@ export default function AdminBudgets() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
       setIsCreateDialogOpen(false);
-      resetBudgetForm();
+      resetAdminBudgetForm();
       setBudgetProductSearch("");
       setBudgetCategoryFilter("all");
       toast({
@@ -195,7 +186,7 @@ export default function AdminBudgets() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
       toast({
@@ -215,7 +206,7 @@ export default function AdminBudgets() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
       if (data.whatsappUrl) {
         window.open(data.whatsappUrl, '_blank');
       }
@@ -225,17 +216,6 @@ export default function AdminBudgets() {
       });
     },
   });
-
-  const handleConvertClick = (budgetId: string) => {
-    setBudgetToConvert(budgetId);
-    setConvertDialogOpen(true);
-  };
-
-  const handleConfirmConvert = () => {
-    if (budgetToConvert) {
-      convertToOrderMutation.mutate(budgetToConvert);
-    }
-  };
 
   const generatePDFMutation = useMutation({
     mutationFn: async (budgetId: string) => {
@@ -280,9 +260,20 @@ export default function AdminBudgets() {
     }
   });
 
-  const handleBudgetSubmit = (e: React.FormEvent) => {
+  const handleConvertClick = (budgetId: string) => {
+    setBudgetToConvert(budgetId);
+    setConvertDialogOpen(true);
+  };
+
+  const handleConfirmConvert = () => {
+    if (budgetToConvert) {
+      convertToOrderMutation.mutate(budgetToConvert);
+    }
+  };
+
+  const handleAdminBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (budgetForm.items.length === 0) {
+    if (adminBudgetForm.items.length === 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao orçamento",
@@ -290,11 +281,11 @@ export default function AdminBudgets() {
       });
       return;
     }
-    createBudgetMutation.mutate(budgetForm);
+    createAdminBudgetMutation.mutate(adminBudgetForm);
   };
 
-  // Filter products for budget creation
-  const filteredBudgetProducts = products.filter((product: any) => {
+  // Filter products for admin budget creation
+  const filteredAdminBudgetProducts = products.filter((product: any) => {
     const matchesSearch = !budgetProductSearch || 
       product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
@@ -354,8 +345,8 @@ export default function AdminBudgets() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Orçamentos</h1>
-          <p className="text-gray-600">Crie e gerencie orçamentos para seus clientes</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Orçamentos - Admin</h1>
+          <p className="text-gray-600">Crie e gerencie orçamentos para todos os vendedores e clientes</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -371,42 +362,42 @@ export default function AdminBudgets() {
                 Crie um orçamento personalizado com produtos do catálogo
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleBudgetSubmit} className="space-y-6">
+            <form onSubmit={handleAdminBudgetSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="budget-title">Título do Orçamento</Label>
+                  <Label htmlFor="admin-budget-title">Título do Orçamento</Label>
                   <Input
-                    id="budget-title"
-                    value={budgetForm.title}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, title: e.target.value })}
+                    id="admin-budget-title"
+                    value={adminBudgetForm.title}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, title: e.target.value })}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="budget-validUntil">Válido Até</Label>
+                  <Label htmlFor="admin-budget-validUntil">Válido Até</Label>
                   <Input
-                    id="budget-validUntil"
+                    id="admin-budget-validUntil"
                     type="date"
-                    value={budgetForm.validUntil}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, validUntil: e.target.value })}
+                    value={adminBudgetForm.validUntil}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, validUntil: e.target.value })}
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="budget-description">Descrição</Label>
+                <Label htmlFor="admin-budget-description">Descrição</Label>
                 <Textarea
-                  id="budget-description"
+                  id="admin-budget-description"
                   rows={2}
-                  value={budgetForm.description}
-                  onChange={(e) => setBudgetForm({ ...budgetForm, description: e.target.value })}
+                  value={adminBudgetForm.description}
+                  onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, description: e.target.value })}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="budget-client">Cliente</Label>
-                  <Select value={budgetForm.clientId} onValueChange={(value) => setBudgetForm({ ...budgetForm, clientId: value })}>
+                  <Label htmlFor="admin-budget-client">Cliente</Label>
+                  <Select value={adminBudgetForm.clientId} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, clientId: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um cliente" />
                     </SelectTrigger>
@@ -418,8 +409,8 @@ export default function AdminBudgets() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="budget-vendor">Vendedor</Label>
-                  <Select value={budgetForm.vendorId} onValueChange={(value) => setBudgetForm({ ...budgetForm, vendorId: value })}>
+                  <Label htmlFor="admin-budget-vendor">Vendedor</Label>
+                  <Select value={adminBudgetForm.vendorId} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, vendorId: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um vendedor" />
                     </SelectTrigger>
@@ -434,73 +425,100 @@ export default function AdminBudgets() {
 
               <Separator />
 
-              {/* Customization Options */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="budget-customization"
-                    checked={budgetForm.hasCustomization}
-                    onCheckedChange={(checked) => setBudgetForm({ ...budgetForm, hasCustomization: checked })}
-                  />
-                  <Label htmlFor="budget-customization" className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Aplicar Personalização Global
-                  </Label>
-                </div>
-                
-                {budgetForm.hasCustomization && (
-                  <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
-                    <div>
-                      <Label htmlFor="budget-customization-percentage">Percentual (%)</Label>
-                      <Input
-                        id="budget-customization-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={budgetForm.customizationPercentage}
-                        onChange={(e) => setBudgetForm({ ...budgetForm, customizationPercentage: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="budget-customization-description">Descrição da Personalização</Label>
-                      <Input
-                        id="budget-customization-description"
-                        value={budgetForm.customizationDescription}
-                        onChange={(e) => setBudgetForm({ ...budgetForm, customizationDescription: e.target.value })}
-                        placeholder="Ex: Gravação personalizada, cor especial..."
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
               {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
                 
                 {/* Selected Products */}
-                {budgetForm.items.length > 0 && (
-                  <div className="space-y-2">
-                    {budgetForm.items.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded">
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-500">
-                            {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
-                            R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
+                {adminBudgetForm.items.length > 0 && (
+                  <div className="space-y-4">
+                    {adminBudgetForm.items.map((item, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium">{item.productName}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeProductFromAdminBudget(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeProductFromBudget(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`admin-quantity-${index}`}>Quantidade</Label>
+                            <Input
+                              id={`admin-quantity-${index}`}
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateAdminBudgetItem(index, 'quantity', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-unit-price-${index}`}>Preço Unitário</Label>
+                            <Input
+                              id={`admin-unit-price-${index}`}
+                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
+                            <Input
+                              id={`admin-subtotal-${index}`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`admin-item-customization-${index}`}
+                            checked={item.hasItemCustomization}
+                            onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasItemCustomization', checked)}
+                          />
+                          <Label htmlFor={`admin-item-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização do Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemCustomization && (
+                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
+                            <div>
+                              <Label htmlFor={`admin-item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                              <Input
+                                id={`admin-item-customization-value-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.itemCustomizationValue}
+                                onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationValue', e.target.value)}
+                                placeholder="0,00"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`admin-item-customization-description-${index}`}>Descrição</Label>
+                              <Input
+                                id={`admin-item-customization-description-${index}`}
+                                value={item.itemCustomizationDescription}
+                                onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
+                                placeholder="Ex: Gravação, cor especial..."
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Subtotal:</span>
+                          <span className="font-medium">
+                            R$ {calculateAdminItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -512,7 +530,7 @@ export default function AdminBudgets() {
                     <CardTitle className="text-base">Adicionar Produtos</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Budget Product Search */}
+                    {/* Admin Budget Product Search */}
                     <div className="mb-4 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div className="relative">
@@ -522,11 +540,10 @@ export default function AdminBudgets() {
                             value={budgetProductSearch}
                             onChange={(e) => setBudgetProductSearch(e.target.value)}
                             className="pl-9"
-                            data-testid="input-budget-product-search"
                           />
                         </div>
                         <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
-                          <SelectTrigger data-testid="select-budget-category">
+                          <SelectTrigger>
                             <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
@@ -539,7 +556,7 @@ export default function AdminBudgets() {
                         </Select>
                       </div>
                       <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{filteredBudgetProducts.length} produtos encontrados</span>
+                        <span>{filteredAdminBudgetProducts.length} produtos encontrados</span>
                         {(budgetProductSearch || budgetCategoryFilter !== "all") && (
                           <Button 
                             variant="ghost" 
@@ -555,7 +572,7 @@ export default function AdminBudgets() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {filteredBudgetProducts.length === 0 ? (
+                      {filteredAdminBudgetProducts.length === 0 ? (
                         <div className="col-span-full text-center py-8">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500">
@@ -565,9 +582,9 @@ export default function AdminBudgets() {
                           </p>
                         </div>
                       ) : (
-                        filteredBudgetProducts.map((product: any) => (
+                        filteredAdminBudgetProducts.map((product: any) => (
                           <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
-                               onClick={() => addProductToBudget(product)}>
+                               onClick={() => addProductToAdminBudget(product)}>
                             <div className="flex items-center gap-2">
                               {product.imageLink ? (
                                 <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
@@ -596,14 +613,9 @@ export default function AdminBudgets() {
                 <div className="flex justify-between items-center text-lg font-semibold">
                   <span>Total do Orçamento:</span>
                   <span className="text-blue-600">
-                    R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {budgetForm.hasCustomization && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Inclui {budgetForm.customizationPercentage}% de personalização
-                  </p>
-                )}
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -612,21 +624,88 @@ export default function AdminBudgets() {
                   type="button" 
                   onClick={() => {
                     setIsCreateDialogOpen(false);
-                    resetBudgetForm();
+                    resetAdminBudgetForm();
                   }}
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={createBudgetMutation.isPending || budgetForm.items.length === 0}
+                  disabled={createAdminBudgetMutation.isPending || adminBudgetForm.items.length === 0}
                 >
-                  {createBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
+                  {createAdminBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total de Orçamentos</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {budgets?.length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Calculator className="h-6 w-6 text-gray-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Enviados</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {budgets?.filter((b: any) => b.status === 'sent').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Send className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Aprovados</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {budgets?.filter((b: any) => b.status === 'approved').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                <p className="text-lg font-bold gradient-text">
+                  R$ {budgets?.reduce((total: number, b: any) => total + parseFloat(b.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                </p>
+              </div>
+              <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">R$</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
