@@ -694,7 +694,7 @@ export default function VendorBudgets() {
                             <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((category) => (
+                            {categories.map((category: string) => (
                               <SelectItem key={category} value={category}>
                                 {category === "all" ? "Todas as Categorias" : category}
                               </SelectItem>
