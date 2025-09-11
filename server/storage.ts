@@ -39,6 +39,7 @@ export interface IStorage {
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   getOrdersByVendor(vendorId: string): Promise<Order[]>;
   getOrdersByClient(clientId: string): Promise<Order[]>;
+  getClientsByVendor(vendorId: string): Promise<Client[]>;
 
   // Production Orders
   getProductionOrders(): Promise<ProductionOrder[]>;
@@ -369,7 +370,14 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      ...insertUser, 
+      id,
+      vendorId: insertUser.vendorId || null,
+      email: insertUser.email || null,
+      phone: insertUser.phone || null,
+      isActive: insertUser.isActive !== undefined ? insertUser.isActive : true
+    };
     this.users.set(id, user);
     return user;
   }
@@ -388,31 +396,6 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).filter(user => user.role === 'vendor');
   }
 
-  async createVendor(vendorData: any): Promise<User> {
-    const newUser: User = {
-      id: `vendor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      role: 'vendor',
-      phone: null,
-      vendorId: null,
-      isActive: true,
-      email: vendorData.email || null,
-      ...vendorData
-    };
-    
-    this.users.set(newUser.id, newUser);
-    
-    // Also create vendor profile
-    const vendorProfile: Vendor = {
-      id: `vendor-profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      userId: newUser.id,
-      salesLink: vendorData.salesLink || null,
-      commissionRate: vendorData.commissionRate || "10.00",
-      isActive: true
-    };
-    
-    this.vendors.set(vendorProfile.id, vendorProfile);
-    return newUser;
-  }
 
   // Client methods
   async getClients(): Promise<Client[]> {
@@ -428,6 +411,14 @@ export class MemStorage implements IStorage {
     const client: Client = {
       ...clientData,
       id,
+      vendorId: clientData.vendorId || null,
+      userId: clientData.userId || null,
+      email: clientData.email || null,
+      phone: clientData.phone || null,
+      whatsapp: clientData.whatsapp || null,
+      cpfCnpj: clientData.cpfCnpj || null,
+      address: clientData.address || null,
+      isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -467,6 +458,11 @@ export class MemStorage implements IStorage {
     const order: Order = { 
       ...insertOrder, 
       id,
+      producerId: insertOrder.producerId || null,
+      description: insertOrder.description || null,
+      paidValue: insertOrder.paidValue || null,
+      deadline: insertOrder.deadline || null,
+      status: insertOrder.status || 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -492,6 +488,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.orders.values()).filter(order => order.clientId === clientId);
   }
 
+  async getClientsByVendor(vendorId: string): Promise<Client[]> {
+    return Array.from(this.clients.values()).filter(client => client.vendorId === vendorId);
+  }
+
   // Production Order methods
   async getProductionOrders(): Promise<ProductionOrder[]> {
     return Array.from(this.productionOrders.values());
@@ -503,7 +503,15 @@ export class MemStorage implements IStorage {
 
   async createProductionOrder(insertProductionOrder: InsertProductionOrder): Promise<ProductionOrder> {
     const id = randomUUID();
-    const productionOrder: ProductionOrder = { ...insertProductionOrder, id };
+    const productionOrder: ProductionOrder = { 
+      ...insertProductionOrder, 
+      id,
+      status: insertProductionOrder.status || 'pending',
+      deadline: insertProductionOrder.deadline || null,
+      acceptedAt: insertProductionOrder.acceptedAt || null,
+      completedAt: insertProductionOrder.completedAt || null,
+      notes: insertProductionOrder.notes || null
+    };
     this.productionOrders.set(id, productionOrder);
     return productionOrder;
   }
@@ -528,6 +536,9 @@ export class MemStorage implements IStorage {
     const payment: Payment = { 
       ...insertPayment, 
       id,
+      status: insertPayment.status || 'pending',
+      transactionId: insertPayment.transactionId || null,
+      paidAt: insertPayment.paidAt || null,
       createdAt: new Date()
     };
     this.payments.set(id, payment);
@@ -548,6 +559,8 @@ export class MemStorage implements IStorage {
     const commission: Commission = { 
       ...insertCommission, 
       id,
+      status: insertCommission.status || 'pending',
+      paidAt: insertCommission.paidAt || null,
       createdAt: new Date()
     };
     this.commissions.set(id, commission);
@@ -559,11 +572,33 @@ export class MemStorage implements IStorage {
     return Array.from(this.vendors.values()).find(vendor => vendor.userId === userId);
   }
 
-  async createVendor(insertVendor: InsertVendor): Promise<Vendor> {
-    const id = randomUUID();
-    const vendor: Vendor = { ...insertVendor, id };
-    this.vendors.set(id, vendor);
-    return vendor;
+  async createVendor(vendorData: any): Promise<User> {
+    // Create user first
+    const newUser: User = {
+      id: randomUUID(),
+      username: vendorData.username,
+      password: vendorData.password || "123456",
+      role: 'vendor',
+      name: vendorData.name,
+      email: vendorData.email || null,
+      phone: vendorData.phone || null,
+      vendorId: null,
+      isActive: true
+    };
+    
+    this.users.set(newUser.id, newUser);
+    
+    // Also create vendor profile
+    const vendorProfile: Vendor = {
+      id: randomUUID(),
+      userId: newUser.id,
+      salesLink: vendorData.salesLink || null,
+      commissionRate: vendorData.commissionRate || "10.00",
+      isActive: true
+    };
+    
+    this.vendors.set(vendorProfile.id, vendorProfile);
+    return newUser;
   }
 
   async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
@@ -796,11 +831,13 @@ export class MemStorage implements IStorage {
       orderNumber: `#${Math.floor(Math.random() * 100000)}`,
       clientId: budget.clientId,
       vendorId: budget.vendorId,
+      producerId: null,
       product: budget.title,
       description: budget.description,
       totalValue: budget.totalValue,
       paidValue: '0',
       status: 'pending',
+      deadline: null,
       createdAt: new Date(),
       updatedAt: new Date()
     };

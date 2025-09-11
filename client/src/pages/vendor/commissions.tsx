@@ -23,9 +23,9 @@ export default function VendorCommissions() {
     );
   }
 
-  const totalCommissions = commissions?.reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
-  const confirmedCommissions = commissions?.filter((c: any) => c.status === 'confirmed').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
-  const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
+  const totalCommissions = (commissions as any[])?.reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
+  const confirmedCommissions = (commissions as any[])?.filter((c: any) => c.status === 'confirmed').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
+  const pendingCommissions = (commissions as any[])?.filter((c: any) => c.status === 'pending').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
 
   return (
     <div className="p-8">
@@ -114,7 +114,7 @@ export default function VendorCommissions() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {commissions?.map((commission: any) => (
+                {(commissions as any[])?.map((commission: any) => (
                   <tr key={commission.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(commission.createdAt).toLocaleDateString('pt-BR')}

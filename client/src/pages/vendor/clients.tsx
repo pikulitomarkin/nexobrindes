@@ -1,12 +1,84 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, ShoppingCart } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Textarea } from "@/components/ui/textarea";
+import { Mail, Phone, ShoppingCart, Plus, MessageCircle, Hash, MapPin } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+
+const clientFormSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z.string().email("Email inválido").optional(),
+  phone: z.string().optional(),
+  whatsapp: z.string().optional(),
+  cpfCnpj: z.string().optional(),
+  address: z.string().optional(),
+});
+
+type ClientFormValues = z.infer<typeof clientFormSchema>;
 
 export default function VendorClients() {
-  const vendorId = "vendor-1";
+  const vendorId = "vendor-1"; // Em produção, buscar do contexto/auth
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
+
   const { data: clients, isLoading } = useQuery({
     queryKey: ["/api/vendor/clients", vendorId],
+    queryFn: async () => {
+      const response = await fetch(`/api/vendors/${vendorId}/clients`);
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
+    },
+  });
+
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      whatsapp: "",
+      cpfCnpj: "",
+      address: "",
+    },
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: async (data: ClientFormValues) => {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          vendorId: vendorId,
+        }),
+      });
+      if (!response.ok) throw new Error("Erro ao criar cliente");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
+      setIsCreateDialogOpen(false);
+      form.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Cliente criado com sucesso",
+      });
+    },
   });
 
   if (isLoading) {
@@ -24,11 +96,143 @@ export default function VendorClients() {
     );
   }
 
+  const onSubmit = (data: ClientFormValues) => {
+    createClientMutation.mutate(data);
+  };
+
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Clientes</h1>
-        <p className="text-gray-600">Clientes que compraram através do seu link</p>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Clientes</h1>
+          <p className="text-gray-600">Gerencie seus clientes e acompanhe suas compras</p>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-bg text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
+              <DialogDescription>
+                Preencha os dados do cliente
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Completo *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="João Silva" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="joao@email.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(11) 99999-9999" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="whatsapp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(11) 99999-9999" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cpfCnpj"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF/CNPJ</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123.456.789-00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço Completo</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Rua das Flores, 123, Centro, São Paulo, SP"
+                          rows={3}
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="gradient-bg text-white"
+                    disabled={createClientMutation.isPending}
+                  >
+                    {createClientMutation.isPending ? "Criando..." : "Criar Cliente"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -45,14 +249,30 @@ export default function VendorClients() {
               </div>
               
               <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="h-4 w-4 mr-2" />
-                  {client.email}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Phone className="h-4 w-4 mr-2" />
-                  {client.phone || 'Não informado'}
-                </div>
+                {client.email && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">{client.email}</span>
+                  </div>
+                )}
+                {client.phone && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{client.phone}</span>
+                  </div>
+                )}
+                {client.whatsapp && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{client.whatsapp}</span>
+                  </div>
+                )}
+                {client.cpfCnpj && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{client.cpfCnpj}</span>
+                  </div>
+                )}
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -82,7 +302,14 @@ export default function VendorClients() {
       {clients?.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500">Ainda não há clientes cadastrados através do seu link</p>
+            <p className="text-gray-500 mb-4">Ainda não há clientes cadastrados</p>
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="gradient-bg text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Cadastrar Primeiro Cliente
+            </Button>
           </CardContent>
         </Card>
       )}

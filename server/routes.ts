@@ -15,7 +15,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const today = new Date().toDateString();
       const ordersToday = orders.filter(order => 
-        new Date(order.createdAt).toDateString() === today
+        order.createdAt && new Date(order.createdAt).toDateString() === today
       ).length;
 
       const inProduction = orders.filter(order => 
@@ -24,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const monthlyRevenue = orders
         .filter(order => {
+          if (!order.createdAt) return false;
           const orderMonth = new Date(order.createdAt).getMonth();
           const currentMonth = new Date().getMonth();
           return orderMonth === currentMonth && order.status !== 'cancelled';
@@ -43,7 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalClients: users.filter(u => u.role === 'client').length,
         totalVendors: users.filter(u => u.role === 'vendor').length,
         totalProducers: users.filter(u => u.role === 'producer').length,
-        totalProducts: products.length,
+        totalProducts: products.total,
         totalBudgets: budgets.length
       });
     } catch (error) {
@@ -220,6 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const monthlySales = orders
         .filter(order => {
+          if (!order.createdAt) return false;
           const orderMonth = new Date(order.createdAt).getMonth();
           const currentMonth = new Date().getMonth();
           return orderMonth === currentMonth;
@@ -249,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const receivables = orders
         .filter(order => order.status !== 'cancelled')
-        .reduce((total, order) => total + (parseFloat(order.totalValue) - parseFloat(order.paidValue)), 0);
+        .reduce((total, order) => total + (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')), 0);
 
       const payables = 12450; // Mock data for suppliers/producers
       const balance = 89230; // Mock bank balance
@@ -695,6 +697,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to create vendor" });
+    }
+  });
+
+  app.get("/api/vendors/:id/stats", async (req, res) => {
+    try {
+      const vendorId = req.params.id;
+      const orders = await storage.getOrdersByVendor(vendorId);
+      const clients = await storage.getClientsByVendor(vendorId);
+      const commissions = await storage.getCommissionsByVendor(vendorId);
+      
+      const totalOrders = orders.length;
+      const totalClients = clients.length;
+      const totalSales = orders.reduce((sum, order) => sum + parseFloat(order.totalValue), 0);
+      const totalCommissions = commissions.reduce((sum, comm) => sum + parseFloat(comm.amount), 0);
+
+      res.json({
+        totalOrders,
+        totalClients,
+        totalSales,
+        totalCommissions,
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch vendor stats" });
+    }
+  });
+
+  app.get("/api/vendors/:id/orders", async (req, res) => {
+    try {
+      const vendorId = req.params.id;
+      const orders = await storage.getOrdersByVendor(vendorId);
+      res.json(orders);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch vendor orders" });
+    }
+  });
+
+  app.get("/api/vendors/:id/commissions", async (req, res) => {
+    try {
+      const vendorId = req.params.id;
+      const commissions = await storage.getCommissionsByVendor(vendorId);
+      res.json(commissions);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch vendor commissions" });
+    }
+  });
+
+  app.get("/api/vendors/:id/clients", async (req, res) => {
+    try {
+      const vendorId = req.params.id;
+      const clients = await storage.getClientsByVendor(vendorId);
+      res.json(clients);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ error: "Failed to fetch vendor clients" });
     }
   });
 
