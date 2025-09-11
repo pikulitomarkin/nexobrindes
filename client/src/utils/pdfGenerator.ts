@@ -69,23 +69,23 @@ export class PDFGenerator {
     this.doc.setFontSize(20);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('ORÇAMENTO', this.pageWidth / 2, this.currentY, { align: 'center' });
-    
+
     this.currentY += 15;
     this.doc.setFontSize(12);
     this.doc.text(`Número: ${data.budget.budgetNumber}`, this.margin, this.currentY);
     this.doc.text(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`, this.pageWidth - this.margin - 50, this.currentY);
-    
+
     if (data.budget.validUntil) {
       this.currentY += 8;
       this.doc.text(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
     }
-    
+
     this.currentY += 20;
   }
 
   private addClientVendorInfo(data: BudgetPDFData): void {
     this.addNewPageIfNeeded(40);
-    
+
     // Client info
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
@@ -93,12 +93,12 @@ export class PDFGenerator {
     this.doc.setFont('helvetica', 'normal');
     this.currentY += 8;
     this.doc.text(data.client.name, this.margin, this.currentY);
-    
+
     if (data.client.email) {
       this.currentY += 6;
       this.doc.text(`Email: ${data.client.email}`, this.margin, this.currentY);
     }
-    
+
     if (data.client.phone) {
       this.currentY += 6;
       this.doc.text(`Telefone: ${data.client.phone}`, this.margin, this.currentY);
@@ -107,26 +107,26 @@ export class PDFGenerator {
     // Vendor info
     const rightColumn = this.pageWidth / 2 + 10;
     const vendorStartY = this.currentY - (data.client.email ? 14 : 8) - (data.client.phone ? 6 : 0);
-    
+
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('VENDEDOR:', rightColumn, vendorStartY);
     this.doc.setFont('helvetica', 'normal');
     this.doc.text(data.vendor.name, rightColumn, vendorStartY + 8);
-    
+
     if (data.vendor.email) {
       this.doc.text(`Email: ${data.vendor.email}`, rightColumn, vendorStartY + 14);
     }
-    
+
     if (data.vendor.phone) {
       this.doc.text(`Telefone: ${data.vendor.phone}`, rightColumn, vendorStartY + (data.vendor.email ? 20 : 14));
     }
-    
+
     this.currentY += 20;
   }
 
   private addItems(data: BudgetPDFData): void {
     this.addNewPageIfNeeded(50);
-    
+
     // Title
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
@@ -140,11 +140,11 @@ export class PDFGenerator {
 
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
-    
+
     // Draw header background
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
-    
+
     this.doc.text('Produto', currentX + 2, this.currentY);
     currentX += colWidths[0];
     this.doc.text('Qtd', currentX + 2, this.currentY);
@@ -152,80 +152,80 @@ export class PDFGenerator {
     this.doc.text('Preço Unit.', currentX + 2, this.currentY);
     currentX += colWidths[2];
     this.doc.text('Total', currentX + 2, this.currentY);
-    
+
     this.currentY += 10;
 
     // Items
     this.doc.setFont('helvetica', 'normal');
     data.items.forEach((item, index) => {
       this.addNewPageIfNeeded(15);
-      
+
       // Draw row background (alternating)
       if (index % 2 === 1) {
         this.doc.setFillColor(250, 250, 250);
         this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
       }
-      
+
       currentX = startX;
-      
+
       // Product name (with text wrapping if needed)
       const productName = item.product.name.length > 30 
         ? item.product.name.substring(0, 30) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY);
       currentX += colWidths[0];
-      
+
       // Quantity
       this.doc.text(item.quantity.toString(), currentX + 2, this.currentY);
       currentX += colWidths[1];
-      
+
       // Unit price
       this.doc.text(`R$ ${parseFloat(item.unitPrice).toFixed(2)}`, currentX + 2, this.currentY);
       currentX += colWidths[2];
-      
+
       // Total price
       this.doc.text(`R$ ${parseFloat(item.totalPrice).toFixed(2)}`, currentX + 2, this.currentY);
-      
+
       this.currentY += 10;
-      
+
       // Add customization info if exists
       if (item.hasItemCustomization && item.itemCustomizationDescription) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
         this.doc.text(`  + ${item.itemCustomizationDescription}: R$ ${parseFloat(item.itemCustomizationValue || '0').toFixed(2)}`, startX + 2, this.currentY);
-        this.currentY += 6; += 8;
+        this.currentY += 6; 
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
     });
-    
+
     this.currentY += 10;
   }
 
   private addTotal(data: BudgetPDFData): void {
     this.addNewPageIfNeeded(30);
-    
+
     // Draw total section
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, 20, 'F');
-    
+
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('TOTAL GERAL:', this.pageWidth - this.margin - 95, this.currentY + 5);
     this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toFixed(2)}`, this.pageWidth - this.margin - 95, this.currentY + 15);
-    
+
     this.currentY += 30;
   }
 
   private addDescription(data: BudgetPDFData): void {
     if (data.budget.description) {
       this.addNewPageIfNeeded(30);
-      
+
       this.doc.setFontSize(12);
       this.doc.setFont('helvetica', 'bold');
       this.doc.text('OBSERVAÇÕES:', this.margin, this.currentY);
       this.currentY += 10;
-      
+
       this.doc.setFont('helvetica', 'normal');
       const lines = this.doc.splitTextToSize(data.budget.description, this.pageWidth - 2 * this.margin);
       this.doc.text(lines, this.margin, this.currentY);
@@ -236,13 +236,13 @@ export class PDFGenerator {
   public async generateBudgetPDF(data: BudgetPDFData): Promise<Blob> {
     try {
       this.currentY = 20;
-      
+
       this.addHeader(data);
       this.addClientVendorInfo(data);
       this.addItems(data);
       this.addTotal(data);
       this.addDescription(data);
-      
+
       return new Promise((resolve) => {
         const pdfBlob = this.doc.output('blob');
         resolve(pdfBlob);
@@ -270,7 +270,7 @@ export class PDFGenerator {
       canvas.width = width * 4; // Higher resolution
       canvas.height = height * 4;
       const ctx = canvas.getContext('2d');
-      
+
       if (ctx) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL('image/jpeg', 0.8);

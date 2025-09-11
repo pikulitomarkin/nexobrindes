@@ -315,51 +315,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Products
-  app.get("/api/products", (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const offset = (page - 1) * limit;
-    const search = (req.query.search as string) || '';
-    const category = (req.query.category as string) || '';
+  app.get("/api/products", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const search = (req.query.search as string) || '';
+      const category = (req.query.category as string) || '';
 
-    let allProducts = storage.getAll('products');
+      const result = await storage.getProducts({
+        page,
+        limit,
+        search,
+        category
+      });
 
-    // Apply filters
-    if (search) {
-      const searchLower = search.toLowerCase();
-      allProducts = allProducts.filter((product: any) =>
-        product.name.toLowerCase().includes(searchLower) ||
-        product.description?.toLowerCase().includes(searchLower) ||
-        product.id.toLowerCase().includes(searchLower) ||
-        product.friendlyCode?.toLowerCase().includes(searchLower)
-      );
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch products" });
     }
-
-    if (category && category !== 'all') {
-      allProducts = allProducts.filter((product: any) =>
-        product.category === category
-      );
-    }
-
-    const products = allProducts.slice(offset, offset + limit);
-
-    res.json({
-      products,
-      total: allProducts.length,
-      page,
-      limit,
-      totalPages: Math.ceil(allProducts.length / limit)
-    });
   });
 
-  app.get("/api/products/categories", (req, res) => {
-    const allProducts = storage.getAll('products');
-    const categories = [...new Set(allProducts
-      .map((product: any) => product.category)
-      .filter(Boolean)
-    )].sort();
+    
 
-    res.json(categories);
+  app.get("/api/products/categories", async (req, res) => {
+    try {
+      const result = await storage.getProducts({ limit: 9999 });
+      const categories = [...new Set(result.products
+        .map((product: any) => product.category)
+        .filter(Boolean)
+      )].sort();
+
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
   });
 
   // Product search endpoint
