@@ -150,28 +150,10 @@ export default function AdminPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Link href="/admin/vendors">
-              <Button className="w-full justify-start gradient-bg text-white">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Vendedores ({stats?.totalVendors || 0})
-              </Button>
-            </Link>
             <Link href="/admin/clients">
               <Button variant="outline" className="w-full justify-start">
                 <Users className="h-4 w-4 mr-2" />
                 Gerenciar Clientes ({stats?.totalClients || 0})
-              </Button>
-            </Link>
-            <Link href="/admin/producers">
-              <Button variant="outline" className="w-full justify-start">
-                <Factory className="h-4 w-4 mr-2" />
-                Gerenciar Produtores ({stats?.totalProducers || 0})
-              </Button>
-            </Link>
-            <Link href="/admin/commission-settings">
-              <Button variant="outline" className="w-full justify-start">
-                <Settings className="h-4 w-4 mr-2" />
-                Configurar Comissões
               </Button>
             </Link>
           </CardContent>
