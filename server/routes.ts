@@ -934,7 +934,24 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const vendorId = req.params.id;
       const orders = await storage.getOrdersByVendor(vendorId);
-      res.json(orders);
+      
+      // Enrich with client and vendor names
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const client = await storage.getUser(order.clientId);
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          
+          return {
+            ...order,
+            clientName: client?.name || 'Unknown',
+            vendorName: vendor?.name || 'Unknown',
+            producerName: producer?.name || null
+          };
+        })
+      );
+      
+      res.json(enrichedOrders);
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to fetch vendor orders" });

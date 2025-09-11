@@ -232,6 +232,8 @@ export default function VendorOrders() {
       pending: "status-badge status-pending",
       confirmed: "status-badge status-confirmed",
       production: "status-badge status-production",
+      delayed: "status-badge status-cancelled",
+      ready: "status-badge status-pending",
       shipped: "status-badge status-confirmed",
       delivered: "status-badge status-completed",
       cancelled: "status-badge status-cancelled",
@@ -241,6 +243,8 @@ export default function VendorOrders() {
       pending: "Aguardando",
       confirmed: "Confirmado",
       production: "Em Produção",
+      delayed: "Em Atraso",
+      ready: "Pronto",
       shipped: "Enviado",
       delivered: "Entregue",
       cancelled: "Cancelado",
@@ -650,6 +654,8 @@ export default function VendorOrders() {
                   <SelectItem value="pending">Aguardando</SelectItem>
                   <SelectItem value="confirmed">Confirmado</SelectItem>
                   <SelectItem value="production">Em Produção</SelectItem>
+                  <SelectItem value="delayed">Em Atraso</SelectItem>
+                  <SelectItem value="ready">Pronto</SelectItem>
                   <SelectItem value="shipped">Enviado</SelectItem>
                   <SelectItem value="delivered">Entregue</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
@@ -709,7 +715,27 @@ export default function VendorOrders() {
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(order.status)}
+                      <div className="space-y-2">
+                        {getStatusBadge(order.status)}
+                        {(order.status === 'production' || order.status === 'delayed' || order.status === 'ready' || order.status === 'shipped' || order.status === 'delivered') && (
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all duration-500 ${
+                                order.status === 'delayed' ? 'bg-red-500' :
+                                order.status === 'ready' ? 'bg-yellow-500' : 
+                                order.status === 'shipped' ? 'bg-blue-500' :
+                                order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
+                              }`}
+                              style={{ 
+                                width: order.status === 'production' ? '25%' : 
+                                       order.status === 'delayed' ? '25%' : 
+                                       order.status === 'ready' ? '50%' : 
+                                       order.status === 'shipped' ? '75%' : '100%' 
+                              }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(order.createdAt).toLocaleDateString('pt-BR')}
