@@ -315,21 +315,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Products
-  app.get("/api/products", async (req, res) => {
-    try {
-      const { page, limit, search, category } = req.query;
-      const options = {
-        page: page ? parseInt(page as string, 10) : 1,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        search: search as string,
-        category: category as string
-      };
+  app.get("/api/products", (req, res) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string) || '';
+    const category = (req.query.category as string) || '';
 
-      const result = await storage.getProducts(options);
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch products" });
+    let allProducts = storage.getAll('products');
+
+    // Apply filters
+    if (search) {
+      const searchLower = search.toLowerCase();
+      allProducts = allProducts.filter((product: any) =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.id.toLowerCase().includes(searchLower) ||
+        product.friendlyCode?.toLowerCase().includes(searchLower)
+      );
     }
+
+    if (category && category !== 'all') {
+      allProducts = allProducts.filter((product: any) =>
+        product.category === category
+      );
+    }
+
+    const products = allProducts.slice(offset, offset + limit);
+
+    res.json({
+      products,
+      total: allProducts.length,
+      page,
+      limit,
+      totalPages: Math.ceil(allProducts.length / limit)
+    });
+  });
+
+  app.get("/api/products/categories", (req, res) => {
+    const allProducts = storage.getAll('products');
+    const categories = [...new Set(allProducts
+      .map((product: any) => product.category)
+      .filter(Boolean)
+    )].sort();
+
+    res.json(categories);
   });
 
   // Product search endpoint
