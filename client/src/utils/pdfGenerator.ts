@@ -290,41 +290,58 @@ export class PDFGenerator {
       const photo = photos[i];
       
       try {
-        // For data URLs, we can add them directly to the PDF
+        // Load image to get natural dimensions
+        const img = await this.loadImage(photo);
+        
+        // Calculate maximum dimensions
+        const maxWidth = this.pageWidth - 2 * this.margin;
+        const maxHeight = 160; // Max height for images
+        
+        // Calculate scaling to preserve aspect ratio
+        const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
+        const imgWidth = img.naturalWidth * scale;
+        const imgHeight = img.naturalHeight * scale;
+        
+        // Check if we need a new page for the image with correct height
+        const captionSpace = 25;
+        this.addNewPageIfNeeded(imgHeight + captionSpace);
+        
+        // Center the image
+        const imgX = (this.pageWidth - imgWidth) / 2;
+        
+        let imageData: string;
+        let format: string;
+        
         if (photo.startsWith('data:image/')) {
-          // Load image to get natural dimensions
-          const img = await this.loadImage(photo);
-          
-          // Calculate maximum dimensions
-          const maxWidth = this.pageWidth - 2 * this.margin;
-          const maxHeight = 160; // Max height for images
-          
-          // Calculate scaling to preserve aspect ratio
-          const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
-          const imgWidth = img.naturalWidth * scale;
-          const imgHeight = img.naturalHeight * scale;
-          
-          // Check if we need a new page for the image with correct height
-          const captionSpace = 25;
-          this.addNewPageIfNeeded(imgHeight + captionSpace);
-          
-          // Center the image
-          const imgX = (this.pageWidth - imgWidth) / 2;
-          
-          // Detect image format from data URL
+          // For data URLs, use directly
+          imageData = photo;
           const mimeMatch = photo.match(/data:image\/([^;]+)/);
-          const format = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
-          const pdfFormat = format === 'JPG' ? 'JPEG' : format;
+          format = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
+        } else {
+          // For regular URLs, convert to canvas and get data URL
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
           
-          this.doc.addImage(photo, pdfFormat, imgX, this.currentY, imgWidth, imgHeight);
-          this.currentY += imgHeight + 15;
-          
-          // Add caption
-          this.doc.setFontSize(10);
-          this.doc.setFont('helvetica', 'normal');
-          this.doc.text(`Imagem de Personalização ${i + 1}`, imgX, this.currentY);
-          this.currentY += 10;
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            imageData = canvas.toDataURL('image/jpeg', 0.8);
+            format = 'JPEG';
+          } else {
+            throw new Error('Failed to get canvas context');
+          }
         }
+        
+        const pdfFormat = format === 'JPG' ? 'JPEG' : format;
+        this.doc.addImage(imageData, pdfFormat, imgX, this.currentY, imgWidth, imgHeight);
+        this.currentY += imgHeight + 15;
+        
+        // Add caption
+        this.doc.setFontSize(10);
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.text(`Imagem de Personalização ${i + 1}`, imgX, this.currentY);
+        this.currentY += 10;
       } catch (error) {
         console.warn('Erro ao adicionar imagem ao PDF:', error);
         // Add placeholder text if image fails
