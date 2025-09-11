@@ -826,13 +826,18 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
       
-      // Enrich with client names
+      // Enrich with client names and items
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
           const client = await storage.getUser(budget.clientId);
+          const items = await storage.getBudgetItems(budget.id);
+          const photos = await storage.getBudgetPhotos(budget.id);
+          
           return {
             ...budget,
-            clientName: client?.name || 'Unknown'
+            clientName: client?.name || 'Unknown',
+            items: items,
+            photos: photos
           };
         })
       );

@@ -208,6 +208,8 @@ export default function VendorBudgets() {
 
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
+  const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
+  const [budgetToView, setBudgetToView] = useState<any>(null);
 
   const convertToOrderMutation = useMutation({
     mutationFn: async (budgetId: string) => {
@@ -259,6 +261,11 @@ export default function VendorBudgets() {
     if (budgetToConvert) {
       convertToOrderMutation.mutate(budgetToConvert);
     }
+  };
+
+  const handleViewBudget = (budget: any) => {
+    setBudgetToView(budget);
+    setViewBudgetDialogOpen(true);
   };
 
   const handleBudgetSubmit = (e: React.FormEvent) => {
@@ -773,7 +780,11 @@ export default function VendorBudgets() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewBudget(budget)}
+                        >
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
@@ -819,6 +830,207 @@ export default function VendorBudgets() {
           </div>
         </CardContent>
       </Card>
+
+      {/* View Budget Dialog */}
+      <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Orçamento</DialogTitle>
+            <DialogDescription>
+              Visualização completa do orçamento {budgetToView?.budgetNumber}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {budgetToView && (
+            <div className="space-y-6">
+              {/* Budget Header */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <Label className="font-semibold">Número do Orçamento</Label>
+                  <p className="text-lg">{budgetToView.budgetNumber}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Status</Label>
+                  <div className="mt-1">{getStatusBadge(budgetToView.status)}</div>
+                </div>
+                <div>
+                  <Label className="font-semibold">Cliente</Label>
+                  <p>{budgetToView.clientName}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Data de Criação</Label>
+                  <p>{new Date(budgetToView.createdAt).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Válido Até</Label>
+                  <p>{budgetToView.validUntil ? new Date(budgetToView.validUntil).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Valor Total</Label>
+                  <p className="text-lg font-bold text-green-600">
+                    R$ {parseFloat(budgetToView.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Budget Details */}
+              <div>
+                <Label className="font-semibold">Título</Label>
+                <p className="mt-1">{budgetToView.title}</p>
+              </div>
+
+              {budgetToView.description && (
+                <div>
+                  <Label className="font-semibold">Descrição</Label>
+                  <p className="mt-1">{budgetToView.description}</p>
+                </div>
+              )}
+
+              {/* Budget Items */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
+                <div className="space-y-3">
+                  {budgetToView.items?.map((item: any, index: number) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="grid grid-cols-4 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium">Produto</Label>
+                          <p className="font-semibold">{item.productName}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Quantidade</Label>
+                          <p>{item.quantity}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Preço Unitário</Label>
+                          <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Subtotal</Label>
+                          <p className="font-semibold">
+                            R$ {(parseFloat(item.unitPrice) * parseInt(item.quantity)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {item.hasItemCustomization && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium">Personalização</Label>
+                              <p>R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium">Descrição</Label>
+                              <p>{item.itemCustomizationDescription || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <Label className="text-sm font-medium">Total do Item</Label>
+                            <p className="font-semibold">
+                              R$ {((parseFloat(item.unitPrice) * parseInt(item.quantity)) + parseFloat(item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Customization Details */}
+              {budgetToView.hasCustomization && (
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Personalização Geral</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-medium">Percentual</Label>
+                      <p>{budgetToView.customizationPercentage}%</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Valor</Label>
+                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="font-medium">Descrição</Label>
+                      <p>{budgetToView.customizationDescription}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Photos */}
+              {budgetToView.photos && budgetToView.photos.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Fotos Anexadas</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {budgetToView.photos.map((photo: string, index: number) => (
+                      <div key={index} className="border rounded-lg overflow-hidden">
+                        <img 
+                          src={photo} 
+                          alt={`Foto ${index + 1}`} 
+                          className="w-full h-32 object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => generatePDFMutation.mutate(budgetToView.id)}
+                  disabled={generatePDFMutation.isPending}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {generatePDFMutation.isPending ? 'Gerando...' : 'Baixar PDF'}
+                </Button>
+                
+                {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
+                  <Button 
+                    variant="outline"
+                    className="text-blue-600 hover:text-blue-900"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      sendToWhatsAppMutation.mutate(budgetToView.id);
+                    }}
+                    disabled={sendToWhatsAppMutation.isPending}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar WhatsApp'}
+                  </Button>
+                )}
+                
+                {(budgetToView.status === 'sent' || budgetToView.status === 'approved') && (
+                  <Button 
+                    className="text-green-600 hover:text-green-900"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleConvertClick(budgetToView.id);
+                    }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Converter em Pedido
+                  </Button>
+                )}
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setViewBudgetDialogOpen(false);
+                    setBudgetToView(null);
+                  }}
+                  className="ml-auto"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Convert to Order Confirmation Dialog */}
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
