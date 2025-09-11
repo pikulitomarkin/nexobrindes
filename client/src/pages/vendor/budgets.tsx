@@ -24,6 +24,59 @@ export default function VendorBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const { toast } = useToast();
 
+  // Image upload functions
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        title: "Erro",
+        description: "Imagem deve ter até 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'budget-customizations');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+      
+      const { url } = await response.json();
+      
+      setVendorBudgetForm(prev => ({
+        ...prev,
+        photos: [...prev.photos, url]
+      }));
+
+      toast({
+        title: "Sucesso!",
+        description: "Imagem enviada com sucesso"
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar imagem",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setVendorBudgetForm(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
+  };
+
   // Budget form state - isolated for vendor
   const [vendorBudgetForm, setVendorBudgetForm] = useState({
     title: "",
@@ -403,6 +456,56 @@ export default function VendorBudgets() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <Label>Imagem da Personalização</Label>
+                <div className="mt-2 space-y-3">
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Clique para enviar</span> imagem da personalização
+                        </p>
+                        <p className="text-xs text-gray-500">PNG, JPG até 5MB</p>
+                      </div>
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        data-testid="input-image-upload"
+                      />
+                    </label>
+                  </div>
+                  
+                  {vendorBudgetForm.photos.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {vendorBudgetForm.photos.map((photo, index) => (
+                        <div key={index} className="relative">
+                          <img 
+                            src={photo} 
+                            alt={`Personalização ${index + 1}`} 
+                            className="w-full h-24 object-cover rounded-lg"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                            onClick={() => removeImage(index)}
+                            type="button"
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <Separator />

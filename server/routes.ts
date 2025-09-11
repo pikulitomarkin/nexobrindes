@@ -1124,6 +1124,29 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Image upload for budget customizations
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+
+      const { mimetype, size, buffer } = req.file;
+      if (!mimetype.startsWith("image/")) {
+        return res.status(400).json({ error: "Apenas imagens são permitidas" });
+      }
+      if (size > 5 * 1024 * 1024) { // 5MB
+        return res.status(400).json({ error: "Imagem muito grande. Limite de 5MB." });
+      }
+
+      // Return Data URL for immediate use
+      const base64 = buffer.toString("base64");
+      const url = `data:${mimetype};base64,${base64}`;
+      return res.json({ url });
+    } catch (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: "Erro ao processar upload" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
