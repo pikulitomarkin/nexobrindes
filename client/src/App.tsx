@@ -63,7 +63,7 @@ function Router() {
         <Route path="/client/orders" component={ClientOrders} />
 
         {/* Producer Routes */}
-        <Route path="/producer/production-dashboard" component={ProductionDashboard} />
+        <Route path="/producer/dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
 
         {/* Finance Routes */}

@@ -3,7 +3,19 @@ import {
   Bus, 
   User, 
   Factory, 
-  TrendingUp 
+  TrendingUp,
+  Package,
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  FileText,
+  Settings,
+  DollarSign,
+  UserCheck,
+  ClipboardList,
+  CreditCard,
+  Receipt,
+  Calculator,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -11,11 +23,26 @@ interface SidebarProps {
   onPanelChange: (panel: string) => void;
 }
 
+// Mocking currentUser and location for demonstration purposes
+const currentUser = { role: 'producer' }; 
+const location = '/producer/dashboard';
+
+// Mocking SidebarItem component
+const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
+  <a
+    href={href}
+    className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
+  >
+    <Icon className="mr-3 h-5 w-5" />
+    <span>{label}</span>
+  </a>
+);
+
 export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const menuItems = [
-    { id: "admin", label: "Admin Geral", icon: BarChart3 },
-    { id: "vendor", label: "Vendedor", icon: Bus },
-    { id: "client", label: "Cliente", icon: User },
+    { id: "admin", label: "Admin Geral", icon: LayoutDashboard },
+    { id: "vendor", label: "Vendedor", icon: ShoppingCart },
+    { id: "client", label: "Cliente", icon: Users },
     { id: "producer", label: "Produtor Externo", icon: Factory },
     { id: "finance", label: "Financeiro", icon: TrendingUp },
   ];
@@ -50,6 +77,22 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
           );
         })}
       </nav>
+      {currentUser?.role === 'producer' && (
+            <>
+              <SidebarItem 
+                icon={BarChart3} 
+                label="Dashboard" 
+                href="/producer/dashboard"
+                isActive={location === "/producer/dashboard"}
+              />
+              <SidebarItem 
+                icon={Package} 
+                label="Ordens" 
+                href="/producer/orders"
+                isActive={location === "/producer/orders"}
+              />
+            </>
+          )}
     </div>
   );
 }
