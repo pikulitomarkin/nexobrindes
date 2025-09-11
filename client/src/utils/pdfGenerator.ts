@@ -318,18 +318,34 @@ export class PDFGenerator {
           const mimeMatch = photo.match(/data:image\/([^;]+)/);
           format = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
         } else {
-          // For regular URLs, convert to canvas and get data URL
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            imageData = canvas.toDataURL('image/jpeg', 0.8);
+          // For regular URLs, fetch and convert to data URL
+          try {
+            const response = await fetch(photo);
+            if (!response.ok) {
+              throw new Error(`Failed to fetch image: ${response.status}`);
+            }
+            const blob = await response.blob();
+            imageData = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(new Error('Failed to convert blob to data URL'));
+              reader.readAsDataURL(blob);
+            });
             format = 'JPEG';
-          } else {
-            throw new Error('Failed to get canvas context');
+          } catch (fetchError) {
+            // Fallback to canvas method
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              imageData = canvas.toDataURL('image/jpeg', 0.8);
+              format = 'JPEG';
+            } else {
+              throw new Error('Failed to get canvas context');
+            }
           }
         }
         

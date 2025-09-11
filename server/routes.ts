@@ -6,8 +6,6 @@ import path from 'path';
 import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve uploaded images from public/uploads directory
-  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
@@ -1160,7 +1158,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Image upload for budget customizations
+  // Image upload for budget customizations using Object Storage
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
@@ -1173,32 +1171,74 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Imagem muito grande. Limite de 5MB." });
       }
 
-      // Generate unique filename
+      // Generate unique key for object storage
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(2, 15);
       const extension = originalname.split('.').pop() || 'jpg';
-      const filename = `image-${timestamp}-${randomStr}.${extension}`;
+      const key = `budgets/${new Date().toISOString().split('T')[0]}/${timestamp}-${randomStr}.${extension}`;
 
-      // Save to public directory (accessible by Vite)
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      // Create public/uploads directory if it doesn't exist
-      const uploadsDir = path.default.join(process.cwd(), 'public', 'uploads');
-      if (!fs.default.existsSync(uploadsDir)) {
-        fs.default.mkdirSync(uploadsDir, { recursive: true });
+      // Store in Replit Object Storage
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) {
+        throw new Error('Object storage not configured');
       }
-      
-      // Save file
-      const filePath = path.default.join(uploadsDir, filename);
-      fs.default.writeFileSync(filePath, buffer);
-      
-      // Return public URL that Vite can serve
-      const url = `/uploads/${filename}`;
+
+      // Use fetch to store in object storage
+      const response = await fetch(`https://storage.replit.com/buckets/${bucketId}/objects/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': mimetype,
+          'Authorization': `Bearer ${process.env.REPLIT_DB_TOKEN || ''}`
+        },
+        body: buffer
+      });
+
+      if (!response.ok) {
+        throw new Error(`Object storage upload failed: ${response.statusText}`);
+      }
+
+      // Return proxy URL
+      const url = `/api/files/${encodeURIComponent(key)}`;
       return res.json({ url });
     } catch (err) {
       console.error("Upload error:", err);
       return res.status(500).json({ error: "Erro ao processar upload" });
+    }
+  });
+
+  // File proxy endpoint to serve images from object storage
+  app.get("/api/files/:key", async (req, res) => {
+    try {
+      const key = decodeURIComponent(req.params.key);
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      
+      if (!bucketId) {
+        return res.status(500).json({ error: 'Object storage not configured' });
+      }
+
+      const response = await fetch(`https://storage.replit.com/buckets/${bucketId}/objects/${encodeURIComponent(key)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.REPLIT_DB_TOKEN || ''}`
+        }
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const buffer = await response.arrayBuffer();
+      
+      res.set({
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      });
+      
+      res.send(Buffer.from(buffer));
+    } catch (err) {
+      console.error("File serve error:", err);
+      return res.status(500).json({ error: "Erro ao buscar arquivo" });
     }
   });
 
