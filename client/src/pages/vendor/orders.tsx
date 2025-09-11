@@ -26,6 +26,8 @@ export default function VendorOrders() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [orderProductSearch, setOrderProductSearch] = useState("");
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
+  const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
+  const [orderToSend, setOrderToSend] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [vendorOrderForm, setVendorOrderForm] = useState({
@@ -68,6 +70,33 @@ export default function VendorOrders() {
   const products = productsData?.products || [];
 
   // Mutations
+  const sendToProductionMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao enviar para produção");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
+      setShowSendToProductionModal(false);
+      setOrderToSend(null);
+      toast({
+        title: "Sucesso!",
+        description: "Pedido enviado para produção",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar pedido para produção",
+        variant: "destructive"
+      });
+    }
+  });
+
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
       const response = await fetch("/api/orders", {
@@ -184,6 +213,17 @@ export default function VendorOrders() {
       return;
     }
     createOrderMutation.mutate(vendorOrderForm);
+  };
+
+  const handleSendToProductionClick = (orderId: string) => {
+    setOrderToSend(orderId);
+    setShowSendToProductionModal(true);
+  };
+
+  const confirmSendToProduction = () => {
+    if (orderToSend) {
+      sendToProductionMutation.mutate(orderToSend);
+    }
   };
 
   // Filter products for order creation
@@ -527,16 +567,28 @@ export default function VendorOrders() {
                         {order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrderId(order.id);
-                            setShowOrderDetails(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setShowOrderDetails(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {order.status === "confirmed" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-900"
+                              onClick={() => handleSendToProductionClick(order.id)}
+                            >
+                              Enviar p/ Produção
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -560,6 +612,33 @@ export default function VendorOrders() {
             </CardContent>
           </Card>
         )}
+
+        {/* Send to Production Confirmation Modal */}
+        <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enviar para Produção</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja enviar este pedido para produção?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowSendToProductionModal(false)}
+              >
+                Não
+              </Button>
+              <Button
+                className="gradient-bg text-white"
+                onClick={confirmSendToProduction}
+                disabled={sendToProductionMutation.isPending}
+              >
+                {sendToProductionMutation.isPending ? "Enviando..." : "Sim"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

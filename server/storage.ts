@@ -91,14 +91,14 @@ export interface IStorage {
   updateBudget(id: string, budgetData: any): Promise<any>;
   deleteBudget(id: string): Promise<boolean>;
   convertBudgetToOrder(budgetId: string): Promise<any>;
-  
+
   // Budget Items
   getBudgetItems(budgetId: string): Promise<any[]>;
   createBudgetItem(budgetId: string, itemData: any): Promise<any>;
   updateBudgetItem(itemId: string, itemData: any): Promise<any>;
   deleteBudgetItem(itemId: string): Promise<boolean>;
   deleteBudgetItems(budgetId: string): Promise<boolean>;
-  
+
   // Budget Photos
   getBudgetPhotos(budgetId: string): Promise<any[]>;
   createBudgetPhoto(budgetId: string, photoData: any): Promise<any>;
@@ -113,6 +113,8 @@ export class MemStorage implements IStorage {
   private payments: Map<string, Payment>;
   private commissions: Map<string, Commission>;
   private vendors: Map<string, Vendor>;
+  private products: Map<string, any>; 
+  private budgets: Map<string, any>; 
 
   constructor() {
     this.users = new Map();
@@ -122,6 +124,8 @@ export class MemStorage implements IStorage {
     this.payments = new Map();
     this.commissions = new Map();
     this.vendors = new Map();
+    this.products = new Map(); 
+    this.budgets = new Map(); 
     this.initializeData();
   }
 
@@ -324,6 +328,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date().toISOString()
       }
     ];
+    mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
 
     // Initialize mock products
     mockProducts = [
@@ -358,6 +363,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date().toISOString()
       }
     ];
+    mockProducts.forEach(product => this.products.set(product.id, product));
   }
 
   // User methods
@@ -586,9 +592,9 @@ export class MemStorage implements IStorage {
       vendorId: null,
       isActive: true
     };
-    
+
     this.users.set(newUser.id, newUser);
-    
+
     // Also create vendor profile
     const vendorProfile: Vendor = {
       id: randomUUID(),
@@ -597,7 +603,7 @@ export class MemStorage implements IStorage {
       commissionRate: vendorData.commissionRate || "10.00",
       isActive: true
     };
-    
+
     this.vendors.set(vendorProfile.id, vendorProfile);
     return newUser;
   }
@@ -617,7 +623,7 @@ export class MemStorage implements IStorage {
     search?: string;
     category?: string;
   }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
-    let filteredProducts = [...mockProducts];
+    let filteredProducts = Array.from(this.products.values());
 
     // Apply search filter
     if (options?.search) {
@@ -643,7 +649,7 @@ export class MemStorage implements IStorage {
     const page = options?.page || 1;
     const limit = options?.limit || 20;
     const totalPages = Math.ceil(total / limit);
-    
+
     // Apply pagination
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
@@ -653,45 +659,40 @@ export class MemStorage implements IStorage {
   }
 
   async getProduct(id: string): Promise<any> {
-    return mockProducts.find(product => product.id === id);
+    return this.products.get(id);
   }
 
   async createProduct(productData: any): Promise<any> {
+    const id = `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newProduct = {
-      id: `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id,
       ...productData,
       basePrice: productData.basePrice.toString(), // Ensure it's a string
       isActive: productData.isActive !== undefined ? productData.isActive : true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    mockProducts.push(newProduct); // Add to mockProducts
+    this.products.set(id, newProduct); 
     return newProduct;
   }
 
   async updateProduct(id: string, productData: any): Promise<any> {
-    const productIndex = mockProducts.findIndex(product => product.id === id);
-    if (productIndex === -1) {
+    const product = this.products.get(id);
+    if (!product) {
       throw new Error('Product not found');
     }
 
     const updatedProduct = {
-      ...mockProducts[productIndex],
+      ...product,
       ...productData,
       updatedAt: new Date().toISOString()
     };
-    mockProducts[productIndex] = updatedProduct;
+    this.products.set(id, updatedProduct);
     return updatedProduct;
   }
 
   async deleteProduct(id: string): Promise<boolean> {
-    const productIndex = mockProducts.findIndex(product => product.id === id);
-    if (productIndex === -1) {
-      return false;
-    }
-
-    mockProducts.splice(productIndex, 1);
-    return true;
+    return this.products.delete(id);
   }
 
   async importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }> {
@@ -708,7 +709,7 @@ export class MemStorage implements IStorage {
           basePrice: (item.PrecoVenda || item.basePrice || 0).toString(),
           unit: 'un',
           isActive: true,
-          
+
           // Campos específicos do JSON XBZ
           externalId: item.IdProduto?.toString(),
           externalCode: item.CodigoXbz,
@@ -741,10 +742,10 @@ export class MemStorage implements IStorage {
   }
 
   async searchProducts(query: string): Promise<any[]> {
-    if (!query) return mockProducts;
-    
+    if (!query) return Array.from(this.products.values());
+
     const searchLower = query.toLowerCase();
-    return mockProducts.filter(product =>
+    return Array.from(this.products.values()).filter(product =>
       (product.name?.toLowerCase() || '').includes(searchLower) ||
       (product.description?.toLowerCase() || '').includes(searchLower) ||
       (product.category?.toLowerCase() || '').includes(searchLower) ||
@@ -756,24 +757,25 @@ export class MemStorage implements IStorage {
 
   // Budget methods
   async getBudgets(): Promise<any[]> {
-    return mockBudgets;
+    return Array.from(this.budgets.values());
   }
 
   async getBudget(id: string): Promise<any> {
-    return mockBudgets.find(budget => budget.id === id);
+    return this.budgets.get(id);
   }
 
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
-    return mockBudgets.filter(budget => budget.vendorId === vendorId);
+    return Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
   }
 
   async getBudgetsByClient(clientId: string): Promise<any[]> {
-    return mockBudgets.filter(budget => budget.clientId === clientId);
+    return Array.from(this.budgets.values()).filter(budget => budget.clientId === clientId);
   }
 
   async createBudget(budgetData: any): Promise<any> {
+    const id = `budget-${Date.now()}`;
     const newBudget = {
-      id: `budget-${Date.now()}`,
+      id,
       budgetNumber: `ORC-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
       ...budgetData,
       totalValue: budgetData.totalValue || '0.00',
@@ -785,40 +787,34 @@ export class MemStorage implements IStorage {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    mockBudgets.push(newBudget);
+    this.budgets.set(id, newBudget);
     return newBudget;
   }
 
   async updateBudget(id: string, budgetData: any): Promise<any> {
-    const budgetIndex = mockBudgets.findIndex(budget => budget.id === id);
-    if (budgetIndex === -1) {
+    const budget = this.budgets.get(id);
+    if (!budget) {
       throw new Error('Budget not found');
     }
 
     const updatedBudget = {
-      ...mockBudgets[budgetIndex],
+      ...budget,
       ...budgetData,
       updatedAt: new Date().toISOString()
     };
-    mockBudgets[budgetIndex] = updatedBudget;
+    this.budgets.set(id, updatedBudget);
     return updatedBudget;
   }
 
   async deleteBudget(id: string): Promise<boolean> {
-    const budgetIndex = mockBudgets.findIndex(budget => budget.id === id);
-    if (budgetIndex === -1) {
-      return false;
-    }
-
     // Also delete related items and photos
     mockBudgetItems = mockBudgetItems.filter(item => item.budgetId !== id);
     mockBudgetPhotos = mockBudgetPhotos.filter(photo => photo.budgetId !== id);
-    mockBudgets.splice(budgetIndex, 1);
-    return true;
+    return this.budgets.delete(id);
   }
 
   async convertBudgetToOrder(budgetId: string): Promise<any> {
-    const budget = mockBudgets.find(b => b.id === budgetId);
+    const budget = this.budgets.get(budgetId);
 
     if (!budget) {
       throw new Error('Budget not found');
@@ -843,7 +839,6 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    mockOrders.push(newOrder);
     this.orders.set(newOrder.id, newOrder);
     return newOrder;
   }
@@ -854,8 +849,9 @@ export class MemStorage implements IStorage {
   }
 
   async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
+    const id = `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newItem = {
-      id: `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id,
       budgetId,
       productId: itemData.productId,
       quantity: itemData.quantity || 1,
@@ -869,7 +865,7 @@ export class MemStorage implements IStorage {
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(budgetId);
-    
+
     return newItem;
   }
 
@@ -887,7 +883,7 @@ export class MemStorage implements IStorage {
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(updatedItem.budgetId);
-    
+
     return updatedItem;
   }
 
@@ -902,7 +898,7 @@ export class MemStorage implements IStorage {
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(budgetId);
-    
+
     return true;
   }
 
@@ -918,8 +914,9 @@ export class MemStorage implements IStorage {
   }
 
   async createBudgetPhoto(budgetId: string, photoData: any): Promise<any> {
+    const id = `budget-photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newPhoto = {
-      id: `budget-photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id,
       budgetId,
       ...photoData,
       uploadedAt: new Date().toISOString()
@@ -942,24 +939,40 @@ export class MemStorage implements IStorage {
   private async recalculateBudgetTotal(budgetId: string): Promise<void> {
     const budget = await this.getBudget(budgetId);
     const items = await this.getBudgetItems(budgetId);
-    
+
     if (!budget) return;
 
     let subtotal = items.reduce((sum, item) => {
       const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity || '1');
-      
+
       // Apply item customization if applicable (now as fixed value)
       if (item.hasItemCustomization) {
         const customizationValue = parseFloat(item.itemCustomizationValue || '0');
         return sum + basePrice + customizationValue;
       }
-      
+
       return sum + basePrice;
     }, 0);
 
     await this.updateBudget(budgetId, {
       totalValue: subtotal.toFixed(2)
     });
+  }
+
+  // Added getAll method as per the changes
+  getAll(table: string): any[] {
+    switch(table) {
+      case 'products':
+        return Array.from(this.products.values());
+      case 'orders':
+        return Array.from(this.orders.values());
+      case 'users':
+        return Array.from(this.users.values());
+      case 'budgets':
+        return Array.from(this.budgets.values());
+      default:
+        return [];
+    }
   }
 }
 

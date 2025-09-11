@@ -193,7 +193,7 @@ export class PDFGenerator {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
         this.doc.text(`  + ${item.itemCustomizationDescription}: R$ ${parseFloat(item.itemCustomizationValue || '0').toFixed(2)}`, startX + 2, this.currentY);
-        this.currentY += 8;
+        this.currentY += 6; += 8;
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
