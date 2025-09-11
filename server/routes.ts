@@ -57,18 +57,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.getOrders();
 
-      // Enrich with user data
+      // Enrich with user data and budget photos
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          
+          // Get budget photos if order was converted from budget
+          let budgetPhotos = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl);
+          }
 
           return {
             ...order,
             clientName: client?.name || 'Unknown',
             vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null
+            producerName: producer?.name || null,
+            budgetPhotos: budgetPhotos
           };
         })
       );
@@ -955,18 +963,26 @@ Para mais detalhes, entre em contato conosco!`;
       const vendorId = req.params.id;
       const orders = await storage.getOrdersByVendor(vendorId);
 
-      // Enrich with client and vendor names
+      // Enrich with client and vendor names and budget photos
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          
+          // Get budget photos if order was converted from budget
+          let budgetPhotos = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl);
+          }
 
           return {
             ...order,
             clientName: client?.name || 'Unknown',
             vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null
+            producerName: producer?.name || null,
+            budgetPhotos: budgetPhotos
           };
         })
       );

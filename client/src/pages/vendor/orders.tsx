@@ -887,6 +887,24 @@ export default function VendorOrders() {
                 </div>
               )}
 
+              {/* Photos from Budget */}
+              {selectedOrder.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedOrder.budgetPhotos.map((photo: string, index: number) => (
+                      <div key={index} className="border rounded-lg overflow-hidden">
+                        <img 
+                          src={photo} 
+                          alt={`Personalização ${index + 1}`} 
+                          className="w-full h-32 object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-between items-center pt-4 border-t">
                 <div className="flex space-x-2">

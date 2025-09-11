@@ -843,7 +843,8 @@ export class MemStorage implements IStorage {
       status: 'pending',
       deadline: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      budgetId: budgetId  // Store reference to original budget
     };
 
     this.orders.set(newOrder.id, newOrder);
