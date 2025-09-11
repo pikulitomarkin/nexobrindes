@@ -134,9 +134,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 return (
                   <li key={item.href}>
                     <Link href={item.href}>
-                      <a
+                      <div
                         className={`
-                          flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                          flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer
                           ${isActive
                             ? 'bg-white text-blue-600 shadow-lg transform scale-105'
                             : 'text-white/90 hover:bg-white/10 hover:text-white hover:transform hover:scale-105'
@@ -146,7 +146,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       >
                         <Icon className="h-5 w-5 mr-3" />
                         {item.label}
-                      </a>
+                      </div>
                     </Link>
                   </li>
                 );
