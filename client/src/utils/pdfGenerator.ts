@@ -223,11 +223,11 @@ export class PDFGenerator {
       currentX += colWidths[2];
 
       // Unit price
-      this.doc.text(`R$ ${parseFloat(item.unitPrice).toFixed(2)}`, currentX + 2, this.currentY + 5);
+      this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
       currentX += colWidths[3];
 
       // Total price
-      this.doc.text(`R$ ${parseFloat(item.totalPrice).toFixed(2)}`, currentX + 2, this.currentY + 5);
+      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
 
       this.currentY += rowHeight;
 
@@ -235,7 +235,7 @@ export class PDFGenerator {
       if (item.hasItemCustomization && item.itemCustomizationDescription) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        this.doc.text(`  + ${item.itemCustomizationDescription}: R$ ${parseFloat(item.itemCustomizationValue || '0').toFixed(2)}`, startX + 2, this.currentY);
+        this.doc.text(`  + ${item.itemCustomizationDescription}: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY);
         this.currentY += 6; 
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
@@ -255,7 +255,7 @@ export class PDFGenerator {
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('TOTAL GERAL:', this.pageWidth - this.margin - 95, this.currentY + 5);
-    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toFixed(2)}`, this.pageWidth - this.margin - 95, this.currentY + 15);
+    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 15);
 
     this.currentY += 30;
   }

@@ -735,7 +735,7 @@ Para mais detalhes, entre em contato conosco!`;
       
       // Get budget photos
       const photos = await storage.getBudgetPhotos(req.params.id);
-      const photoUrls = photos.map(photo => photo.imageUrl);
+      const photoUrls = photos.map(photo => photo.photoUrl);
 
       const pdfData = {
         budget: {
@@ -860,7 +860,7 @@ Para mais detalhes, entre em contato conosco!`;
             ...budget,
             clientName: client?.name || 'Unknown',
             items: items,
-            photos: photos
+            photos: photos.map(photo => photo.photoUrl)
           };
         })
       );
