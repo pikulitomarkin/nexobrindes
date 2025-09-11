@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { PDFGenerator } from "@/utils/pdfGenerator";
 
 export default function VendorBudgets() {
   const vendorId = "vendor-1";
