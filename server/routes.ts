@@ -1,9 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from 'multer';
+import express from 'express';
+import path from 'path';
 import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded images from public/uploads directory
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
@@ -1160,7 +1165,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       if (!req.file) return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
 
-      const { mimetype, size, buffer } = req.file;
+      const { mimetype, size, buffer, originalname } = req.file;
       if (!mimetype.startsWith("image/")) {
         return res.status(400).json({ error: "Apenas imagens são permitidas" });
       }
@@ -1168,9 +1173,28 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Imagem muito grande. Limite de 5MB." });
       }
 
-      // Return Data URL for immediate use
-      const base64 = buffer.toString("base64");
-      const url = `data:${mimetype};base64,${base64}`;
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 15);
+      const extension = originalname.split('.').pop() || 'jpg';
+      const filename = `image-${timestamp}-${randomStr}.${extension}`;
+
+      // Save to public directory (accessible by Vite)
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Create public/uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      // Save file
+      const filePath = path.join(uploadsDir, filename);
+      fs.writeFileSync(filePath, buffer);
+      
+      // Return public URL that Vite can serve
+      const url = `/uploads/${filename}`;
       return res.json({ url });
     } catch (err) {
       console.error("Upload error:", err);
