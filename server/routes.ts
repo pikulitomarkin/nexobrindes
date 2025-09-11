@@ -978,7 +978,27 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const vendorId = req.params.id;
       const clients = await storage.getClientsByVendor(vendorId);
-      res.json(clients);
+      
+      // Enrich clients with order counts and total spent
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const orders = await storage.getOrdersByClient(client.userId);
+          const vendorOrders = orders.filter(order => order.vendorId === vendorId);
+          
+          const ordersCount = vendorOrders.length;
+          const totalSpent = vendorOrders.reduce((sum, order) => 
+            sum + parseFloat(order.totalValue || '0'), 0
+          );
+          
+          return {
+            ...client,
+            ordersCount,
+            totalSpent
+          };
+        })
+      );
+      
+      res.json(enrichedClients);
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to fetch vendor clients" });

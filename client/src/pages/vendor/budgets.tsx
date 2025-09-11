@@ -113,14 +113,14 @@ export default function VendorBudgets() {
   const calculateBudgetTotal = () => {
     return vendorBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
-      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
       return total + basePrice + customizationValue;
     }, 0);
   };
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
     return basePrice + customizationValue;
   };
 
