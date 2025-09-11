@@ -72,17 +72,37 @@ export default function VendorBudgets() {
     const newItem = {
       productId: product.id,
       productName: product.name,
-      quantity: "1",
-      unitPrice: product.basePrice,
-      totalPrice: product.basePrice,
+      quantity: 1,
+      unitPrice: parseFloat(product.basePrice),
+      totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
-      itemCustomizationPercentage: "0.00",
+      itemCustomizationPercentage: 0,
       itemCustomizationDescription: ""
     };
     setVendorBudgetForm(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
+  };
+
+  const updateBudgetItem = (index: number, field: string, value: any) => {
+    setVendorBudgetForm(prev => {
+      const newItems = [...prev.items];
+      const item = { ...newItems[index] };
+      
+      if (field === 'quantity') {
+        const quantity = parseInt(value) || 1;
+        item.quantity = quantity;
+        item.totalPrice = item.unitPrice * quantity;
+      } else if (field === 'itemCustomizationPercentage') {
+        item[field] = parseFloat(value) || 0;
+      } else {
+        item[field] = value;
+      }
+      
+      newItems[index] = item;
+      return { ...prev, items: newItems };
+    });
   };
 
   const removeProductFromBudget = (index: number) => {
@@ -93,27 +113,38 @@ export default function VendorBudgets() {
   };
 
   const calculateBudgetTotal = () => {
-    const itemsTotal = vendorBudgetForm.items.reduce((sum, item) => {
-      const itemPrice = parseFloat(item.totalPrice || '0');
+    let itemsTotal = 0;
+    
+    // Calculate each item total including its customization
+    vendorBudgetForm.items.forEach(item => {
+      const basePrice = item.unitPrice * item.quantity;
+      let itemTotal = basePrice;
       
-      // Apply item customization
-      if (item.hasItemCustomization) {
-        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
-        const customizationAmount = itemPrice * (customizationPercentage / 100);
-        return sum + itemPrice + customizationAmount;
+      // Apply item-level customization
+      if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
+        const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
+        itemTotal = basePrice + customizationAmount;
       }
       
-      return sum + itemPrice;
-    }, 0);
+      itemsTotal += itemTotal;
+    });
 
-    // Apply global customization
-    if (vendorBudgetForm.hasCustomization) {
-      const customizationPercentage = parseFloat(vendorBudgetForm.customizationPercentage || '0');
-      const customizationAmount = itemsTotal * (customizationPercentage / 100);
-      return itemsTotal + customizationAmount;
+    // Apply global customization on top of everything
+    if (vendorBudgetForm.hasCustomization && parseFloat(vendorBudgetForm.customizationPercentage) > 0) {
+      const globalCustomizationAmount = itemsTotal * (parseFloat(vendorBudgetForm.customizationPercentage) / 100);
+      itemsTotal += globalCustomizationAmount;
     }
 
     return itemsTotal;
+  };
+
+  const calculateItemTotal = (item: any) => {
+    const basePrice = item.unitPrice * item.quantity;
+    if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
+      const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
+      return basePrice + customizationAmount;
+    }
+    return basePrice;
   };
 
   const resetBudgetForm = () => {
@@ -370,24 +401,86 @@ export default function VendorBudgets() {
                 
                 {/* Selected Products */}
                 {vendorBudgetForm.items.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {vendorBudgetForm.items.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded">
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
-                          <p className="text-sm text-gray-500">
-                            {item.quantity}x R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
-                            R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
+                      <div key={index} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium">{item.productName}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeProductFromBudget(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeProductFromBudget(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
+                            <Input
+                              id={`quantity-${index}`}
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateBudgetItem(index, 'quantity', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`unit-price-${index}`}>Preço Unitário</Label>
+                            <Input
+                              id={`unit-price-${index}`}
+                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`item-customization-${index}`}
+                            checked={item.hasItemCustomization}
+                            onCheckedChange={(checked) => updateBudgetItem(index, 'hasItemCustomization', checked)}
+                          />
+                          <Label htmlFor={`item-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização do Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemCustomization && (
+                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
+                            <div>
+                              <Label htmlFor={`item-customization-percentage-${index}`}>Percentual (%)</Label>
+                              <Input
+                                id={`item-customization-percentage-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                value={item.itemCustomizationPercentage}
+                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationPercentage', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
+                              <Input
+                                id={`item-customization-description-${index}`}
+                                value={item.itemCustomizationDescription}
+                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
+                                placeholder="Ex: Gravação, cor especial..."
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Subtotal:</span>
+                          <span className="font-medium">
+                            R$ {calculateItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>

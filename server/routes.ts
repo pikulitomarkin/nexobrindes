@@ -14,11 +14,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgets = await storage.getBudgets();
 
       const today = new Date().toDateString();
-      const ordersToday = orders.filter(order => 
+      const ordersToday = orders.filter(order =>
         order.createdAt && new Date(order.createdAt).toDateString() === today
       ).length;
 
-      const inProduction = orders.filter(order => 
+      const inProduction = orders.filter(order =>
         order.status === 'production'
       ).length;
 
@@ -306,7 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         activeOrders,
-        pendingOrders, 
+        pendingOrders,
         completedOrders
       });
     } catch (error) {
@@ -324,7 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search: search as string,
         category: category as string
       };
-      
+
       const result = await storage.getProducts(options);
       res.json(result);
     } catch (error) {
@@ -339,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!q) {
         return res.status(400).json({ error: "Query parameter 'q' is required" });
       }
-      
+
       const products = await storage.searchProducts(q as string);
       res.json(products);
     } catch (error) {
@@ -358,7 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Configure multer for file uploads
-  const upload = multer({ 
+  const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
   });
@@ -405,8 +405,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check file size
       if (req.file.size > 50 * 1024 * 1024) {
-        return res.status(400).json({ 
-          error: "Arquivo muito grande. O limite é de 50MB." 
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
         });
       }
 
@@ -418,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const fileContent = req.file.buffer.toString('utf8');
           productsData = JSON.parse(fileContent);
         } catch (parseError) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
             details: (parseError as Error).message
           });
@@ -428,30 +428,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!Array.isArray(productsData)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "O arquivo JSON deve conter um array de produtos",
           example: "[{\"Nome\": \"Produto\", \"PrecoVenda\": 10.50}]"
         });
       }
 
       if (productsData.length === 0) {
-        return res.status(400).json({ 
-          error: "O arquivo JSON está vazio. Adicione pelo menos um produto." 
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio. Adicione pelo menos um produto."
         });
       }
 
       if (productsData.length > 10000) {
-        return res.status(400).json({ 
-          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação." 
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
         });
       }
 
       console.log(`Importing ${productsData.length} products...`);
-      
+
       const result = await storage.importProducts(productsData);
-      
+
       console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
-      
+
       res.json({
         message: `${result.imported} produtos importados com sucesso`,
         imported: result.imported,
@@ -460,21 +460,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Import error:', error);
-      
+
       if (error instanceof SyntaxError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Formato JSON inválido. Verifique a sintaxe do arquivo.",
           details: error.message
         });
       }
-      
+
       if ((error as any).code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ 
-          error: "Arquivo muito grande. O limite é de 50MB." 
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
         });
       }
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: "Erro interno do servidor ao processar importação",
         details: (error as Error).message
       });
@@ -497,11 +497,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
-      
+
       // Include items and photos
       const items = await storage.getBudgetItems(req.params.id);
       const photos = await storage.getBudgetPhotos(req.params.id);
-      
+
       res.json({
         ...budget,
         items,
@@ -514,18 +514,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      const newBudget = await storage.createBudget(req.body);
+      const budgetData = req.body;
+      const newBudget = await storage.createBudget(budgetData);
+
+      // Process budget items
+      for (const item of budgetData.items) {
+        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
+        const customizationPercentage = typeof item.itemCustomizationPercentage === 'string' ? parseFloat(item.itemCustomizationPercentage) : item.itemCustomizationPercentage || 0;
+
+        // Calculate correct total with item customization
+        const baseTotal = unitPrice * quantity;
+        let itemTotal = baseTotal;
+
+        if (item.hasItemCustomization && customizationPercentage > 0) {
+          const customizationAmount = baseTotal * (customizationPercentage / 100);
+          itemTotal = baseTotal + customizationAmount;
+        }
+
+        await storage.createBudgetItem({
+          budgetId: newBudget.id,
+          productId: item.productId,
+          quantity: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          totalPrice: itemTotal.toFixed(2),
+          hasItemCustomization: item.hasItemCustomization || false,
+          itemCustomizationPercentage: customizationPercentage.toFixed(2),
+          itemCustomizationDescription: item.itemCustomizationDescription || ""
+        });
+      }
+
       res.json(newBudget);
     } catch (error) {
+      console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
 
   app.put("/api/budgets/:id", async (req, res) => {
     try {
-      const updatedBudget = await storage.updateBudget(req.params.id, req.body);
+      const budgetData = req.body;
+      const updatedBudget = await storage.updateBudget(req.params.id, budgetData);
+
+      // Remove existing items and re-add them to ensure consistency
+      await storage.deleteBudgetItems(req.params.id);
+      for (const item of budgetData.items) {
+        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
+        const customizationPercentage = typeof item.itemCustomizationPercentage === 'string' ? parseFloat(item.itemCustomizationPercentage) : item.itemCustomizationPercentage || 0;
+
+        // Calculate correct total with item customization
+        const baseTotal = unitPrice * quantity;
+        let itemTotal = baseTotal;
+
+        if (item.hasItemCustomization && customizationPercentage > 0) {
+          const customizationAmount = baseTotal * (customizationPercentage / 100);
+          itemTotal = baseTotal + customizationAmount;
+        }
+
+        await storage.createBudgetItem({
+          budgetId: updatedBudget.id,
+          productId: item.productId,
+          quantity: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          totalPrice: itemTotal.toFixed(2),
+          hasItemCustomization: item.hasItemCustomization || false,
+          itemCustomizationPercentage: customizationPercentage.toFixed(2),
+          itemCustomizationDescription: item.itemCustomizationDescription || ""
+        });
+      }
+
       res.json(updatedBudget);
     } catch (error) {
+      console.error("Error updating budget:", error);
       res.status(500).json({ error: "Failed to update budget" });
     }
   });
@@ -561,24 +622,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get budget items
       const items = await storage.getBudgetItems(req.params.id);
-      
-      // Enrich items with product data
+
+      // Enrich items with product data and calculate totals
       const enrichedItems = await Promise.all(
         items.map(async (item) => {
           const product = await storage.getProduct(item.productId);
+          const quantity = item.quantity;
+          const unitPrice = parseFloat(item.unitPrice);
+          const customizationPercentage = parseFloat(item.itemCustomizationPercentage);
+
+          let itemTotal = unitPrice * quantity;
+          if (item.hasItemCustomization && customizationPercentage > 0) {
+            const customizationAmount = itemTotal * (customizationPercentage / 100);
+            itemTotal += customizationAmount;
+          }
+
           return {
             ...item,
-            product: product || { name: 'Produto não encontrado', description: '', category: '' }
+            product: product || { name: 'Produto não encontrado', description: '', category: '' },
+            itemTotal: itemTotal.toFixed(2)
           };
         })
       );
+
+      // Calculate overall budget total
+      const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.itemTotal), 0);
 
       // Get client and vendor data
       const client = await storage.getUser(budget.clientId);
       const vendor = await storage.getUser(budget.vendorId);
 
       res.json({
-        budget,
+        budget: {
+          ...budget,
+          total: totalBudget.toFixed(2)
+        },
         items: enrichedItems,
         client: client || { name: 'Cliente não encontrado' },
         vendor: vendor || { name: 'Vendedor não encontrado' }
@@ -715,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orders = await storage.getOrdersByVendor(vendorId);
       const clients = await storage.getClientsByVendor(vendorId);
       const commissions = await storage.getCommissionsByVendor(vendorId);
-      
+
       const totalOrders = orders.length;
       const totalClients = clients.length;
       const totalSales = orders.reduce((sum, order) => sum + parseFloat(order.totalValue), 0);
@@ -766,7 +844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Client routes  
+  // Client routes
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();

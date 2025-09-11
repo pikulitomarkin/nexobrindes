@@ -65,17 +65,37 @@ export default function AdminBudgets() {
     const newItem = {
       productId: product.id,
       productName: product.name,
-      quantity: "1",
-      unitPrice: product.basePrice,
-      totalPrice: product.basePrice,
+      quantity: 1,
+      unitPrice: parseFloat(product.basePrice),
+      totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
-      itemCustomizationPercentage: "0.00",
+      itemCustomizationPercentage: 0,
       itemCustomizationDescription: ""
     };
     setBudgetForm(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
+  };
+
+  const updateBudgetItem = (index: number, field: string, value: any) => {
+    setBudgetForm(prev => {
+      const newItems = [...prev.items];
+      const item = { ...newItems[index] };
+      
+      if (field === 'quantity') {
+        const quantity = parseInt(value) || 1;
+        item.quantity = quantity;
+        item.totalPrice = item.unitPrice * quantity;
+      } else if (field === 'itemCustomizationPercentage') {
+        item[field] = parseFloat(value) || 0;
+      } else {
+        item[field] = value;
+      }
+      
+      newItems[index] = item;
+      return { ...prev, items: newItems };
+    });
   };
 
   const removeProductFromBudget = (index: number) => {
@@ -86,27 +106,38 @@ export default function AdminBudgets() {
   };
 
   const calculateBudgetTotal = () => {
-    const itemsTotal = budgetForm.items.reduce((sum, item) => {
-      const itemPrice = parseFloat(item.totalPrice || '0');
+    let itemsTotal = 0;
+    
+    // Calculate each item total including its customization
+    budgetForm.items.forEach(item => {
+      const basePrice = item.unitPrice * item.quantity;
+      let itemTotal = basePrice;
       
-      // Apply item customization
-      if (item.hasItemCustomization) {
-        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
-        const customizationAmount = itemPrice * (customizationPercentage / 100);
-        return sum + itemPrice + customizationAmount;
+      // Apply item-level customization
+      if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
+        const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
+        itemTotal = basePrice + customizationAmount;
       }
       
-      return sum + itemPrice;
-    }, 0);
+      itemsTotal += itemTotal;
+    });
 
-    // Apply global customization
-    if (budgetForm.hasCustomization) {
-      const customizationPercentage = parseFloat(budgetForm.customizationPercentage || '0');
-      const customizationAmount = itemsTotal * (customizationPercentage / 100);
-      return itemsTotal + customizationAmount;
+    // Apply global customization on top of everything
+    if (budgetForm.hasCustomization && parseFloat(budgetForm.customizationPercentage) > 0) {
+      const globalCustomizationAmount = itemsTotal * (parseFloat(budgetForm.customizationPercentage) / 100);
+      itemsTotal += globalCustomizationAmount;
     }
 
     return itemsTotal;
+  };
+
+  const calculateItemTotal = (item: any) => {
+    const basePrice = item.unitPrice * item.quantity;
+    if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
+      const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
+      return basePrice + customizationAmount;
+    }
+    return basePrice;
   };
 
   const resetBudgetForm = () => {
