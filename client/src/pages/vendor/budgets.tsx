@@ -186,6 +186,9 @@ export default function VendorBudgets() {
     },
   });
 
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
+
   const convertToOrderMutation = useMutation({
     mutationFn: async (budgetId: string) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
@@ -197,12 +200,46 @@ export default function VendorBudgets() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      setConvertDialogOpen(false);
+      setBudgetToConvert(null);
       toast({
         title: "Sucesso!",
         description: "Orçamento convertido em pedido",
       });
     },
   });
+
+  const sendToWhatsAppMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}/send-whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao enviar orçamento");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, '_blank');
+      }
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento enviado via WhatsApp",
+      });
+    },
+  });
+
+  const handleConvertClick = (budgetId: string) => {
+    setBudgetToConvert(budgetId);
+    setConvertDialogOpen(true);
+  };
+
+  const handleConfirmConvert = () => {
+    if (budgetToConvert) {
+      convertToOrderMutation.mutate(budgetToConvert);
+    }
+  };
 
   const handleBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -729,22 +766,28 @@ export default function VendorBudgets() {
                           <FileText className="h-4 w-4 mr-1" />
                           PDF
                         </Button>
-                        {budget.status === 'draft' && (
-                          <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-900">
+                        {(budget.status === 'draft' || budget.status === 'sent') && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-blue-600 hover:text-blue-900"
+                            onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
+                            disabled={sendToWhatsAppMutation.isPending}
+                          >
                             <Send className="h-4 w-4 mr-1" />
-                            Enviar
+                            {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar'}
                           </Button>
                         )}
-                        {budget.status === 'approved' && (
+                        {(budget.status === 'sent' || budget.status === 'approved') && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="text-green-600 hover:text-green-900"
-                            onClick={() => convertToOrderMutation.mutate(budget.id)}
+                            onClick={() => handleConvertClick(budget.id)}
                             disabled={convertToOrderMutation.isPending}
                           >
                             <ShoppingCart className="h-4 w-4 mr-1" />
-                            Converter
+                            {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter'}
                           </Button>
                         )}
                       </div>
@@ -756,6 +799,37 @@ export default function VendorBudgets() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Convert to Order Confirmation Dialog */}
+      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
+            <DialogDescription>
+              Deseja converter este orçamento em pedido? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setConvertDialogOpen(false);
+                setBudgetToConvert(null);
+              }}
+              className="flex-1"
+            >
+              Não
+            </Button>
+            <Button 
+              onClick={handleConfirmConvert}
+              disabled={convertToOrderMutation.isPending}
+              className="flex-1"
+            >
+              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Sim'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

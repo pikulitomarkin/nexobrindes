@@ -602,6 +602,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/budgets/:id/send-whatsapp", async (req, res) => {
+    try {
+      const budget = await storage.getBudget(req.params.id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Get client data
+      const client = await storage.getUser(budget.clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
+      // Update budget status to 'sent'
+      await storage.updateBudget(req.params.id, { status: 'sent' });
+
+      // Generate WhatsApp message
+      const message = `Olá ${client.name}! 👋
+
+Segue seu orçamento:
+
+📋 *${budget.title}*
+💰 Valor: R$ ${parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+📅 Válido até: ${budget.validUntil ? new Date(budget.validUntil).toLocaleDateString('pt-BR') : 'Não especificado'}
+
+${budget.description ? `📝 ${budget.description}` : ''}
+
+Para mais detalhes, entre em contato conosco!`;
+
+      // Create WhatsApp URL
+      const encodedMessage = encodeURIComponent(message);
+      const phoneNumber = client.phone?.replace(/\D/g, '') || ''; // Remove non-digits
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+
+      res.json({
+        success: true,
+        whatsappUrl,
+        message: "Orçamento marcado como enviado"
+      });
+    } catch (error) {
+      console.error('Error sending budget via WhatsApp:', error);
+      res.status(500).json({ error: "Failed to send budget via WhatsApp" });
+    }
+  });
+
   // Budget PDF data endpoint
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
