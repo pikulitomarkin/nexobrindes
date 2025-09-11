@@ -460,9 +460,27 @@ export default function VendorBudgets() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Orçamentos</h1>
           <p className="text-gray-600">Gerencie orçamentos criados para seus clientes</p>
         </div>
-        <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
+        <Dialog open={isBudgetDialogOpen} onOpenChange={(open) => {
+          setIsBudgetDialogOpen(open);
+          if (open && !isEditMode) {
+            // Reset form when opening for new budget
+            resetBudgetForm();
+            setBudgetProductSearch("");
+            setBudgetCategoryFilter("all");
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="gradient-bg text-white">
+            <Button 
+              className="gradient-bg text-white"
+              onClick={() => {
+                // Ensure we're in create mode when clicking new budget
+                setIsEditMode(false);
+                setEditingBudgetId(null);
+                resetBudgetForm();
+                setBudgetProductSearch("");
+                setBudgetCategoryFilter("all");
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Orçamento
             </Button>
@@ -772,6 +790,8 @@ export default function VendorBudgets() {
                   onClick={() => {
                     setIsBudgetDialogOpen(false);
                     resetBudgetForm();
+                    setBudgetProductSearch("");
+                    setBudgetCategoryFilter("all");
                   }}
                 >
                   Cancelar

@@ -1180,18 +1180,18 @@ Para mais detalhes, entre em contato conosco!`;
       const filename = `image-${timestamp}-${randomStr}.${extension}`;
 
       // Save to public directory (accessible by Vite)
-      const fs = require('fs');
-      const path = require('path');
+      const fs = await import('fs');
+      const path = await import('path');
       
       // Create public/uploads directory if it doesn't exist
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
+      const uploadsDir = path.default.join(process.cwd(), 'public', 'uploads');
+      if (!fs.default.existsSync(uploadsDir)) {
+        fs.default.mkdirSync(uploadsDir, { recursive: true });
       }
       
       // Save file
-      const filePath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filePath, buffer);
+      const filePath = path.default.join(uploadsDir, filename);
+      fs.default.writeFileSync(filePath, buffer);
       
       // Return public URL that Vite can serve
       const url = `/uploads/${filename}`;
