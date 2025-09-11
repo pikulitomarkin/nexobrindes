@@ -562,8 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemTotal = baseTotal + customizationAmount;
         }
 
-        await storage.createBudgetItem({
-          budgetId: updatedBudget.id,
+        await storage.createBudgetItem(updatedBudget.id, {
           productId: item.productId,
           quantity: quantity,
           unitPrice: unitPrice.toFixed(2),
