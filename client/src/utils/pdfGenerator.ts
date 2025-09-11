@@ -15,6 +15,7 @@ export interface BudgetPDFData {
     customizationPercentage?: string;
     customizationDescription?: string;
     createdAt: string;
+    photos?: string[];
   };
   items: Array<{
     id: string;
@@ -275,6 +276,53 @@ export class PDFGenerator {
     }
   }
 
+  private async addCustomizationImages(photos: string[]): Promise<void> {
+    if (!photos || photos.length === 0) return;
+
+    this.addNewPageIfNeeded(40);
+    
+    this.doc.setFontSize(14);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('PERSONALIZAÇÃO:', this.margin, this.currentY);
+    this.currentY += 15;
+
+    for (let i = 0; i < photos.length; i++) {
+      const photo = photos[i];
+      
+      // Check if we need a new page for the image
+      this.addNewPageIfNeeded(100);
+      
+      try {
+        // For data URLs, we can add them directly to the PDF
+        if (photo.startsWith('data:image/')) {
+          const imgWidth = 150; // Large size as requested
+          const imgHeight = 100; 
+          
+          // Center the image
+          const imgX = (this.pageWidth - imgWidth) / 2;
+          
+          this.doc.addImage(photo, 'JPEG', imgX, this.currentY, imgWidth, imgHeight);
+          this.currentY += imgHeight + 15;
+          
+          // Add caption
+          this.doc.setFontSize(10);
+          this.doc.setFont('helvetica', 'normal');
+          this.doc.text(`Imagem de Personalização ${i + 1}`, imgX, this.currentY);
+          this.currentY += 10;
+        }
+      } catch (error) {
+        console.warn('Erro ao adicionar imagem ao PDF:', error);
+        // Add placeholder text if image fails
+        this.doc.setFontSize(10);
+        this.doc.setFont('helvetica', 'italic');
+        this.doc.text('Imagem não disponível', this.margin, this.currentY);
+        this.currentY += 15;
+      }
+    }
+    
+    this.currentY += 10;
+  }
+
   public async generateBudgetPDF(data: BudgetPDFData): Promise<Blob> {
     try {
       this.currentY = 20;
@@ -284,6 +332,11 @@ export class PDFGenerator {
       await this.addItems(data);
       this.addTotal(data);
       this.addDescription(data);
+      
+      // Add customization images if they exist
+      if (data.budget.photos && data.budget.photos.length > 0) {
+        await this.addCustomizationImages(data.budget.photos);
+      }
 
       return new Promise((resolve) => {
         const pdfBlob = this.doc.output('blob');
