@@ -289,19 +289,34 @@ export class PDFGenerator {
     for (let i = 0; i < photos.length; i++) {
       const photo = photos[i];
       
-      // Check if we need a new page for the image
-      this.addNewPageIfNeeded(100);
-      
       try {
         // For data URLs, we can add them directly to the PDF
         if (photo.startsWith('data:image/')) {
-          const imgWidth = 150; // Large size as requested
-          const imgHeight = 100; 
+          // Load image to get natural dimensions
+          const img = await this.loadImage(photo);
+          
+          // Calculate maximum dimensions
+          const maxWidth = this.pageWidth - 2 * this.margin;
+          const maxHeight = 160; // Max height for images
+          
+          // Calculate scaling to preserve aspect ratio
+          const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
+          const imgWidth = img.naturalWidth * scale;
+          const imgHeight = img.naturalHeight * scale;
+          
+          // Check if we need a new page for the image with correct height
+          const captionSpace = 25;
+          this.addNewPageIfNeeded(imgHeight + captionSpace);
           
           // Center the image
           const imgX = (this.pageWidth - imgWidth) / 2;
           
-          this.doc.addImage(photo, 'JPEG', imgX, this.currentY, imgWidth, imgHeight);
+          // Detect image format from data URL
+          const mimeMatch = photo.match(/data:image\/([^;]+)/);
+          const format = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
+          const pdfFormat = format === 'JPG' ? 'JPEG' : format;
+          
+          this.doc.addImage(photo, pdfFormat, imgX, this.currentY, imgWidth, imgHeight);
           this.currentY += imgHeight + 15;
           
           // Add caption
