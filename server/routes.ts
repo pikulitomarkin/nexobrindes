@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-    
+
 
   app.get("/api/products/categories", async (req, res) => {
     try {
@@ -825,14 +825,14 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
-      
+
       // Enrich with client names and items
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
           const client = await storage.getUser(budget.clientId);
           const items = await storage.getBudgetItems(budget.id);
           const photos = await storage.getBudgetPhotos(budget.id);
-          
+
           return {
             ...budget,
             clientName: client?.name || 'Unknown',
@@ -841,7 +841,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
@@ -851,7 +851,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/vendor/:vendorId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
-      
+
       // Enrich with client names
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
@@ -862,7 +862,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
@@ -872,7 +872,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/client/:clientId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByClient(req.params.clientId);
-      
+
       // Enrich with vendor names
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
@@ -883,7 +883,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client budgets" });
@@ -939,14 +939,14 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const vendorId = req.params.id;
       const orders = await storage.getOrdersByVendor(vendorId);
-      
+
       // Enrich with client and vendor names
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           return {
             ...order,
             clientName: client?.name || 'Unknown',
@@ -955,7 +955,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       console.log(error);
@@ -1059,33 +1059,48 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
       const orderId = req.params.id;
-      
+
       // Update order status to production
       const updatedOrder = await storage.updateOrder(orderId, { 
         status: 'production',
         productionStartedAt: new Date().toISOString()
       });
-      
+
       if (!updatedOrder) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
-      
+
       // Get enriched order data
       const client = await storage.getUser(updatedOrder.clientId);
       const vendor = await storage.getUser(updatedOrder.vendorId);
       const producer = updatedOrder.producerId ? await storage.getUser(updatedOrder.producerId) : null;
-      
+
       const enrichedOrder = {
         ...updatedOrder,
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null
       };
-      
+
       res.json(enrichedOrder);
     } catch (error) {
       console.error("Error sending order to production:", error);
       res.status(500).json({ error: "Failed to send order to production" });
+    }
+  });
+
+  app.patch("/api/production-orders/:id/status", async (req, res) => {
+    try {
+      const { status, notes, deliveryDate } = req.body;
+
+      const updatedPO = await storage.updateProductionOrderStatus(req.params.id, status, notes, deliveryDate);
+      if (!updatedPO) {
+        return res.status(404).json({ error: "Production order not found" });
+      }
+
+      res.json(updatedPO);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update production order status" });
     }
   });
 

@@ -29,6 +29,7 @@ import ClientOrders from "@/pages/client/orders";
 
 // Producer pages
 import ProducerOrders from "@/pages/producer/orders";
+import ProductionDashboard from "@/pages/producer/production-dashboard";
 
 // Finance pages
 import FinancePayments from "@/pages/finance/payments";
@@ -62,6 +63,7 @@ function Router() {
         <Route path="/client/orders" component={ClientOrders} />
 
         {/* Producer Routes */}
+        <Route path="/producer/production-dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
 
         {/* Finance Routes */}

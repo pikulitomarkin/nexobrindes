@@ -523,10 +523,17 @@ export class MemStorage implements IStorage {
     return productionOrder;
   }
 
-  async updateProductionOrderStatus(id: string, status: string): Promise<ProductionOrder | undefined> {
+  async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined> {
     const productionOrder = this.productionOrders.get(id);
     if (productionOrder) {
-      const updatedPO = { ...productionOrder, status };
+      const updatedPO = { 
+        ...productionOrder, 
+        status,
+        notes: notes || productionOrder.notes,
+        acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date().toISOString() : productionOrder.acceptedAt,
+        completedAt: (status === 'completed' || status === 'ready') && !productionOrder.completedAt ? new Date().toISOString() : productionOrder.completedAt,
+        deadline: deliveryDate ? new Date(deliveryDate).toISOString() : productionOrder.deadline
+      };
       this.productionOrders.set(id, updatedPO);
       return updatedPO;
     }
