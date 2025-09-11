@@ -23,6 +23,8 @@ export default function VendorOrders() {
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [orderToSend, setOrderToSend] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const { toast } = useToast();
 
   // Order form state - isolated for vendor
@@ -742,17 +744,26 @@ export default function VendorOrders() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowOrderDetailsModal(true);
+                          }}
+                          data-testid={`button-view-${order.id}`}
+                        >
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
-                        {order.status === 'confirmed' && (
+                        {(order.status === 'confirmed' || order.status === 'pending') && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => handleSendToProductionClick(order.id)}
                             disabled={sendToProductionMutation.isPending}
+                            data-testid={`button-production-${order.id}`}
                           >
                             <Send className="h-4 w-4 mr-1" />
                             {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
@@ -796,6 +807,111 @@ export default function VendorOrders() {
               {sendToProductionMutation.isPending ? 'Enviando...' : 'Sim'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Details Modal */}
+      <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Pedido {selectedOrder?.orderNumber}</DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Cliente</Label>
+                  <p className="text-sm text-gray-900">{selectedOrder.clientName || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Status</Label>
+                  <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Valor Total</Label>
+                  <p className="text-sm text-gray-900">
+                    R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Data de Criação</Label>
+                  <p className="text-sm text-gray-900">
+                    {new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+              
+              {selectedOrder.description && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Descrição</Label>
+                  <p className="text-sm text-gray-900 mt-1">{selectedOrder.description}</p>
+                </div>
+              )}
+
+              {selectedOrder.deadline && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Prazo de Entrega</Label>
+                  <p className="text-sm text-gray-900">
+                    {new Date(selectedOrder.deadline).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              )}
+
+              {/* Progress Bar for Production Status */}
+              {(selectedOrder.status === 'production' || selectedOrder.status === 'delayed' || selectedOrder.status === 'ready' || selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered') && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Progresso da Produção</Label>
+                  <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
+                    <div 
+                      className={`h-4 rounded-full transition-all duration-500 ${
+                        selectedOrder.status === 'delayed' ? 'bg-red-500' :
+                        selectedOrder.status === 'ready' ? 'bg-yellow-500' : 
+                        selectedOrder.status === 'shipped' ? 'bg-blue-500' :
+                        selectedOrder.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
+                      }`}
+                      style={{ 
+                        width: selectedOrder.status === 'production' ? '25%' : 
+                               selectedOrder.status === 'delayed' ? '25%' : 
+                               selectedOrder.status === 'ready' ? '50%' : 
+                               selectedOrder.status === 'shipped' ? '75%' : '100%' 
+                      }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Produção</span>
+                    <span>Pronto</span>
+                    <span>Enviado</span>
+                    <span>Entregue</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="flex space-x-2">
+                  {(selectedOrder.status === 'confirmed' || selectedOrder.status === 'pending') && (
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => {
+                        setShowOrderDetailsModal(false);
+                        handleSendToProductionClick(selectedOrder.id);
+                      }}
+                    >
+                      <Send className="h-4 w-4 mr-1" />
+                      Enviar para Produção
+                    </Button>
+                  )}
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowOrderDetailsModal(false)}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
