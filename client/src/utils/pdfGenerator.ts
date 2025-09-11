@@ -124,7 +124,7 @@ export class PDFGenerator {
     this.currentY += 20;
   }
 
-  private addItems(data: BudgetPDFData): void {
+  private async addItems(data: BudgetPDFData): Promise<void> {
     this.addNewPageIfNeeded(50);
 
     // Title
@@ -133,8 +133,8 @@ export class PDFGenerator {
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 15;
 
-    // Table headers
-    const colWidths = [80, 25, 35, 50];
+    // Table headers with image column
+    const colWidths = [25, 65, 20, 30, 45];
     const startX = this.margin;
     let currentX = startX;
 
@@ -145,48 +145,90 @@ export class PDFGenerator {
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
-    this.doc.text('Produto', currentX + 2, this.currentY);
+    this.doc.text('Foto', currentX + 2, this.currentY);
     currentX += colWidths[0];
-    this.doc.text('Qtd', currentX + 2, this.currentY);
+    this.doc.text('Produto', currentX + 2, this.currentY);
     currentX += colWidths[1];
-    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    this.doc.text('Qtd', currentX + 2, this.currentY);
     currentX += colWidths[2];
+    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    currentX += colWidths[3];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 10;
 
     // Items
     this.doc.setFont('helvetica', 'normal');
-    data.items.forEach((item, index) => {
-      this.addNewPageIfNeeded(15);
+    
+    for (let index = 0; index < data.items.length; index++) {
+      const item = data.items[index];
+      const rowHeight = 20; // Increased height to accommodate image
+      
+      this.addNewPageIfNeeded(rowHeight + 10);
 
       // Draw row background (alternating)
       if (index % 2 === 1) {
         this.doc.setFillColor(250, 250, 250);
-        this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
+        this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
       }
 
       currentX = startX;
 
-      // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 30 
-        ? item.product.name.substring(0, 30) + '...' 
-        : item.product.name;
-      this.doc.text(productName, currentX + 2, this.currentY);
+      // Product image
+      if (item.product.imageLink) {
+        try {
+          await this.addImage(item.product.imageLink, currentX + 2, this.currentY - 3, 20, 15);
+        } catch (error) {
+          // Draw placeholder if image fails to load
+          this.doc.setDrawColor(200);
+          this.doc.rect(currentX + 2, this.currentY - 3, 20, 15);
+          this.doc.setFontSize(6);
+          this.doc.text('Sem', currentX + 8, this.currentY + 2);
+          this.doc.text('imagem', currentX + 5, this.currentY + 8);
+          this.doc.setFontSize(10);
+        }
+      } else {
+        // Draw placeholder rectangle
+        this.doc.setDrawColor(200);
+        this.doc.rect(currentX + 2, this.currentY - 3, 20, 15);
+        this.doc.setFontSize(6);
+        this.doc.text('Sem', currentX + 8, this.currentY + 2);
+        this.doc.text('imagem', currentX + 5, this.currentY + 8);
+        this.doc.setFontSize(10);
+      }
       currentX += colWidths[0];
 
-      // Quantity
-      this.doc.text(item.quantity.toString(), currentX + 2, this.currentY);
+      // Product name (with text wrapping if needed)
+      const productName = item.product.name.length > 35 
+        ? item.product.name.substring(0, 35) + '...' 
+        : item.product.name;
+      this.doc.text(productName, currentX + 2, this.currentY + 5);
+      
+      // Add product description if available
+      if (item.product.description) {
+        this.doc.setFontSize(8);
+        this.doc.setTextColor(100, 100, 100);
+        const description = item.product.description.length > 40 
+          ? item.product.description.substring(0, 40) + '...' 
+          : item.product.description;
+        this.doc.text(description, currentX + 2, this.currentY + 12);
+        this.doc.setFontSize(10);
+        this.doc.setTextColor(0, 0, 0);
+      }
       currentX += colWidths[1];
 
-      // Unit price
-      this.doc.text(`R$ ${parseFloat(item.unitPrice).toFixed(2)}`, currentX + 2, this.currentY);
+      // Quantity
+      this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 5);
       currentX += colWidths[2];
 
-      // Total price
-      this.doc.text(`R$ ${parseFloat(item.totalPrice).toFixed(2)}`, currentX + 2, this.currentY);
+      // Unit price
+      this.doc.text(`R$ ${parseFloat(item.unitPrice).toFixed(2)}`, currentX + 2, this.currentY + 5);
+      currentX += colWidths[3];
 
-      this.currentY += 10;
+      // Total price
+      this.doc.text(`R$ ${parseFloat(item.totalPrice).toFixed(2)}`, currentX + 2, this.currentY + 5);
+
+      this.currentY += rowHeight;
 
       // Add customization info if exists
       if (item.hasItemCustomization && item.itemCustomizationDescription) {
@@ -197,7 +239,7 @@ export class PDFGenerator {
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-    });
+    }
 
     this.currentY += 10;
   }
@@ -239,7 +281,7 @@ export class PDFGenerator {
 
       this.addHeader(data);
       this.addClientVendorInfo(data);
-      this.addItems(data);
+      await this.addItems(data);
       this.addTotal(data);
       this.addDescription(data);
 
