@@ -23,8 +23,8 @@ export default function VendorBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const { toast } = useToast();
 
-  // Budget form state
-  const [budgetForm, setBudgetForm] = useState({
+  // Budget form state - isolated for vendor
+  const [vendorBudgetForm, setVendorBudgetForm] = useState({
     title: "",
     description: "",
     clientId: "",
@@ -39,6 +39,11 @@ export default function VendorBudgets() {
 
   const { data: budgets, isLoading } = useQuery({
     queryKey: ["/api/budgets/vendor", vendorId],
+    queryFn: async () => {
+      const response = await fetch(`/api/budgets/vendor/${vendorId}`);
+      if (!response.ok) throw new Error('Failed to fetch vendor budgets');
+      return response.json();
+    },
   });
 
   const { data: clients } = useQuery({
@@ -74,21 +79,21 @@ export default function VendorBudgets() {
       itemCustomizationPercentage: "0.00",
       itemCustomizationDescription: ""
     };
-    setBudgetForm(prev => ({
+    setVendorBudgetForm(prev => ({
       ...prev,
       items: [...prev.items, newItem]
     }));
   };
 
   const removeProductFromBudget = (index: number) => {
-    setBudgetForm(prev => ({
+    setVendorBudgetForm(prev => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index)
     }));
   };
 
   const calculateBudgetTotal = () => {
-    const itemsTotal = budgetForm.items.reduce((sum, item) => {
+    const itemsTotal = vendorBudgetForm.items.reduce((sum, item) => {
       const itemPrice = parseFloat(item.totalPrice || '0');
       
       // Apply item customization
@@ -102,8 +107,8 @@ export default function VendorBudgets() {
     }, 0);
 
     // Apply global customization
-    if (budgetForm.hasCustomization) {
-      const customizationPercentage = parseFloat(budgetForm.customizationPercentage || '0');
+    if (vendorBudgetForm.hasCustomization) {
+      const customizationPercentage = parseFloat(vendorBudgetForm.customizationPercentage || '0');
       const customizationAmount = itemsTotal * (customizationPercentage / 100);
       return itemsTotal + customizationAmount;
     }
@@ -112,7 +117,7 @@ export default function VendorBudgets() {
   };
 
   const resetBudgetForm = () => {
-    setBudgetForm({
+    setVendorBudgetForm({
       title: "",
       description: "",
       clientId: "",
@@ -179,7 +184,7 @@ export default function VendorBudgets() {
 
   const handleBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (budgetForm.items.length === 0) {
+    if (vendorBudgetForm.items.length === 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao orçamento",
@@ -187,7 +192,7 @@ export default function VendorBudgets() {
       });
       return;
     }
-    createBudgetMutation.mutate(budgetForm);
+    createBudgetMutation.mutate(vendorBudgetForm);
   };
 
   // Filter products for budget creation
@@ -274,8 +279,8 @@ export default function VendorBudgets() {
                   <Label htmlFor="budget-title">Título do Orçamento</Label>
                   <Input
                     id="budget-title"
-                    value={budgetForm.title}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, title: e.target.value })}
+                    value={vendorBudgetForm.title}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, title: e.target.value })}
                     required
                   />
                 </div>
@@ -284,8 +289,8 @@ export default function VendorBudgets() {
                   <Input
                     id="budget-validUntil"
                     type="date"
-                    value={budgetForm.validUntil}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, validUntil: e.target.value })}
+                    value={vendorBudgetForm.validUntil}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, validUntil: e.target.value })}
                   />
                 </div>
               </div>
@@ -295,14 +300,14 @@ export default function VendorBudgets() {
                 <Textarea
                   id="budget-description"
                   rows={2}
-                  value={budgetForm.description}
-                  onChange={(e) => setBudgetForm({ ...budgetForm, description: e.target.value })}
+                  value={vendorBudgetForm.description}
+                  onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, description: e.target.value })}
                 />
               </div>
 
               <div>
                 <Label htmlFor="budget-client">Cliente</Label>
-                <Select value={budgetForm.clientId} onValueChange={(value) => setBudgetForm({ ...budgetForm, clientId: value })}>
+                <Select value={vendorBudgetForm.clientId} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, clientId: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
@@ -321,8 +326,8 @@ export default function VendorBudgets() {
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="budget-customization"
-                    checked={budgetForm.hasCustomization}
-                    onCheckedChange={(checked) => setBudgetForm({ ...budgetForm, hasCustomization: checked })}
+                    checked={vendorBudgetForm.hasCustomization}
+                    onCheckedChange={(checked) => setVendorBudgetForm({ ...vendorBudgetForm, hasCustomization: checked })}
                   />
                   <Label htmlFor="budget-customization" className="flex items-center gap-2">
                     <Percent className="h-4 w-4" />
@@ -330,7 +335,7 @@ export default function VendorBudgets() {
                   </Label>
                 </div>
                 
-                {budgetForm.hasCustomization && (
+                {vendorBudgetForm.hasCustomization && (
                   <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
                     <div>
                       <Label htmlFor="budget-customization-percentage">Percentual (%)</Label>
@@ -340,16 +345,16 @@ export default function VendorBudgets() {
                         step="0.01"
                         min="0"
                         max="100"
-                        value={budgetForm.customizationPercentage}
-                        onChange={(e) => setBudgetForm({ ...budgetForm, customizationPercentage: e.target.value })}
+                        value={vendorBudgetForm.customizationPercentage}
+                        onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, customizationPercentage: e.target.value })}
                       />
                     </div>
                     <div>
                       <Label htmlFor="budget-customization-description">Descrição da Personalização</Label>
                       <Input
                         id="budget-customization-description"
-                        value={budgetForm.customizationDescription}
-                        onChange={(e) => setBudgetForm({ ...budgetForm, customizationDescription: e.target.value })}
+                        value={vendorBudgetForm.customizationDescription}
+                        onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, customizationDescription: e.target.value })}
                         placeholder="Ex: Gravação personalizada, cor especial..."
                       />
                     </div>
@@ -364,9 +369,9 @@ export default function VendorBudgets() {
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
                 
                 {/* Selected Products */}
-                {budgetForm.items.length > 0 && (
+                {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-2">
-                    {budgetForm.items.map((item, index) => (
+                    {vendorBudgetForm.items.map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-3 border rounded">
                         <div>
                           <p className="font-medium">{item.productName}</p>
@@ -480,9 +485,9 @@ export default function VendorBudgets() {
                     R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {budgetForm.hasCustomization && (
+                {vendorBudgetForm.hasCustomization && (
                   <p className="text-sm text-gray-600 mt-1">
-                    Inclui {budgetForm.customizationPercentage}% de personalização
+                    Inclui {vendorBudgetForm.customizationPercentage}% de personalização
                   </p>
                 )}
               </div>
@@ -500,7 +505,7 @@ export default function VendorBudgets() {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={createBudgetMutation.isPending || budgetForm.items.length === 0}
+                  disabled={createBudgetMutation.isPending || vendorBudgetForm.items.length === 0}
                 >
                   {createBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
                 </Button>

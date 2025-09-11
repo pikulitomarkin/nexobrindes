@@ -661,6 +661,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Routes by role
+  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
+      res.json(budgets);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch vendor budgets" });
+    }
+  });
+
   app.get("/api/vendor/:vendorId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
