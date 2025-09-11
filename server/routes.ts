@@ -553,6 +553,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Process budget photos
+      if (budgetData.photos && budgetData.photos.length > 0) {
+        for (const photoUrl of budgetData.photos) {
+          await storage.createBudgetPhoto(newBudget.id, {
+            imageUrl: photoUrl,
+            description: "Imagem de personalização"
+          });
+        }
+      }
+
       res.json(newBudget);
     } catch (error) {
       console.error("Error creating budget:", error);
@@ -714,6 +724,10 @@ Para mais detalhes, entre em contato conosco!`;
       // Get client and vendor data
       const client = await storage.getUser(budget.clientId);
       const vendor = await storage.getUser(budget.vendorId);
+      
+      // Get budget photos
+      const photos = await storage.getBudgetPhotos(req.params.id);
+      const photoUrls = photos.map(photo => photo.imageUrl);
 
       const pdfData = {
         budget: {
@@ -728,7 +742,8 @@ Para mais detalhes, entre em contato conosco!`;
           hasCustomization: budget.hasCustomization,
           customizationPercentage: budget.customizationPercentage,
           customizationDescription: budget.customizationDescription,
-          createdAt: budget.createdAt
+          createdAt: budget.createdAt,
+          photos: photoUrls
         },
         items: enrichedItems,
         client: {
