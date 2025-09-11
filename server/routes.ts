@@ -1050,6 +1050,40 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Send order to production
+  app.post("/api/orders/:id/send-to-production", async (req, res) => {
+    try {
+      const orderId = req.params.id;
+      
+      // Update order status to production
+      const updatedOrder = await storage.updateOrder(orderId, { 
+        status: 'production',
+        productionStartedAt: new Date().toISOString()
+      });
+      
+      if (!updatedOrder) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+      
+      // Get enriched order data
+      const client = await storage.getUser(updatedOrder.clientId);
+      const vendor = await storage.getUser(updatedOrder.vendorId);
+      const producer = updatedOrder.producerId ? await storage.getUser(updatedOrder.producerId) : null;
+      
+      const enrichedOrder = {
+        ...updatedOrder,
+        clientName: client?.name || 'Unknown',
+        vendorName: vendor?.name || 'Unknown',
+        producerName: producer?.name || null
+      };
+      
+      res.json(enrichedOrder);
+    } catch (error) {
+      console.error("Error sending order to production:", error);
+      res.status(500).json({ error: "Failed to send order to production" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
