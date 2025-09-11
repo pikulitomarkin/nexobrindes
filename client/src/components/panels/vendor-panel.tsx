@@ -172,13 +172,14 @@ export default function VendorPanel() {
           <CardContent className="space-y-4">
             <Link href="/vendor/clients">
               <Button variant="outline" className="w-full justify-start">
+                <Users className="h-4 w-4 mr-2" />
                 Ver Meus Clientes
               </Button>
             </Link>
             <Link href="/vendor/commissions">
               <Button variant="outline" className="w-full justify-start">
                 <DollarSign className="h-4 w-4 mr-2" />
-                Ver Comissões
+                Minhas Comissões
               </Button>
             </Link>
           </CardContent>

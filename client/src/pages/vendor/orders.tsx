@@ -5,31 +5,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Plus, Eye, Trash2, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function VendorOrders() {
   const vendorId = "vendor-1";
-  const [showNewOrderForm, setShowNewOrderForm] = useState(false);
-  const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderProductSearch, setOrderProductSearch] = useState("");
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [orderToSend, setOrderToSend] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Order form state - isolated for vendor
   const [vendorOrderForm, setVendorOrderForm] = useState({
     title: "",
     description: "",
@@ -39,18 +35,17 @@ export default function VendorOrders() {
     items: [] as any[]
   });
 
-  // Queries
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/vendors", vendorId, "orders"],
     queryFn: async () => {
       const response = await fetch(`/api/vendors/${vendorId}/orders`);
-      if (!response.ok) throw new Error('Failed to fetch orders');
+      if (!response.ok) throw new Error('Failed to fetch vendor orders');
       return response.json();
     },
   });
 
   const { data: clients } = useQuery({
-    queryKey: ["/api/vendor/clients", vendorId],
+    queryKey: ["/api/vendors", vendorId, "clients"],
     queryFn: async () => {
       const response = await fetch(`/api/vendors/${vendorId}/clients`);
       if (!response.ok) throw new Error('Failed to fetch clients');
@@ -59,68 +54,16 @@ export default function VendorOrders() {
   });
 
   const { data: productsData } = useQuery({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/products", { limit: 9999 }],
     queryFn: async () => {
-      const response = await fetch('/api/products?limit=100');
+      const response = await fetch('/api/products?limit=9999');
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
   });
 
   const products = productsData?.products || [];
-
-  // Mutations
-  const sendToProductionMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error("Erro ao enviar para produção");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
-      setShowSendToProductionModal(false);
-      setOrderToSend(null);
-      toast({
-        title: "Sucesso!",
-        description: "Pedido enviado para produção",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar pedido para produção",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const createOrderMutation = useMutation({
-    mutationFn: async (orderData: any) => {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...orderData,
-          totalValue: calculateOrderTotal(),
-          status: "confirmed"
-        }),
-      });
-      if (!response.ok) throw new Error("Erro ao criar pedido");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
-      setShowNewOrderForm(false);
-      resetOrderForm();
-      toast({
-        title: "Sucesso!",
-        description: "Pedido criado com sucesso",
-      });
-    },
-  });
+  const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
 
   // Order functions
   const addProductToOrder = (product: any) => {
@@ -190,8 +133,72 @@ export default function VendorOrders() {
       deadline: "",
       items: []
     });
-    setOrderProductSearch("");
-    setOrderCategoryFilter("all");
+  };
+
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const orderData = {
+        ...data,
+        totalValue: calculateOrderTotal().toFixed(2),
+        status: "confirmed"
+      };
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
+      if (!response.ok) throw new Error("Erro ao criar pedido");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
+      setIsOrderDialogOpen(false);
+      resetOrderForm();
+      setOrderProductSearch("");
+      setOrderCategoryFilter("all");
+      toast({
+        title: "Sucesso!",
+        description: "Pedido criado com sucesso",
+      });
+    },
+  });
+
+  const sendToProductionMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao enviar para produção");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
+      setShowSendToProductionModal(false);
+      setOrderToSend(null);
+      toast({
+        title: "Sucesso!",
+        description: "Pedido enviado para produção",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar pedido para produção",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleSendToProductionClick = (orderId: string) => {
+    setOrderToSend(orderId);
+    setShowSendToProductionModal(true);
+  };
+
+  const confirmSendToProduction = () => {
+    if (orderToSend) {
+      sendToProductionMutation.mutate(orderToSend);
+    }
   };
 
   const handleOrderSubmit = (e: React.FormEvent) => {
@@ -204,26 +211,7 @@ export default function VendorOrders() {
       });
       return;
     }
-    if (!vendorOrderForm.clientId) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente para o pedido",
-        variant: "destructive"
-      });
-      return;
-    }
     createOrderMutation.mutate(vendorOrderForm);
-  };
-
-  const handleSendToProductionClick = (orderId: string) => {
-    setOrderToSend(orderId);
-    setShowSendToProductionModal(true);
-  };
-
-  const confirmSendToProduction = () => {
-    if (orderToSend) {
-      sendToProductionMutation.mutate(orderToSend);
-    }
   };
 
   // Filter products for order creation
@@ -241,12 +229,12 @@ export default function VendorOrders() {
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800",
-      production: "bg-purple-100 text-purple-800",
-      shipped: "bg-indigo-100 text-indigo-800",
-      delivered: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
+      pending: "status-badge status-pending",
+      confirmed: "status-badge status-confirmed",
+      production: "status-badge status-production",
+      shipped: "status-badge status-confirmed",
+      delivered: "status-badge status-completed",
+      cancelled: "status-badge status-cancelled",
     };
 
     const statusLabels = {
@@ -259,18 +247,27 @@ export default function VendorOrders() {
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusClasses[status as keyof typeof statusClasses]}`}>
-        {statusLabels[status as keyof typeof statusLabels]}
+      <span className={statusClasses[status as keyof typeof statusClasses] || "status-badge"}>
+        {statusLabels[status as keyof typeof statusLabels] || status}
       </span>
     );
   };
+
+  const filteredOrders = orders?.filter((order: any) => {
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesSearch = searchTerm === "" || 
+      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   if (isLoading) {
     return (
       <div className="p-8">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-gray-200 rounded-xl"></div>
         </div>
       </div>
     );
@@ -278,368 +275,503 @@ export default function VendorOrders() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Meus Pedidos</h1>
-            <p className="text-gray-600">Gerencie seus pedidos de venda</p>
-          </div>
-          <Dialog open={showNewOrderForm} onOpenChange={setShowNewOrderForm}>
-            <DialogTrigger asChild>
-              <Button className="gradient-bg text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Pedido
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Criar Novo Pedido</DialogTitle>
-                <DialogDescription>Preencha os dados do pedido</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleOrderSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="order-title">Título do Pedido</Label>
-                    <Input
-                      id="order-title"
-                      value={vendorOrderForm.title}
-                      onChange={(e) => setVendorOrderForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Ex: Pedido de canecas personalizadas"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="order-client">Cliente *</Label>
-                    <Select value={vendorOrderForm.clientId} onValueChange={(value) => setVendorOrderForm(prev => ({ ...prev, clientId: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients?.map((client: any) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Pedidos</h1>
+          <p className="text-gray-600">Gerencie pedidos criados para seus clientes</p>
+        </div>
+        <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-bg text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Pedido
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Criar Novo Pedido</DialogTitle>
+              <DialogDescription>
+                Crie um pedido personalizado com produtos do catálogo
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleOrderSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="order-title">Título do Pedido</Label>
+                  <Input
+                    id="order-title"
+                    value={vendorOrderForm.title}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, title: e.target.value })}
+                    required
+                  />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="order-deadline">Prazo de Entrega</Label>
-                    <Input
-                      id="order-deadline"
-                      type="date"
-                      value={vendorOrderForm.deadline}
-                      onChange={(e) => setVendorOrderForm(prev => ({ ...prev, deadline: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="order-description">Observações</Label>
-                    <Textarea
-                      id="order-description"
-                      value={vendorOrderForm.description}
-                      onChange={(e) => setVendorOrderForm(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Observações adicionais sobre o pedido"
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="order-deadline">Prazo de Entrega</Label>
+                  <Input
+                    id="order-deadline"
+                    type="date"
+                    value={vendorOrderForm.deadline}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deadline: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                {/* Product Selection */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Produtos do Pedido</h3>
-                  
-                  {/* Selected Products */}
-                  {vendorOrderForm.items.length > 0 && (
-                    <div className="space-y-4">
-                      {vendorOrderForm.items.map((item, index) => (
-                        <div key={index} className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium">{item.productName}</h4>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeProductFromOrder(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div>
-                              <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
-                              <Input
-                                id={`quantity-${index}`}
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
-                              />
-                            </div>
-                            <div>
-                              <Label>Preço Unitário</Label>
-                              <div className="p-2 bg-gray-50 rounded text-sm">
-                                R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                            </div>
-                            <div>
-                              <Label>Total do Item</Label>
-                              <div className="p-2 bg-gray-50 rounded text-sm font-medium">
-                                R$ {calculateItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                            </div>
-                          </div>
+              <div>
+                <Label htmlFor="order-description">Descrição</Label>
+                <Textarea
+                  id="order-description"
+                  rows={2}
+                  value={vendorOrderForm.description}
+                  onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, description: e.target.value })}
+                />
+              </div>
 
-                          <div className="border-t pt-3">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <input
-                                type="checkbox"
-                                id={`customization-${index}`}
-                                checked={item.hasItemCustomization}
-                                onChange={(e) => updateOrderItem(index, 'hasItemCustomization', e.target.checked)}
-                              />
-                              <Label htmlFor={`customization-${index}`}>Taxa de Personalização</Label>
-                            </div>
-                            
-                            {item.hasItemCustomization && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label htmlFor={`customization-value-${index}`}>Valor da Personalização (R$)</Label>
-                                  <Input
-                                    id={`customization-value-${index}`}
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={item.itemCustomizationValue}
-                                    onChange={(e) => updateOrderItem(index, 'itemCustomizationValue', e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor={`customization-desc-${index}`}>Descrição da Personalização</Label>
-                                  <Input
-                                    id={`customization-desc-${index}`}
-                                    value={item.itemCustomizationDescription}
-                                    onChange={(e) => updateOrderItem(index, 'itemCustomizationDescription', e.target.value)}
-                                    placeholder="Ex: Logotipo em dourado"
-                                  />
-                                </div>
-                              </div>
-                            )}
+              <div>
+                <Label htmlFor="order-client">Cliente</Label>
+                <Select value={vendorOrderForm.clientId} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, clientId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              {/* Product Selection */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Produtos do Pedido</h3>
+                
+                {/* Selected Products */}
+                {vendorOrderForm.items.length > 0 && (
+                  <div className="space-y-4">
+                    {vendorOrderForm.items.map((item, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium">{item.productName}</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeProductFromOrder(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
+                            <Input
+                              id={`quantity-${index}`}
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`unit-price-${index}`}>Preço Unitário</Label>
+                            <Input
+                              id={`unit-price-${index}`}
+                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
+                            <Input
+                              id={`subtotal-${index}`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {/* Add Products Section */}
-                  <div className="border rounded-lg p-4">
-                    <h4 className="text-md font-medium mb-3">Adicionar Produtos</h4>
-                    
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div>
-                        <Input
-                          placeholder="Buscar produtos..."
-                          value={orderProductSearch}
-                          onChange={(e) => setOrderProductSearch(e.target.value)}
-                        />
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`item-customization-${index}`}
+                            checked={item.hasItemCustomization}
+                            onCheckedChange={(checked) => updateOrderItem(index, 'hasItemCustomization', checked)}
+                          />
+                          <Label htmlFor={`item-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização do Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemCustomization && (
+                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
+                            <div>
+                              <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                              <Input
+                                id={`item-customization-value-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.itemCustomizationValue}
+                                onChange={(e) => updateOrderItem(index, 'itemCustomizationValue', e.target.value)}
+                                placeholder="0,00"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
+                              <Input
+                                id={`item-customization-description-${index}`}
+                                value={item.itemCustomizationDescription}
+                                onChange={(e) => updateOrderItem(index, 'itemCustomizationDescription', e.target.value)}
+                                placeholder="Ex: Gravação, cor especial..."
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Subtotal:</span>
+                          <span className="font-medium">
+                            R$ {calculateItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
-                      <div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Products */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Order Product Search */}
+                    <div className="mb-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Buscar produtos..."
+                            value={orderProductSearch}
+                            onChange={(e) => setOrderProductSearch(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
                         <Select value={orderCategoryFilter} onValueChange={setOrderCategoryFilter}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Filtrar por categoria" />
+                            <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">Todas as categorias</SelectItem>
-                            <SelectItem value="canecas">Canecas</SelectItem>
-                            <SelectItem value="brindes">Brindes</SelectItem>
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category === "all" ? "Todas as Categorias" : category}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
-                      {filteredOrderProducts.map((product: any) => (
-                        <div key={product.id} className="p-3 border rounded-lg hover:bg-gray-50">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1">
-                              <h5 className="font-medium text-sm">{product.name}</h5>
-                              <p className="text-xs text-gray-600">{product.friendlyCode}</p>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => addProductToOrder(product)}
-                              className="ml-2"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <p className="text-sm font-medium text-green-600">
-                            R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Order Total */}
-                  {vendorOrderForm.items.length > 0 && (
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-medium">Total do Pedido:</span>
-                        <span className="text-2xl font-bold text-green-600">
-                          R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowNewOrderForm(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="gradient-bg text-white"
-                    disabled={createOrderMutation.isPending}
-                  >
-                    {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Orders List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Pedidos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Número
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cliente
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orders?.map((order: any) => (
-                    <tr key={order.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {order.orderNumber}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.clientName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(order.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <span>{filteredOrderProducts.length} produtos encontrados</span>
+                        {(orderProductSearch || orderCategoryFilter !== "all") && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                             onClick={() => {
-                              setSelectedOrderId(order.id);
-                              setShowOrderDetails(true);
+                              setOrderProductSearch("");
+                              setOrderCategoryFilter("all");
                             }}
                           >
-                            <Eye className="h-4 w-4" />
+                            Limpar filtros
                           </Button>
-                          {order.status === "confirmed" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-blue-600 hover:text-blue-900"
-                              onClick={() => handleSendToProductionClick(order.id)}
-                            >
-                              Enviar p/ Produção
-                            </Button>
-                          )}
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                      {filteredOrderProducts.length === 0 ? (
+                        <div className="col-span-full text-center py-8">
+                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500">
+                            {orderProductSearch || orderCategoryFilter !== "all" ? 
+                              "Nenhum produto encontrado com os filtros aplicados" : 
+                              "Nenhum produto disponível"}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      ) : (
+                        filteredOrderProducts.map((product: any) => (
+                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
+                               onClick={() => addProductToOrder(product)}>
+                            <div className="flex items-center gap-2">
+                              {product.imageLink ? (
+                                <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                  <Package className="h-4 w-4 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{product.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Total */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center text-lg font-semibold">
+                  <span>Total do Pedido:</span>
+                  <span className="text-blue-600">
+                    R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => {
+                    setIsOrderDialogOpen(false);
+                    resetOrderForm();
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createOrderMutation.isPending || vendorOrderForm.items.length === 0}
+                >
+                  {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Confirmados</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {orders?.filter((o: any) => o.status === 'confirmed').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <ShoppingCart className="h-6 w-6 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {orders?.length === 0 && (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <p className="text-gray-500 mb-4">Nenhum pedido encontrado</p>
-              <Button
-                onClick={() => setShowNewOrderForm(true)}
-                className="gradient-bg text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Primeiro Pedido
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Send to Production Confirmation Modal */}
-        <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Enviar para Produção</DialogTitle>
-              <DialogDescription>
-                Tem certeza que deseja enviar este pedido para produção?
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end space-x-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowSendToProductionModal(false)}
-              >
-                Não
-              </Button>
-              <Button
-                className="gradient-bg text-white"
-                onClick={confirmSendToProduction}
-                disabled={sendToProductionMutation.isPending}
-              >
-                {sendToProductionMutation.isPending ? "Enviando..." : "Sim"}
-              </Button>
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Em Produção</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {orders?.filter((o: any) => o.status === 'production').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Calculator className="h-6 w-6 text-purple-600" />
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Entregues</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {orders?.filter((o: any) => o.status === 'delivered').length || 0}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                <p className="text-lg font-bold gradient-text">
+                  R$ {orders?.reduce((total: number, o: any) => total + parseFloat(o.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                </p>
+              </div>
+              <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">R$</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar por número, título ou cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pending">Aguardando</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="production">Em Produção</SelectItem>
+                  <SelectItem value="shipped">Enviado</SelectItem>
+                  <SelectItem value="delivered">Entregue</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Orders Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Pedidos ({filteredOrders?.length || 0})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Número
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Título
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Data
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredOrders?.map((order: any) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {order.orderNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.clientName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(order.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-1">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                        {order.status === 'confirmed' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-blue-600 hover:text-blue-900"
+                            onClick={() => handleSendToProductionClick(order.id)}
+                            disabled={sendToProductionMutation.isPending}
+                          >
+                            <Send className="h-4 w-4 mr-1" />
+                            {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Send to Production Confirmation Dialog */}
+      <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar para Produção</DialogTitle>
+            <DialogDescription>
+              Deseja realmente enviar este pedido para produção? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowSendToProductionModal(false);
+                setOrderToSend(null);
+              }}
+              className="flex-1"
+            >
+              Não
+            </Button>
+            <Button 
+              onClick={confirmSendToProduction}
+              disabled={sendToProductionMutation.isPending}
+              className="flex-1"
+            >
+              {sendToProductionMutation.isPending ? 'Enviando...' : 'Sim'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
