@@ -246,7 +246,7 @@ export class PDFGenerator {
         this.doc.setFont('helvetica', 'italic');
         this.doc.setFontSize(7);
         this.doc.setTextColor(100, 100, 100);
-        const customization = this.doc.splitTextToSize(`Personalização (${item.itemCustomizationPercentage}%): ${item.itemCustomizationDescription}`, colWidths[1] - 4);
+        const customization = this.doc.splitTextToSize(`Personalização (+${this.formatCurrency(item.itemCustomizationValue)}): ${item.itemCustomizationDescription}`, colWidths[1] - 4);
         this.doc.text(customization, currentX + 2, this.currentY + 18);
         this.doc.setTextColor(0, 0, 0);
       }
@@ -266,8 +266,8 @@ export class PDFGenerator {
       const baseItemTotal = parseFloat(item.unitPrice) * item.quantity;
       let itemTotal = baseItemTotal;
       
-      if (item.hasItemCustomization && item.itemCustomizationPercentage) {
-        const customizationAmount = baseItemTotal * (parseFloat(item.itemCustomizationPercentage) / 100);
+      if (item.hasItemCustomization && item.itemCustomizationValue) {
+        const customizationAmount = parseFloat(item.itemCustomizationValue);
         itemTotal = baseItemTotal + customizationAmount;
       }
       

@@ -239,26 +239,45 @@ export default function AdminBudgets() {
 
   const generatePDFMutation = useMutation({
     mutationFn: async (budgetId: string) => {
-      const response = await fetch(`/api/budgets/${budgetId}/pdf`, {
-        method: "GET",
-      });
-      if (!response.ok) throw new Error("Erro ao gerar PDF");
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `orcamento-${budgetId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const response = await fetch(`/api/budgets/${budgetId}/pdf-data`);
+      if (!response.ok) throw new Error("Erro ao buscar dados do orçamento");
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      try {
+        const pdfGenerator = new PDFGenerator();
+        const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
+        
+        // Create download link
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `orcamento-${data.budget.budgetNumber}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Sucesso!",
+          description: "PDF gerado e baixado com sucesso!"
+        });
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao gerar PDF. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error) => {
       toast({
-        title: "Sucesso!",
-        description: "PDF gerado e baixado",
+        title: "Erro",
+        description: "Erro ao buscar dados do orçamento.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
   const handleBudgetSubmit = (e: React.FormEvent) => {

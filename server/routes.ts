@@ -664,38 +664,68 @@ Para mais detalhes, entre em contato conosco!`;
           const product = await storage.getProduct(item.productId);
           const quantity = item.quantity;
           const unitPrice = parseFloat(item.unitPrice);
-          const customizationPercentage = parseFloat(item.itemCustomizationPercentage);
+          const customizationValue = parseFloat(item.itemCustomizationValue || '0');
 
           let itemTotal = unitPrice * quantity;
-          if (item.hasItemCustomization && customizationPercentage > 0) {
-            const customizationAmount = itemTotal * (customizationPercentage / 100);
-            itemTotal += customizationAmount;
+          if (item.hasItemCustomization && customizationValue > 0) {
+            itemTotal += customizationValue;
           }
 
           return {
-            ...item,
-            product: product || { name: 'Produto não encontrado', description: '', category: '' },
-            itemTotal: itemTotal.toFixed(2)
+            id: item.id,
+            productId: item.productId,
+            quantity: quantity,
+            unitPrice: unitPrice.toFixed(2),
+            totalPrice: itemTotal.toFixed(2),
+            hasItemCustomization: item.hasItemCustomization,
+            itemCustomizationValue: customizationValue.toFixed(2),
+            itemCustomizationDescription: item.itemCustomizationDescription || '',
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
           };
         })
       );
 
       // Calculate overall budget total
-      const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.itemTotal), 0);
+      const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
 
       // Get client and vendor data
       const client = await storage.getUser(budget.clientId);
       const vendor = await storage.getUser(budget.vendorId);
 
-      res.json({
+      const pdfData = {
         budget: {
-          ...budget,
-          total: totalBudget.toFixed(2)
+          id: budget.id,
+          budgetNumber: budget.budgetNumber,
+          title: budget.title,
+          description: budget.description,
+          clientId: budget.clientId,
+          vendorId: budget.vendorId,
+          totalValue: totalBudget.toFixed(2),
+          validUntil: budget.validUntil,
+          hasCustomization: budget.hasCustomization,
+          customizationPercentage: budget.customizationPercentage,
+          customizationDescription: budget.customizationDescription,
+          createdAt: budget.createdAt
         },
         items: enrichedItems,
-        client: client || { name: 'Cliente não encontrado' },
-        vendor: vendor || { name: 'Vendedor não encontrado' }
-      });
+        client: {
+          name: client?.name || 'Cliente não encontrado',
+          email: client?.email || '',
+          phone: client?.phone || ''
+        },
+        vendor: {
+          name: vendor?.name || 'Vendedor não encontrado',
+          email: vendor?.email || '',
+          phone: vendor?.phone || ''
+        }
+      };
+
+      res.json(pdfData);
     } catch (error) {
       console.error('Error fetching budget PDF data:', error);
       res.status(500).json({ error: "Failed to fetch budget PDF data" });
