@@ -957,7 +957,7 @@ export default function VendorBudgets() {
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
-                        {budget.status === 'draft' && (
+                        {budget.status !== 'production' && (
                           <Button 
                             variant="ghost" 
                             size="sm"
