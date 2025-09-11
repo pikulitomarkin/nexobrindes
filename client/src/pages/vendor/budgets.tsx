@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -22,6 +22,8 @@ export default function VendorBudgets() {
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [budgetProductSearch, setBudgetProductSearch] = useState("");
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Image upload functions
@@ -187,6 +189,8 @@ export default function VendorBudgets() {
       items: [],
       photos: []
     });
+    setIsEditMode(false);
+    setEditingBudgetId(null);
   };
 
   const createBudgetMutation = useMutation({
@@ -212,6 +216,33 @@ export default function VendorBudgets() {
       toast({
         title: "Sucesso!",
         description: "Orçamento criado com sucesso",
+      });
+    },
+  });
+
+  const updateBudgetMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const budgetData = {
+        ...data,
+        totalValue: calculateBudgetTotal().toFixed(2)
+      };
+      const response = await fetch(`/api/budgets/${editingBudgetId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(budgetData),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar orçamento");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      setIsBudgetDialogOpen(false);
+      resetBudgetForm();
+      setBudgetProductSearch("");
+      setBudgetCategoryFilter("all");
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento atualizado com sucesso",
       });
     },
   });
@@ -321,6 +352,32 @@ export default function VendorBudgets() {
     setViewBudgetDialogOpen(true);
   };
 
+  const handleEditBudget = (budget: any) => {
+    // Pre-populate form with existing budget data
+    setVendorBudgetForm({
+      title: budget.title,
+      description: budget.description || "",
+      clientId: budget.clientId,
+      vendorId: budget.vendorId,
+      validUntil: budget.validUntil || "",
+      items: budget.items.map((item: any) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: parseFloat(item.unitPrice),
+        totalPrice: parseFloat(item.totalPrice),
+        hasItemCustomization: item.hasItemCustomization,
+        itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+        itemCustomizationDescription: item.itemCustomizationDescription || ""
+      })),
+      photos: budget.photos || []
+    });
+    
+    setIsEditMode(true);
+    setEditingBudgetId(budget.id);
+    setIsBudgetDialogOpen(true);
+  };
+
   const handleBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (vendorBudgetForm.items.length === 0) {
@@ -331,7 +388,12 @@ export default function VendorBudgets() {
       });
       return;
     }
-    createBudgetMutation.mutate(vendorBudgetForm);
+    
+    if (isEditMode) {
+      updateBudgetMutation.mutate(vendorBudgetForm);
+    } else {
+      createBudgetMutation.mutate(vendorBudgetForm);
+    }
   };
 
   // Filter products for budget creation
@@ -407,9 +469,9 @@ export default function VendorBudgets() {
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Criar Novo Orçamento</DialogTitle>
+              <DialogTitle>{isEditMode ? "Editar Orçamento" : "Criar Novo Orçamento"}</DialogTitle>
               <DialogDescription>
-                Crie um orçamento personalizado com produtos do catálogo
+                {isEditMode ? "Modifique os dados do orçamento existente" : "Crie um orçamento personalizado com produtos do catálogo"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleBudgetSubmit} className="space-y-6">
@@ -716,9 +778,12 @@ export default function VendorBudgets() {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={createBudgetMutation.isPending || vendorBudgetForm.items.length === 0}
+                  disabled={(isEditMode ? updateBudgetMutation.isPending : createBudgetMutation.isPending) || vendorBudgetForm.items.length === 0}
                 >
-                  {createBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
+                  {isEditMode
+                    ? (updateBudgetMutation.isPending ? "Atualizando..." : "Atualizar Orçamento")
+                    : (createBudgetMutation.isPending ? "Criando..." : "Criar Orçamento")
+                  }
                 </Button>
               </div>
             </form>
@@ -887,15 +952,29 @@ export default function VendorBudgets() {
                           variant="ghost" 
                           size="sm"
                           onClick={() => handleViewBudget(budget)}
+                          data-testid={`button-view-${budget.id}`}
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
+                        {budget.status === 'draft' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditBudget(budget)}
+                            data-testid={`button-edit-${budget.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => generatePDFMutation.mutate(budget.id)}
                           disabled={generatePDFMutation.isPending}
+                          data-testid={`button-pdf-${budget.id}`}
                         >
                           <FileText className="h-4 w-4 mr-1" />
                           PDF
@@ -907,6 +986,7 @@ export default function VendorBudgets() {
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
                             disabled={sendToWhatsAppMutation.isPending}
+                            data-testid={`button-send-${budget.id}`}
                           >
                             <Send className="h-4 w-4 mr-1" />
                             {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar'}
@@ -919,6 +999,7 @@ export default function VendorBudgets() {
                             className="text-green-600 hover:text-green-900"
                             onClick={() => handleConvertClick(budget.id)}
                             disabled={convertToOrderMutation.isPending}
+                            data-testid={`button-convert-${budget.id}`}
                           >
                             <ShoppingCart className="h-4 w-4 mr-1" />
                             {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter'}
