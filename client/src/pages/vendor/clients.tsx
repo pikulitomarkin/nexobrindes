@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,14 @@ const clientFormSchema = z.object({
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   cpfCnpj: z.string().optional(),
-  address: z.string().optional(),
+  street: z.string().min(1, "Rua é obrigatória"),
+  number: z.string().min(1, "Número é obrigatório"),
+  complement: z.string().optional(),
+  neighborhood: z.string().min(1, "Bairro é obrigatório"),
+  city: z.string().min(1, "Cidade é obrigatória"),
+  state: z.string().min(2, "Estado é obrigatório"),
+  zipCode: z.string().min(8, "CEP deve ter 8 dígitos"),
+  reference: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -53,17 +61,32 @@ export default function VendorClients() {
       phone: "",
       whatsapp: "",
       cpfCnpj: "",
-      address: "",
+      street: "",
+      number: "",
+      complement: "",
+      neighborhood: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      reference: "",
     },
   });
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
+      // Combinar campos de endereço em um campo único para compatibilidade
+      const address = `${data.street}, ${data.number}${data.complement ? ', ' + data.complement : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, CEP: ${data.zipCode}${data.reference ? ' - Ref: ' + data.reference : ''}`;
+      
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...data,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          whatsapp: data.whatsapp,
+          cpfCnpj: data.cpfCnpj,
+          address: address,
           vendorId: vendorId,
         }),
       });
@@ -114,11 +137,11 @@ export default function VendorClients() {
               Novo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
               <DialogDescription>
-                Preencha os dados do cliente
+                Preencha os dados completos do cliente
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -195,23 +218,137 @@ export default function VendorClients() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Endereço Completo</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Rua das Flores, 123, Centro, São Paulo, SP"
-                          rows={3}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Seção de Endereço Detalhado */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium mb-4">Endereço Completo</h3>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="street"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rua/Avenida *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Rua das Flores" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="complement"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apt 101, Bloco A" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="neighborhood"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="São Paulo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Estado *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="SP" maxLength={2} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="zipCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="01234-567" 
+                              maxLength={9}
+                              {...field}
+                              onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, '');
+                                if (value.length > 5) {
+                                  value = value.replace(/^(\d{5})(\d)/, '$1-$2');
+                                }
+                                field.onChange(value);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="reference"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ponto de Referência</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Próximo ao Shopping Center" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button
@@ -271,6 +408,12 @@ export default function VendorClients() {
                   <div className="flex items-center text-sm text-gray-600">
                     <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
                     <span>{client.cpfCnpj}</span>
+                  </div>
+                )}
+                {client.address && (
+                  <div className="flex items-start text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs leading-tight">{client.address}</span>
                   </div>
                 )}
               </div>
