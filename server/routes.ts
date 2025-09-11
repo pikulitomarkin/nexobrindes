@@ -521,25 +521,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of budgetData.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const customizationPercentage = typeof item.itemCustomizationPercentage === 'string' ? parseFloat(item.itemCustomizationPercentage) : item.itemCustomizationPercentage || 0;
+        const customizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
 
-        // Calculate correct total with item customization
-        const baseTotal = unitPrice * quantity;
-        let itemTotal = baseTotal;
-
-        if (item.hasItemCustomization && customizationPercentage > 0) {
-          const customizationAmount = baseTotal * (customizationPercentage / 100);
-          itemTotal = baseTotal + customizationAmount;
-        }
-
-        await storage.createBudgetItem({
-          budgetId: newBudget.id,
+        await storage.createBudgetItem(newBudget.id, {
           productId: item.productId,
           quantity: quantity,
           unitPrice: unitPrice.toFixed(2),
-          totalPrice: itemTotal.toFixed(2),
+          totalPrice: (unitPrice * quantity).toFixed(2),
           hasItemCustomization: item.hasItemCustomization || false,
-          itemCustomizationPercentage: customizationPercentage.toFixed(2),
+          itemCustomizationValue: customizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || ""
         });
       }
@@ -603,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:id/convert", async (req, res) => {
+  app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const order = await storage.convertBudgetToOrder(req.params.id);
       res.json(order);

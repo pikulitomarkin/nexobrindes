@@ -30,9 +30,6 @@ export default function VendorBudgets() {
     clientId: "",
     vendorId: vendorId,
     validUntil: "",
-    hasCustomization: false,
-    customizationPercentage: "10.00",
-    customizationDescription: "",
     items: [] as any[],
     photos: [] as string[]
   });
@@ -76,7 +73,7 @@ export default function VendorBudgets() {
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
-      itemCustomizationPercentage: 0,
+      itemCustomizationValue: 0,
       itemCustomizationDescription: ""
     };
     setVendorBudgetForm(prev => ({
@@ -94,7 +91,7 @@ export default function VendorBudgets() {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
         item.totalPrice = item.unitPrice * quantity;
-      } else if (field === 'itemCustomizationPercentage') {
+      } else if (field === 'itemCustomizationValue') {
         item[field] = parseFloat(value) || 0;
       } else {
         item[field] = value;
@@ -113,38 +110,17 @@ export default function VendorBudgets() {
   };
 
   const calculateBudgetTotal = () => {
-    let itemsTotal = 0;
-    
-    // Calculate each item total including its customization
-    vendorBudgetForm.items.forEach(item => {
+    return vendorBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
-      let itemTotal = basePrice;
-      
-      // Apply item-level customization
-      if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
-        const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
-        itemTotal = basePrice + customizationAmount;
-      }
-      
-      itemsTotal += itemTotal;
-    });
-
-    // Apply global customization on top of everything
-    if (vendorBudgetForm.hasCustomization && parseFloat(vendorBudgetForm.customizationPercentage) > 0) {
-      const globalCustomizationAmount = itemsTotal * (parseFloat(vendorBudgetForm.customizationPercentage) / 100);
-      itemsTotal += globalCustomizationAmount;
-    }
-
-    return itemsTotal;
+      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+      return total + basePrice + customizationValue;
+    }, 0);
   };
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    if (item.hasItemCustomization && item.itemCustomizationPercentage > 0) {
-      const customizationAmount = basePrice * (item.itemCustomizationPercentage / 100);
-      return basePrice + customizationAmount;
-    }
-    return basePrice;
+    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+    return basePrice + customizationValue;
   };
 
   const resetBudgetForm = () => {
@@ -154,9 +130,6 @@ export default function VendorBudgets() {
       clientId: "",
       vendorId: vendorId,
       validUntil: "",
-      hasCustomization: false,
-      customizationPercentage: "10.00",
-      customizationDescription: "",
       items: [],
       photos: []
     });
@@ -209,6 +182,24 @@ export default function VendorBudgets() {
       toast({
         title: "Sucesso!",
         description: "PDF gerado e baixado",
+      });
+    },
+  });
+
+  const convertToOrderMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao converter para pedido");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento convertido em pedido",
       });
     },
   });
@@ -352,49 +343,6 @@ export default function VendorBudgets() {
 
               <Separator />
 
-              {/* Customization Options */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="budget-customization"
-                    checked={vendorBudgetForm.hasCustomization}
-                    onCheckedChange={(checked) => setVendorBudgetForm({ ...vendorBudgetForm, hasCustomization: checked })}
-                  />
-                  <Label htmlFor="budget-customization" className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Aplicar Personalização Global
-                  </Label>
-                </div>
-                
-                {vendorBudgetForm.hasCustomization && (
-                  <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
-                    <div>
-                      <Label htmlFor="budget-customization-percentage">Percentual (%)</Label>
-                      <Input
-                        id="budget-customization-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={vendorBudgetForm.customizationPercentage}
-                        onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, customizationPercentage: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="budget-customization-description">Descrição da Personalização</Label>
-                      <Input
-                        id="budget-customization-description"
-                        value={vendorBudgetForm.customizationDescription}
-                        onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, customizationDescription: e.target.value })}
-                        placeholder="Ex: Gravação personalizada, cor especial..."
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
               {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
@@ -416,7 +364,7 @@ export default function VendorBudgets() {
                           </Button>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
                             <Input
@@ -432,6 +380,14 @@ export default function VendorBudgets() {
                             <Input
                               id={`unit-price-${index}`}
                               value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              disabled
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
+                            <Input
+                              id={`subtotal-${index}`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                               disabled
                             />
                           </div>
@@ -452,15 +408,15 @@ export default function VendorBudgets() {
                         {item.hasItemCustomization && (
                           <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
                             <div>
-                              <Label htmlFor={`item-customization-percentage-${index}`}>Percentual (%)</Label>
+                              <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
                               <Input
-                                id={`item-customization-percentage-${index}`}
+                                id={`item-customization-value-${index}`}
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max="100"
-                                value={item.itemCustomizationPercentage}
-                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationPercentage', e.target.value)}
+                                value={item.itemCustomizationValue}
+                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', e.target.value)}
+                                placeholder="0,00"
                               />
                             </div>
                             <div>
@@ -578,11 +534,6 @@ export default function VendorBudgets() {
                     R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {vendorBudgetForm.hasCustomization && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Inclui {vendorBudgetForm.customizationPercentage}% de personalização
-                  </p>
-                )}
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -782,6 +733,18 @@ export default function VendorBudgets() {
                           <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-900">
                             <Send className="h-4 w-4 mr-1" />
                             Enviar
+                          </Button>
+                        )}
+                        {budget.status === 'approved' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-green-600 hover:text-green-900"
+                            onClick={() => convertToOrderMutation.mutate(budget.id)}
+                            disabled={convertToOrderMutation.isPending}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-1" />
+                            Converter
                           </Button>
                         )}
                       </div>

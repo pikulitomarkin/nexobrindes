@@ -97,6 +97,7 @@ export interface IStorage {
   createBudgetItem(budgetId: string, itemData: any): Promise<any>;
   updateBudgetItem(itemId: string, itemData: any): Promise<any>;
   deleteBudgetItem(itemId: string): Promise<boolean>;
+  deleteBudgetItems(budgetId: string): Promise<boolean>;
   
   // Budget Photos
   getBudgetPhotos(budgetId: string): Promise<any[]>;
@@ -856,9 +857,12 @@ export class MemStorage implements IStorage {
     const newItem = {
       id: `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       budgetId,
-      ...itemData,
+      productId: itemData.productId,
+      quantity: itemData.quantity || 1,
+      unitPrice: itemData.unitPrice || '0.00',
+      totalPrice: itemData.totalPrice || '0.00',
       hasItemCustomization: itemData.hasItemCustomization || false,
-      itemCustomizationPercentage: itemData.itemCustomizationPercentage || '0.00',
+      itemCustomizationValue: itemData.itemCustomizationValue || '0.00',
       itemCustomizationDescription: itemData.itemCustomizationDescription || ''
     };
     mockBudgetItems.push(newItem);
@@ -902,6 +906,12 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  async deleteBudgetItems(budgetId: string): Promise<boolean> {
+    const initialLength = mockBudgetItems.length;
+    mockBudgetItems = mockBudgetItems.filter(item => item.budgetId !== budgetId);
+    return mockBudgetItems.length < initialLength;
+  }
+
   // Budget Photos methods
   async getBudgetPhotos(budgetId: string): Promise<any[]> {
     return mockBudgetPhotos.filter(photo => photo.budgetId === budgetId);
@@ -936,34 +946,20 @@ export class MemStorage implements IStorage {
     if (!budget) return;
 
     let subtotal = items.reduce((sum, item) => {
-      const itemPrice = parseFloat(item.totalPrice || '0');
+      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity || '1');
       
-      // Apply item customization if applicable
+      // Apply item customization if applicable (now as fixed value)
       if (item.hasItemCustomization) {
-        const customizationPercentage = parseFloat(item.itemCustomizationPercentage || '0');
-        const customizationAmount = itemPrice * (customizationPercentage / 100);
-        return sum + itemPrice + customizationAmount;
+        const customizationValue = parseFloat(item.itemCustomizationValue || '0');
+        return sum + basePrice + customizationValue;
       }
       
-      return sum + itemPrice;
+      return sum + basePrice;
     }, 0);
 
-    // Apply global customization if applicable
-    if (budget.hasCustomization) {
-      const customizationPercentage = parseFloat(budget.customizationPercentage || '0');
-      const customizationAmount = subtotal * (customizationPercentage / 100);
-      subtotal += customizationAmount;
-      
-      // Update customization value
-      await this.updateBudget(budgetId, {
-        customizationValue: customizationAmount.toFixed(2),
-        totalValue: subtotal.toFixed(2)
-      });
-    } else {
-      await this.updateBudget(budgetId, {
-        totalValue: subtotal.toFixed(2)
-      });
-    }
+    await this.updateBudget(budgetId, {
+      totalValue: subtotal.toFixed(2)
+    });
   }
 }
 
