@@ -825,7 +825,19 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
-      res.json(budgets);
+      
+      // Enrich with client names
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          const client = await storage.getUser(budget.clientId);
+          return {
+            ...budget,
+            clientName: client?.name || 'Unknown'
+          };
+        })
+      );
+      
+      res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
@@ -834,7 +846,19 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/vendor/:vendorId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
-      res.json(budgets);
+      
+      // Enrich with client names
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          const client = await storage.getUser(budget.clientId);
+          return {
+            ...budget,
+            clientName: client?.name || 'Unknown'
+          };
+        })
+      );
+      
+      res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
@@ -843,7 +867,19 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/client/:clientId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByClient(req.params.clientId);
-      res.json(budgets);
+      
+      // Enrich with vendor names
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          const vendor = await storage.getUser(budget.vendorId);
+          return {
+            ...budget,
+            vendorName: vendor?.name || 'Unknown'
+          };
+        })
+      );
+      
+      res.json(enrichedBudgets);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch client budgets" });
     }
