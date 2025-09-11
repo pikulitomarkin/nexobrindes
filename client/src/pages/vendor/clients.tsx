@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,7 +75,7 @@ export default function VendorClients() {
     mutationFn: async (data: ClientFormValues) => {
       // Combinar campos de endereço em um campo único para compatibilidade
       const address = `${data.street}, ${data.number}${data.complement ? ', ' + data.complement : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, CEP: ${data.zipCode}${data.reference ? ' - Ref: ' + data.reference : ''}`;
-      
+
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,7 +158,7 @@ export default function VendorClients() {
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -221,7 +220,7 @@ export default function VendorClients() {
                 {/* Seção de Endereço Detalhado */}
                 <div className="border-t pt-4">
                   <h3 className="text-lg font-medium mb-4">Endereço Completo</h3>
-                  
+
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                       <FormField
@@ -384,7 +383,7 @@ export default function VendorClients() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
               </div>
-              
+
               <div className="space-y-2 mb-4">
                 {client.email && (
                   <div className="flex items-center text-sm text-gray-600">
