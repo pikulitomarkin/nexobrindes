@@ -135,8 +135,8 @@ export class PDFGenerator {
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 15;
 
-    // Table headers with image column
-    const colWidths = [25, 65, 20, 30, 45];
+    // Table headers without image column (cleaner layout)
+    const colWidths = [90, 20, 30, 45];
     const startX = this.margin;
     let currentX = startX;
 
@@ -147,14 +147,12 @@ export class PDFGenerator {
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
-    this.doc.text('Foto', currentX + 2, this.currentY);
-    currentX += colWidths[0];
     this.doc.text('Produto', currentX + 2, this.currentY);
-    currentX += colWidths[1];
+    currentX += colWidths[0];
     this.doc.text('Qtd', currentX + 2, this.currentY);
-    currentX += colWidths[2];
+    currentX += colWidths[1];
     this.doc.text('Preço Unit.', currentX + 2, this.currentY);
-    currentX += colWidths[3];
+    currentX += colWidths[2];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 10;
@@ -164,12 +162,10 @@ export class PDFGenerator {
 
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
-      const baseRowHeight = 20;
-      const hasCustomization = item.hasItemCustomization && (item.itemCustomizationDescription || item.customizationPhoto);
-      const customizationPhotoHeight = item.customizationPhoto ? 40 : 0;
-      const rowHeight = baseRowHeight + (hasCustomization ? 15 + customizationPhotoHeight : 0);
+      const baseRowHeight = 15;
+      const hasCustomization = item.hasItemCustomization && item.itemCustomizationDescription;
 
-      this.addNewPageIfNeeded(rowHeight + 10);
+      this.addNewPageIfNeeded(baseRowHeight + (hasCustomization ? 15 : 0) + 5);
 
       // Draw row background (alternating)
       if (index % 2 === 1) {
@@ -179,33 +175,9 @@ export class PDFGenerator {
 
       currentX = startX;
 
-      // Product image
-      if (item.product.imageLink) {
-        try {
-          await this.addImage(item.product.imageLink, currentX + 2, this.currentY - 3, 20, 15);
-        } catch (error) {
-          // Draw placeholder if image fails to load
-          this.doc.setDrawColor(200);
-          this.doc.rect(currentX + 2, this.currentY - 3, 20, 15);
-          this.doc.setFontSize(6);
-          this.doc.text('Sem', currentX + 8, this.currentY + 2);
-          this.doc.text('imagem', currentX + 5, this.currentY + 8);
-          this.doc.setFontSize(10);
-        }
-      } else {
-        // Draw placeholder rectangle
-        this.doc.setDrawColor(200);
-        this.doc.rect(currentX + 2, this.currentY - 3, 20, 15);
-        this.doc.setFontSize(6);
-        this.doc.text('Sem', currentX + 8, this.currentY + 2);
-        this.doc.text('imagem', currentX + 5, this.currentY + 8);
-        this.doc.setFontSize(10);
-      }
-      currentX += colWidths[0];
-
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 35 
-        ? item.product.name.substring(0, 35) + '...' 
+      const productName = item.product.name.length > 45 
+        ? item.product.name.substring(0, 45) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
@@ -213,61 +185,36 @@ export class PDFGenerator {
       if (item.product.description) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = item.product.description.length > 40 
-          ? item.product.description.substring(0, 40) + '...' 
+        const description = item.product.description.length > 50 
+          ? item.product.description.substring(0, 50) + '...' 
           : item.product.description;
-        this.doc.text(description, currentX + 2, this.currentY + 12);
+        this.doc.text(description, currentX + 2, this.currentY + 10);
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-      currentX += colWidths[1];
+      currentX += colWidths[0];
 
       // Quantity
       this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 5);
-      currentX += colWidths[2];
+      currentX += colWidths[1];
 
       // Unit price
       this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
-      currentX += colWidths[3];
+      currentX += colWidths[2];
 
       // Total price
       this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
 
       this.currentY += baseRowHeight;
 
-      // Add customization info and photo if exists
+      // Add customization info if exists
       if (hasCustomization) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
         
-        if (item.itemCustomizationDescription) {
-          this.doc.text(`  + Personalização: ${item.itemCustomizationDescription}`, startX + 2, this.currentY);
-          this.doc.text(`    Valor: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY + 5);
-          this.currentY += 10;
-        }
-
-        // Add customization photo if exists
-        if (item.customizationPhoto) {
-          try {
-            let imageUrl = item.customizationPhoto;
-            
-            // Convert relative URLs to absolute URLs for PDF generation
-            if (item.customizationPhoto.startsWith('/uploads/')) {
-              imageUrl = `${window.location.origin}${item.customizationPhoto}`;
-            }
-
-            this.doc.setFontSize(8);
-            this.doc.text(`    Foto da Personalização:`, startX + 2, this.currentY);
-            this.currentY += 5;
-            
-            await this.addImage(imageUrl, startX + 4, this.currentY, 30, 25);
-            this.currentY += 30;
-          } catch (error) {
-            console.warn('Failed to load customization image:', error);
-            this.doc.text(`    [Imagem de personalização não disponível]`, startX + 4, this.currentY);
-            this.currentY += 5;
-          }
-        }
+        this.doc.text(`  + Personalização: ${item.itemCustomizationDescription}`, startX + 2, this.currentY);
+        this.doc.text(`    Valor: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY + 5);
+        this.currentY += 10;
         
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
@@ -310,27 +257,29 @@ export class PDFGenerator {
     }
   }
 
-  private async addCustomizationImages(photos: string[]): Promise<void> {
-    if (!photos || photos.length === 0) return;
+  private async addProductCustomizationImages(data: BudgetPDFData): Promise<void> {
+    // Filter items that have customization photos
+    const itemsWithPhotos = data.items.filter(item => item.customizationPhoto);
+    
+    if (itemsWithPhotos.length === 0) return;
 
     this.addNewPageIfNeeded(60);
 
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('IMAGENS DE PERSONALIZAÇÃO:', this.margin, this.currentY);
-    this.currentY += 15;
+    this.doc.text('PERSONALIZAÇÕES DOS PRODUTOS', this.margin, this.currentY);
+    this.currentY += 20;
 
-    // Add images
-    for (let i = 0; i < photos.length; i++) {
+    // Add images for each product
+    for (let i = 0; i < itemsWithPhotos.length; i++) {
+      const item = itemsWithPhotos[i];
+      
       try {
-        const photo = photos[i];
-        let imageUrl = photo;
+        let imageUrl = item.customizationPhoto!;
 
         // Convert relative URLs to absolute URLs for PDF generation
-        if (photo.startsWith('/uploads/')) {
-          imageUrl = `${window.location.origin}${photo}`;
-        } else if (photo.startsWith('/api/files/')) {
-          imageUrl = `${window.location.origin}${photo}`;
+        if (item.customizationPhoto!.startsWith('/uploads/')) {
+          imageUrl = `${window.location.origin}${item.customizationPhoto}`;
         }
 
         // Load image
@@ -347,11 +296,29 @@ export class PDFGenerator {
         });
 
         if (img.complete && img.naturalWidth > 0) {
-          this.addNewPageIfNeeded(80);
+          this.addNewPageIfNeeded(120);
 
-          // Calculate image dimensions (maintain aspect ratio)
-          const maxWidth = 80;
-          const maxHeight = 60;
+          // Product name
+          this.doc.setFontSize(12);
+          this.doc.setFont('helvetica', 'bold');
+          this.doc.text(item.product.name, this.margin, this.currentY);
+          this.currentY += 5;
+
+          // Customization description if available
+          if (item.itemCustomizationDescription) {
+            this.doc.setFontSize(10);
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.setTextColor(100, 100, 100);
+            this.doc.text(`Personalização: ${item.itemCustomizationDescription}`, this.margin, this.currentY);
+            this.currentY += 5;
+            this.doc.setTextColor(0, 0, 0);
+          }
+
+          this.currentY += 5;
+
+          // Calculate image dimensions (maintain aspect ratio and make it larger)
+          const maxWidth = 120; // Increased from 80
+          const maxHeight = 90;  // Increased from 60
 
           let width = maxWidth;
           let height = (img.naturalHeight / img.naturalWidth) * width;
@@ -361,6 +328,9 @@ export class PDFGenerator {
             width = (img.naturalWidth / img.naturalHeight) * height;
           }
 
+          // Center the image horizontally
+          const imageX = this.margin + (this.pageWidth - 2 * this.margin - width) / 2;
+
           // Add image to PDF
           const canvas = document.createElement('canvas');
           canvas.width = img.naturalWidth;
@@ -368,14 +338,14 @@ export class PDFGenerator {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            const imageData = canvas.toDataURL('image/jpeg', 0.9); // Higher quality
 
-            this.doc.addImage(imageData, 'JPEG', this.margin, this.currentY, width, height);
-            this.currentY += height + 5;
+            this.doc.addImage(imageData, 'JPEG', imageX, this.currentY, width, height);
+            this.currentY += height + 15; // More spacing between images
           }
         }
       } catch (error) {
-        console.error('Error adding image to PDF:', error);
+        console.error('Error adding product customization image to PDF:', error);
         // Continue with next image even if this one fails
       }
     }
@@ -392,8 +362,7 @@ export class PDFGenerator {
       await this.addItems(data);
       this.addTotal(data);
       this.addDescription(data);
-
-      
+      await this.addProductCustomizationImages(data);
 
       return new Promise((resolve) => {
         const pdfBlob = this.doc.output('blob');

@@ -1158,21 +1158,22 @@ export default function VendorBudgets() {
               {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {budgetToView.items?.filter((item: any) => item.customizationPhoto).map((item: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                        <img 
-                          src={item.customizationPhoto} 
-                          alt={`Personalização ${item.productName}`} 
-                          className="w-20 h-20 object-cover rounded"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
+                      <div key={index} className="border rounded-lg p-4">
+                        <h4 className="font-medium text-lg mb-3">{item.productName}</h4>
+                        <div className="flex flex-col items-center">
+                          <img 
+                            src={item.customizationPhoto} 
+                            alt={`Personalização ${item.productName}`} 
+                            className="w-full max-w-sm h-64 object-contain rounded-lg border"
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', item.customizationPhoto);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                           {item.itemCustomizationDescription && (
-                            <p className="text-sm text-gray-600">{item.itemCustomizationDescription}</p>
+                            <p className="text-sm text-gray-600 mt-3 text-center">{item.itemCustomizationDescription}</p>
                           )}
                         </div>
                       </div>
