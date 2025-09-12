@@ -27,6 +27,7 @@ export interface BudgetPDFData {
     itemCustomizationPercentage?: string;
     itemCustomizationDescription?: string;
     itemCustomizationValue?: string;
+    customizationPhoto?: string;
     product: {
       name: string;
       description?: string;
@@ -163,14 +164,17 @@ export class PDFGenerator {
 
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
-      const rowHeight = 20; // Increased height to accommodate image
+      const baseRowHeight = 20;
+      const hasCustomization = item.hasItemCustomization && (item.itemCustomizationDescription || item.customizationPhoto);
+      const customizationPhotoHeight = item.customizationPhoto ? 40 : 0;
+      const rowHeight = baseRowHeight + (hasCustomization ? 15 + customizationPhotoHeight : 0);
 
       this.addNewPageIfNeeded(rowHeight + 10);
 
       // Draw row background (alternating)
       if (index % 2 === 1) {
         this.doc.setFillColor(250, 250, 250);
-        this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+        this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), baseRowHeight, 'F');
       }
 
       currentX = startX;
@@ -229,17 +233,47 @@ export class PDFGenerator {
       // Total price
       this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
 
-      this.currentY += rowHeight;
+      this.currentY += baseRowHeight;
 
-      // Add customization info if exists
-      if (item.hasItemCustomization && item.itemCustomizationDescription) {
+      // Add customization info and photo if exists
+      if (hasCustomization) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        this.doc.text(`  + ${item.itemCustomizationDescription}: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY);
-        this.currentY += 6; 
+        
+        if (item.itemCustomizationDescription) {
+          this.doc.text(`  + Personalização: ${item.itemCustomizationDescription}`, startX + 2, this.currentY);
+          this.doc.text(`    Valor: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY + 5);
+          this.currentY += 10;
+        }
+
+        // Add customization photo if exists
+        if (item.customizationPhoto) {
+          try {
+            let imageUrl = item.customizationPhoto;
+            
+            // Convert relative URLs to absolute URLs for PDF generation
+            if (item.customizationPhoto.startsWith('/uploads/')) {
+              imageUrl = `${window.location.origin}${item.customizationPhoto}`;
+            }
+
+            this.doc.setFontSize(8);
+            this.doc.text(`    Foto da Personalização:`, startX + 2, this.currentY);
+            this.currentY += 5;
+            
+            await this.addImage(imageUrl, startX + 4, this.currentY, 30, 25);
+            this.currentY += 30;
+          } catch (error) {
+            console.warn('Failed to load customization image:', error);
+            this.doc.text(`    [Imagem de personalização não disponível]`, startX + 4, this.currentY);
+            this.currentY += 5;
+          }
+        }
+        
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
+
+      this.currentY += 5; // Extra spacing between items
     }
 
     this.currentY += 10;
@@ -359,10 +393,7 @@ export class PDFGenerator {
       this.addTotal(data);
       this.addDescription(data);
 
-      // Add customization images if they exist
-      if (data.budget.photos && data.budget.photos.length > 0) {
-        await this.addCustomizationImages(data.budget.photos);
-      }
+      
 
       return new Promise((resolve) => {
         const pdfBlob = this.doc.output('blob');

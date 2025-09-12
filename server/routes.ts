@@ -1,4 +1,3 @@
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from 'multer';
@@ -69,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           // Get budget photos if order was converted from budget
           let budgetPhotos = [];
           if (order.budgetId) {
@@ -720,8 +719,9 @@ Para mais detalhes, entre em contato conosco!`;
             unitPrice: unitPrice.toFixed(2),
             totalPrice: itemTotal.toFixed(2),
             hasItemCustomization: item.hasItemCustomization,
-            itemCustomizationValue: customizationValue.toFixed(2),
+            itemCustomizationValue: item.itemCustomizationValue,
             itemCustomizationDescription: item.itemCustomizationDescription || '',
+            customizationPhoto: item.customizationPhoto || '',
             product: {
               name: product?.name || 'Produto não encontrado',
               description: product?.description || '',
@@ -738,7 +738,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Get client and vendor data
       const client = await storage.getUser(budget.clientId);
       const vendor = await storage.getUser(budget.vendorId);
-      
+
       // Get budget photos
       const photos = await storage.getBudgetPhotos(req.params.id);
       const photoUrls = photos.map(photo => photo.imageUrl || photo.photoUrl);
@@ -975,7 +975,7 @@ Para mais detalhes, entre em contato conosco!`;
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           // Get budget photos if order was converted from budget
           let budgetPhotos = [];
           if (order.budgetId) {
@@ -1015,19 +1015,19 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const vendorId = req.params.id;
       const clients = await storage.getClientsByVendor(vendorId);
-      
+
       // Enrich clients with order counts and total spent
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
           if (!client.userId) return { ...client, ordersCount: 0, totalSpent: 0 };
           const orders = await storage.getOrdersByClient(client.userId);
           const vendorOrders = orders.filter(order => order.vendorId === vendorId);
-          
+
           const ordersCount = vendorOrders.length;
-          const totalSpent = vendorOrders.reduce((sum, order) => 
+          const totalSpent = vendorOrders.reduce((sum, order) =>
             sum + parseFloat(order.totalValue || '0'), 0
           );
-          
+
           return {
             ...client,
             ordersCount,
@@ -1035,7 +1035,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedClients);
     } catch (error) {
       console.log(error);
@@ -1119,7 +1119,7 @@ Para mais detalhes, entre em contato conosco!`;
       const orderId = req.params.id;
 
       // Update order status to production
-      const updatedOrder = await storage.updateOrder(orderId, { 
+      const updatedOrder = await storage.updateOrder(orderId, {
         status: 'production'
       });
 
@@ -1183,17 +1183,17 @@ Para mais detalhes, entre em contato conosco!`;
       // Save to public directory (accessible by Vite)
       const fs = await import('fs');
       const path = await import('path');
-      
+
       // Create public/uploads directory if it doesn't exist
       const uploadsDir = path.default.join(process.cwd(), 'public', 'uploads');
       if (!fs.default.existsSync(uploadsDir)) {
         fs.default.mkdirSync(uploadsDir, { recursive: true });
       }
-      
+
       // Save file
       const filePath = path.default.join(uploadsDir, filename);
       fs.default.writeFileSync(filePath, buffer);
-      
+
       // Return public URL that Vite can serve
       const url = `/uploads/${filename}`;
       return res.json({ url });

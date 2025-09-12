@@ -26,8 +26,8 @@ export default function VendorBudgets() {
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Image upload functions
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image upload functions for individual products
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, itemIndex: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -43,7 +43,7 @@ export default function VendorBudgets() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('folder', 'budget-customizations');
+      formData.append('folder', 'product-customizations');
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -54,10 +54,7 @@ export default function VendorBudgets() {
       
       const { url } = await response.json();
       
-      setVendorBudgetForm(prev => ({
-        ...prev,
-        photos: [...prev.photos, url]
-      }));
+      updateBudgetItem(itemIndex, 'customizationPhoto', url);
 
       toast({
         title: "Sucesso!",
@@ -72,11 +69,8 @@ export default function VendorBudgets() {
     }
   };
 
-  const removeImage = (index: number) => {
-    setVendorBudgetForm(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }));
+  const removeProductImage = (itemIndex: number) => {
+    updateBudgetItem(itemIndex, 'customizationPhoto', '');
   };
 
   // Budget form state - isolated for vendor
@@ -86,8 +80,7 @@ export default function VendorBudgets() {
     clientId: "",
     vendorId: vendorId,
     validUntil: "",
-    items: [] as any[],
-    photos: [] as string[]
+    items: [] as any[]
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -130,7 +123,8 @@ export default function VendorBudgets() {
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
       itemCustomizationValue: 0,
-      itemCustomizationDescription: ""
+      itemCustomizationDescription: "",
+      customizationPhoto: ""
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -186,8 +180,7 @@ export default function VendorBudgets() {
       clientId: "",
       vendorId: vendorId,
       validUntil: "",
-      items: [],
-      photos: []
+      items: []
     });
     setIsEditMode(false);
     setEditingBudgetId(null);
@@ -368,9 +361,9 @@ export default function VendorBudgets() {
         totalPrice: parseFloat(item.totalPrice),
         hasItemCustomization: item.hasItemCustomization,
         itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
-        itemCustomizationDescription: item.itemCustomizationDescription || ""
-      })),
-      photos: budget.photos || []
+        itemCustomizationDescription: item.itemCustomizationDescription || "",
+        customizationPhoto: item.customizationPhoto || ""
+      }))
     });
     
     setIsEditMode(true);
@@ -538,56 +531,6 @@ export default function VendorBudgets() {
                 </Select>
               </div>
 
-              {/* Image Upload */}
-              <div>
-                <Label>Imagem da Personalização</Label>
-                <div className="mt-2 space-y-3">
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
-                        </svg>
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Clique para enviar</span> imagem da personalização
-                        </p>
-                        <p className="text-xs text-gray-500">PNG, JPG até 5MB</p>
-                      </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        data-testid="input-image-upload"
-                      />
-                    </label>
-                  </div>
-                  
-                  {vendorBudgetForm.photos.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {vendorBudgetForm.photos.map((photo, index) => (
-                        <div key={index} className="relative">
-                          <img 
-                            src={photo} 
-                            alt={`Personalização ${index + 1}`} 
-                            className="w-full h-24 object-cover rounded-lg"
-                          />
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 p-0"
-                            onClick={() => removeImage(index)}
-                            type="button"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <Separator />
 
               {/* Product Selection */}
@@ -653,27 +596,71 @@ export default function VendorBudgets() {
                         </div>
 
                         {item.hasItemCustomization && (
-                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
-                            <div>
-                              <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
-                              <Input
-                                id={`item-customization-value-${index}`}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.itemCustomizationValue}
-                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', e.target.value)}
-                                placeholder="0,00"
-                              />
+                          <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                                <Input
+                                  id={`item-customization-value-${index}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.itemCustomizationValue}
+                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', e.target.value)}
+                                  placeholder="0,00"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
+                                <Input
+                                  id={`item-customization-description-${index}`}
+                                  value={item.itemCustomizationDescription}
+                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
+                                  placeholder="Ex: Gravação, cor especial..."
+                                />
+                              </div>
                             </div>
+                            
+                            {/* Image Upload for Product Customization */}
                             <div>
-                              <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
-                              <Input
-                                id={`item-customization-description-${index}`}
-                                value={item.itemCustomizationDescription}
-                                onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
-                                placeholder="Ex: Gravação, cor especial..."
-                              />
+                              <Label>Imagem da Personalização deste Produto</Label>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-center w-full">
+                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                                      <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                      </svg>
+                                      <p className="text-xs text-gray-500">Clique para enviar imagem</p>
+                                    </div>
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => handleProductImageUpload(e, index)}
+                                    />
+                                  </label>
+                                </div>
+                                
+                                {item.customizationPhoto && (
+                                  <div className="relative inline-block">
+                                    <img 
+                                      src={item.customizationPhoto} 
+                                      alt={`Personalização ${item.productName}`} 
+                                      className="w-24 h-24 object-cover rounded-lg"
+                                    />
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                                      onClick={() => removeProductImage(index)}
+                                      type="button"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1163,18 +1150,24 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Photos */}
-              {budgetToView.photos && budgetToView.photos.length > 0 && (
+              {/* Product Customization Images */}
+              {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-3">Fotos Anexadas</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {budgetToView.photos.map((photo: string, index: number) => (
-                      <div key={index} className="border rounded-lg overflow-hidden">
+                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
+                  <div className="space-y-3">
+                    {budgetToView.items?.filter((item: any) => item.customizationPhoto).map((item: any, index: number) => (
+                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
                         <img 
-                          src={photo} 
-                          alt={`Foto ${index + 1}`} 
-                          className="w-full h-32 object-cover"
+                          src={item.customizationPhoto} 
+                          alt={`Personalização ${item.productName}`} 
+                          className="w-20 h-20 object-cover rounded"
                         />
+                        <div>
+                          <p className="font-medium">{item.productName}</p>
+                          {item.itemCustomizationDescription && (
+                            <p className="text-sm text-gray-600">{item.itemCustomizationDescription}</p>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

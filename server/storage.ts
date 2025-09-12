@@ -881,7 +881,8 @@ export class MemStorage implements IStorage {
       totalPrice: itemData.totalPrice || '0.00',
       hasItemCustomization: itemData.hasItemCustomization || false,
       itemCustomizationValue: itemData.itemCustomizationValue || '0.00',
-      itemCustomizationDescription: itemData.itemCustomizationDescription || ''
+      itemCustomizationDescription: itemData.itemCustomizationDescription || '',
+      customizationPhoto: itemData.customizationPhoto || ''
     };
     mockBudgetItems.push(newItem);
 
