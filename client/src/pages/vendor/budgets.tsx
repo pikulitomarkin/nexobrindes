@@ -648,6 +648,10 @@ export default function VendorBudgets() {
                                       src={item.customizationPhoto} 
                                       alt={`Personalização ${item.productName}`} 
                                       className="w-24 h-24 object-cover rounded-lg"
+                                      onError={(e) => {
+                                        console.error('Erro ao carregar imagem:', item.customizationPhoto);
+                                        e.currentTarget.style.display = 'none';
+                                      }}
                                     />
                                     <Button
                                       variant="destructive"
@@ -1161,6 +1165,9 @@ export default function VendorBudgets() {
                           src={item.customizationPhoto} 
                           alt={`Personalização ${item.productName}`} 
                           className="w-20 h-20 object-cover rounded"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                         <div>
                           <p className="font-medium">{item.productName}</p>

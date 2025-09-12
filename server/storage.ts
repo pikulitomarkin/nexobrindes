@@ -116,6 +116,8 @@ export class MemStorage implements IStorage {
   private vendors: Map<string, Vendor>;
   private products: Map<string, any>; 
   private budgets: Map<string, any>; 
+  private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
+  private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
 
   constructor() {
     this.users = new Map();
@@ -127,6 +129,8 @@ export class MemStorage implements IStorage {
     this.vendors = new Map();
     this.products = new Map(); 
     this.budgets = new Map(); 
+    this.budgetItems = []; // Initialize as empty array
+    this.budgetPhotos = []; // Initialize as empty array
     this.initializeData();
   }
 
@@ -829,8 +833,8 @@ export class MemStorage implements IStorage {
 
   async deleteBudget(id: string): Promise<boolean> {
     // Also delete related items and photos
-    mockBudgetItems = mockBudgetItems.filter(item => item.budgetId !== id);
-    mockBudgetPhotos = mockBudgetPhotos.filter(photo => photo.budgetId !== id);
+    this.budgetItems = this.budgetItems.filter(item => item.budgetId !== id);
+    this.budgetPhotos = this.budgetPhotos.filter(photo => photo.budgetId !== id);
     return this.budgets.delete(id);
   }
 
@@ -867,7 +871,7 @@ export class MemStorage implements IStorage {
 
   // Budget Items methods
   async getBudgetItems(budgetId: string): Promise<any[]> {
-    return mockBudgetItems.filter(item => item.budgetId === budgetId);
+    return this.budgetItems.filter(item => item.budgetId === budgetId);
   }
 
   async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
@@ -884,7 +888,7 @@ export class MemStorage implements IStorage {
       itemCustomizationDescription: itemData.itemCustomizationDescription || '',
       customizationPhoto: itemData.customizationPhoto || ''
     };
-    mockBudgetItems.push(newItem);
+    this.budgetItems.push(newItem);
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(budgetId);
@@ -893,16 +897,17 @@ export class MemStorage implements IStorage {
   }
 
   async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
-    const itemIndex = mockBudgetItems.findIndex(item => item.id === itemId);
+    const itemIndex = this.budgetItems.findIndex(item => item.id === itemId);
     if (itemIndex === -1) {
       throw new Error('Budget item not found');
     }
 
     const updatedItem = {
-      ...mockBudgetItems[itemIndex],
-      ...itemData
+      ...this.budgetItems[itemIndex],
+      ...itemData,
+      customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : this.budgetItems[itemIndex].customizationPhoto
     };
-    mockBudgetItems[itemIndex] = updatedItem;
+    this.budgetItems[itemIndex] = updatedItem;
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(updatedItem.budgetId);
@@ -911,13 +916,13 @@ export class MemStorage implements IStorage {
   }
 
   async deleteBudgetItem(itemId: string): Promise<boolean> {
-    const itemIndex = mockBudgetItems.findIndex(item => item.id === itemId);
+    const itemIndex = this.budgetItems.findIndex(item => item.id === itemId);
     if (itemIndex === -1) {
       return false;
     }
 
-    const budgetId = mockBudgetItems[itemIndex].budgetId;
-    mockBudgetItems.splice(itemIndex, 1);
+    const budgetId = this.budgetItems[itemIndex].budgetId;
+    this.budgetItems.splice(itemIndex, 1);
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(budgetId);
@@ -926,14 +931,14 @@ export class MemStorage implements IStorage {
   }
 
   async deleteBudgetItems(budgetId: string): Promise<boolean> {
-    const initialLength = mockBudgetItems.length;
-    mockBudgetItems = mockBudgetItems.filter(item => item.budgetId !== budgetId);
-    return mockBudgetItems.length < initialLength;
+    const initialLength = this.budgetItems.length;
+    this.budgetItems = this.budgetItems.filter(item => item.budgetId !== budgetId);
+    return this.budgetItems.length < initialLength;
   }
 
   // Budget Photos methods
   async getBudgetPhotos(budgetId: string): Promise<any[]> {
-    return mockBudgetPhotos.filter(photo => photo.budgetId === budgetId);
+    return this.budgetPhotos.filter(photo => photo.budgetId === budgetId);
   }
 
   async createBudgetPhoto(budgetId: string, photoData: any): Promise<any> {
@@ -946,17 +951,17 @@ export class MemStorage implements IStorage {
       description: photoData.description || 'Imagem de personalização',
       uploadedAt: new Date().toISOString()
     };
-    mockBudgetPhotos.push(newPhoto);
+    this.budgetPhotos.push(newPhoto);
     return newPhoto;
   }
 
   async deleteBudgetPhoto(photoId: string): Promise<boolean> {
-    const photoIndex = mockBudgetPhotos.findIndex(photo => photo.id === photoId);
+    const photoIndex = this.budgetPhotos.findIndex(photo => photo.id === photoId);
     if (photoIndex === -1) {
       return false;
     }
 
-    mockBudgetPhotos.splice(photoIndex, 1);
+    this.budgetPhotos.splice(photoIndex, 1);
     return true;
   }
 

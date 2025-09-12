@@ -562,7 +562,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalPrice: (unitPrice * quantity).toFixed(2),
           hasItemCustomization: item.hasItemCustomization || false,
           itemCustomizationValue: customizationValue.toFixed(2),
-          itemCustomizationDescription: item.itemCustomizationDescription || ""
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          customizationPhoto: item.customizationPhoto || ""
         });
       }
 
@@ -593,15 +594,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of budgetData.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const customizationPercentage = typeof item.itemCustomizationPercentage === 'string' ? parseFloat(item.itemCustomizationPercentage) : item.itemCustomizationPercentage || 0;
+        const customizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
 
         // Calculate correct total with item customization
         const baseTotal = unitPrice * quantity;
         let itemTotal = baseTotal;
 
-        if (item.hasItemCustomization && customizationPercentage > 0) {
-          const customizationAmount = baseTotal * (customizationPercentage / 100);
-          itemTotal = baseTotal + customizationAmount;
+        if (item.hasItemCustomization && customizationValue > 0) {
+          itemTotal = baseTotal + (customizationValue * quantity);
         }
 
         await storage.createBudgetItem(updatedBudget.id, {
@@ -610,8 +610,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: unitPrice.toFixed(2),
           totalPrice: itemTotal.toFixed(2),
           hasItemCustomization: item.hasItemCustomization || false,
-          itemCustomizationPercentage: customizationPercentage.toFixed(2),
-          itemCustomizationDescription: item.itemCustomizationDescription || ""
+          itemCustomizationValue: customizationValue.toFixed(2),
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          customizationPhoto: item.customizationPhoto || ""
         });
       }
 
