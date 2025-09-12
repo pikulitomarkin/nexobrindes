@@ -160,11 +160,11 @@ export class PDFGenerator {
 
     // Items
     this.doc.setFont('helvetica', 'normal');
-    
+
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
       const rowHeight = 20; // Increased height to accommodate image
-      
+
       this.addNewPageIfNeeded(rowHeight + 10);
 
       // Draw row background (alternating)
@@ -204,7 +204,7 @@ export class PDFGenerator {
         ? item.product.name.substring(0, 35) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
-      
+
       // Add product description if available
       if (item.product.description) {
         this.doc.setFontSize(8);
@@ -279,95 +279,73 @@ export class PDFGenerator {
   private async addCustomizationImages(photos: string[]): Promise<void> {
     if (!photos || photos.length === 0) return;
 
-    this.addNewPageIfNeeded(40);
-    
+    this.addNewPageIfNeeded(60);
+
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('PERSONALIZAÇÃO:', this.margin, this.currentY);
+    this.doc.text('IMAGENS DE PERSONALIZAÇÃO:', this.margin, this.currentY);
     this.currentY += 15;
 
+    // Add images
     for (let i = 0; i < photos.length; i++) {
-      const photo = photos[i];
-      
       try {
-        // Load image to get natural dimensions
-        const img = await this.loadImage(photo);
-        
-        // Calculate maximum dimensions
-        const maxWidth = this.pageWidth - 2 * this.margin;
-        const maxHeight = 160; // Max height for images
-        
-        // Calculate scaling to preserve aspect ratio
-        const scale = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
-        const imgWidth = img.naturalWidth * scale;
-        const imgHeight = img.naturalHeight * scale;
-        
-        // Check if we need a new page for the image with correct height
-        const captionSpace = 25;
-        this.addNewPageIfNeeded(imgHeight + captionSpace);
-        
-        // Center the image
-        const imgX = (this.pageWidth - imgWidth) / 2;
-        
-        let imageData: string;
-        let format: string;
-        
-        if (photo.startsWith('data:image/')) {
-          // For data URLs, use directly
-          imageData = photo;
-          const mimeMatch = photo.match(/data:image\/([^;]+)/);
-          format = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
-        } else {
-          // For regular URLs, fetch and convert to data URL
-          try {
-            const response = await fetch(photo);
-            if (!response.ok) {
-              throw new Error(`Failed to fetch image: ${response.status}`);
-            }
-            const blob = await response.blob();
-            imageData = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(new Error('Failed to convert blob to data URL'));
-              reader.readAsDataURL(blob);
-            });
-            format = 'JPEG';
-          } catch (fetchError) {
-            // Fallback to canvas method
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            const ctx = canvas.getContext('2d');
-            
-            if (ctx) {
-              ctx.drawImage(img, 0, 0);
-              imageData = canvas.toDataURL('image/jpeg', 0.8);
-              format = 'JPEG';
-            } else {
-              throw new Error('Failed to get canvas context');
-            }
+        const photo = photos[i];
+        let imageUrl = photo;
+
+        // Convert relative URLs to absolute URLs for PDF generation
+        if (photo.startsWith('/uploads/')) {
+          imageUrl = `${window.location.origin}${photo}`;
+        } else if (photo.startsWith('/api/files/')) {
+          imageUrl = `${window.location.origin}${photo}`;
+        }
+
+        // Load image
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn(`Failed to load image: ${imageUrl}`);
+            resolve(null); // Continue even if image fails to load
+          };
+          img.src = imageUrl;
+        });
+
+        if (img.complete && img.naturalWidth > 0) {
+          this.addNewPageIfNeeded(80);
+
+          // Calculate image dimensions (maintain aspect ratio)
+          const maxWidth = 80;
+          const maxHeight = 60;
+
+          let width = maxWidth;
+          let height = (img.naturalHeight / img.naturalWidth) * width;
+
+          if (height > maxHeight) {
+            height = maxHeight;
+            width = (img.naturalWidth / img.naturalHeight) * height;
+          }
+
+          // Add image to PDF
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+            this.doc.addImage(imageData, 'JPEG', this.margin, this.currentY, width, height);
+            this.currentY += height + 5;
           }
         }
-        
-        const pdfFormat = format === 'JPG' ? 'JPEG' : format;
-        this.doc.addImage(imageData, pdfFormat, imgX, this.currentY, imgWidth, imgHeight);
-        this.currentY += imgHeight + 15;
-        
-        // Add caption
-        this.doc.setFontSize(10);
-        this.doc.setFont('helvetica', 'normal');
-        this.doc.text(`Imagem de Personalização ${i + 1}`, imgX, this.currentY);
-        this.currentY += 10;
       } catch (error) {
-        console.warn('Erro ao adicionar imagem ao PDF:', error);
-        // Add placeholder text if image fails
-        this.doc.setFontSize(10);
-        this.doc.setFont('helvetica', 'italic');
-        this.doc.text('Imagem não disponível', this.margin, this.currentY);
-        this.currentY += 15;
+        console.error('Error adding image to PDF:', error);
+        // Continue with next image even if this one fails
       }
     }
-    
+
     this.currentY += 10;
   }
 
@@ -380,7 +358,7 @@ export class PDFGenerator {
       await this.addItems(data);
       this.addTotal(data);
       this.addDescription(data);
-      
+
       // Add customization images if they exist
       if (data.budget.photos && data.budget.photos.length > 0) {
         await this.addCustomizationImages(data.budget.photos);

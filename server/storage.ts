@@ -926,7 +926,9 @@ export class MemStorage implements IStorage {
     const newPhoto = {
       id,
       budgetId,
-      ...photoData,
+      imageUrl: photoData.imageUrl || photoData.photoUrl,
+      photoUrl: photoData.imageUrl || photoData.photoUrl, // Keep both for compatibility
+      description: photoData.description || 'Imagem de personalização',
       uploadedAt: new Date().toISOString()
     };
     mockBudgetPhotos.push(newPhoto);
