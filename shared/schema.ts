@@ -36,6 +36,7 @@ export const orders = pgTable("orders", {
   clientId: varchar("client_id").references(() => clients.id).notNull(),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
   producerId: varchar("producer_id").references(() => users.id),
+  budgetId: varchar("budget_id").references(() => budgets.id),
   product: text("product").notNull(),
   description: text("description"),
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),

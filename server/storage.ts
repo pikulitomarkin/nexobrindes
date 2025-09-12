@@ -36,6 +36,7 @@ export interface IStorage {
   getOrders(): Promise<Order[]>;
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   getOrdersByVendor(vendorId: string): Promise<Order[]>;
   getOrdersByClient(clientId: string): Promise<Order[]>;
@@ -230,6 +231,7 @@ export class MemStorage implements IStorage {
         clientId: "client-1",
         vendorId: "vendor-1", 
         producerId: "producer-1",
+        budgetId: null,
         product: "Mesa de Jantar Personalizada",
         description: "Mesa de madeira maciça para 6 pessoas",
         totalValue: "2450.00",
@@ -245,6 +247,7 @@ export class MemStorage implements IStorage {
         clientId: "client-1",
         vendorId: "vendor-1",
         producerId: null,
+        budgetId: null,
         product: "Estante Personalizada",
         description: "Estante de madeira com 5 prateleiras",
         totalValue: "1890.00", 
@@ -466,6 +469,7 @@ export class MemStorage implements IStorage {
       ...insertOrder, 
       id,
       producerId: insertOrder.producerId || null,
+      budgetId: insertOrder.budgetId || null,
       description: insertOrder.description || null,
       paidValue: insertOrder.paidValue || null,
       deadline: insertOrder.deadline || null,
@@ -475,6 +479,16 @@ export class MemStorage implements IStorage {
     };
     this.orders.set(id, order);
     return order;
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    const order = this.orders.get(id);
+    if (order) {
+      const updatedOrder = { ...order, ...updates, updatedAt: new Date() };
+      this.orders.set(id, updatedOrder);
+      return updatedOrder;
+    }
+    return undefined;
   }
 
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
@@ -530,9 +544,9 @@ export class MemStorage implements IStorage {
         ...productionOrder, 
         status,
         notes: notes || productionOrder.notes,
-        acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date().toISOString() : productionOrder.acceptedAt,
-        completedAt: (status === 'completed' || status === 'ready') && !productionOrder.completedAt ? new Date().toISOString() : productionOrder.completedAt,
-        deadline: deliveryDate ? new Date(deliveryDate).toISOString() : productionOrder.deadline
+        acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date() : (typeof productionOrder.acceptedAt === 'string' ? new Date(productionOrder.acceptedAt) : productionOrder.acceptedAt),
+        completedAt: (status === 'completed' || status === 'ready') && !productionOrder.completedAt ? new Date() : (typeof productionOrder.completedAt === 'string' ? new Date(productionOrder.completedAt) : productionOrder.completedAt),
+        deadline: deliveryDate ? new Date(deliveryDate) : (typeof productionOrder.deadline === 'string' ? new Date(productionOrder.deadline) : productionOrder.deadline)
       };
       this.productionOrders.set(id, updatedPO);
       return updatedPO;

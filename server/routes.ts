@@ -1,12 +1,4 @@
 
-import express from 'express';
-import path from 'path';
-
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve static files from public/uploads directory
-  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
-
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from 'multer';
@@ -15,6 +7,8 @@ import path from 'path';
 import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve static files from public/uploads directory
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
@@ -360,10 +354,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/categories", async (req, res) => {
     try {
       const result = await storage.getProducts({ limit: 9999 });
-      const categories = [...new Set(result.products
+      const categories = Array.from(new Set(result.products
         .map((product: any) => product.category)
         .filter(Boolean)
-      )].sort();
+      )).sort();
 
       res.json(categories);
     } catch (error) {
@@ -1025,6 +1019,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich clients with order counts and total spent
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
+          if (!client.userId) return { ...client, ordersCount: 0, totalSpent: 0 };
           const orders = await storage.getOrdersByClient(client.userId);
           const vendorOrders = orders.filter(order => order.vendorId === vendorId);
           
@@ -1125,8 +1120,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Update order status to production
       const updatedOrder = await storage.updateOrder(orderId, { 
-        status: 'production',
-        productionStartedAt: new Date().toISOString()
+        status: 'production'
       });
 
       if (!updatedOrder) {
