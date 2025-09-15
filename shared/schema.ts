@@ -163,6 +163,41 @@ export const budgetPhotos = pgTable("budget_photos", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'pix', 'credit_card', 'boleto', 'transfer'
+  maxInstallments: integer("max_installments").default(1),
+  installmentInterest: decimal("installment_interest", { precision: 5, scale: 2 }).default('0.00'),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shippingMethods = pgTable("shipping_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'fixed', 'calculated', 'free'
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).default('0.00'),
+  freeShippingThreshold: decimal("free_shipping_threshold", { precision: 10, scale: 2 }).default('0.00'),
+  estimatedDays: integer("estimated_days").default(5),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const budgetPaymentInfo = pgTable("budget_payment_info", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").references(() => budgets.id).notNull(),
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  shippingMethodId: varchar("shipping_method_id").references(() => shippingMethods.id),
+  installments: integer("installments").default(1),
+  downPayment: decimal("down_payment", { precision: 10, scale: 2 }).default('0.00'),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -175,6 +210,9 @@ export const insertProductSchema = createInsertSchema(products).omit({ id: true,
 export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });
 export const insertBudgetPhotoSchema = createInsertSchema(budgetPhotos).omit({ id: true, uploadedAt: true });
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertShippingMethodSchema = createInsertSchema(shippingMethods).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBudgetPaymentInfoSchema = createInsertSchema(budgetPaymentInfo).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -199,3 +237,9 @@ export type BudgetItem = typeof budgetItems.$inferSelect;
 export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;
 export type BudgetPhoto = typeof budgetPhotos.$inferSelect;
 export type InsertBudgetPhoto = z.infer<typeof insertBudgetPhotoSchema>;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type InsertShippingMethod = z.infer<typeof insertShippingMethodSchema>;
+export type BudgetPaymentInfo = typeof budgetPaymentInfo.$inferSelect;
+export type InsertBudgetPaymentInfo = z.infer<typeof insertBudgetPaymentInfoSchema>;

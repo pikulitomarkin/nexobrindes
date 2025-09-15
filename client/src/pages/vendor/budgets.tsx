@@ -80,7 +80,13 @@ export default function VendorBudgets() {
     clientId: "",
     vendorId: vendorId,
     validUntil: "",
-    items: [] as any[]
+    items: [] as any[],
+    paymentMethodId: "",
+    shippingMethodId: "",
+    installments: 1,
+    downPayment: 0,
+    remainingAmount: 0,
+    shippingCost: 0
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -110,8 +116,44 @@ export default function VendorBudgets() {
     },
   });
 
+  const { data: paymentMethods } = useQuery({
+    queryKey: ["/api/payment-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/payment-methods');
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      return response.json();
+    },
+  });
+
+  const { data: shippingMethods } = useQuery({
+    queryKey: ["/api/shipping-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/shipping-methods');
+      if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
   const products = productsData?.products || [];
   const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+
+  // Helper variables for selected payment and shipping methods
+  const selectedPaymentMethod = paymentMethods?.find((pm: any) => pm.id === vendorBudgetForm.paymentMethodId);
+  const selectedShippingMethod = shippingMethods?.find((sm: any) => sm.id === vendorBudgetForm.shippingMethodId);
+
+  // Calculate shipping cost based on selected method
+  const calculateShippingCost = () => {
+    if (!selectedShippingMethod) return 0;
+    
+    const subtotal = calculateBudgetTotal();
+    
+    if (selectedShippingMethod.type === "free") return 0;
+    if (selectedShippingMethod.freeShippingThreshold > 0 && subtotal >= selectedShippingMethod.freeShippingThreshold) return 0;
+    if (selectedShippingMethod.type === "fixed") return parseFloat(selectedShippingMethod.basePrice);
+    
+    // For calculated, return base price as placeholder (could integrate with shipping API)
+    return parseFloat(selectedShippingMethod.basePrice || "0");
+  };
 
   // Budget functions
   const addProductToBudget = (product: any) => {
@@ -180,7 +222,13 @@ export default function VendorBudgets() {
       clientId: "",
       vendorId: vendorId,
       validUntil: "",
-      items: []
+      items: [],
+      paymentMethodId: "",
+      shippingMethodId: "",
+      installments: 1,
+      downPayment: 0,
+      remainingAmount: 0,
+      shippingCost: 0
     });
     setIsEditMode(false);
     setEditingBudgetId(null);
@@ -764,13 +812,152 @@ export default function VendorBudgets() {
                 </Card>
               </div>
 
+              {/* Payment and Shipping Configuration */}
+              <Separator />
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Pagamento e Frete</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="payment-method">Forma de Pagamento</Label>
+                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a forma de pagamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="shipping-method">Método de Frete</Label>
+                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o método de frete" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shippingMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Payment Configuration */}
+                {selectedPaymentMethod && (
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Pagamento</h4>
+                    
+                    {selectedPaymentMethod.type === "credit_card" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="installments">Número de Parcelas</Label>
+                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: selectedPaymentMethod.maxInstallments }, (_, i) => i + 1).map(num => (
+                                <SelectItem key={num} value={num.toString()}>
+                                  {num}x {num > 1 && selectedPaymentMethod.installmentInterest > 0 && `(${selectedPaymentMethod.installmentInterest}% a.m.)`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Input
+                          id="down-payment"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={vendorBudgetForm.downPayment || 0}
+                          onChange={(e) => {
+                            const downPayment = parseFloat(e.target.value) || 0;
+                            const total = calculateBudgetTotal() + (vendorBudgetForm.shippingCost || 0);
+                            setVendorBudgetForm({ 
+                              ...vendorBudgetForm, 
+                              downPayment,
+                              remainingAmount: Math.max(0, total - downPayment)
+                            });
+                          }}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
+                        <Input
+                          id="remaining-amount"
+                          value={`R$ ${(vendorBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Shipping Configuration */}
+                {selectedShippingMethod && (
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Frete</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
+                        <Input
+                          id="shipping-cost"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={vendorBudgetForm.shippingCost || calculateShippingCost()}
+                          onChange={(e) => {
+                            const shippingCost = parseFloat(e.target.value) || 0;
+                            const total = calculateBudgetTotal() + shippingCost;
+                            setVendorBudgetForm({ 
+                              ...vendorBudgetForm, 
+                              shippingCost,
+                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                            });
+                          }}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Prazo de Entrega</Label>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {selectedShippingMethod.estimatedDays} dias úteis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Total do Orçamento:</span>
-                  <span className="text-blue-600">
-                    R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal dos Produtos:</span>
+                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Frete:</span>
+                    <span>R$ {(vendorBudgetForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Total do Orçamento:</span>
+                    <span className="text-blue-600">
+                      R$ {(calculateBudgetTotal() + (vendorBudgetForm.shippingCost || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
               </div>
 

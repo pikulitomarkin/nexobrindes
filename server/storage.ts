@@ -12,7 +12,21 @@ import {
   type Commission,
   type InsertCommission,
   type Vendor,
-  type InsertVendor
+  type InsertVendor,
+  type Product,
+  type InsertProduct,
+  type Budget,
+  type InsertBudget,
+  type BudgetItem,
+  type InsertBudgetItem,
+  type BudgetPhoto,
+  type InsertBudgetPhoto,
+  type PaymentMethod,
+  type InsertPaymentMethod,
+  type ShippingMethod,
+  type InsertShippingMethod,
+  type BudgetPaymentInfo,
+  type InsertBudgetPaymentInfo
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -46,7 +60,7 @@ export interface IStorage {
   getProductionOrders(): Promise<ProductionOrder[]>;
   getProductionOrdersByProducer(producerId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
-  updateProductionOrderStatus(id: string, status: string): Promise<ProductionOrder | undefined>;
+  updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined>;
 
   // Payments
   getPayments(): Promise<Payment[]>;
@@ -61,6 +75,7 @@ export interface IStorage {
   getVendors(): Promise<User[]>;
   getVendor(userId: string): Promise<Vendor | undefined>;
   createVendor(vendorData: any): Promise<User>;
+  updateVendorCommission(userId: string, commissionRate: string): Promise<void>;
 
   // Clients
   getClients(): Promise<Client[]>;
@@ -104,6 +119,25 @@ export interface IStorage {
   getBudgetPhotos(budgetId: string): Promise<any[]>;
   createBudgetPhoto(budgetId: string, photoData: any): Promise<any>;
   deleteBudgetPhoto(photoId: string): Promise<boolean>;
+
+  // Payment Methods
+  getPaymentMethods(): Promise<PaymentMethod[]>;
+  getAllPaymentMethods(): Promise<PaymentMethod[]>;
+  createPaymentMethod(data: InsertPaymentMethod): Promise<PaymentMethod>;
+  updatePaymentMethod(id: string, data: Partial<InsertPaymentMethod>): Promise<PaymentMethod | null>;
+  deletePaymentMethod(id: string): Promise<boolean>;
+
+  // Shipping Methods
+  getShippingMethods(): Promise<ShippingMethod[]>;
+  getAllShippingMethods(): Promise<ShippingMethod[]>;
+  createShippingMethod(data: InsertShippingMethod): Promise<ShippingMethod>;
+  updateShippingMethod(id: string, data: Partial<InsertShippingMethod>): Promise<ShippingMethod | null>;
+  deleteShippingMethod(id: string): Promise<boolean>;
+
+  // Budget Payment Info
+  getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined>;
+  createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo>;
+  updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo>;
 }
 
 export class MemStorage implements IStorage {
@@ -118,6 +152,80 @@ export class MemStorage implements IStorage {
   private budgets: Map<string, any>; 
   private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
+
+  // Payment Methods
+  private paymentMethods: PaymentMethod[] = [
+    {
+      id: "pm-1",
+      name: "PIX",
+      type: "pix",
+      maxInstallments: 1,
+      installmentInterest: "0.00",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "pm-2", 
+      name: "Cartão de Crédito",
+      type: "credit_card",
+      maxInstallments: 12,
+      installmentInterest: "2.99",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "pm-3",
+      name: "Boleto Bancário",
+      type: "boleto",
+      maxInstallments: 1,
+      installmentInterest: "0.00",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // Shipping Methods
+  private shippingMethods: ShippingMethod[] = [
+    {
+      id: "sm-1",
+      name: "Correios PAC",
+      type: "calculated",
+      basePrice: "0.00",
+      freeShippingThreshold: "150.00",
+      estimatedDays: 8,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "sm-2",
+      name: "Transportadora",
+      type: "fixed",
+      basePrice: "25.00",
+      freeShippingThreshold: "300.00", 
+      estimatedDays: 5,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "sm-3",
+      name: "Frete Grátis",
+      type: "free",
+      basePrice: "0.00",
+      freeShippingThreshold: "0.00",
+      estimatedDays: 7,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // Budget Payment Info
+  private budgetPaymentInfo: BudgetPaymentInfo[] = [];
 
   constructor() {
     this.users = new Map();
@@ -941,14 +1049,12 @@ export class MemStorage implements IStorage {
     return this.budgetPhotos.filter(photo => photo.budgetId === budgetId);
   }
 
-  async createBudgetPhoto(budgetId: string, photoData: any): Promise<any> {
-    const id = `budget-photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newPhoto = {
-      id,
-      budgetId,
-      imageUrl: photoData.imageUrl || photoData.photoUrl,
-      photoUrl: photoData.imageUrl || photoData.photoUrl, // Keep both for compatibility
-      description: photoData.description || 'Imagem de personalização',
+  async createBudgetPhoto(budgetId: string, photoData: { imageUrl: string; description?: string }): Promise<any> {
+    const newPhoto: BudgetPhoto = {
+      id: `photo-${Date.now()}-${Math.random()}`,
+      budgetId: budgetId,
+      photoUrl: photoData.imageUrl,
+      description: photoData.description || "",
       uploadedAt: new Date().toISOString()
     };
     this.budgetPhotos.push(newPhoto);
@@ -956,13 +1062,125 @@ export class MemStorage implements IStorage {
   }
 
   async deleteBudgetPhoto(photoId: string): Promise<boolean> {
-    const photoIndex = this.budgetPhotos.findIndex(photo => photo.id === photoId);
-    if (photoIndex === -1) {
-      return false;
+    const index = this.budgetPhotos.findIndex(photo => photo.id === photoId);
+    if (index !== -1) {
+      this.budgetPhotos.splice(index, 1);
+      return true;
     }
+    return false;
+  }
 
-    this.budgetPhotos.splice(photoIndex, 1);
-    return true;
+  // Payment Methods
+  async getPaymentMethods() {
+    return this.paymentMethods.filter(pm => pm.isActive);
+  }
+
+  async getAllPaymentMethods() {
+    return this.paymentMethods;
+  }
+
+  async createPaymentMethod(data: InsertPaymentMethod) {
+    const newPaymentMethod: PaymentMethod = {
+      id: `pm-${Date.now()}-${Math.random()}`,
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    this.paymentMethods.push(newPaymentMethod);
+    return newPaymentMethod;
+  }
+
+  async updatePaymentMethod(id: string, data: Partial<InsertPaymentMethod>) {
+    const index = this.paymentMethods.findIndex(pm => pm.id === id);
+    if (index !== -1) {
+      this.paymentMethods[index] = {
+        ...this.paymentMethods[index],
+        ...data,
+        updatedAt: new Date().toISOString()
+      };
+      return this.paymentMethods[index];
+    }
+    return null;
+  }
+
+  async deletePaymentMethod(id: string) {
+    const index = this.paymentMethods.findIndex(pm => pm.id === id);
+    if (index !== -1) {
+      this.paymentMethods.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  // Shipping Methods
+  async getShippingMethods() {
+    return this.shippingMethods.filter(sm => sm.isActive);
+  }
+
+  async getAllShippingMethods() {
+    return this.shippingMethods;
+  }
+
+  async createShippingMethod(data: InsertShippingMethod) {
+    const newShippingMethod: ShippingMethod = {
+      id: `sm-${Date.now()}-${Math.random()}`,
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    this.shippingMethods.push(newShippingMethod);
+    return newShippingMethod;
+  }
+
+  async updateShippingMethod(id: string, data: Partial<InsertShippingMethod>) {
+    const index = this.shippingMethods.findIndex(sm => sm.id === id);
+    if (index !== -1) {
+      this.shippingMethods[index] = {
+        ...this.shippingMethods[index],
+        ...data,
+        updatedAt: new Date().toISOString()
+      };
+      return this.shippingMethods[index];
+    }
+    return null;
+  }
+
+  async deleteShippingMethod(id: string) {
+    const index = this.shippingMethods.findIndex(sm => sm.id === id);
+    if (index !== -1) {
+      this.shippingMethods.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  // Budget Payment Info
+  async getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined> {
+    return this.budgetPaymentInfo.find(bpi => bpi.budgetId === budgetId);
+  }
+
+  async createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo> {
+    const newBudgetPaymentInfo: BudgetPaymentInfo = {
+      id: `bpi-${Date.now()}-${Math.random()}`,
+      ...data,
+      createdAt: new Date().toISOString()
+    };
+    this.budgetPaymentInfo.push(newBudgetPaymentInfo);
+    return newBudgetPaymentInfo;
+  }
+
+  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo> {
+    const index = this.budgetPaymentInfo.findIndex(bpi => bpi.budgetId === budgetId);
+    if (index !== -1) {
+      this.budgetPaymentInfo[index] = {
+        ...this.budgetPaymentInfo[index],
+        ...data
+      };
+      return this.budgetPaymentInfo[index];
+    } else {
+      // Create new if doesn't exist
+      return this.createBudgetPaymentInfo({ budgetId, ...data } as InsertBudgetPaymentInfo);
+    }
   }
 
   // Helper method to recalculate budget total
@@ -1000,6 +1218,10 @@ export class MemStorage implements IStorage {
         return Array.from(this.users.values());
       case 'budgets':
         return Array.from(this.budgets.values());
+      case 'paymentMethods':
+        return this.paymentMethods;
+      case 'shippingMethods':
+        return this.shippingMethods;
       default:
         return [];
     }

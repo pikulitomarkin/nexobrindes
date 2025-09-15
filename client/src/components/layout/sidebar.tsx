@@ -16,7 +16,11 @@ import {
   CreditCard,
   Receipt,
   Calculator,
+  Percent,
 } from "lucide-react";
+
+import Link from "next/link"; // Assuming next/link for routing
+import { SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar-menu"; // Assuming these are UI components
 
 interface SidebarProps {
   activePanel: string;
@@ -77,6 +81,34 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Admin Panel Specific Links */}
+      {activePanel === "admin" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Configurações
+            </p>
+          </div>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/admin/commission-settings">
+                <Percent className="h-4 w-4" />
+                <span>Configurar Comissões</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/admin/settings">
+                <Settings className="h-4 w-4" />
+                <span>Configurações Gerais</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </nav>
+      )}
+
       {currentUser?.role === 'producer' && (
             <>
               <SidebarItem 

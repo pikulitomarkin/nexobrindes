@@ -16,6 +16,9 @@ import AdminProducers from "@/pages/admin/producers";
 import AdminFinance from "@/pages/admin/finance";
 import AdminProducts from "@/pages/admin/products";
 import AdminBudgets from "@/pages/admin/budgets";
+import AdminCommissionSettings from './pages/admin/commission-settings';
+import AdminSettings from './pages/admin/settings';
+
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
@@ -50,6 +53,7 @@ function Router() {
         <Route path="/admin/clients" component={AdminClients} />
         <Route path="/admin/producers" component={AdminProducers} />
         <Route path="/admin/finance" component={AdminFinance} />
+        <Route path="/admin/settings" component={AdminSettings} />
 
 
         {/* Vendor Routes */}

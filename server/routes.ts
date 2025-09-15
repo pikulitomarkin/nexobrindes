@@ -851,6 +851,111 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Settings Routes - Payment Methods
+  app.get("/api/settings/payment-methods", async (req, res) => {
+    try {
+      const paymentMethods = await storage.getAllPaymentMethods();
+      res.json(paymentMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.post("/api/settings/payment-methods", async (req, res) => {
+    try {
+      const newPaymentMethod = await storage.createPaymentMethod(req.body);
+      res.json(newPaymentMethod);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create payment method" });
+    }
+  });
+
+  app.put("/api/settings/payment-methods/:id", async (req, res) => {
+    try {
+      const updatedPaymentMethod = await storage.updatePaymentMethod(req.params.id, req.body);
+      if (!updatedPaymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+      res.json(updatedPaymentMethod);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update payment method" });
+    }
+  });
+
+  app.delete("/api/settings/payment-methods/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePaymentMethod(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete payment method" });
+    }
+  });
+
+  // Settings Routes - Shipping Methods
+  app.get("/api/settings/shipping-methods", async (req, res) => {
+    try {
+      const shippingMethods = await storage.getAllShippingMethods();
+      res.json(shippingMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
+  app.post("/api/settings/shipping-methods", async (req, res) => {
+    try {
+      const newShippingMethod = await storage.createShippingMethod(req.body);
+      res.json(newShippingMethod);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create shipping method" });
+    }
+  });
+
+  app.put("/api/settings/shipping-methods/:id", async (req, res) => {
+    try {
+      const updatedShippingMethod = await storage.updateShippingMethod(req.params.id, req.body);
+      if (!updatedShippingMethod) {
+        return res.status(404).json({ error: "Shipping method not found" });
+      }
+      res.json(updatedShippingMethod);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update shipping method" });
+    }
+  });
+
+  app.delete("/api/settings/shipping-methods/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteShippingMethod(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Shipping method not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete shipping method" });
+    }
+  });
+
+  // Active payment and shipping methods for vendor forms
+  app.get("/api/payment-methods", async (req, res) => {
+    try {
+      const paymentMethods = await storage.getPaymentMethods();
+      res.json(paymentMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.get("/api/shipping-methods", async (req, res) => {
+    try {
+      const shippingMethods = await storage.getShippingMethods();
+      res.json(shippingMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
   // Routes by role
   app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
     try {
