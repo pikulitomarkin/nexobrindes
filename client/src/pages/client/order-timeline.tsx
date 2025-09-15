@@ -1,6 +1,4 @@
-
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,12 +16,15 @@ import {
   Phone,
   MapPin
 } from "lucide-react";
+import { useRoute } from "wouter";
 
 export default function ClientOrderTimeline() {
-  const { id } = useParams();
+  const [match, params] = useRoute("/client/orders/:id/timeline");
+  const orderId = params?.id;
 
   const { data: orderData, isLoading } = useQuery({
-    queryKey: ["/api/orders", id, "timeline"],
+    queryKey: ["/api/orders", orderId, "timeline"],
+    enabled: !!orderId,
   });
 
   const getIcon = (iconName: string) => {
@@ -106,7 +107,7 @@ export default function ClientOrderTimeline() {
               <div className="relative">
                 {/* Vertical line */}
                 <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-                
+
                 <div className="space-y-8">
                   {timeline.map((step: any, index: number) => {
                     const Icon = getIcon(step.icon);
@@ -122,7 +123,7 @@ export default function ClientOrderTimeline() {
                         `}>
                           <Icon className="h-6 w-6" />
                         </div>
-                        
+
                         {/* Content */}
                         <div className="flex-1 min-w-0 pb-8">
                           <div className="flex items-center justify-between">
@@ -142,7 +143,7 @@ export default function ClientOrderTimeline() {
                           }`}>
                             {step.description}
                           </p>
-                          
+
                           {/* Show current status indicator */}
                           {step.completed && index === timeline.findIndex((s: any) => s.completed) && (
                             <div className="mt-2">
