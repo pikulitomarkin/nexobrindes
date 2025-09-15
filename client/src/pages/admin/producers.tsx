@@ -18,6 +18,11 @@ const producerFormSchema = z.object({
   phone: z.string().min(10, "Telefone inválido"),
   specialty: z.string().min(2, "Especialidade é obrigatória"),
   address: z.string().min(5, "Endereço é obrigatório"),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "Confirmação de senha é obrigatória"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Senhas não coincidem",
+  path: ["confirmPassword"],
 });
 
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
@@ -44,6 +49,8 @@ export default function AdminProducers() {
       phone: "",
       specialty: "",
       address: "",
+      password: "",
+      confirmPassword: "",
     },
   });
 
@@ -166,6 +173,32 @@ export default function AdminProducers() {
                       <FormLabel>Endereço</FormLabel>
                       <FormControl>
                         <Input placeholder="Rua Industrial, 456" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmar Senha</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

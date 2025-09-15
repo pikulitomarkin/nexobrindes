@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
@@ -11,7 +10,8 @@ import {
   DollarSign,
   Menu,
   X,
-  Home
+  Home,
+  Settings // Added Settings icon import
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -63,6 +63,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return [
           { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
           { href: "/producer/orders", icon: ShoppingCart, label: "Ordens de Produção" },
+          // Added Settings link for producers
+          { href: "/producer/settings", icon: Settings, label: "Configurações" }, 
         ];
       case "finance":
         return [
@@ -130,7 +132,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location === item.href;
-                
+
                 return (
                   <li key={item.href}>
                     <Link href={item.href}>

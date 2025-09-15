@@ -34,6 +34,7 @@ import ClientOrders from "@/pages/client/orders";
 import ProducerOrders from "@/pages/producer/orders";
 import ProductionDashboard from "@/pages/producer/production-dashboard";
 import ProducerOrderDetails from "./pages/producer/order-details";
+import ProducerProfileSettings from "./pages/producer/profile-settings";
 import ClientOrderTimeline from "./pages/client/order-timeline";
 
 
@@ -74,6 +75,7 @@ function Router() {
         <Route path="/producer/production-dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
         <Route path="/producer/order/:id" element={<ProducerOrderDetails />} />
+        <Route path="/producer/profile-settings" component={ProducerProfileSettings} />
 
         {/* Finance Routes */}
         <Route path="/finance/payments" component={FinancePayments} />

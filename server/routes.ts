@@ -195,12 +195,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/producers", async (req, res) => {
     try {
-      const { name, email, phone, specialty, address } = req.body;
+      const { name, email, phone, specialty, address, password } = req.body;
 
       // Create user with role producer including specialty and address
       const user = await storage.createUser({
         username: email,
-        password: "123456", // Default password
+        password: password || "123456",
         role: "producer",
         name,
         email,
@@ -1390,6 +1390,89 @@ Para mais detalhes, entre em contato conosco!`;
       res.json(updatedPO);
     } catch (error) {
       res.status(500).json({ error: "Failed to update production order status" });
+    }
+  });
+
+  // Producer profile management
+  app.get("/api/producers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user || user.role !== 'producer') {
+        return res.status(404).json({ error: "Producer not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch producer" });
+    }
+  });
+
+  app.put("/api/producers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, phone, specialty, address } = req.body;
+      
+      const updatedUser = await storage.updateUser(id, {
+        name,
+        phone,
+        specialty,
+        address
+      });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Producer not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update producer" });
+    }
+  });
+
+  app.put("/api/producers/:id/change-password", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { currentPassword, newPassword } = req.body;
+      
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "Producer not found" });
+      }
+      
+      // Verify current password
+      if (user.password !== currentPassword) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+      
+      const updatedUser = await storage.updateUser(id, {
+        password: newPassword
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // In a real application, you would send an actual email
+      // For now, we'll just return success
+      console.log(`Password reset requested for: ${email}`);
+      
+      res.json({ 
+        success: true, 
+        message: "Password reset instructions sent to your email" 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process password reset" });
     }
   });
 
