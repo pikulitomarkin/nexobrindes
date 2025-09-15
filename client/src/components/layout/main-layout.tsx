@@ -61,8 +61,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         ];
       case "producer":
         return [
-          { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/producer/production-dashboard", icon: ShoppingCart, label: "Painel de Produção" },
+          { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
           { href: "/producer/orders", icon: ShoppingCart, label: "Ordens de Produção" },
         ];
       case "finance":
