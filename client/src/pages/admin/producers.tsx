@@ -28,6 +28,12 @@ export default function AdminProducers() {
 
   const { data: producers, isLoading } = useQuery({
     queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'producer');
+    },
   });
 
   const form = useForm<ProducerFormValues>({

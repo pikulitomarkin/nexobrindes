@@ -175,12 +175,23 @@ export default function AdminBudgets() {
 
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
+  const [selectedProducer, setSelectedProducer] = useState<string>("");
+
+  const { data: producers } = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
+      return response.json();
+    },
+  });
 
   const convertToOrderMutation = useMutation({
-    mutationFn: async (budgetId: string) => {
+    mutationFn: async ({ budgetId, producerId }: { budgetId: string; producerId: string }) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ producerId }),
       });
       if (!response.ok) throw new Error("Erro ao converter para pedido");
       return response.json();
@@ -189,9 +200,10 @@ export default function AdminBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
+      setSelectedProducer("");
       toast({
         title: "Sucesso!",
-        description: "Orçamento convertido em pedido",
+        description: "Orçamento convertido em pedido e enviado para o produtor",
       });
     },
   });
@@ -266,8 +278,8 @@ export default function AdminBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert) {
-      convertToOrderMutation.mutate(budgetToConvert);
+    if (budgetToConvert && selectedProducer) {
+      convertToOrderMutation.mutate({ budgetId: budgetToConvert, producerId: selectedProducer });
     }
   };
 
@@ -851,26 +863,44 @@ export default function AdminBudgets() {
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Deseja converter este orçamento em pedido? Esta ação não pode ser desfeita.
+              Selecione o produtor que receberá este pedido para produção.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="producer-select">Produtor Responsável</Label>
+              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produtor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {producers?.map((producer: any) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name} - {producer.specialty}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex gap-2 pt-4">
             <Button 
               variant="outline" 
               onClick={() => {
                 setConvertDialogOpen(false);
                 setBudgetToConvert(null);
+                setSelectedProducer("");
               }}
               className="flex-1"
             >
-              Não
+              Cancelar
             </Button>
             <Button 
               onClick={handleConfirmConvert}
-              disabled={convertToOrderMutation.isPending}
+              disabled={convertToOrderMutation.isPending || !selectedProducer}
               className="flex-1"
             >
-              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Sim'}
+              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter e Enviar'}
             </Button>
           </div>
         </DialogContent>

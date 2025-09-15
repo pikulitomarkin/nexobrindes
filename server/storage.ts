@@ -1,9 +1,9 @@
-import { 
-  type User, 
-  type InsertUser, 
+import {
+  type User,
+  type InsertUser,
   type Client,
   type InsertClient,
-  type Order, 
+  type Order,
   type InsertOrder,
   type ProductionOrder,
   type InsertProductionOrder,
@@ -87,9 +87,9 @@ export interface IStorage {
   deleteClient(id: string): Promise<boolean>;
 
   // Products
-  getProducts(options?: { 
-    page?: number; 
-    limit?: number; 
+  getProducts(options?: {
+    page?: number;
+    limit?: number;
     search?: string;
     category?: string;
   }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }>;
@@ -108,7 +108,7 @@ export interface IStorage {
   createBudget(budgetData: any): Promise<any>;
   updateBudget(id: string, budgetData: any): Promise<any>;
   deleteBudget(id: string): Promise<boolean>;
-  convertBudgetToOrder(budgetId: string): Promise<any>;
+  convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any>;
 
   // Budget Items
   getBudgetItems(budgetId: string): Promise<any[]>;
@@ -150,8 +150,8 @@ export class MemStorage implements IStorage {
   private payments: Map<string, Payment>;
   private commissions: Map<string, Commission>;
   private vendors: Map<string, Vendor>;
-  private products: Map<string, any>; 
-  private budgets: Map<string, any>; 
+  private products: Map<string, any>;
+  private budgets: Map<string, any>;
   private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
 
@@ -168,7 +168,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date().toISOString()
     },
     {
-      id: "pm-2", 
+      id: "pm-2",
       name: "Cartão de Crédito",
       type: "credit_card",
       maxInstallments: 12,
@@ -207,7 +207,7 @@ export class MemStorage implements IStorage {
       name: "Transportadora",
       type: "fixed",
       basePrice: "25.00",
-      freeShippingThreshold: "300.00", 
+      freeShippingThreshold: "300.00",
       estimatedDays: 5,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -237,8 +237,8 @@ export class MemStorage implements IStorage {
     this.payments = new Map();
     this.commissions = new Map();
     this.vendors = new Map();
-    this.products = new Map(); 
-    this.budgets = new Map(); 
+    this.products = new Map();
+    this.budgets = new Map();
     this.budgetItems = []; // Initialize as empty array
     this.budgetPhotos = []; // Initialize as empty array
     this.initializeData();
@@ -259,7 +259,7 @@ export class MemStorage implements IStorage {
     };
 
     const vendorUser: User = {
-      id: "vendor-1", 
+      id: "vendor-1",
       username: "maria.santos",
       password: "123",
       role: "vendor",
@@ -273,7 +273,7 @@ export class MemStorage implements IStorage {
     const clientUser: User = {
       id: "client-1",
       username: "joao.silva",
-      password: "123", 
+      password: "123",
       role: "client",
       name: "João Silva",
       email: "joao@gmail.com",
@@ -286,7 +286,7 @@ export class MemStorage implements IStorage {
       id: "producer-1",
       username: "marcenaria.santos",
       password: "123",
-      role: "producer", 
+      role: "producer",
       name: "Marcenaria Santos",
       email: "contato@marcenariasantos.com",
       phone: null,
@@ -299,7 +299,7 @@ export class MemStorage implements IStorage {
       username: "financeiro",
       password: "123",
       role: "finance",
-      name: "Departamento Financeiro", 
+      name: "Departamento Financeiro",
       email: "financeiro@erp.com",
       phone: null,
       vendorId: null,
@@ -323,7 +323,7 @@ export class MemStorage implements IStorage {
     // Create sample clients
     const sampleClient: Client = {
       id: "client-1",
-      userId: "client-1", 
+      userId: "client-1",
       name: "João Silva",
       email: "joao@gmail.com",
       phone: "(11) 98765-4321",
@@ -343,7 +343,7 @@ export class MemStorage implements IStorage {
         id: "order-1",
         orderNumber: "#12345",
         clientId: "client-1",
-        vendorId: "vendor-1", 
+        vendorId: "vendor-1",
         producerId: "producer-1",
         budgetId: null,
         product: "Mesa de Jantar Personalizada",
@@ -356,7 +356,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date("2024-11-16")
       },
       {
-        id: "order-2", 
+        id: "order-2",
         orderNumber: "#12346",
         clientId: "client-1",
         vendorId: "vendor-1",
@@ -364,7 +364,7 @@ export class MemStorage implements IStorage {
         budgetId: null,
         product: "Estante Personalizada",
         description: "Estante de madeira com 5 prateleiras",
-        totalValue: "1890.00", 
+        totalValue: "1890.00",
         paidValue: "567.00",
         status: "pending",
         deadline: new Date("2024-11-25"),
@@ -393,7 +393,7 @@ export class MemStorage implements IStorage {
     // Create sample payment
     const payment: Payment = {
       id: "payment-1",
-      orderId: "order-1", 
+      orderId: "order-1",
       amount: "735.00",
       method: "pix",
       status: "confirmed",
@@ -407,7 +407,7 @@ export class MemStorage implements IStorage {
     const commission: Commission = {
       id: "commission-1",
       vendorId: "vendor-1",
-      orderId: "order-1", 
+      orderId: "order-1",
       percentage: "10.00",
       amount: "245.00",
       status: "pending",
@@ -494,8 +494,8 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { 
-      ...insertUser, 
+    const user: User = {
+      ...insertUser,
       id,
       vendorId: insertUser.vendorId || null,
       email: insertUser.email || null,
@@ -579,8 +579,8 @@ export class MemStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const id = randomUUID();
-    const order: Order = { 
-      ...insertOrder, 
+    const order: Order = {
+      ...insertOrder,
       id,
       producerId: insertOrder.producerId || null,
       budgetId: insertOrder.budgetId || null,
@@ -638,8 +638,8 @@ export class MemStorage implements IStorage {
 
   async createProductionOrder(insertProductionOrder: InsertProductionOrder): Promise<ProductionOrder> {
     const id = randomUUID();
-    const productionOrder: ProductionOrder = { 
-      ...insertProductionOrder, 
+    const productionOrder: ProductionOrder = {
+      ...insertProductionOrder,
       id,
       status: insertProductionOrder.status || 'pending',
       deadline: insertProductionOrder.deadline || null,
@@ -654,8 +654,8 @@ export class MemStorage implements IStorage {
   async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined> {
     const productionOrder = this.productionOrders.get(id);
     if (productionOrder) {
-      const updatedPO = { 
-        ...productionOrder, 
+      const updatedPO = {
+        ...productionOrder,
         status,
         notes: notes || productionOrder.notes,
         acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date() : (typeof productionOrder.acceptedAt === 'string' ? new Date(productionOrder.acceptedAt) : productionOrder.acceptedAt),
@@ -683,8 +683,8 @@ export class MemStorage implements IStorage {
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
-    const payment: Payment = { 
-      ...insertPayment, 
+    const payment: Payment = {
+      ...insertPayment,
       id,
       status: insertPayment.status || 'pending',
       transactionId: insertPayment.transactionId || null,
@@ -706,8 +706,8 @@ export class MemStorage implements IStorage {
 
   async createCommission(insertCommission: InsertCommission): Promise<Commission> {
     const id = randomUUID();
-    const commission: Commission = { 
-      ...insertCommission, 
+    const commission: Commission = {
+      ...insertCommission,
       id,
       status: insertCommission.status || 'pending',
       paidAt: insertCommission.paidAt || null,
@@ -760,9 +760,9 @@ export class MemStorage implements IStorage {
   }
 
   // Product methods
-  async getProducts(options?: { 
-    page?: number; 
-    limit?: number; 
+  async getProducts(options?: {
+    page?: number;
+    limit?: number;
     search?: string;
     category?: string;
   }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
@@ -815,7 +815,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    this.products.set(id, newProduct); 
+    this.products.set(id, newProduct);
     return newProduct;
   }
 
@@ -956,35 +956,31 @@ export class MemStorage implements IStorage {
     return this.budgets.delete(id);
   }
 
-  async convertBudgetToOrder(budgetId: string): Promise<any> {
-    const budget = this.budgets.get(budgetId);
-
+  async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
+    const budget = await this.getBudget(budgetId);
     if (!budget) {
-      throw new Error('Budget not found');
+      throw new Error("Budget not found");
     }
 
-    // Mark budget as converted
-    await this.updateBudget(budgetId, { status: 'converted' });
-
-    const newOrder: Order = {
-      id: `order-${Date.now()}`,
-      orderNumber: `#${Math.floor(Math.random() * 100000)}`,
+    // Create order from budget
+    const orderNumber = `PED-${Date.now()}`;
+    const order = await this.createOrder({
+      orderNumber,
       clientId: budget.clientId,
       vendorId: budget.vendorId,
-      producerId: null,
+      producerId: producerId || null,
+      budgetId: budget.id,
       product: budget.title,
       description: budget.description,
       totalValue: budget.totalValue,
-      paidValue: '0',
-      status: 'pending',
-      deadline: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      budgetId: budgetId  // Store reference to original budget
-    };
+      status: 'confirmed',
+      deadline: budget.validUntil
+    });
 
-    this.orders.set(newOrder.id, newOrder);
-    return newOrder;
+    // Update budget status
+    await this.updateBudget(budgetId, { status: 'converted' });
+
+    return order;
   }
 
   // Budget Items methods

@@ -151,6 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...po,
             product: order?.product || 'Unknown',
             orderNumber: order?.orderNumber || 'Unknown',
+            clientName: clientUser?.name || 'Unknown',
             clientAddress: clientDetails?.address || null,
             clientPhone: clientDetails?.phone || clientUser?.phone || null
           };
@@ -160,6 +161,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enrichedOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch production orders" });
+    }
+  });
+
+  // Producers
+  app.get("/api/producers", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const producers = users.filter(user => user.role === 'producer');
+
+      const producersWithStats = await Promise.all(
+        producers.map(async (producer) => {
+          const productionOrders = await storage.getProductionOrdersByProducer(producer.id);
+          const activeOrders = productionOrders.filter(po => 
+            ['pending', 'accepted', 'production', 'quality_check', 'ready'].includes(po.status)
+          ).length;
+          const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
+
+          return {
+            ...producer,
+            activeOrders,
+            completedOrders,
+            totalOrders: productionOrders.length
+          };
+        })
+      );
+
+      res.json(producersWithStats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch producers" });
+    }
+  });
+
+  app.post("/api/producers", async (req, res) => {
+    try {
+      const { name, email, phone, specialty, address } = req.body;
+
+      // Create user with role producer
+      const user = await storage.createUser({
+        username: email,
+        password: "123456", // Default password
+        role: "producer",
+        name,
+        email,
+        phone
+      });
+
+      // Store additional producer info in the user record
+      await storage.updateUser(user.id, {
+        specialty,
+        address
+      });
+
+      res.json({ success: true, user });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create producer" });
     }
   });
 
@@ -666,7 +722,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
-      const order = await storage.convertBudgetToOrder(req.params.id);
+      const { producerId } = req.body;
+      const order = await storage.convertBudgetToOrder(req.params.id, producerId);
+      
+      // Create production order for the selected producer
+      if (producerId && order) {
+        await storage.createProductionOrder({
+          orderId: order.id,
+          producerId: producerId,
+          status: 'pending',
+          deadline: order.deadline
+        });
+      }
+      
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Failed to convert budget to order" });
