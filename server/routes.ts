@@ -197,24 +197,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, email, phone, specialty, address } = req.body;
 
-      // Create user with role producer
+      // Create user with role producer including specialty and address
       const user = await storage.createUser({
         username: email,
         password: "123456", // Default password
         role: "producer",
         name,
         email,
-        phone
-      });
-
-      // Store additional producer info in the user record
-      await storage.updateUser(user.id, {
+        phone,
         specialty,
         address
       });
 
       res.json({ success: true, user });
     } catch (error) {
+      console.error('Error creating producer:', error);
       res.status(500).json({ error: "Failed to create producer" });
     }
   });
@@ -1338,20 +1335,34 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
       const orderId = req.params.id;
+      const { producerId } = req.body;
 
-      // Update order status to production
+      if (!producerId) {
+        return res.status(400).json({ error: "Producer ID is required" });
+      }
+
+      // Update order status to production and assign producer
       const updatedOrder = await storage.updateOrder(orderId, {
-        status: 'production'
+        status: 'production',
+        producerId: producerId
       });
 
       if (!updatedOrder) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
+      // Create production order for the selected producer
+      await storage.createProductionOrder({
+        orderId: updatedOrder.id,
+        producerId: producerId,
+        status: 'pending',
+        deadline: updatedOrder.deadline
+      });
+
       // Get enriched order data
       const client = await storage.getUser(updatedOrder.clientId);
       const vendor = await storage.getUser(updatedOrder.vendorId);
-      const producer = updatedOrder.producerId ? await storage.getUser(updatedOrder.producerId) : null;
+      const producer = await storage.getUser(producerId);
 
       const enrichedOrder = {
         ...updatedOrder,

@@ -23,6 +23,7 @@ export default function VendorOrders() {
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [orderToSend, setOrderToSend] = useState<string | null>(null);
+  const [selectedProducer, setSelectedProducer] = useState<string>("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const { toast } = useToast();
@@ -60,6 +61,15 @@ export default function VendorOrders() {
     queryFn: async () => {
       const response = await fetch('/api/products?limit=9999');
       if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
+  });
+
+  const { data: producers } = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
       return response.json();
     },
   });
@@ -166,10 +176,11 @@ export default function VendorOrders() {
   });
 
   const sendToProductionMutation = useMutation({
-    mutationFn: async (orderId: string) => {
+    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId: string }) => {
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ producerId }),
       });
       if (!response.ok) throw new Error("Erro ao enviar para produção");
       return response.json();
@@ -178,6 +189,7 @@ export default function VendorOrders() {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
       setShowSendToProductionModal(false);
       setOrderToSend(null);
+      setSelectedProducer("");
       toast({
         title: "Sucesso!",
         description: "Pedido enviado para produção",
@@ -198,8 +210,8 @@ export default function VendorOrders() {
   };
 
   const confirmSendToProduction = () => {
-    if (orderToSend) {
-      sendToProductionMutation.mutate(orderToSend);
+    if (orderToSend && selectedProducer) {
+      sendToProductionMutation.mutate({ orderId: orderToSend, producerId: selectedProducer });
     }
   };
 
@@ -785,26 +797,44 @@ export default function VendorOrders() {
           <DialogHeader>
             <DialogTitle>Enviar para Produção</DialogTitle>
             <DialogDescription>
-              Deseja realmente enviar este pedido para produção? Esta ação não pode ser desfeita.
+              Selecione o produtor que receberá este pedido para produção.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="producer-select">Produtor Responsável</Label>
+              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produtor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {producers?.map((producer: any) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name} - {producer.specialty}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex gap-2 pt-4">
             <Button 
               variant="outline" 
               onClick={() => {
                 setShowSendToProductionModal(false);
                 setOrderToSend(null);
+                setSelectedProducer("");
               }}
               className="flex-1"
             >
-              Não
+              Cancelar
             </Button>
             <Button 
               onClick={confirmSendToProduction}
-              disabled={sendToProductionMutation.isPending}
+              disabled={sendToProductionMutation.isPending || !selectedProducer}
               className="flex-1"
             >
-              {sendToProductionMutation.isPending ? 'Enviando...' : 'Sim'}
+              {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar para Produção'}
             </Button>
           </div>
         </DialogContent>
