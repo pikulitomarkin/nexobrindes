@@ -16,6 +16,12 @@ export interface BudgetPDFData {
     customizationDescription?: string;
     createdAt: string;
     photos?: string[];
+    paymentMethodId?: string;
+    shippingMethodId?: string;
+    installments?: number;
+    downPayment?: string;
+    remainingAmount?: string;
+    shippingCost?: string;
   };
   items: Array<{
     id: string;
@@ -45,6 +51,16 @@ export interface BudgetPDFData {
     email?: string;
     phone?: string;
   };
+  paymentMethods?: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
+  shippingMethods?: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
 }
 
 export class PDFGenerator {
@@ -241,6 +257,63 @@ export class PDFGenerator {
     this.currentY += 30;
   }
 
+  private addPaymentShippingInfo(data: BudgetPDFData): void {
+    if (data.budget.paymentMethodId || data.budget.shippingMethodId) {
+      this.addNewPageIfNeeded(60);
+
+      this.doc.setFontSize(12);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('INFORMAÇÕES DE PAGAMENTO E FRETE', this.margin, this.currentY);
+      this.currentY += 15;
+
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+
+      // Payment info
+      if (data.budget.paymentMethodId) {
+        const paymentMethod = data.paymentMethods?.find(pm => pm.id === data.budget.paymentMethodId);
+        if (paymentMethod) {
+          this.doc.setFont('helvetica', 'bold');
+          this.doc.text('Forma de Pagamento:', this.margin, this.currentY);
+          this.doc.setFont('helvetica', 'normal');
+          this.doc.text(paymentMethod.name, this.margin + 70, this.currentY);
+          this.currentY += 8;
+
+          if (data.budget.installments && data.budget.installments > 1) {
+            this.doc.text(`Parcelas: ${data.budget.installments}x`, this.margin, this.currentY);
+            this.currentY += 8;
+          }
+
+          if (data.budget.downPayment && parseFloat(data.budget.downPayment) > 0) {
+            this.doc.text(`Entrada: R$ ${parseFloat(data.budget.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
+            this.currentY += 8;
+            this.doc.text(`Restante: R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
+            this.currentY += 8;
+          }
+        }
+      }
+
+      // Shipping info
+      if (data.budget.shippingMethodId) {
+        const shippingMethod = data.shippingMethods?.find(sm => sm.id === data.budget.shippingMethodId);
+        if (shippingMethod) {
+          this.doc.setFont('helvetica', 'bold');
+          this.doc.text('Método de Frete:', this.margin, this.currentY);
+          this.doc.setFont('helvetica', 'normal');
+          this.doc.text(shippingMethod.name, this.margin + 60, this.currentY);
+          this.currentY += 8;
+
+          if (data.budget.shippingCost) {
+            this.doc.text(`Valor do Frete: R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
+            this.currentY += 8;
+          }
+        }
+      }
+
+      this.currentY += 10;
+    }
+  }
+
   private addDescription(data: BudgetPDFData): void {
     if (data.budget.description) {
       this.addNewPageIfNeeded(30);
@@ -361,6 +434,7 @@ export class PDFGenerator {
       this.addClientVendorInfo(data);
       await this.addItems(data);
       this.addTotal(data);
+      this.addPaymentShippingInfo(data);
       this.addDescription(data);
       await this.addProductCustomizationImages(data);
 

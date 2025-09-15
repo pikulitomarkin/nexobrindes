@@ -411,7 +411,13 @@ export default function VendorBudgets() {
         itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
         itemCustomizationDescription: item.itemCustomizationDescription || "",
         customizationPhoto: item.customizationPhoto || ""
-      }))
+      })),
+      paymentMethodId: budget.paymentMethodId || "",
+      shippingMethodId: budget.shippingMethodId || "",
+      installments: budget.installments || 1,
+      downPayment: budget.downPayment || 0,
+      remainingAmount: budget.remainingAmount || 0,
+      shippingCost: budget.shippingCost || 0
     });
     
     setIsEditMode(true);
@@ -1265,6 +1271,39 @@ export default function VendorBudgets() {
                 <div>
                   <Label className="font-semibold">Descrição</Label>
                   <p className="mt-1">{budgetToView.description}</p>
+                </div>
+              )}
+
+              {/* Payment and Shipping Information */}
+              {(budgetToView.paymentMethodId || budgetToView.shippingMethodId) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Informações de Pagamento e Frete</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                    {budgetToView.paymentMethodId && (
+                      <div>
+                        <Label className="font-semibold">Forma de Pagamento</Label>
+                        <p>{paymentMethods?.find((pm: any) => pm.id === budgetToView.paymentMethodId)?.name || 'Não especificado'}</p>
+                        {budgetToView.installments > 1 && (
+                          <p className="text-sm text-gray-600">{budgetToView.installments}x</p>
+                        )}
+                        {budgetToView.downPayment > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {budgetToView.shippingMethodId && (
+                      <div>
+                        <Label className="font-semibold">Método de Frete</Label>
+                        <p>{shippingMethods?.find((sm: any) => sm.id === budgetToView.shippingMethodId)?.name || 'Não especificado'}</p>
+                        <p className="text-sm text-gray-600">
+                          R$ {parseFloat(budgetToView.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

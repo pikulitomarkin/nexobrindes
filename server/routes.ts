@@ -567,6 +567,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Save payment and shipping information
+      if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
+        await storage.createBudgetPaymentInfo({
+          budgetId: newBudget.id,
+          paymentMethodId: budgetData.paymentMethodId || null,
+          shippingMethodId: budgetData.shippingMethodId || null,
+          installments: budgetData.installments || 1,
+          downPayment: budgetData.downPayment?.toString() || "0.00",
+          remainingAmount: budgetData.remainingAmount?.toString() || "0.00",
+          shippingCost: budgetData.shippingCost?.toString() || "0.00"
+        });
+      }
+
       // Process budget photos
       if (budgetData.photos && budgetData.photos.length > 0) {
         for (const photoUrl of budgetData.photos) {
@@ -613,6 +626,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemCustomizationValue: customizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           customizationPhoto: item.customizationPhoto || ""
+        });
+      }
+
+      // Update payment and shipping information
+      if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
+        await storage.updateBudgetPaymentInfo(req.params.id, {
+          paymentMethodId: budgetData.paymentMethodId || null,
+          shippingMethodId: budgetData.shippingMethodId || null,
+          installments: budgetData.installments || 1,
+          downPayment: budgetData.downPayment?.toString() || "0.00",
+          remainingAmount: budgetData.remainingAmount?.toString() || "0.00",
+          shippingCost: budgetData.shippingCost?.toString() || "0.00"
         });
       }
 
@@ -744,6 +769,9 @@ Para mais detalhes, entre em contato conosco!`;
       const photos = await storage.getBudgetPhotos(req.params.id);
       const photoUrls = photos.map(photo => photo.imageUrl || photo.photoUrl);
 
+      // Get payment and shipping info
+      const paymentInfo = await storage.getBudgetPaymentInfo(req.params.id);
+
       const pdfData = {
         budget: {
           id: budget.id,
@@ -758,7 +786,13 @@ Para mais detalhes, entre em contato conosco!`;
           customizationPercentage: budget.customizationPercentage,
           customizationDescription: budget.customizationDescription,
           createdAt: budget.createdAt,
-          photos: photoUrls
+          photos: photoUrls,
+          paymentMethodId: paymentInfo?.paymentMethodId || null,
+          shippingMethodId: paymentInfo?.shippingMethodId || null,
+          installments: paymentInfo?.installments || 1,
+          downPayment: paymentInfo?.downPayment || "0.00",
+          remainingAmount: paymentInfo?.remainingAmount || "0.00",
+          shippingCost: paymentInfo?.shippingCost || "0.00"
         },
         items: enrichedItems,
         client: {
@@ -770,7 +804,9 @@ Para mais detalhes, entre em contato conosco!`;
           name: vendor?.name || 'Vendedor não encontrado',
           email: vendor?.email || '',
           phone: vendor?.phone || ''
-        }
+        },
+        paymentMethods: await storage.getPaymentMethods(),
+        shippingMethods: await storage.getShippingMethods()
       };
 
       res.json(pdfData);
@@ -967,12 +1003,19 @@ Para mais detalhes, entre em contato conosco!`;
           const client = await storage.getUser(budget.clientId);
           const items = await storage.getBudgetItems(budget.id);
           const photos = await storage.getBudgetPhotos(budget.id);
+          const paymentInfo = await storage.getBudgetPaymentInfo(budget.id);
 
           return {
             ...budget,
             clientName: client?.name || 'Unknown',
             items: items,
-            photos: photos.map(photo => photo.photoUrl)
+            photos: photos.map(photo => photo.photoUrl),
+            paymentMethodId: paymentInfo?.paymentMethodId || "",
+            shippingMethodId: paymentInfo?.shippingMethodId || "",
+            installments: paymentInfo?.installments || 1,
+            downPayment: paymentInfo?.downPayment || "0.00",
+            remainingAmount: paymentInfo?.remainingAmount || "0.00",
+            shippingCost: paymentInfo?.shippingCost || "0.00"
           };
         })
       );
