@@ -145,10 +145,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
           const order = await storage.getOrder(po.orderId);
+          const clientUser = order ? await storage.getUser(order.clientId) : null;
+          const clientDetails = order ? await storage.getClient(order.clientId) : null;
           return {
             ...po,
             product: order?.product || 'Unknown',
-            orderNumber: order?.orderNumber || 'Unknown'
+            orderNumber: order?.orderNumber || 'Unknown',
+            clientAddress: clientDetails?.address || null,
+            clientPhone: clientDetails?.phone || clientUser?.phone || null
           };
         })
       );
@@ -1325,7 +1329,8 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Get client info
-      const client = await storage.getUser(order.clientId);
+      const clientUser = await storage.getUser(order.clientId);
+      const clientDetails = await storage.getClient(order.clientId);
       
       // Get budget items if order has budgetId
       let budgetItems = [];
@@ -1355,7 +1360,10 @@ Para mais detalhes, entre em contato conosco!`;
         ...productionOrder,
         order: {
           ...order,
-          clientName: client?.name || 'Cliente não encontrado'
+          clientName: clientUser?.name || 'Cliente não encontrado',
+          clientAddress: clientDetails?.address || null,
+          clientPhone: clientDetails?.phone || clientUser?.phone || null,
+          clientEmail: clientDetails?.email || clientUser?.email || null
         },
         items: budgetItems,
         photos: budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl)

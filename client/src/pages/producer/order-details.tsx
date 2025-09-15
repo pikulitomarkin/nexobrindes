@@ -172,6 +172,18 @@ export default function ProducerOrderDetails() {
                     <User className="h-4 w-4 text-gray-400" />
                     <span className="font-medium">{productionOrder.order.clientName}</span>
                   </div>
+                  {productionOrder.order.clientAddress && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                      <Label className="text-xs font-medium text-gray-600">Endereço de Entrega</Label>
+                      <p className="text-sm text-gray-700 mt-1">{productionOrder.order.clientAddress}</p>
+                    </div>
+                  )}
+                  {productionOrder.order.clientPhone && (
+                    <div className="mt-2">
+                      <Label className="text-xs font-medium text-gray-600">Telefone</Label>
+                      <p className="text-sm text-gray-700">{productionOrder.order.clientPhone}</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Produto</Label>
