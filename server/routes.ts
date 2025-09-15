@@ -1310,6 +1310,149 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get production order details for producer
+  app.get("/api/production-orders/:id", async (req, res) => {
+    try {
+      const productionOrder = await storage.getProductionOrder(req.params.id);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Production order not found" });
+      }
+
+      // Get related order
+      const order = await storage.getOrder(productionOrder.orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Related order not found" });
+      }
+
+      // Get client info
+      const client = await storage.getUser(order.clientId);
+      
+      // Get budget items if order has budgetId
+      let budgetItems = [];
+      let budgetPhotos = [];
+      if (order.budgetId) {
+        budgetItems = await storage.getBudgetItems(order.budgetId);
+        budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
+        
+        // Enrich items with product data
+        budgetItems = await Promise.all(
+          budgetItems.map(async (item) => {
+            const product = await storage.getProduct(item.productId);
+            return {
+              ...item,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
+        );
+      }
+
+      const enrichedPO = {
+        ...productionOrder,
+        order: {
+          ...order,
+          clientName: client?.name || 'Cliente não encontrado'
+        },
+        items: budgetItems,
+        photos: budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl)
+      };
+
+      res.json(enrichedPO);
+    } catch (error) {
+      console.error('Error fetching production order:', error);
+      res.status(500).json({ error: "Failed to fetch production order" });
+    }
+  });
+
+  // Get order timeline for client view
+  app.get("/api/orders/:id/timeline", async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Get production order if exists
+      let productionOrder = null;
+      if (order.producerId) {
+        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+        productionOrder = productionOrders[0] || null;
+      }
+
+      const timeline = [
+        {
+          id: 'created',
+          status: 'created',
+          title: 'Pedido Criado',
+          description: 'Pedido foi criado e está aguardando confirmação',
+          date: order.createdAt,
+          completed: true,
+          icon: 'file-plus'
+        },
+        {
+          id: 'confirmed',
+          status: 'confirmed', 
+          title: 'Pedido Confirmado',
+          description: 'Pedido foi confirmado e enviado para produção',
+          date: order.status !== 'pending' ? order.updatedAt : null,
+          completed: order.status !== 'pending',
+          icon: 'check-circle'
+        },
+        {
+          id: 'production',
+          status: 'production',
+          title: 'Em Produção',
+          description: productionOrder?.notes || 'Pedido em processo de produção',
+          date: productionOrder?.acceptedAt || null,
+          completed: productionOrder && ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status),
+          icon: 'settings'
+        },
+        {
+          id: 'ready',
+          status: 'ready',
+          title: 'Pronto para Envio',
+          description: 'Produto finalizado e pronto para envio',
+          date: productionOrder?.status === 'ready' || productionOrder?.status === 'completed' ? productionOrder?.completedAt : null,
+          completed: productionOrder && ['ready', 'shipped', 'completed'].includes(productionOrder.status),
+          icon: 'package'
+        },
+        {
+          id: 'shipped',
+          status: 'shipped',
+          title: 'Enviado',
+          description: 'Produto foi enviado para o cliente',
+          date: productionOrder?.status === 'shipped' ? productionOrder?.updatedAt : null,
+          completed: productionOrder && ['shipped', 'completed'].includes(productionOrder.status),
+          icon: 'truck'
+        },
+        {
+          id: 'completed',
+          status: 'completed',
+          title: 'Entregue',
+          description: 'Pedido foi entregue com sucesso',
+          date: productionOrder?.status === 'completed' ? productionOrder?.completedAt : null,
+          completed: productionOrder?.status === 'completed',
+          icon: 'check-circle-2'
+        }
+      ];
+
+      res.json({
+        order: {
+          ...order,
+          productionOrder
+        },
+        timeline
+      });
+    } catch (error) {
+      console.error('Error fetching order timeline:', error);
+      res.status(500).json({ error: "Failed to fetch order timeline" });
+    }
+  });
+
   // Image upload for budget customizations using local file system
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {

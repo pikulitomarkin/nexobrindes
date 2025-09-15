@@ -59,6 +59,8 @@ export interface IStorage {
   // Production Orders
   getProductionOrders(): Promise<ProductionOrder[]>;
   getProductionOrdersByProducer(producerId: string): Promise<ProductionOrder[]>;
+  getProductionOrder(id: string): Promise<ProductionOrder | undefined>;
+  getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
   updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined>;
 
@@ -664,6 +666,14 @@ export class MemStorage implements IStorage {
       return updatedPO;
     }
     return undefined;
+  }
+
+  async getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
+    return this.productionOrders.get(id);
+  }
+
+  async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {
+    return Array.from(this.productionOrders.values()).filter(po => po.orderId === orderId);
   }
 
   // Payment methods

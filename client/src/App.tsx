@@ -33,6 +33,9 @@ import ClientOrders from "@/pages/client/orders";
 // Producer pages
 import ProducerOrders from "@/pages/producer/orders";
 import ProductionDashboard from "@/pages/producer/production-dashboard";
+import ProducerOrderDetails from "./pages/producer/order-details";
+import ClientOrderTimeline from "./pages/client/order-timeline";
+
 
 // Finance pages
 import FinancePayments from "@/pages/finance/payments";
@@ -65,10 +68,12 @@ function Router() {
 
         {/* Client Routes */}
         <Route path="/client/orders" component={ClientOrders} />
+        <Route path="/client/order/:id/timeline" element={<ClientOrderTimeline />} />
 
         {/* Producer Routes */}
-        <Route path="/producer/dashboard" component={ProductionDashboard} />
+        <Route path="/producer/production-dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
+        <Route path="/producer/order/:id" element={<ProducerOrderDetails />} />
 
         {/* Finance Routes */}
         <Route path="/finance/payments" component={FinancePayments} />

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, Truck, Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Eye } from "lucide-react";
 
 export default function ClientOrders() {
   const clientId = "client-1";
@@ -68,15 +70,15 @@ export default function ClientOrders() {
                     );
                   })}
                 </div>
-                
+
                 {/* Progress Line */}
                 <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200">
-                  <div 
+                  <div
                     className="h-full gradient-bg transition-all duration-500"
-                    style={{ 
-                      width: order.status === "pending" ? "25%" : 
-                             order.status === "production" ? "50%" : 
-                             order.status === "shipped" ? "75%" : "100%" 
+                    style={{
+                      width: order.status === "pending" ? "25%" :
+                             order.status === "production" ? "50%" :
+                             order.status === "shipped" ? "75%" : "100%"
                     }}
                   ></div>
                 </div>
@@ -100,6 +102,17 @@ export default function ClientOrders() {
                     {order.producerName || 'Em definição'}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <Button
+                  size="sm"
+                  className="gradient-bg text-white"
+                  onClick={() => window.location.href = `/client/order/${order.id}/timeline`}
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  Ver Status
+                </Button>
               </div>
             </CardContent>
           </Card>

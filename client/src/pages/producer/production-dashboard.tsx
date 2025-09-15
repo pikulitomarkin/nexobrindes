@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -279,7 +278,7 @@ export default function ProductionDashboard() {
                 {filteredOrders?.map((order: any) => {
                   const daysUntilDeadline = getDaysUntilDeadline(order.deadline);
                   const isOrderOverdue = isOverdue(order.deadline);
-                  
+
                   return (
                     <tr key={order.id} className={isOrderOverdue ? "bg-red-50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -330,11 +329,15 @@ export default function ProductionDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => window.location.href = `/producer/order/${order.id}`}
+                          >
                             <Eye className="h-4 w-4 mr-1" />
                             Ver
                           </Button>
-                          
+
                           {order.status === 'pending' && (
                             <>
                               <Button 
@@ -355,7 +358,7 @@ export default function ProductionDashboard() {
                               </Button>
                             </>
                           )}
-                          
+
                           {order.status === 'accepted' && (
                             <Button 
                               size="sm" 
@@ -366,7 +369,7 @@ export default function ProductionDashboard() {
                               Iniciar Produção
                             </Button>
                           )}
-                          
+
                           {order.status === 'production' && (
                             <Button 
                               size="sm" 
