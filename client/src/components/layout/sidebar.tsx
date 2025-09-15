@@ -109,22 +109,27 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
         </nav>
       )}
 
-      {currentUser?.role === 'producer' && (
-            <>
-              <SidebarItem 
-                icon={BarChart3} 
-                label="Dashboard" 
-                href="/producer/dashboard"
-                isActive={location === "/producer/dashboard"}
-              />
-              <SidebarItem 
-                icon={Package} 
-                label="Ordens" 
-                href="/producer/orders"
-                isActive={location === "/producer/orders"}
-              />
-            </>
-          )}
+      {activePanel === "producer" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Produção
+            </p>
+          </div>
+          <SidebarItem 
+            icon={BarChart3} 
+            label="Painel de Produção" 
+            href="/producer/production-dashboard"
+            isActive={location === "/producer/production-dashboard"}
+          />
+          <SidebarItem 
+            icon={Package} 
+            label="Ordens" 
+            href="/producer/orders"
+            isActive={location === "/producer/orders"}
+          />
+        </nav>
+      )}
     </div>
   );
 }

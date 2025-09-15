@@ -71,6 +71,7 @@ function Router() {
         <Route path="/client/order/:id/timeline" element={<ClientOrderTimeline />} />
 
         {/* Producer Routes */}
+        <Route path="/producer" component={ProductionDashboard} />
         <Route path="/producer/production-dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
         <Route path="/producer/order/:id" element={<ProducerOrderDetails />} />
