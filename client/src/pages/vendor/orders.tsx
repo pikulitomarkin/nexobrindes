@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -202,6 +202,24 @@ export default function VendorOrders() {
         variant: "destructive"
       });
     }
+  });
+
+  const markNotesAsReadMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/orders/${orderId}/mark-notes-read`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao marcar como lido");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
+      toast({
+        title: "Sucesso!",
+        description: "Observações marcadas como lidas",
+      });
+    },
   });
 
   const handleSendToProductionClick = (orderId: string) => {
@@ -730,7 +748,15 @@ export default function VendorOrders() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-2">
-                        {getStatusBadge(order.status)}
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(order.status)}
+                          {order.hasUnreadNotes && (
+                            <div className="relative">
+                              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-600 rounded-full"></div>
+                            </div>
+                          )}
+                        </div>
                         {(order.status === 'production' || order.status === 'delayed' || order.status === 'ready' || order.status === 'shipped' || order.status === 'delivered') && (
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
@@ -768,6 +794,18 @@ export default function VendorOrders() {
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
+                        {order.hasUnreadNotes && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-900"
+                            onClick={() => markNotesAsReadMutation.mutate(order.id)}
+                            disabled={markNotesAsReadMutation.isPending}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Ciente
+                          </Button>
+                        )}
                         {(order.status === 'confirmed' || order.status === 'pending') && (
                           <Button 
                             variant="ghost" 
@@ -885,6 +923,29 @@ export default function VendorOrders() {
                   <p className="text-sm text-gray-900">
                     {new Date(selectedOrder.deadline).toLocaleDateString('pt-BR')}
                   </p>
+                </div>
+              )}
+
+              {selectedOrder.productionDeadline && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Prazo de Entrega (Atualizado pela Produção)</Label>
+                  <p className="text-sm text-gray-900 font-semibold">
+                    {new Date(selectedOrder.productionDeadline).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              )}
+
+              {selectedOrder.productionNotes && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Observações da Produção</Label>
+                  <div className="mt-1 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm text-orange-800">{selectedOrder.productionNotes}</p>
+                    {selectedOrder.lastNoteAt && (
+                      <p className="text-xs text-orange-600 mt-2">
+                        Atualizado em: {new Date(selectedOrder.lastNoteAt).toLocaleString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 

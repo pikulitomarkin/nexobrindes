@@ -59,6 +59,9 @@ export const productionOrders = pgTable("production_orders", {
   acceptedAt: timestamp("accepted_at"),
   completedAt: timestamp("completed_at"),
   notes: text("notes"),
+  deliveryDeadline: timestamp("delivery_deadline"),
+  hasUnreadNotes: boolean("has_unread_notes").default(false),
+  lastNoteAt: timestamp("last_note_at"),
 });
 
 export const payments = pgTable("payments", {

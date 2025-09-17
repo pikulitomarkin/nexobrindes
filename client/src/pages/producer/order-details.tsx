@@ -61,6 +61,30 @@ export default function ProducerOrderDetails() {
     },
   });
 
+  const updateNotesMutation = useMutation({
+    mutationFn: async ({ notes, deliveryDeadline }: { 
+      notes: string;
+      deliveryDeadline?: string;
+    }) => {
+      const response = await fetch(`/api/production-orders/${id}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes, deliveryDeadline }),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar observações");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders", id] });
+      setUpdateNotes("");
+      setDeliveryDate("");
+      toast({
+        title: "Sucesso!",
+        description: "Observações atualizadas com sucesso",
+      });
+    },
+  });
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: "Aguardando", color: "bg-yellow-100 text-yellow-800", icon: Clock },
@@ -340,7 +364,44 @@ export default function ProducerOrderDetails() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Ações</CardTitle>
+              <CardTitle>Atualizar Informações</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="delivery-deadline">Prazo de Entrega</Label>
+                <Input
+                  id="delivery-deadline"
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="production-notes">Observações</Label>
+                <Textarea
+                  id="production-notes"
+                  placeholder="Adicione observações sobre a produção..."
+                  value={updateNotes}
+                  onChange={(e) => setUpdateNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <Button 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => updateNotesMutation.mutate({ 
+                  notes: updateNotes, 
+                  deliveryDeadline: deliveryDate 
+                })}
+                disabled={updateNotesMutation.isPending}
+              >
+                {updateNotesMutation.isPending ? "Salvando..." : "Salvar Informações"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ações de Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {productionOrder.status === 'pending' && (

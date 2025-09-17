@@ -4,6 +4,7 @@ import multer from 'multer';
 import express from 'express';
 import path from 'path';
 import { storage } from "./storage";
+import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder } from './db'; // Assuming these are your database models and functions
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
@@ -1208,38 +1209,39 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/vendors/:id/orders", async (req, res) => {
+  // Get vendor orders
+  app.get("/api/vendors/:vendorId/orders", async (req, res) => {
+    const { vendorId } = req.params;
     try {
-      const vendorId = req.params.id;
-      const orders = await storage.getOrdersByVendor(vendorId);
+      const vendorOrders = await db.select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        title: budgets.title,
+        clientName: clients.name,
+        product: orders.product,
+        description: orders.description,
+        totalValue: orders.totalValue,
+        status: orders.status,
+        deadline: orders.deadline,
+        createdAt: orders.createdAt,
+        budgetPhotos: sql<string[]>`COALESCE(array_agg(DISTINCT ${budgetPhotos.photoUrl}) FILTER (WHERE ${budgetPhotos.photoUrl} IS NOT NULL), '{}')`,
+        hasUnreadNotes: productionOrders.hasUnreadNotes,
+        productionNotes: productionOrders.notes,
+        productionDeadline: productionOrders.deliveryDeadline,
+        lastNoteAt: productionOrders.lastNoteAt
+      })
+      .from(orders)
+      .leftJoin(clients, eq(orders.clientId, clients.id))
+      .leftJoin(budgets, eq(orders.budgetId, budgets.id))
+      .leftJoin(budgetPhotos, eq(budgets.id, budgetPhotos.budgetId))
+      .leftJoin(productionOrders, eq(orders.id, productionOrders.orderId))
+      .where(eq(orders.vendorId, vendorId))
+      .groupBy(orders.id, clients.name, budgets.title, productionOrders.hasUnreadNotes, productionOrders.notes, productionOrders.deliveryDeadline, productionOrders.lastNoteAt)
+      .orderBy(desc(orders.createdAt));
 
-      // Enrich with client and vendor names and budget photos
-      const enrichedOrders = await Promise.all(
-        orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
-          const vendor = await storage.getUser(order.vendorId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
-          // Get budget photos if order was converted from budget
-          let budgetPhotos = [];
-          if (order.budgetId) {
-            const photos = await storage.getBudgetPhotos(order.budgetId);
-            budgetPhotos = photos.map(photo => photo.imageUrl);
-          }
-
-          return {
-            ...order,
-            clientName: client?.name || 'Unknown',
-            vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null,
-            budgetPhotos: budgetPhotos
-          };
-        })
-      );
-
-      res.json(enrichedOrders);
+      res.json(vendorOrders);
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching vendor orders:", error);
       res.status(500).json({ error: "Failed to fetch vendor orders" });
     }
   });
@@ -1404,18 +1406,92 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Update production order status
   app.patch("/api/production-orders/:id/status", async (req, res) => {
-    try {
-      const { status, notes, deliveryDate } = req.body;
+    const { id } = req.params;
+    const { status, notes, deliveryDate } = req.body;
 
-      const updatedPO = await storage.updateProductionOrderStatus(req.params.id, status, notes, deliveryDate);
-      if (!updatedPO) {
-        return res.status(404).json({ error: "Production order not found" });
+    try {
+      const updateData: any = { status };
+
+      if (notes) {
+        updateData.notes = notes;
+        updateData.hasUnreadNotes = true;
+        updateData.lastNoteAt = new Date();
       }
 
-      res.json(updatedPO);
+      if (deliveryDate) {
+        updateData.deliveryDate = new Date(deliveryDate);
+        updateData.deliveryDeadline = new Date(deliveryDate);
+      }
+
+      if (status === 'accepted') {
+        updateData.acceptedAt = new Date();
+      } else if (status === 'completed') {
+        updateData.completedAt = new Date();
+      }
+
+      await db.update(productionOrders)
+        .set(updateData)
+        .where(eq(productionOrders.id, id));
+
+      res.json({ success: true });
     } catch (error) {
+      console.error("Error updating production order status:", error);
       res.status(500).json({ error: "Failed to update production order status" });
+    }
+  });
+
+  // Update production order notes only
+  app.patch("/api/production-orders/:id/notes", async (req, res) => {
+    const { id } = req.params;
+    const { notes, deliveryDeadline } = req.body;
+
+    try {
+      const updateData: any = {};
+
+      if (notes) {
+        updateData.notes = notes;
+        updateData.hasUnreadNotes = true;
+        updateData.lastNoteAt = new Date();
+      }
+
+      if (deliveryDeadline) {
+        updateData.deliveryDeadline = new Date(deliveryDeadline);
+      }
+
+      await db.update(productionOrders)
+        .set(updateData)
+        .where(eq(productionOrders.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating production order notes:", error);
+      res.status(500).json({ error: "Failed to update production order notes" });
+    }
+  });
+
+  // Mark production notes as read
+  app.patch("/api/orders/:id/mark-notes-read", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Find production order by order ID
+      const productionOrderResult = await db.select()
+        .from(productionOrders)
+        .where(eq(productionOrders.orderId, id))
+        .limit(1);
+
+      if (productionOrderResult.length > 0) {
+        await db.update(productionOrders)
+          .set({ hasUnreadNotes: false })
+          .where(eq(productionOrders.orderId, id));
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking notes as read:", error);
+      res.status(500).json({ error: "Failed to mark notes as read" });
     }
   });
 
