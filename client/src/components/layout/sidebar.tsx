@@ -19,19 +19,14 @@ import {
   Percent,
 } from "lucide-react";
 
-import Link from "next/link"; // Assuming next/link for routing
-import { SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar-menu"; // Assuming these are UI components
+import { useLocation } from "wouter";
 
 interface SidebarProps {
   activePanel: string;
   onPanelChange: (panel: string) => void;
 }
 
-// Mocking currentUser and location for demonstration purposes
-const currentUser = { role: 'producer' }; 
-const location = '/producer/dashboard';
-
-// Mocking SidebarItem component
+// SidebarItem component
 const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
   <a
     href={href}
@@ -43,6 +38,7 @@ const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
 );
 
 export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
+  const [location] = useLocation();
   const menuItems = [
     { id: "admin", label: "Admin Geral", icon: LayoutDashboard },
     { id: "vendor", label: "Vendedor", icon: ShoppingCart },
