@@ -28,6 +28,9 @@ export default function AdminBudgets() {
     title: "",
     description: "",
     clientId: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
     vendorId: "",
     validUntil: "",
     items: [] as any[],
@@ -139,6 +142,9 @@ export default function AdminBudgets() {
       title: "",
       description: "",
       clientId: "",
+      contactName: "",
+      contactPhone: "",
+      contactEmail: "",
       vendorId: "",
       validUntil: "",
       items: [],
@@ -406,14 +412,47 @@ export default function AdminBudgets() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="admin-budget-contact-name">Nome de Contato *</Label>
+                  <Input
+                    id="admin-budget-contact-name"
+                    value={adminBudgetForm.contactName}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactName: e.target.value })}
+                    required
+                    placeholder="Nome do cliente/contato"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="admin-budget-contact-phone">Telefone</Label>
+                  <Input
+                    id="admin-budget-contact-phone"
+                    value={adminBudgetForm.contactPhone}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="admin-budget-contact-email">Email</Label>
+                  <Input
+                    id="admin-budget-contact-email"
+                    type="email"
+                    value={adminBudgetForm.contactEmail}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactEmail: e.target.value })}
+                    placeholder="cliente@email.com"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="admin-budget-client">Cliente</Label>
+                  <Label htmlFor="admin-budget-client">Cliente Cadastrado (Opcional)</Label>
                   <Select value={adminBudgetForm.clientId} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, clientId: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um cliente" />
+                      <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Nenhum cliente selecionado</SelectItem>
                       {clients?.map((client: any) => (
                         <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                       ))}

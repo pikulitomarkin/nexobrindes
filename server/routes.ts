@@ -604,6 +604,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets", async (req, res) => {
     try {
       const budgetData = req.body;
+      
+      // Validate that contactName is provided
+      if (!budgetData.contactName) {
+        return res.status(400).json({ error: "Nome de contato é obrigatório" });
+      }
+      
       const newBudget = await storage.createBudget(budgetData);
 
       // Process budget items
@@ -719,7 +725,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
-      const { producerId } = req.body;
+      const { producerId, clientId } = req.body;
+      
+      // Validate that clientId is provided for order conversion
+      if (!clientId) {
+        return res.status(400).json({ error: "Cliente deve ser selecionado para converter orçamento em pedido" });
+      }
+      
+      // Update budget with clientId before conversion
+      await storage.updateBudget(req.params.id, { clientId });
+      
       const order = await storage.convertBudgetToOrder(req.params.id, producerId);
       
       // Create production order for the selected producer
@@ -745,17 +760,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Get client data
-      const client = await storage.getUser(budget.clientId);
-      if (!client) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
+      // Get client data or use contact name
+      let clientName = budget.contactName;
+      let clientPhone = budget.contactPhone;
+      
+      if (budget.clientId) {
+        const client = await storage.getUser(budget.clientId);
+        if (client) {
+          clientName = client.name;
+          clientPhone = client.phone || budget.contactPhone;
+        }
       }
 
       // Update budget status to 'sent'
       await storage.updateBudget(req.params.id, { status: 'sent' });
 
       // Generate WhatsApp message
-      const message = `Olá ${client.name}! 👋
+      const message = `Olá ${clientName}! 👋
 
 Segue seu orçamento:
 
@@ -769,7 +790,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Create WhatsApp URL
       const encodedMessage = encodeURIComponent(message);
-      const phoneNumber = client.phone?.replace(/\D/g, '') || ''; // Remove non-digits
+      const phoneNumber = clientPhone?.replace(/\D/g, '') || ''; // Remove non-digits
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
       res.json({
@@ -1069,14 +1090,19 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich with client names and items
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
-          const client = await storage.getUser(budget.clientId);
+          let clientName = budget.contactName;
+          if (budget.clientId) {
+            const client = await storage.getUser(budget.clientId);
+            clientName = client?.name || budget.contactName;
+          }
+          
           const items = await storage.getBudgetItems(budget.id);
           const photos = await storage.getBudgetPhotos(budget.id);
           const paymentInfo = await storage.getBudgetPaymentInfo(budget.id);
 
           return {
             ...budget,
-            clientName: client?.name || 'Unknown',
+            clientName: clientName,
             items: items,
             photos: photos.map(photo => photo.photoUrl),
             paymentMethodId: paymentInfo?.paymentMethodId || "",

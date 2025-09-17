@@ -78,6 +78,9 @@ export default function VendorBudgets() {
     title: "",
     description: "",
     clientId: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
     vendorId: vendorId,
     validUntil: "",
     items: [] as any[],
@@ -220,6 +223,9 @@ export default function VendorBudgets() {
       title: "",
       description: "",
       clientId: "",
+      contactName: "",
+      contactPhone: "",
+      contactEmail: "",
       vendorId: vendorId,
       validUntil: "",
       items: [],
@@ -333,14 +339,26 @@ export default function VendorBudgets() {
 
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
+  const [convertClientId, setConvertClientId] = useState("");
+  const [convertProducerId, setConvertProducerId] = useState("");
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
   const [budgetToView, setBudgetToView] = useState<any>(null);
 
+  const { data: producers } = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
+      return response.json();
+    },
+  });
+
   const convertToOrderMutation = useMutation({
-    mutationFn: async (budgetId: string) => {
+    mutationFn: async ({ budgetId, clientId, producerId }: { budgetId: string; clientId: string; producerId: string }) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, producerId }),
       });
       if (!response.ok) throw new Error("Erro ao converter para pedido");
       return response.json();
@@ -349,9 +367,11 @@ export default function VendorBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
+      setConvertClientId("");
+      setConvertProducerId("");
       toast({
         title: "Sucesso!",
-        description: "Orçamento convertido em pedido",
+        description: "Orçamento convertido em pedido e enviado para o produtor",
       });
     },
   });
@@ -383,8 +403,12 @@ export default function VendorBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert) {
-      convertToOrderMutation.mutate(budgetToConvert);
+    if (budgetToConvert && convertClientId && convertProducerId) {
+      convertToOrderMutation.mutate({ 
+        budgetId: budgetToConvert, 
+        clientId: convertClientId, 
+        producerId: convertProducerId 
+      });
     }
   };
 
@@ -398,7 +422,10 @@ export default function VendorBudgets() {
     setVendorBudgetForm({
       title: budget.title,
       description: budget.description || "",
-      clientId: budget.clientId,
+      clientId: budget.clientId || "",
+      contactName: budget.contactName || "",
+      contactPhone: budget.contactPhone || "",
+      contactEmail: budget.contactEmail || "",
       vendorId: budget.vendorId,
       validUntil: budget.validUntil || "",
       items: budget.items.map((item: any) => ({
@@ -571,13 +598,46 @@ export default function VendorBudgets() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="budget-contact-name">Nome de Contato *</Label>
+                  <Input
+                    id="budget-contact-name"
+                    value={vendorBudgetForm.contactName}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactName: e.target.value })}
+                    required
+                    placeholder="Nome do cliente/contato"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="budget-contact-phone">Telefone</Label>
+                  <Input
+                    id="budget-contact-phone"
+                    value={vendorBudgetForm.contactPhone}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="budget-contact-email">Email</Label>
+                  <Input
+                    id="budget-contact-email"
+                    type="email"
+                    value={vendorBudgetForm.contactEmail}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactEmail: e.target.value })}
+                    placeholder="cliente@email.com"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="budget-client">Cliente</Label>
+                <Label htmlFor="budget-client">Cliente Cadastrado (Opcional)</Label>
                 <Select value={vendorBudgetForm.clientId} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, clientId: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
+                    <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum cliente selecionado</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
@@ -1242,9 +1302,27 @@ export default function VendorBudgets() {
                   <div className="mt-1">{getStatusBadge(budgetToView.status)}</div>
                 </div>
                 <div>
-                  <Label className="font-semibold">Cliente</Label>
-                  <p>{budgetToView.clientName}</p>
+                  <Label className="font-semibold">Nome de Contato</Label>
+                  <p>{budgetToView.contactName}</p>
                 </div>
+                {budgetToView.contactPhone && (
+                  <div>
+                    <Label className="font-semibold">Telefone</Label>
+                    <p>{budgetToView.contactPhone}</p>
+                  </div>
+                )}
+                {budgetToView.contactEmail && (
+                  <div>
+                    <Label className="font-semibold">Email</Label>
+                    <p>{budgetToView.contactEmail}</p>
+                  </div>
+                )}
+                {budgetToView.clientName && (
+                  <div>
+                    <Label className="font-semibold">Cliente Cadastrado</Label>
+                    <p>{budgetToView.clientName}</p>
+                  </div>
+                )}
                 <div>
                   <Label className="font-semibold">Data de Criação</Label>
                   <p>{new Date(budgetToView.createdAt).toLocaleDateString('pt-BR')}</p>
@@ -1469,26 +1547,58 @@ export default function VendorBudgets() {
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Deseja converter este orçamento em pedido? Esta ação não pode ser desfeita.
+              Para converter em pedido, é necessário associar um cliente cadastrado e selecionar um produtor.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="convert-client">Cliente *</Label>
+              <Select value={convertClientId} onValueChange={setConvertClientId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="convert-producer">Produtor *</Label>
+              <Select value={convertProducerId} onValueChange={setConvertProducerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produtor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {producers?.map((producer: any) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name} - {producer.specialty}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex gap-2 pt-4">
             <Button 
               variant="outline" 
               onClick={() => {
                 setConvertDialogOpen(false);
                 setBudgetToConvert(null);
+                setConvertClientId("");
+                setConvertProducerId("");
               }}
               className="flex-1"
             >
-              Não
+              Cancelar
             </Button>
             <Button 
               onClick={handleConfirmConvert}
-              disabled={convertToOrderMutation.isPending}
+              disabled={convertToOrderMutation.isPending || !convertClientId || !convertProducerId}
               className="flex-1"
             >
-              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Sim'}
+              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter e Enviar'}
             </Button>
           </div>
         </DialogContent>

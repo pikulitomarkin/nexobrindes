@@ -124,8 +124,11 @@ export const products = pgTable("products", {
 export const budgets = pgTable("budgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   budgetNumber: text("budget_number").notNull().unique(),
-  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  clientId: varchar("client_id").references(() => clients.id), // Opcional - só obrigatório na conversão para pedido
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  contactName: text("contact_name").notNull(), // Nome de contato obrigatório
+  contactPhone: text("contact_phone"), // Telefone de contato opcional
+  contactEmail: text("contact_email"), // Email de contato opcional
   title: text("title").notNull(),
   description: text("description"),
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
