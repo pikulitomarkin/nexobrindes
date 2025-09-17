@@ -89,7 +89,11 @@ export default function VendorBudgets() {
     installments: 1,
     downPayment: 0,
     remainingAmount: 0,
-    shippingCost: 0
+    shippingCost: 0,
+    hasDiscount: false,
+    discountType: "percentage",
+    discountPercentage: 0,
+    discountValue: 0
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -169,7 +173,10 @@ export default function VendorBudgets() {
       hasItemCustomization: false,
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
-      customizationPhoto: ""
+      customizationPhoto: "",
+      productWidth: "",
+      productHeight: "",
+      productDepth: ""
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -205,11 +212,23 @@ export default function VendorBudgets() {
   };
 
   const calculateBudgetTotal = () => {
-    return vendorBudgetForm.items.reduce((total, item) => {
+    const subtotal = vendorBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
       const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
       return total + basePrice + customizationValue;
     }, 0);
+
+    // Apply discount
+    if (vendorBudgetForm.hasDiscount) {
+      if (vendorBudgetForm.discountType === 'percentage') {
+        const discountAmount = (subtotal * vendorBudgetForm.discountPercentage) / 100;
+        return Math.max(0, subtotal - discountAmount);
+      } else if (vendorBudgetForm.discountType === 'value') {
+        return Math.max(0, subtotal - vendorBudgetForm.discountValue);
+      }
+    }
+
+    return subtotal;
   };
 
   const calculateItemTotal = (item: any) => {
@@ -234,7 +253,11 @@ export default function VendorBudgets() {
       installments: 1,
       downPayment: 0,
       remainingAmount: 0,
-      shippingCost: 0
+      shippingCost: 0,
+      hasDiscount: false,
+      discountType: "percentage",
+      discountPercentage: 0,
+      discountValue: 0
     });
     setIsEditMode(false);
     setEditingBudgetId(null);
@@ -437,14 +460,21 @@ export default function VendorBudgets() {
         hasItemCustomization: item.hasItemCustomization,
         itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
         itemCustomizationDescription: item.itemCustomizationDescription || "",
-        customizationPhoto: item.customizationPhoto || ""
+        customizationPhoto: item.customizationPhoto || "",
+        productWidth: item.productWidth || "",
+        productHeight: item.productHeight || "",
+        productDepth: item.productDepth || ""
       })),
       paymentMethodId: budget.paymentMethodId || "",
       shippingMethodId: budget.shippingMethodId || "",
       installments: budget.installments || 1,
       downPayment: budget.downPayment || 0,
       remainingAmount: budget.remainingAmount || 0,
-      shippingCost: budget.shippingCost || 0
+      shippingCost: budget.shippingCost || 0,
+      hasDiscount: budget.hasDiscount || false,
+      discountType: budget.discountType || "percentage",
+      discountPercentage: parseFloat(budget.discountPercentage || 0),
+      discountValue: parseFloat(budget.discountValue || 0)
     });
     
     setIsEditMode(true);
@@ -693,6 +723,46 @@ export default function VendorBudgets() {
                               id={`subtotal-${index}`}
                               value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                               disabled
+                            />
+                          </div>
+                        </div>
+
+                        {/* Product Size Fields */}
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`width-${index}`}>Largura (cm)</Label>
+                            <Input
+                              id={`width-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productWidth}
+                              onChange={(e) => updateBudgetItem(index, 'productWidth', e.target.value)}
+                              placeholder="Ex: 150.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`height-${index}`}>Altura (cm)</Label>
+                            <Input
+                              id={`height-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productHeight}
+                              onChange={(e) => updateBudgetItem(index, 'productHeight', e.target.value)}
+                              placeholder="Ex: 80.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`depth-${index}`}>Profundidade (cm)</Label>
+                            <Input
+                              id={`depth-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productDepth}
+                              onChange={(e) => updateBudgetItem(index, 'productDepth', e.target.value)}
+                              placeholder="Ex: 60.0"
                             />
                           </div>
                         </div>
@@ -1006,13 +1076,121 @@ export default function VendorBudgets() {
                 )}
               </div>
 
+              {/* Discount Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="has-discount"
+                    checked={vendorBudgetForm.hasDiscount}
+                    onCheckedChange={(checked) => setVendorBudgetForm({ ...vendorBudgetForm, hasDiscount: checked })}
+                  />
+                  <Label htmlFor="has-discount" className="flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Aplicar Desconto
+                  </Label>
+                </div>
+
+                {vendorBudgetForm.hasDiscount && (
+                  <div className="bg-orange-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label htmlFor="discount-type">Tipo de Desconto</Label>
+                        <Select value={vendorBudgetForm.discountType} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, discountType: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                            <SelectItem value="value">Valor Fixo (R$)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {vendorBudgetForm.discountType === 'percentage' ? (
+                        <div>
+                          <Label htmlFor="discount-percentage">Desconto (%)</Label>
+                          <Input
+                            id="discount-percentage"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={vendorBudgetForm.discountPercentage}
+                            onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, discountPercentage: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 10.50"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <Label htmlFor="discount-value">Desconto (R$)</Label>
+                          <Input
+                            id="discount-value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={vendorBudgetForm.discountValue}
+                            onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, discountValue: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 150.00"
+                          />
+                        </div>
+                      )}
+                      
+                      <div>
+                        <Label>Valor do Desconto</Label>
+                        <p className="text-lg font-semibold text-orange-600 mt-2">
+                          R$ {(() => {
+                            const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
+                              const basePrice = item.unitPrice * item.quantity;
+                              const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
+                              return total + basePrice + customizationValue;
+                            }, 0);
+                            
+                            if (vendorBudgetForm.discountType === 'percentage') {
+                              return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            } else {
+                              return vendorBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal dos Produtos:</span>
-                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {(() => {
+                      const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
+                        const basePrice = item.unitPrice * item.quantity;
+                        const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
+                        return total + basePrice + customizationValue;
+                      }, 0);
+                      return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    })()}</span>
                   </div>
+                  {vendorBudgetForm.hasDiscount && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Desconto:</span>
+                      <span>- R$ {(() => {
+                        const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
+                          const basePrice = item.unitPrice * item.quantity;
+                          const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
+                          return total + basePrice + customizationValue;
+                        }, 0);
+                        
+                        if (vendorBudgetForm.discountType === 'percentage') {
+                          return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        } else {
+                          return vendorBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        }
+                      })()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>R$ {(vendorBudgetForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
@@ -1412,6 +1590,33 @@ export default function VendorBudgets() {
                         </div>
                       </div>
                       
+                      {/* Product Size Information */}
+                      {(item.productWidth || item.productHeight || item.productDepth) && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded">
+                          <Label className="text-sm font-medium">Dimensões (cm)</Label>
+                          <div className="grid grid-cols-3 gap-4 mt-2">
+                            {item.productWidth && (
+                              <div>
+                                <span className="text-xs text-gray-500">Largura:</span>
+                                <p className="font-medium">{item.productWidth} cm</p>
+                              </div>
+                            )}
+                            {item.productHeight && (
+                              <div>
+                                <span className="text-xs text-gray-500">Altura:</span>
+                                <p className="font-medium">{item.productHeight} cm</p>
+                              </div>
+                            )}
+                            {item.productDepth && (
+                              <div>
+                                <span className="text-xs text-gray-500">Profundidade:</span>
+                                <p className="font-medium">{item.productDepth} cm</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       {item.hasItemCustomization && (
                         <div className="mt-3 p-3 bg-blue-50 rounded">
                           <div className="grid grid-cols-2 gap-4">
@@ -1436,6 +1641,28 @@ export default function VendorBudgets() {
                   ))}
                 </div>
               </div>
+
+              {/* Discount Details */}
+              {budgetToView.hasDiscount && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Desconto Aplicado</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-medium">Tipo de Desconto</Label>
+                      <p>{budgetToView.discountType === 'percentage' ? 'Porcentagem' : 'Valor Fixo'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Valor do Desconto</Label>
+                      <p className="text-orange-600 font-semibold">
+                        {budgetToView.discountType === 'percentage' 
+                          ? `${budgetToView.discountPercentage}%`
+                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Customization Details */}
               {budgetToView.hasCustomization && (

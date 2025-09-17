@@ -34,7 +34,11 @@ export default function AdminBudgets() {
     vendorId: "",
     validUntil: "",
     items: [] as any[],
-    photos: [] as string[]
+    photos: [] as string[],
+    hasDiscount: false,
+    discountType: "percentage",
+    discountPercentage: 0,
+    discountValue: 0
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -88,7 +92,10 @@ export default function AdminBudgets() {
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
       itemCustomizationValue: 0,
-      itemCustomizationDescription: ""
+      itemCustomizationDescription: "",
+      productWidth: "",
+      productHeight: "",
+      productDepth: ""
     };
     setAdminBudgetForm(prev => ({
       ...prev,
@@ -124,11 +131,23 @@ export default function AdminBudgets() {
   };
 
   const calculateAdminBudgetTotal = () => {
-    return adminBudgetForm.items.reduce((total, item) => {
+    const subtotal = adminBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
       const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
       return total + basePrice + customizationValue;
     }, 0);
+
+    // Apply discount
+    if (adminBudgetForm.hasDiscount) {
+      if (adminBudgetForm.discountType === 'percentage') {
+        const discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
+        return Math.max(0, subtotal - discountAmount);
+      } else if (adminBudgetForm.discountType === 'value') {
+        return Math.max(0, subtotal - adminBudgetForm.discountValue);
+      }
+    }
+
+    return subtotal;
   };
 
   const calculateAdminItemTotal = (item: any) => {
@@ -148,7 +167,11 @@ export default function AdminBudgets() {
       vendorId: "",
       validUntil: "",
       items: [],
-      photos: []
+      photos: [],
+      hasDiscount: false,
+      discountType: "percentage",
+      discountPercentage: 0,
+      discountValue: 0
     });
   };
 
@@ -526,6 +549,46 @@ export default function AdminBudgets() {
                           </div>
                         </div>
 
+                        {/* Product Size Fields */}
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`admin-width-${index}`}>Largura (cm)</Label>
+                            <Input
+                              id={`admin-width-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productWidth}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productWidth', e.target.value)}
+                              placeholder="Ex: 150.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-height-${index}`}>Altura (cm)</Label>
+                            <Input
+                              id={`admin-height-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productHeight}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productHeight', e.target.value)}
+                              placeholder="Ex: 80.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`admin-depth-${index}`}>Profundidade (cm)</Label>
+                            <Input
+                              id={`admin-depth-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productDepth}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productDepth', e.target.value)}
+                              placeholder="Ex: 60.0"
+                            />
+                          </div>
+                        </div>
+
                         <div className="flex items-center space-x-2 mb-3">
                           <Switch
                             id={`admin-item-customization-${index}`}
@@ -659,13 +722,128 @@ export default function AdminBudgets() {
                 </Card>
               </div>
 
+              {/* Discount Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="admin-has-discount"
+                    checked={adminBudgetForm.hasDiscount}
+                    onCheckedChange={(checked) => setAdminBudgetForm({ ...adminBudgetForm, hasDiscount: checked })}
+                  />
+                  <Label htmlFor="admin-has-discount" className="flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Aplicar Desconto
+                  </Label>
+                </div>
+
+                {adminBudgetForm.hasDiscount && (
+                  <div className="bg-orange-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label htmlFor="admin-discount-type">Tipo de Desconto</Label>
+                        <Select value={adminBudgetForm.discountType} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, discountType: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                            <SelectItem value="value">Valor Fixo (R$)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {adminBudgetForm.discountType === 'percentage' ? (
+                        <div>
+                          <Label htmlFor="admin-discount-percentage">Desconto (%)</Label>
+                          <Input
+                            id="admin-discount-percentage"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={adminBudgetForm.discountPercentage}
+                            onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, discountPercentage: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 10.50"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <Label htmlFor="admin-discount-value">Desconto (R$)</Label>
+                          <Input
+                            id="admin-discount-value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={adminBudgetForm.discountValue}
+                            onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, discountValue: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 150.00"
+                          />
+                        </div>
+                      )}
+                      
+                      <div>
+                        <Label>Valor do Desconto</Label>
+                        <p className="text-lg font-semibold text-orange-600 mt-2">
+                          R$ {(() => {
+                            const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
+                              const basePrice = item.unitPrice * item.quantity;
+                              const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+                              return total + basePrice + customizationValue;
+                            }, 0);
+                            
+                            if (adminBudgetForm.discountType === 'percentage') {
+                              return ((itemsSubtotal * adminBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            } else {
+                              return adminBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Total do Orçamento:</span>
-                  <span className="text-blue-600">
-                    R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal dos Produtos:</span>
+                    <span>R$ {(() => {
+                      const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
+                        const basePrice = item.unitPrice * item.quantity;
+                        const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+                        return total + basePrice + customizationValue;
+                      }, 0);
+                      return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    })()}</span>
+                  </div>
+                  {adminBudgetForm.hasDiscount && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Desconto:</span>
+                      <span>- R$ {(() => {
+                        const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
+                          const basePrice = item.unitPrice * item.quantity;
+                          const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+                          return total + basePrice + customizationValue;
+                        }, 0);
+                        
+                        if (adminBudgetForm.discountType === 'percentage') {
+                          return ((itemsSubtotal * adminBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        } else {
+                          return adminBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        }
+                      })()}</span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Total do Orçamento:</span>
+                    <span className="text-blue-600">
+                      R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
               </div>
 

@@ -14,6 +14,10 @@ export interface BudgetPDFData {
     hasCustomization: boolean;
     customizationPercentage?: string;
     customizationDescription?: string;
+    hasDiscount?: boolean;
+    discountType?: string;
+    discountPercentage?: string;
+    discountValue?: string;
     createdAt: string;
     photos?: string[];
     paymentMethodId?: string;
@@ -34,6 +38,9 @@ export interface BudgetPDFData {
     itemCustomizationDescription?: string;
     itemCustomizationValue?: string;
     customizationPhoto?: string;
+    productWidth?: string;
+    productHeight?: string;
+    productDepth?: string;
     product: {
       name: string;
       description?: string;
@@ -223,6 +230,25 @@ export class PDFGenerator {
 
       this.currentY += baseRowHeight;
 
+      // Add product dimensions if exists
+      if (item.productWidth || item.productHeight || item.productDepth) {
+        this.doc.setFontSize(8);
+        this.doc.setTextColor(100, 100, 100);
+        
+        let dimensionsText = '  Dimensões: ';
+        const dimensions = [];
+        if (item.productWidth) dimensions.push(`L: ${item.productWidth}cm`);
+        if (item.productHeight) dimensions.push(`A: ${item.productHeight}cm`);
+        if (item.productDepth) dimensions.push(`P: ${item.productDepth}cm`);
+        dimensionsText += dimensions.join(' × ');
+        
+        this.doc.text(dimensionsText, startX + 2, this.currentY);
+        this.currentY += 8;
+        
+        this.doc.setFontSize(10);
+        this.doc.setTextColor(0, 0, 0);
+      }
+
       // Add customization info if exists
       if (hasCustomization) {
         this.doc.setFontSize(8);
@@ -243,18 +269,49 @@ export class PDFGenerator {
   }
 
   private addTotal(data: BudgetPDFData): void {
-    this.addNewPageIfNeeded(30);
+    this.addNewPageIfNeeded(60);
+
+    // Calculate subtotal
+    const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
 
     // Draw total section
+    const sectionHeight = data.budget.hasDiscount ? 40 : 20;
     this.doc.setFillColor(240, 240, 240);
-    this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, 20, 'F');
+    this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, sectionHeight, 'F');
 
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'normal');
+    
+    // Subtotal
+    this.doc.text('Subtotal:', this.pageWidth - this.margin - 95, this.currentY + 5);
+    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 10);
+
+    // Discount if exists
+    if (data.budget.hasDiscount) {
+      this.doc.setTextColor(255, 100, 0); // Orange color for discount
+      this.doc.text('Desconto:', this.pageWidth - this.margin - 95, this.currentY + 15);
+      
+      let discountText = '';
+      if (data.budget.discountType === 'percentage') {
+        const discountAmount = (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100;
+        discountText = `- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${data.budget.discountPercentage}%)`;
+      } else {
+        discountText = `- R$ ${parseFloat(data.budget.discountValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      }
+      
+      this.doc.text(discountText, this.pageWidth - this.margin - 95, this.currentY + 20);
+      this.doc.setTextColor(0, 0, 0); // Reset to black
+      
+      this.currentY += 10; // Extra space for discount
+    }
+
+    // Total
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('TOTAL GERAL:', this.pageWidth - this.margin - 95, this.currentY + 5);
-    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 15);
+    this.doc.text('TOTAL GERAL:', this.pageWidth - this.margin - 95, this.currentY + 15);
+    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 25);
 
-    this.currentY += 30;
+    this.currentY += 40;
   }
 
   private addPaymentShippingInfo(data: BudgetPDFData): void {

@@ -943,6 +943,10 @@ export class MemStorage implements IStorage {
       customizationPercentage: budgetData.customizationPercentage || '0.00',
       customizationValue: budgetData.customizationValue || '0.00',
       customizationDescription: budgetData.customizationDescription || '',
+      hasDiscount: budgetData.hasDiscount || false,
+      discountType: budgetData.discountType || 'percentage',
+      discountPercentage: budgetData.discountPercentage || '0.00',
+      discountValue: budgetData.discountValue || '0.00',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -1016,7 +1020,10 @@ export class MemStorage implements IStorage {
       hasItemCustomization: itemData.hasItemCustomization || false,
       itemCustomizationValue: itemData.itemCustomizationValue || '0.00',
       itemCustomizationDescription: itemData.itemCustomizationDescription || '',
-      customizationPhoto: itemData.customizationPhoto || ''
+      customizationPhoto: itemData.customizationPhoto || '',
+      productWidth: itemData.productWidth || null,
+      productHeight: itemData.productHeight || null,
+      productDepth: itemData.productDepth || null
     };
     this.budgetItems.push(newItem);
 
@@ -1224,8 +1231,19 @@ export class MemStorage implements IStorage {
       return sum + basePrice;
     }, 0);
 
+    // Apply discount if exists
+    let finalTotal = subtotal;
+    if (budget.hasDiscount) {
+      if (budget.discountType === 'percentage') {
+        const discountAmount = (subtotal * parseFloat(budget.discountPercentage || '0')) / 100;
+        finalTotal = subtotal - discountAmount;
+      } else if (budget.discountType === 'value') {
+        finalTotal = subtotal - parseFloat(budget.discountValue || '0');
+      }
+    }
+
     await this.updateBudget(budgetId, {
-      totalValue: subtotal.toFixed(2)
+      totalValue: Math.max(0, finalTotal).toFixed(2) // Ensure total is not negative
     });
   }
 
