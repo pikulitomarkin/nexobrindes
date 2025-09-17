@@ -508,7 +508,237 @@ export default function AdminOrders() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Order Details Modal */}
+        <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detalhes do Pedido</DialogTitle>
+              <DialogDescription>
+                Informações completas do pedido e status de produção
+              </DialogDescription>
+            </DialogHeader>
+            <OrderDetailsContent 
+              orderId={selectedOrderId} 
+              onClose={() => setShowOrderDetails(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
+    </div>
+  );
+}
+
+// Order Details Component
+function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
+  const { data: order, isLoading: orderLoading } = useQuery({
+    queryKey: ["/api/orders", orderId],
+    enabled: !!orderId,
+  });
+
+  const { data: productionOrders, isLoading: productionLoading } = useQuery({
+    queryKey: ["/api/production-orders/order", orderId],
+    enabled: !!orderId,
+  });
+
+  const { toast } = useToast();
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await fetch(`/api/orders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...order, status }),
+      });
+      if (!response.ok) throw new Error("Failed to update order status");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Sucesso", description: "Status do pedido atualizado!" });
+    },
+  });
+
+  if (orderLoading || productionLoading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-500">Pedido não encontrado</p>
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusClasses = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800", 
+      production: "bg-purple-100 text-purple-800",
+      shipped: "bg-orange-100 text-orange-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+
+    const statusLabels = {
+      pending: "Aguardando",
+      confirmed: "Confirmado",
+      production: "Em Produção", 
+      shipped: "Enviado",
+      delivered: "Entregue",
+      cancelled: "Cancelado",
+    };
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusClasses[status as keyof typeof statusClasses]}`}>
+        {statusLabels[status as keyof typeof statusLabels]}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Order Information */}
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
+              <p className="text-lg font-bold">{order.orderNumber}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Cliente</label>
+              <p>{order.clientName}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Vendedor</label>
+              <p>{order.vendorName}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Produto</label>
+              <p>{order.product}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Descrição</label>
+              <p className="text-gray-700">{order.description}</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Status e Valores</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-500">Status Atual</label>
+              <div className="flex items-center justify-between">
+                {getStatusBadge(order.status)}
+                <Select
+                  value={order.status}
+                  onValueChange={(newStatus) => updateOrderStatusMutation.mutate({ id: order.id, status: newStatus })}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Alterar status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Aguardando</SelectItem>
+                    <SelectItem value="confirmed">Confirmado</SelectItem>
+                    <SelectItem value="production">Em Produção</SelectItem>
+                    <SelectItem value="shipped">Enviado</SelectItem>
+                    <SelectItem value="delivered">Entregue</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Valor Total</label>
+              <p className="text-2xl font-bold text-green-600">
+                R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Valor Pago</label>
+              <p className="text-lg">
+                R$ {parseFloat(order.paidValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Prazo de Entrega</label>
+              <p>{order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Data de Criação</label>
+              <p>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Production Orders */}
+      {productionOrders && productionOrders.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Status de Produção</h3>
+          <div className="space-y-4">
+            {productionOrders.map((po: any) => (
+              <Card key={po.id} className={po.hasUnreadNotes ? "border-red-300 bg-red-50" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Produtor: {po.producerName}</span>
+                      {po.hasUnreadNotes && (
+                        <div className="flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                          <span className="text-red-600 text-sm font-medium">Nova observação</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(po.status)}
+                    </div>
+                  </div>
+                  
+                  {po.notes && (
+                    <div className="mt-3 p-3 bg-gray-100 rounded-lg">
+                      <label className="text-sm font-medium text-gray-600">Observações do Produtor:</label>
+                      <p className="text-gray-800 mt-1">{po.notes}</p>
+                      {po.lastNoteAt && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Última atualização: {new Date(po.lastNoteAt).toLocaleString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-4 mt-3 text-sm">
+                    <div>
+                      <label className="text-gray-500">Aceito em:</label>
+                      <p>{po.acceptedAt ? new Date(po.acceptedAt).toLocaleDateString('pt-BR') : 'Pendente'}</p>
+                    </div>
+                    <div>
+                      <label className="text-gray-500">Prazo:</label>
+                      <p>{po.deadline ? new Date(po.deadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                    </div>
+                    <div>
+                      <label className="text-gray-500">Finalizado em:</label>
+                      <p>{po.completedAt ? new Date(po.completedAt).toLocaleDateString('pt-BR') : 'Em andamento'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
