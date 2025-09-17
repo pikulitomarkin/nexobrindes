@@ -99,7 +99,7 @@ export const products = pgTable("products", {
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
   unit: text("unit").default('un'),
   isActive: boolean("is_active").default(true),
-  
+
   // Campos adicionais do JSON XBZ
   externalId: text("external_id"), // IdProduto
   externalCode: text("external_code"), // CodigoXbz
@@ -116,7 +116,7 @@ export const products = pgTable("products", {
   availableQuantity: integer("available_quantity"), // QuantidadeDisponivel
   stockStatus: text("stock_status"), // StatusConfiabilidade
   ncm: text("ncm"), // Ncm
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -134,19 +134,20 @@ export const budgets = pgTable("budgets", {
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default('draft'), // 'draft', 'sent', 'approved', 'rejected', 'converted'
   validUntil: timestamp("valid_until"),
-  
+  deliveryDeadline: timestamp("delivery_deadline"),
+
   // Campos para personalização
   hasCustomization: boolean("has_customization").default(false),
   customizationPercentage: decimal("customization_percentage", { precision: 5, scale: 2 }).default('0.00'),
   customizationValue: decimal("customization_value", { precision: 10, scale: 2 }).default('0.00'),
   customizationDescription: text("customization_description"),
-  
+
   // Campos para desconto
   hasDiscount: boolean("has_discount").default(false),
   discountType: text("discount_type").default('percentage'), // 'percentage' or 'value'
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default('0.00'),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -159,13 +160,13 @@ export const budgetItems = pgTable("budget_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   notes: text("notes"),
-  
+
   // Campos para personalização do item
   hasItemCustomization: boolean("has_item_customization").default(false),
   itemCustomizationValue: decimal("item_customization_value", { precision: 10, scale: 2 }).default('0.00'),
   itemCustomizationDescription: text("item_customization_description"),
   customizationPhoto: text("customization_photo"),
-  
+
   // Campos para tamanho do produto (em cm)
   productWidth: decimal("product_width", { precision: 8, scale: 2 }), // Largura em cm
   productHeight: decimal("product_height", { precision: 8, scale: 2 }), // Altura em cm

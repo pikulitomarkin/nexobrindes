@@ -82,6 +82,7 @@ export default function VendorBudgets() {
     contactEmail: "",
     vendorId: vendorId,
     validUntil: "",
+    deliveryDeadline: "",
     items: [] as any[],
     paymentMethodId: "",
     shippingMethodId: "",
@@ -254,6 +255,7 @@ export default function VendorBudgets() {
       contactEmail: "",
       vendorId: vendorId,
       validUntil: "",
+      deliveryDeadline: "",
       items: [],
       paymentMethodId: "",
       shippingMethodId: "",
@@ -458,6 +460,7 @@ export default function VendorBudgets() {
       contactEmail: budget.contactEmail || "",
       vendorId: budget.vendorId,
       validUntil: budget.validUntil || "",
+      deliveryDeadline: budget.deliveryDeadline || "",
       items: budget.items.map((item: any) => ({
         productId: item.productId,
         productName: item.productName,
@@ -604,7 +607,7 @@ export default function VendorBudgets() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleBudgetSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="budget-title">Título do Orçamento</Label>
                   <Input
@@ -621,6 +624,15 @@ export default function VendorBudgets() {
                     type="date"
                     value={vendorBudgetForm.validUntil}
                     onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, validUntil: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="budget-deliveryDeadline">Prazo de Entrega</Label>
+                  <Input
+                    id="budget-deliveryDeadline"
+                    type="date"
+                    value={vendorBudgetForm.deliveryDeadline || ""}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
                   />
                 </div>
               </div>
@@ -1518,6 +1530,10 @@ export default function VendorBudgets() {
                 <div>
                   <Label className="font-semibold">Válido Até</Label>
                   <p>{budgetToView.validUntil ? new Date(budgetToView.validUntil).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Prazo de Entrega</Label>
+                  <p>{budgetToView.deliveryDeadline ? new Date(budgetToView.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
                 </div>
                 <div>
                   <Label className="font-semibold">Valor Total</Label>

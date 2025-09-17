@@ -26,6 +26,7 @@ export interface BudgetPDFData {
     downPayment?: string;
     remainingAmount?: string;
     shippingCost?: string;
+    deliveryDeadline?: string; // Added deliveryDeadline
   };
   items: Array<{
     id: string;
@@ -104,6 +105,11 @@ export class PDFGenerator {
       this.currentY += 8;
       this.doc.text(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
     }
+    // Add delivery deadline if it exists
+    if (data.budget.deliveryDeadline) {
+      this.currentY += 8;
+      this.doc.text(`Prazo de entrega: ${new Date(data.budget.deliveryDeadline).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
+    }
 
     this.currentY += 20;
   }
@@ -131,7 +137,9 @@ export class PDFGenerator {
 
     // Vendor info
     const rightColumn = this.pageWidth / 2 + 10;
-    const vendorStartY = this.currentY - (data.client.email ? 14 : 8) - (data.client.phone ? 6 : 0);
+    // Adjust vendor starting Y based on client info height
+    let vendorStartY = this.currentY - (data.client.email ? 14 : 8) - (data.client.phone ? 6 : 0);
+    vendorStartY = Math.max(vendorStartY, this.currentY - 20); // Ensure it doesn't go above currentY
 
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('VENDEDOR:', rightColumn, vendorStartY);
@@ -234,17 +242,17 @@ export class PDFGenerator {
       if (item.productWidth || item.productHeight || item.productDepth) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        
+
         let dimensionsText = '  Dimensões: ';
         const dimensions = [];
         if (item.productWidth) dimensions.push(`L: ${item.productWidth}cm`);
         if (item.productHeight) dimensions.push(`A: ${item.productHeight}cm`);
         if (item.productDepth) dimensions.push(`P: ${item.productDepth}cm`);
         dimensionsText += dimensions.join(' × ');
-        
+
         this.doc.text(dimensionsText, startX + 2, this.currentY);
         this.currentY += 8;
-        
+
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
@@ -253,11 +261,11 @@ export class PDFGenerator {
       if (hasCustomization) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        
+
         this.doc.text(`  + Personalização: ${item.itemCustomizationDescription}`, startX + 2, this.currentY);
         this.doc.text(`    Valor: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY + 5);
         this.currentY += 10;
-        
+
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
@@ -281,7 +289,7 @@ export class PDFGenerator {
 
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
-    
+
     // Subtotal
     this.doc.text('Subtotal:', this.pageWidth - this.margin - 95, this.currentY + 5);
     this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 10);
@@ -290,7 +298,7 @@ export class PDFGenerator {
     if (data.budget.hasDiscount) {
       this.doc.setTextColor(255, 100, 0); // Orange color for discount
       this.doc.text('Desconto:', this.pageWidth - this.margin - 95, this.currentY + 15);
-      
+
       let discountText = '';
       if (data.budget.discountType === 'percentage') {
         const discountAmount = (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100;
@@ -298,10 +306,10 @@ export class PDFGenerator {
       } else {
         discountText = `- R$ ${parseFloat(data.budget.discountValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       }
-      
+
       this.doc.text(discountText, this.pageWidth - this.margin - 95, this.currentY + 20);
       this.doc.setTextColor(0, 0, 0); // Reset to black
-      
+
       this.currentY += 10; // Extra space for discount
     }
 
@@ -390,7 +398,7 @@ export class PDFGenerator {
   private async addProductCustomizationImages(data: BudgetPDFData): Promise<void> {
     // Filter items that have customization photos
     const itemsWithPhotos = data.items.filter(item => item.customizationPhoto);
-    
+
     if (itemsWithPhotos.length === 0) return;
 
     this.addNewPageIfNeeded(60);
@@ -403,7 +411,7 @@ export class PDFGenerator {
     // Add images for each product
     for (let i = 0; i < itemsWithPhotos.length; i++) {
       const item = itemsWithPhotos[i];
-      
+
       try {
         let imageUrl = item.customizationPhoto!;
 

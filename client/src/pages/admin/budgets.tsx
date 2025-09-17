@@ -32,6 +32,7 @@ export default function AdminBudgets() {
     contactEmail: "",
     vendorId: "",
     validUntil: "",
+    deliveryDeadline: "",
     items: [] as any[],
     photos: [] as string[],
     hasDiscount: false,
@@ -172,6 +173,7 @@ export default function AdminBudgets() {
       contactEmail: "",
       vendorId: "",
       validUntil: "",
+      deliveryDeadline: "",
       items: [],
       photos: [],
       hasDiscount: false,
@@ -411,7 +413,7 @@ export default function AdminBudgets() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAdminBudgetSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="admin-budget-title">Título do Orçamento</Label>
                   <Input
@@ -428,6 +430,15 @@ export default function AdminBudgets() {
                     type="date"
                     value={adminBudgetForm.validUntil}
                     onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, validUntil: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="admin-budget-deliveryDeadline">Prazo de Entrega</Label>
+                  <Input
+                    id="admin-budget-deliveryDeadline"
+                    type="date"
+                    value={adminBudgetForm.deliveryDeadline || ""}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
                   />
                 </div>
               </div>
