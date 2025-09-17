@@ -87,14 +87,44 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
         <nav className="mt-8">
           <div className="px-6 mb-4">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Configurações
+              Gestão
             </p>
           </div>
           <SidebarItem 
-            icon={Settings} 
-            label="Configurações Gerais" 
-            href="/admin/settings"
-            isActive={location === "/admin/settings"}
+            icon={ShoppingCart} 
+            label="Pedidos" 
+            href="/admin/orders"
+            isActive={location === "/admin/orders"}
+          />
+          <SidebarItem 
+            icon={Users} 
+            label="Clientes" 
+            href="/admin/clients"
+            isActive={location === "/admin/clients"}
+          />
+          <SidebarItem 
+            icon={Package} 
+            label="Produtos" 
+            href="/admin/products"
+            isActive={location === "/admin/products"}
+          />
+          <SidebarItem 
+            icon={FileText} 
+            label="Orçamentos" 
+            href="/admin/budgets"
+            isActive={location === "/admin/budgets"}
+          />
+          <SidebarItem 
+            icon={Factory} 
+            label="Produtores" 
+            href="/admin/producers"
+            isActive={location === "/admin/producers"}
+          />
+          <SidebarItem 
+            icon={UserCheck} 
+            label="Vendedores" 
+            href="/admin/vendors"
+            isActive={location === "/admin/vendors"}
           />
           
           <div className="px-6 mb-4 mt-6">
@@ -103,7 +133,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             </p>
           </div>
           <SidebarItem 
-            icon={DollarSign} 
+            icon={Calculator} 
             label="Gerenciar Comissões" 
             href="/admin/commission-management"
             isActive={location === "/admin/commission-management"}
@@ -113,7 +143,25 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             label="Configuração de Comissões" 
             href="/admin/commission-settings"
             isActive={location === "/admin/commission-settings"}
-          /></SidebarItem>
+          />
+          
+          <div className="px-6 mb-4 mt-6">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Configurações
+            </p>
+          </div>
+          <SidebarItem 
+            icon={Settings} 
+            label="Configurações Gerais" 
+            href="/admin/settings"
+            isActive={location === "/admin/settings"}
+          />
+          <SidebarItem 
+            icon={TrendingUp} 
+            label="Financeiro" 
+            href="/admin/finance"
+            isActive={location === "/admin/finance"}
+          />
         </nav>
       )}
 
