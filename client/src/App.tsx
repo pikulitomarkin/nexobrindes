@@ -59,8 +59,8 @@ function Router() {
         <Route path="/admin/producers" component={AdminProducers} />
         <Route path="/admin/finance" component={AdminFinance} />
         <Route path="/admin/settings" component={AdminSettings} />
-        <Route path="/admin/commission-settings" element={<CommissionSettings />} />
-          <Route path="/admin/commission-management" element={<CommissionManagement />} />
+        <Route path="/admin/commission-settings" component={AdminCommissionSettings} />
+        <Route path="/admin/commission-management" component={AdminCommissionManagement} />
 
 
         {/* Vendor Routes */}
