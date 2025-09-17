@@ -1697,7 +1697,7 @@ Para mais detalhes, entre em contato conosco!`;
           status: 'shipped',
           title: 'Enviado',
           description: 'Produto foi enviado para o cliente',
-          date: productionOrder?.status === 'shipped' ? productionOrder?.updatedAt : null,
+          date: productionOrder?.status === 'shipped' ? productionOrder?.completedAt : null,
           completed: productionOrder && ['shipped', 'completed'].includes(productionOrder.status),
           icon: 'truck'
         },

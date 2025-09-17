@@ -72,12 +72,12 @@ function Router() {
 
         {/* Client Routes */}
         <Route path="/client/orders" component={ClientOrders} />
-        <Route path="/client/order/:id/timeline" element={<ClientOrderTimeline />} />
+        <Route path="/client/order/:id/timeline" component={ClientOrderTimeline} />
 
         {/* Producer Routes */}
         <Route path="/producer/production-dashboard" component={ProductionDashboard} />
         <Route path="/producer/orders" component={ProducerOrders} />
-        <Route path="/producer/order/:id" element={<ProducerOrderDetails />} />
+        <Route path="/producer/order/:id" component={ProducerOrderDetails} />
         <Route path="/producer/profile-settings" component={ProducerProfileSettings} />
 
         {/* Finance Routes */}
