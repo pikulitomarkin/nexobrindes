@@ -77,12 +77,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             budgetPhotos = photos.map(photo => photo.imageUrl);
           }
 
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            hasUnreadNotes = productionOrders.some(po => po.hasUnreadNotes);
+          }
+
           return {
             ...order,
             clientName: client?.name || 'Unknown',
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
-            budgetPhotos: budgetPhotos
+            budgetPhotos: budgetPhotos,
+            hasUnreadNotes: hasUnreadNotes
           };
         })
       );
@@ -1454,6 +1462,24 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error updating production order status:", error);
       res.status(500).json({ error: "Failed to update production order status" });
+    }
+  });
+
+  // Mark production order notes as read
+  app.patch("/api/production-orders/:id/acknowledge", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const po = await storage.getProductionOrder(id);
+      if (po) {
+        await storage.updateProductionOrderNotes(id, po.notes || '', false);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Production order not found" });
+      }
+    } catch (error) {
+      console.error("Error acknowledging production order notes:", error);
+      res.status(500).json({ error: "Failed to acknowledge production order notes" });
     }
   });
 

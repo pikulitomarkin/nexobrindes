@@ -758,11 +758,29 @@ export class MemStorage implements IStorage {
     if (productionOrder) {
       const updatedPO = {
         ...productionOrder,
-        status,
+        status: status === 'unchanged' ? productionOrder.status : status,
         notes: notes || productionOrder.notes,
+        hasUnreadNotes: notes ? true : productionOrder.hasUnreadNotes,
+        lastNoteAt: notes ? new Date() : productionOrder.lastNoteAt,
         acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date() : (typeof productionOrder.acceptedAt === 'string' ? new Date(productionOrder.acceptedAt) : productionOrder.acceptedAt),
         completedAt: (status === 'completed' || status === 'ready') && !productionOrder.completedAt ? new Date() : (typeof productionOrder.completedAt === 'string' ? new Date(productionOrder.completedAt) : productionOrder.completedAt),
-        deadline: deliveryDate ? new Date(deliveryDate) : (typeof productionOrder.deadline === 'string' ? new Date(productionOrder.deadline) : productionOrder.deadline)
+        deadline: deliveryDate ? new Date(deliveryDate) : (typeof productionOrder.deadline === 'string' ? new Date(productionOrder.deadline) : productionOrder.deadline),
+        deliveryDeadline: deliveryDate ? new Date(deliveryDate) : productionOrder.deliveryDeadline
+      };
+      this.productionOrders.set(id, updatedPO);
+      return updatedPO;
+    }
+    return undefined;
+  }
+
+  async updateProductionOrderNotes(id: string, notes: string, hasUnreadNotes: boolean): Promise<ProductionOrder | undefined> {
+    const productionOrder = this.productionOrders.get(id);
+    if (productionOrder) {
+      const updatedPO = {
+        ...productionOrder,
+        notes,
+        hasUnreadNotes,
+        lastNoteAt: hasUnreadNotes ? new Date() : productionOrder.lastNoteAt
       };
       this.productionOrders.set(id, updatedPO);
       return updatedPO;

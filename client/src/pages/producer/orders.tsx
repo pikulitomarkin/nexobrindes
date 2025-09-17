@@ -13,7 +13,9 @@ import { queryClient } from "@/lib/queryClient";
 export default function ProducerOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDeadlineDialogOpen, setIsDeadlineDialogOpen] = useState(false);
   const [updateNotes, setUpdateNotes] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
   const { toast } = useToast();
 
   const producerId = "producer-1";
@@ -22,19 +24,22 @@ export default function ProducerOrders() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status, notes }: { orderId: string; status: string; notes: string }) => {
+    mutationFn: async ({ orderId, status, notes, deliveryDate }: { orderId: string; status: string; notes: string; deliveryDate?: string }) => {
       const response = await fetch(`/api/production-orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, notes }),
+        body: JSON.stringify({ status, notes, deliveryDate }),
       });
       if (!response.ok) throw new Error("Erro ao atualizar status");
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer", producerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] }); // Refresh main orders list
       setIsUpdateDialogOpen(false);
+      setIsDeadlineDialogOpen(false);
       setUpdateNotes("");
+      setNewDeadline("");
       toast({
         title: "Sucesso!",
         description: "Status atualizado com sucesso",
@@ -73,6 +78,18 @@ export default function ProducerOrders() {
     } else {
       updateStatusMutation.mutate({ orderId: order.id, status: newStatus, notes: "" });
     }
+  };
+
+  const handleUpdateDeadline = (order: any) => {
+    setSelectedOrder(order);
+    setNewDeadline(order.deadline ? new Date(order.deadline).toISOString().split('T')[0] : "");
+    setIsDeadlineDialogOpen(true);
+  };
+
+  const handleAddNotes = (order: any) => {
+    setSelectedOrder(order);
+    setUpdateNotes("");
+    setIsUpdateDialogOpen(true);
   };
 
   if (isLoading) {
@@ -174,6 +191,12 @@ export default function ProducerOrders() {
                       <Eye className="h-4 w-4 mr-1" />
                       Ver Detalhes
                     </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleUpdateDeadline(order)}>
+                      Alterar Prazo
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleAddNotes(order)}>
+                      Adicionar Observação
+                    </Button>
                     
                     {order.status === 'pending' && (
                       <>
@@ -229,17 +252,22 @@ export default function ProducerOrders() {
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Finalizar Ordem de Produção</DialogTitle>
+            <DialogTitle>
+              {selectedOrder?.status === 'completed' ? 'Finalizar Ordem de Produção' : 'Adicionar Observação'}
+            </DialogTitle>
             <DialogDescription>
-              Adicione observações sobre a conclusão da ordem
+              {selectedOrder?.status === 'completed' ? 
+                'Adicione observações sobre a conclusão da ordem' : 
+                'Adicione uma observação sobre o andamento da produção'
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="notes">Observações da Entrega</Label>
+              <Label htmlFor="notes">Observações</Label>
               <Textarea
                 id="notes"
-                placeholder="Descreva o produto finalizado, observações técnicas, etc."
+                placeholder="Descreva o andamento, observações técnicas, etc."
                 value={updateNotes}
                 onChange={(e) => setUpdateNotes(e.target.value)}
               />
@@ -250,14 +278,73 @@ export default function ProducerOrders() {
               </Button>
               <Button 
                 className="gradient-bg text-white"
-                onClick={() => updateStatusMutation.mutate({ 
-                  orderId: selectedOrder.id, 
-                  status: 'completed', 
-                  notes: updateNotes 
-                })}
+                onClick={() => {
+                  if (selectedOrder?.status === 'completed') {
+                    updateStatusMutation.mutate({ 
+                      orderId: selectedOrder.id, 
+                      status: 'completed', 
+                      notes: updateNotes 
+                    });
+                  } else {
+                    updateStatusMutation.mutate({ 
+                      orderId: selectedOrder.id, 
+                      status: selectedOrder.status, 
+                      notes: updateNotes 
+                    });
+                  }
+                }}
                 disabled={updateStatusMutation.isPending}
               >
-                {updateStatusMutation.isPending ? "Finalizando..." : "Finalizar Ordem"}
+                {updateStatusMutation.isPending ? "Salvando..." : "Salvar Observação"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deadline Dialog */}
+      <Dialog open={isDeadlineDialogOpen} onOpenChange={setIsDeadlineDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Prazo de Entrega</DialogTitle>
+            <DialogDescription>
+              Defina um novo prazo para a entrega deste pedido
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="deadline">Nova Data de Entrega</Label>
+              <Input
+                id="deadline"
+                type="date"
+                value={newDeadline}
+                onChange={(e) => setNewDeadline(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="deadline-notes">Motivo da Alteração (Opcional)</Label>
+              <Textarea
+                id="deadline-notes"
+                placeholder="Explique o motivo da alteração do prazo..."
+                value={updateNotes}
+                onChange={(e) => setUpdateNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsDeadlineDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                className="gradient-bg text-white"
+                onClick={() => updateStatusMutation.mutate({ 
+                  orderId: selectedOrder.id, 
+                  status: selectedOrder.status, 
+                  notes: updateNotes,
+                  deliveryDate: newDeadline
+                })}
+                disabled={updateStatusMutation.isPending || !newDeadline}
+              >
+                {updateStatusMutation.isPending ? "Salvando..." : "Alterar Prazo"}
               </Button>
             </div>
           </div>

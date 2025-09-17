@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash, Send, Package } from "lucide-react";
+import { Plus, Eye, Edit, Trash, Send, Package, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminOrders() {
@@ -114,6 +114,33 @@ export default function AdminOrders() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({ title: "Sucesso", description: "Pedido excluído com sucesso!" });
+    },
+  });
+
+  const acknowledgeNotesMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      // First get production orders for this order
+      const productionOrdersResponse = await fetch(`/api/production-orders/order/${orderId}`);
+      if (!productionOrdersResponse.ok) throw new Error("Failed to fetch production orders");
+      const productionOrders = await productionOrdersResponse.json();
+      
+      // Acknowledge notes for all production orders of this order
+      for (const po of productionOrders) {
+        if (po.hasUnreadNotes) {
+          const response = await fetch(`/api/production-orders/${po.id}/acknowledge`, {
+            method: "PATCH",
+          });
+          if (!response.ok) throw new Error("Failed to acknowledge notes");
+        }
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Sucesso", description: "Observações marcadas como lidas!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Erro ao marcar observações como lidas", variant: "destructive" });
     },
   });
 
@@ -318,7 +345,15 @@ export default function AdminOrders() {
                   {orders?.map((order: any) => (
                     <tr key={order.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {order.orderNumber}
+                        <div className="flex items-center gap-2">
+                          {order.orderNumber}
+                          {order.hasUnreadNotes && (
+                            <div className="relative">
+                              <AlertCircle className="h-4 w-4 text-red-500 animate-pulse" />
+                              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {order.clientName}
@@ -357,6 +392,18 @@ export default function AdminOrders() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          {order.hasUnreadNotes && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => acknowledgeNotesMutation.mutate(order.id)}
+                              disabled={acknowledgeNotesMutation.isPending}
+                              className="text-green-600 hover:text-green-800"
+                              title="Marcar observações como lidas"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          )}
                           {order.status === 'confirmed' && (
                             <Button
                               variant="ghost"
