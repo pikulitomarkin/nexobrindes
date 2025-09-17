@@ -103,16 +103,63 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             </p>
           </div>
           <SidebarItem 
+            icon={DollarSign} 
+            label="Gerenciar Comissões" 
+            href="/admin/commission-management"
+            isActive={location === "/admin/commission-management"}
+          />
+          <SidebarItem 
             icon={Settings} 
             label="Configuração de Comissões" 
             href="/admin/commission-settings"
             isActive={location === "/admin/commission-settings"}
+          /></SidebarItem>
+        </nav>
+      )}
+
+      {/* Vendor Panel Specific Links */}
+      {activePanel === "vendor" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Vendas
+            </p>
+          </div>
+          <SidebarItem 
+            icon={ShoppingCart} 
+            label="Pedidos" 
+            href="/vendor/orders"
+            isActive={location === "/vendor/orders"}
           />
           <SidebarItem 
-            icon={Calculator} 
-            label="Gestão de Comissões" 
-            href="/admin/commission-management"
-            isActive={location === "/admin/commission-management"}
+            icon={Users} 
+            label="Clientes" 
+            href="/vendor/clients"
+            isActive={location === "/vendor/clients"}
+          />
+          <SidebarItem 
+            icon={Package} 
+            label="Produtos" 
+            href="/vendor/products"
+            isActive={location === "/vendor/products"}
+          />
+          <SidebarItem 
+            icon={FileText} 
+            label="Orçamentos" 
+            href="/vendor/budgets"
+            isActive={location === "/vendor/budgets"}
+          />
+          
+          <div className="px-6 mb-4 mt-6">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Financeiro
+            </p>
+          </div>
+          <SidebarItem 
+            icon={DollarSign} 
+            label="Comissões" 
+            href="/vendor/commissions"
+            isActive={location === "/vendor/commissions"}
           />
         </nav>
       )}
