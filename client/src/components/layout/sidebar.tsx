@@ -90,22 +90,30 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Configurações
             </p>
           </div>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/admin/commission-management">
-                <Calculator className="h-4 w-4" />
-                Gestão de Comissões
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/admin/commission-settings">
-                <Settings className="h-4 w-4" />
-                Configuração de Comissões
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <SidebarItem 
+            icon={Settings} 
+            label="Configurações Gerais" 
+            href="/admin/settings"
+            isActive={location === "/admin/settings"}
+          />
+          
+          <div className="px-6 mb-4 mt-6">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Comissões
+            </p>
+          </div>
+          <SidebarItem 
+            icon={Settings} 
+            label="Configuração de Comissões" 
+            href="/admin/commission-settings"
+            isActive={location === "/admin/commission-settings"}
+          />
+          <SidebarItem 
+            icon={Calculator} 
+            label="Gestão de Comissões" 
+            href="/admin/commission-management"
+            isActive={location === "/admin/commission-management"}
+          />
         </nav>
       )}
 
