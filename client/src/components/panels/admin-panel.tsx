@@ -187,6 +187,29 @@ export default function AdminPanel() {
             </Link>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <DollarSign className="h-5 w-5 mr-2" />
+              Sistema de Comissões
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/commission-settings">
+              <Button variant="outline" className="w-full justify-start">
+                <Settings className="h-4 w-4 mr-2" />
+                Configuração de Comissões
+              </Button>
+            </Link>
+            <Link href="/admin/commission-management">
+              <Button variant="outline" className="w-full justify-start">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Gestão de Comissões
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Orders Table */}
