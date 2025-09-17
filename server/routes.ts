@@ -1420,45 +1420,24 @@ Para mais detalhes, entre em contato conosco!`;
     const { status, notes, deliveryDate } = req.body;
 
     try {
-      const updateData: any = { status };
-
-      if (notes) {
-        updateData.notes = notes;
-        updateData.hasUnreadNotes = true;
-        updateData.lastNoteAt = new Date();
+      // Use storage instead of db.update
+      const result = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Production order not found" });
       }
-
-      if (deliveryDate) {
-        updateData.deliveryDate = new Date(deliveryDate);
-        updateData.deliveryDeadline = new Date(deliveryDate);
-      }
-
-      if (status === 'accepted') {
-        updateData.acceptedAt = new Date();
-      } else if (status === 'completed') {
-        updateData.completedAt = new Date();
-      }
-
-      await db.update(productionOrders)
-        .set(updateData)
-        .where(eq(productionOrders.id, id));
 
       // Also update the main order status if needed
       if (status === 'production' || status === 'completed' || status === 'ready') {
-        const productionOrder = await db.select()
-          .from(productionOrders)
-          .where(eq(productionOrders.id, id))
-          .limit(1);
+        const productionOrder = await storage.getProductionOrder(id);
         
-        if (productionOrder.length > 0) {
+        if (productionOrder) {
           let orderStatus = status === 'completed' ? 'completed' : 'production';
-          await db.update(orders)
-            .set({ status: orderStatus })
-            .where(eq(orders.id, productionOrder[0].orderId));
+          await storage.updateOrder(productionOrder.orderId, { status: orderStatus });
         }
       }
 
-      res.json({ success: true });
+      res.json({ success: true, productionOrder: result });
     } catch (error) {
       console.error("Error updating production order status:", error);
       res.status(500).json({ error: "Failed to update production order status" });

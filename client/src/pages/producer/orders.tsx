@@ -14,6 +14,7 @@ export default function ProducerOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeadlineDialogOpen, setIsDeadlineDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [updateNotes, setUpdateNotes] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
   const { toast } = useToast();
@@ -90,6 +91,11 @@ export default function ProducerOrders() {
     setSelectedOrder(order);
     setUpdateNotes("");
     setIsUpdateDialogOpen(true);
+  };
+
+  const handleViewDetails = (order: any) => {
+    setSelectedOrder(order);
+    setIsDetailsDialogOpen(true);
   };
 
   if (isLoading) {
@@ -187,7 +193,7 @@ export default function ProducerOrders() {
                   )}
 
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(order)}>
                       <Eye className="h-4 w-4 mr-1" />
                       Ver Detalhes
                     </Button>
@@ -348,6 +354,154 @@ export default function ProducerOrders() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Details Dialog */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Ordem de Produção</DialogTitle>
+            <DialogDescription>
+              Informações completas da ordem de produção
+            </DialogDescription>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">ID da Ordem</label>
+                  <p className="font-semibold">#{selectedOrder.id.slice(-6)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Status</label>
+                  <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Produto</label>
+                  <p>{selectedOrder.product}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
+                  <p>{selectedOrder.orderNumber}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Prazo de Entrega</label>
+                  <p>{selectedOrder.deadline ? new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 'A definir'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Valor</label>
+                  <p className="font-semibold text-green-600">
+                    R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {selectedOrder.description && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Descrição</label>
+                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg mt-1">{selectedOrder.description}</p>
+                </div>
+              )}
+
+              {selectedOrder.notes && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Observações</label>
+                  <p className="text-gray-700 bg-blue-50 p-3 rounded-lg mt-1">{selectedOrder.notes}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-4 pt-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Aceito em</label>
+                  <p className="text-sm">{selectedOrder.acceptedAt ? new Date(selectedOrder.acceptedAt).toLocaleDateString('pt-BR') : 'Pendente'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Iniciado em</label>
+                  <p className="text-sm">{selectedOrder.startedAt ? new Date(selectedOrder.startedAt).toLocaleDateString('pt-BR') : 'Não iniciado'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Concluído em</label>
+                  <p className="text-sm">{selectedOrder.completedAt ? new Date(selectedOrder.completedAt).toLocaleDateString('pt-BR') : 'Em andamento'}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  {selectedOrder.status === 'pending' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        className="gradient-bg text-white"
+                        onClick={() => {
+                          updateStatusMutation.mutate({ 
+                            orderId: selectedOrder.id, 
+                            status: 'accepted', 
+                            notes: ""
+                          });
+                          setIsDetailsDialogOpen(false);
+                        }}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Aceitar Ordem
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          updateStatusMutation.mutate({ 
+                            orderId: selectedOrder.id, 
+                            status: 'rejected', 
+                            notes: ""
+                          });
+                          setIsDetailsDialogOpen(false);
+                        }}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Rejeitar
+                      </Button>
+                    </>
+                  )}
+                  
+                  {selectedOrder.status === 'accepted' && (
+                    <Button 
+                      size="sm" 
+                      className="gradient-bg text-white"
+                      onClick={() => {
+                        updateStatusMutation.mutate({ 
+                          orderId: selectedOrder.id, 
+                          status: 'production', 
+                          notes: ""
+                        });
+                        setIsDetailsDialogOpen(false);
+                      }}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      Iniciar Produção
+                    </Button>
+                  )}
+                  
+                  {selectedOrder.status === 'production' && (
+                    <Button 
+                      size="sm" 
+                      className="gradient-bg text-white"
+                      onClick={() => {
+                        setIsDetailsDialogOpen(false);
+                        handleUpdateStatus(selectedOrder, 'completed');
+                      }}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      Marcar como Concluído
+                    </Button>
+                  )}
+                </div>
+                
+                <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
