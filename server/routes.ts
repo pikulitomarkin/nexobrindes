@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const producersWithStats = await Promise.all(
         producers.map(async (producer) => {
           const productionOrders = await storage.getProductionOrdersByProducer(producer.id);
-          const activeOrders = productionOrders.filter(po => 
+          const activeOrders = productionOrders.filter(po =>
             ['pending', 'accepted', 'production', 'quality_check', 'ready'].includes(po.status)
           ).length;
           const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
@@ -604,12 +604,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets", async (req, res) => {
     try {
       const budgetData = req.body;
-      
+
       // Validate that contactName is provided
       if (!budgetData.contactName) {
         return res.status(400).json({ error: "Nome de contato é obrigatório" });
       }
-      
+
       const newBudget = await storage.createBudget(budgetData);
 
       // Process budget items
@@ -726,17 +726,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const { producerId, clientId } = req.body;
-      
+
       // Validate that clientId is provided for order conversion
       if (!clientId) {
         return res.status(400).json({ error: "Cliente deve ser selecionado para converter orçamento em pedido" });
       }
-      
+
       // Update budget with clientId before conversion
       await storage.updateBudget(req.params.id, { clientId });
-      
+
       const order = await storage.convertBudgetToOrder(req.params.id, producerId);
-      
+
       // Create production order for the selected producer
       if (producerId && order) {
         await storage.createProductionOrder({
@@ -746,7 +746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           deadline: order.deadline
         });
       }
-      
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ error: "Failed to convert budget to order" });
@@ -763,7 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get client data or use contact name
       let clientName = budget.contactName;
       let clientPhone = budget.contactPhone;
-      
+
       if (budget.clientId) {
         const client = await storage.getUser(budget.clientId);
         if (client) {
@@ -1095,7 +1095,7 @@ Para mais detalhes, entre em contato conosco!`;
             const client = await storage.getUser(budget.clientId);
             clientName = client?.name || budget.contactName;
           }
-          
+
           const items = await storage.getBudgetItems(budget.id);
           const photos = await storage.getBudgetPhotos(budget.id);
           const paymentInfo = await storage.getBudgetPaymentInfo(budget.id);
@@ -1437,18 +1437,18 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { id } = req.params;
       const { name, phone, specialty, address } = req.body;
-      
+
       const updatedUser = await storage.updateUser(id, {
         name,
         phone,
         specialty,
         address
       });
-      
+
       if (!updatedUser) {
         return res.status(404).json({ error: "Producer not found" });
       }
-      
+
       res.json(updatedUser);
     } catch (error) {
       res.status(500).json({ error: "Failed to update producer" });
@@ -1459,21 +1459,21 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { id } = req.params;
       const { currentPassword, newPassword } = req.body;
-      
+
       const user = await storage.getUser(id);
       if (!user) {
         return res.status(404).json({ error: "Producer not found" });
       }
-      
+
       // Verify current password
       if (user.password !== currentPassword) {
         return res.status(400).json({ error: "Current password is incorrect" });
       }
-      
+
       const updatedUser = await storage.updateUser(id, {
         password: newPassword
       });
-      
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to change password" });
@@ -1483,19 +1483,19 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
-      
+
       const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      
+
       // In a real application, you would send an actual email
       // For now, we'll just return success
       console.log(`Password reset requested for: ${email}`);
-      
-      res.json({ 
-        success: true, 
-        message: "Password reset instructions sent to your email" 
+
+      res.json({
+        success: true,
+        message: "Password reset instructions sent to your email"
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to process password reset" });
@@ -1519,14 +1519,14 @@ Para mais detalhes, entre em contato conosco!`;
       // Get client info
       const clientUser = await storage.getUser(order.clientId);
       const clientDetails = await storage.getClient(order.clientId);
-      
+
       // Get budget items if order has budgetId
       let budgetItems = [];
       let budgetPhotos = [];
       if (order.budgetId) {
         budgetItems = await storage.getBudgetItems(order.budgetId);
         budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
-        
+
         // Enrich items with product data
         budgetItems = await Promise.all(
           budgetItems.map(async (item) => {
@@ -1591,7 +1591,7 @@ Para mais detalhes, entre em contato conosco!`;
         },
         {
           id: 'confirmed',
-          status: 'confirmed', 
+          status: 'confirmed',
           title: 'Pedido Confirmado',
           description: 'Pedido foi confirmado e enviado para produção',
           date: order.status !== 'pending' ? order.updatedAt : null,
@@ -1688,6 +1688,129 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (err) {
       console.error("Upload error:", err);
       return res.status(500).json({ error: "Erro ao processar upload" });
+    }
+  });
+
+  // Commission management routes
+  app.get("/api/commissions", async (req, res) => {
+    try {
+      const commissions = await storage.getAllCommissions();
+
+      // Enrich with user and order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          const order = await storage.getOrder(commission.orderId);
+          const vendor = commission.vendorId ? await storage.getUser(commission.vendorId) : null;
+          const partner = commission.partnerId ? await storage.getUser(commission.partnerId) : null;
+          const client = order ? await storage.getUser(order.clientId) : null;
+
+          return {
+            ...commission,
+            orderNumber: order?.orderNumber || commission.orderNumber || 'N/A',
+            orderValue: order ? order.totalValue : commission.orderValue || '0.00',
+            vendorName: vendor?.name || null,
+            partnerName: partner?.name || null,
+            clientName: client?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedCommissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch commissions" });
+    }
+  });
+
+  app.put("/api/commissions/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      const updatedCommission = await storage.updateCommissionStatus(req.params.id, status);
+
+      if (!updatedCommission) {
+        return res.status(404).json({ error: "Commission not found" });
+      }
+
+      res.json(updatedCommission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update commission status" });
+    }
+  });
+
+  // Partners management
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const partners = users.filter(user => user.role === 'partner');
+
+      const partnersWithInfo = await Promise.all(
+        partners.map(async (partner) => {
+          const partnerInfo = await storage.getPartner(partner.id);
+          const commissions = await storage.getCommissionsByVendor(partner.id);
+          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount), 0);
+
+          return {
+            id: partner.id,
+            name: partner.name,
+            email: partner.email,
+            username: partner.username,
+            commissionRate: partnerInfo?.commissionRate || '15.00',
+            isActive: partnerInfo?.isActive || true,
+            totalCommissions
+          };
+        })
+      );
+
+      res.json(partnersWithInfo);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const { name, email, username, commissionRate } = req.body;
+
+      const user = await storage.createPartner({
+        username,
+        name,
+        email,
+        commissionRate: commissionRate || '15.00'
+      });
+
+      res.json({ success: true, user });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
+  // Commission settings
+  app.get("/api/commission-settings", async (req, res) => {
+    try {
+      const settings = await storage.getCommissionSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch commission settings" });
+    }
+  });
+
+  app.put("/api/commission-settings", async (req, res) => {
+    try {
+      const settings = await storage.updateCommissionSettings(req.body);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update commission settings" });
     }
   });
 

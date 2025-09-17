@@ -74,13 +74,37 @@ export const payments = pgTable("payments", {
 
 export const commissions = pgTable("commissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  vendorId: varchar("vendor_id").references(() => users.id),
+  partnerId: varchar("partner_id").references(() => users.id),
   orderId: varchar("order_id").references(() => orders.id).notNull(),
+  type: text("type").notNull(), // 'vendor' or 'partner'
   percentage: decimal("percentage", { precision: 5, scale: 2 }).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'paid'
+  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'paid', 'deducted'
   paidAt: timestamp("paid_at"),
+  deductedAt: timestamp("deducted_at"),
+  orderValue: decimal("order_value", { precision: 10, scale: 2 }),
+  orderNumber: text("order_number"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const partners = pgTable("partners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default('15.00'),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const commissionSettings = pgTable("commission_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorCommissionRate: decimal("vendor_commission_rate", { precision: 5, scale: 2 }).default('10.00'),
+  partnerCommissionRate: decimal("partner_commission_rate", { precision: 5, scale: 2 }).default('15.00'),
+  vendorPaymentTiming: text("vendor_payment_timing").default('order_completion'), // 'order_completion'
+  partnerPaymentTiming: text("partner_payment_timing").default('order_start'), // 'order_start'
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const vendors = pgTable("vendors", {
@@ -224,6 +248,8 @@ export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, cre
 export const insertProductionOrderSchema = createInsertSchema(productionOrders).omit({ id: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 export const insertCommissionSchema = createInsertSchema(commissions).omit({ id: true, createdAt: true });
+export const insertPartnerSchema = createInsertSchema(partners).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCommissionSettingsSchema = createInsertSchema(commissionSettings).omit({ id: true, updatedAt: true });
 export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
@@ -246,6 +272,10 @@ export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Commission = typeof commissions.$inferSelect;
 export type InsertCommission = z.infer<typeof insertCommissionSchema>;
+export type Partner = typeof partners.$inferSelect;
+export type InsertPartner = z.infer<typeof insertPartnerSchema>;
+export type CommissionSettings = typeof commissionSettings.$inferSelect;
+export type InsertCommissionSettings = z.infer<typeof insertCommissionSettingsSchema>;
 export type Vendor = typeof vendors.$inferSelect;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
 export type Product = typeof products.$inferSelect;

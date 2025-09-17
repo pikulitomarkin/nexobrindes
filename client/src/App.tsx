@@ -17,6 +17,7 @@ import AdminFinance from "@/pages/admin/finance";
 import AdminProducts from "@/pages/admin/products";
 import AdminBudgets from "@/pages/admin/budgets";
 import AdminCommissionSettings from './pages/admin/commission-settings';
+import AdminCommissionManagement from './pages/admin/commission-management';
 import AdminSettings from './pages/admin/settings';
 
 
@@ -58,6 +59,8 @@ function Router() {
         <Route path="/admin/producers" component={AdminProducers} />
         <Route path="/admin/finance" component={AdminFinance} />
         <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/commission-settings" element={<CommissionSettings />} />
+          <Route path="/admin/commission-management" element={<CommissionManagement />} />
 
 
         {/* Vendor Routes */}

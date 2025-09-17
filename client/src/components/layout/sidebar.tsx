@@ -92,17 +92,17 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
           </div>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/admin/commission-settings">
-                <Percent className="h-4 w-4" />
-                <span>Configurar Comissões</span>
+              <Link href="/admin/commission-management">
+                <Calculator className="h-4 w-4" />
+                Gestão de Comissões
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/admin/settings">
+              <Link href="/admin/commission-settings">
                 <Settings className="h-4 w-4" />
-                <span>Configurações Gerais</span>
+                Configuração de Comissões
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

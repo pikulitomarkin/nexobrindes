@@ -11,6 +11,10 @@ import {
   type InsertPayment,
   type Commission,
   type InsertCommission,
+  type Partner,
+  type InsertPartner,
+  type CommissionSettings,
+  type InsertCommissionSettings,
   type Vendor,
   type InsertVendor,
   type Product,
@@ -73,7 +77,20 @@ export interface IStorage {
 
   // Commissions
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
+  getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
+  updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
+  deductPartnerCommission(partnerId: string, amount: string): Promise<void>;
+
+  // Partners
+  getPartners(): Promise<User[]>;
+  getPartner(userId: string): Promise<Partner | undefined>;
+  createPartner(partnerData: any): Promise<User>;
+  updatePartnerCommission(userId: string, commissionRate: string): Promise<void>;
+
+  // Commission Settings
+  getCommissionSettings(): Promise<CommissionSettings | undefined>;
+  updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings>;
 
   // Vendors
   getVendors(): Promise<User[]>;
@@ -152,10 +169,12 @@ export class MemStorage implements IStorage {
   private payments: Map<string, Payment>;
   private commissions: Map<string, Commission>;
   private vendors: Map<string, Vendor>;
+  private partners: Map<string, Partner>;
   private products: Map<string, any>;
   private budgets: Map<string, any>;
   private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
+  private commissionSettings: CommissionSettings;
 
   // Payment Methods
   private paymentMethods: PaymentMethod[] = [
@@ -239,10 +258,23 @@ export class MemStorage implements IStorage {
     this.payments = new Map();
     this.commissions = new Map();
     this.vendors = new Map();
+    this.partners = new Map();
     this.products = new Map();
     this.budgets = new Map();
     this.budgetItems = []; // Initialize as empty array
     this.budgetPhotos = []; // Initialize as empty array
+    
+    // Initialize commission settings
+    this.commissionSettings = {
+      id: "settings-1",
+      vendorCommissionRate: "10.00",
+      partnerCommissionRate: "15.00",
+      vendorPaymentTiming: "order_completion",
+      partnerPaymentTiming: "order_start",
+      isActive: true,
+      updatedAt: new Date()
+    };
+    
     this.initializeData();
   }
 
@@ -308,7 +340,19 @@ export class MemStorage implements IStorage {
       isActive: true
     };
 
-    [adminUser, vendorUser, clientUser, producerUser, financeUser].forEach(user => {
+    const partnerUser: User = {
+      id: "partner-1",
+      username: "socio1",
+      password: "123",
+      role: "partner",
+      name: "João Sócio",
+      email: "socio@erp.com",
+      phone: null,
+      vendorId: null,
+      isActive: true
+    };
+
+    [adminUser, vendorUser, clientUser, producerUser, financeUser, partnerUser].forEach(user => {
       this.users.set(user.id, user);
     });
 
@@ -321,6 +365,17 @@ export class MemStorage implements IStorage {
       isActive: true
     };
     this.vendors.set(vendor.id, vendor);
+
+    // Create partner profile
+    const partner: Partner = {
+      id: "partner-profile-1",
+      userId: "partner-1",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.partners.set(partner.id, partner);
 
     // Create sample clients
     const sampleClient: Client = {
@@ -751,17 +806,70 @@ export class MemStorage implements IStorage {
     return Array.from(this.commissions.values()).filter(commission => commission.vendorId === vendorId);
   }
 
+  async getAllCommissions(): Promise<Commission[]> {
+    return Array.from(this.commissions.values());
+  }
+
   async createCommission(insertCommission: InsertCommission): Promise<Commission> {
     const id = randomUUID();
     const commission: Commission = {
       ...insertCommission,
       id,
+      vendorId: insertCommission.vendorId || null,
+      partnerId: insertCommission.partnerId || null,
       status: insertCommission.status || 'pending',
       paidAt: insertCommission.paidAt || null,
+      deductedAt: insertCommission.deductedAt || null,
+      orderValue: insertCommission.orderValue || null,
+      orderNumber: insertCommission.orderNumber || null,
       createdAt: new Date()
     };
     this.commissions.set(id, commission);
     return commission;
+  }
+
+  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
+    const commission = this.commissions.get(id);
+    if (commission) {
+      const updatedCommission = { 
+        ...commission, 
+        status,
+        paidAt: status === 'paid' ? new Date() : commission.paidAt,
+        deductedAt: status === 'deducted' ? new Date() : commission.deductedAt
+      };
+      this.commissions.set(id, updatedCommission);
+      return updatedCommission;
+    }
+    return undefined;
+  }
+
+  async deductPartnerCommission(partnerId: string, amount: string): Promise<void> {
+    // Find the next pending partner commission to deduct from
+    const partnerCommissions = Array.from(this.commissions.values())
+      .filter(c => c.partnerId === partnerId && c.status === 'pending')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    let remainingToDeduct = parseFloat(amount);
+    
+    for (const commission of partnerCommissions) {
+      if (remainingToDeduct <= 0) break;
+      
+      const commissionAmount = parseFloat(commission.amount);
+      if (commissionAmount <= remainingToDeduct) {
+        // Deduct entire commission
+        await this.updateCommissionStatus(commission.id, 'deducted');
+        remainingToDeduct -= commissionAmount;
+      } else {
+        // Partial deduction - update amount
+        const newAmount = (commissionAmount - remainingToDeduct).toFixed(2);
+        const updatedCommission = {
+          ...commission,
+          amount: newAmount
+        };
+        this.commissions.set(commission.id, updatedCommission);
+        remainingToDeduct = 0;
+      }
+    }
   }
 
   // Vendor methods
@@ -804,6 +912,67 @@ export class MemStorage implements IStorage {
       const updatedVendor = { ...vendor, commissionRate };
       this.vendors.set(vendor.id, updatedVendor);
     }
+  }
+
+  // Partner methods
+  async getPartners(): Promise<User[]> {
+    return Array.from(this.users.values()).filter(user => user.role === 'partner');
+  }
+
+  async getPartner(userId: string): Promise<Partner | undefined> {
+    return Array.from(this.partners.values()).find(partner => partner.userId === userId);
+  }
+
+  async createPartner(partnerData: any): Promise<User> {
+    // Create user first
+    const newUser: User = {
+      id: randomUUID(),
+      username: partnerData.username,
+      password: partnerData.password || "123456",
+      role: 'partner',
+      name: partnerData.name,
+      email: partnerData.email || null,
+      phone: partnerData.phone || null,
+      vendorId: null,
+      isActive: true
+    };
+
+    this.users.set(newUser.id, newUser);
+
+    // Also create partner profile
+    const partnerProfile: Partner = {
+      id: randomUUID(),
+      userId: newUser.id,
+      commissionRate: partnerData.commissionRate || "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    this.partners.set(partnerProfile.id, partnerProfile);
+    return newUser;
+  }
+
+  async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
+    const partner = Array.from(this.partners.values()).find(p => p.userId === userId);
+    if (partner) {
+      const updatedPartner = { ...partner, commissionRate, updatedAt: new Date() };
+      this.partners.set(partner.id, updatedPartner);
+    }
+  }
+
+  // Commission Settings methods
+  async getCommissionSettings(): Promise<CommissionSettings | undefined> {
+    return this.commissionSettings;
+  }
+
+  async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
+    this.commissionSettings = {
+      ...this.commissionSettings,
+      ...settings,
+      updatedAt: new Date()
+    };
+    return this.commissionSettings;
   }
 
   // Product methods
