@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,9 +50,9 @@ export default function VendorBudgets() {
       });
 
       if (!response.ok) throw new Error('Upload failed');
-      
+
       const { url } = await response.json();
-      
+
       updateBudgetItem(itemIndex, 'customizationPhoto', url);
 
       toast({
@@ -151,13 +150,13 @@ export default function VendorBudgets() {
   // Calculate shipping cost based on selected method
   const calculateShippingCost = () => {
     if (!selectedShippingMethod) return 0;
-    
+
     const subtotal = calculateBudgetTotal();
-    
+
     if (selectedShippingMethod.type === "free") return 0;
     if (selectedShippingMethod.freeShippingThreshold > 0 && subtotal >= selectedShippingMethod.freeShippingThreshold) return 0;
     if (selectedShippingMethod.type === "fixed") return parseFloat(selectedShippingMethod.basePrice);
-    
+
     // For calculated, return base price as placeholder (could integrate with shipping API)
     return parseFloat(selectedShippingMethod.basePrice || "0");
   };
@@ -188,7 +187,7 @@ export default function VendorBudgets() {
     setVendorBudgetForm(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
-      
+
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
@@ -198,7 +197,7 @@ export default function VendorBudgets() {
       } else {
         item[field] = value;
       }
-      
+
       newItems[index] = item;
       return { ...prev, items: newItems };
     });
@@ -237,6 +236,14 @@ export default function VendorBudgets() {
     return basePrice + customizationValue;
   };
 
+  // Calculate the total including shipping cost
+  const calculateTotalWithShipping = () => {
+    const subtotal = calculateBudgetTotal();
+    const shipping = vendorBudgetForm.shippingCost || calculateShippingCost();
+    return subtotal + shipping;
+  };
+
+
   const resetBudgetForm = () => {
     setVendorBudgetForm({
       title: "",
@@ -267,7 +274,7 @@ export default function VendorBudgets() {
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateBudgetTotal().toFixed(2)
+        totalValue: calculateTotalWithShipping().toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -294,7 +301,7 @@ export default function VendorBudgets() {
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateBudgetTotal().toFixed(2)
+        totalValue: calculateTotalWithShipping().toFixed(2)
       };
       const response = await fetch(`/api/budgets/${editingBudgetId}`, {
         method: "PUT",
@@ -327,7 +334,7 @@ export default function VendorBudgets() {
       try {
         const pdfGenerator = new PDFGenerator();
         const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
-        
+
         // Create download link
         const url = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
@@ -337,7 +344,7 @@ export default function VendorBudgets() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         toast({
           title: "Sucesso!",
           description: "PDF gerado e baixado com sucesso!"
@@ -476,7 +483,7 @@ export default function VendorBudgets() {
       discountPercentage: parseFloat(budget.discountPercentage || 0),
       discountValue: parseFloat(budget.discountValue || 0)
     });
-    
+
     setIsEditMode(true);
     setEditingBudgetId(budget.id);
     setIsBudgetDialogOpen(true);
@@ -492,7 +499,7 @@ export default function VendorBudgets() {
       });
       return;
     }
-    
+
     if (isEditMode) {
       updateBudgetMutation.mutate(vendorBudgetForm);
     } else {
@@ -506,10 +513,10 @@ export default function VendorBudgets() {
       product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
-    
+
     const matchesCategory = budgetCategoryFilter === "all" || 
       product.category === budgetCategoryFilter;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -680,7 +687,7 @@ export default function VendorBudgets() {
               {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
-                
+
                 {/* Selected Products */}
                 {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
@@ -697,7 +704,7 @@ export default function VendorBudgets() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
@@ -804,7 +811,7 @@ export default function VendorBudgets() {
                                 />
                               </div>
                             </div>
-                            
+
                             {/* Image Upload for Product Customization */}
                             <div>
                               <Label>Imagem da Personalização deste Produto</Label>
@@ -825,7 +832,7 @@ export default function VendorBudgets() {
                                     />
                                   </label>
                                 </div>
-                                
+
                                 {item.customizationPhoto && (
                                   <div className="relative inline-block">
                                     <img 
@@ -952,7 +959,7 @@ export default function VendorBudgets() {
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Pagamento e Frete</h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="payment-method">Forma de Pagamento</Label>
@@ -986,7 +993,7 @@ export default function VendorBudgets() {
                 {selectedPaymentMethod && (
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Pagamento</h4>
-                    
+
                     {selectedPaymentMethod.type === "credit_card" && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1006,7 +1013,7 @@ export default function VendorBudgets() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
@@ -1018,7 +1025,7 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.downPayment || 0}
                           onChange={(e) => {
                             const downPayment = parseFloat(e.target.value) || 0;
-                            const total = calculateBudgetTotal() + (vendorBudgetForm.shippingCost || 0);
+                            const total = calculateTotalWithShipping();
                             setVendorBudgetForm({ 
                               ...vendorBudgetForm, 
                               downPayment,
@@ -1055,7 +1062,7 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.shippingCost || calculateShippingCost()}
                           onChange={(e) => {
                             const shippingCost = parseFloat(e.target.value) || 0;
-                            const total = calculateBudgetTotal() + shippingCost;
+                            const total = calculateTotalWithShipping();
                             setVendorBudgetForm({ 
                               ...vendorBudgetForm, 
                               shippingCost,
@@ -1106,7 +1113,7 @@ export default function VendorBudgets() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       {vendorBudgetForm.discountType === 'percentage' ? (
                         <div>
                           <Label htmlFor="discount-percentage">Desconto (%)</Label>
@@ -1135,7 +1142,7 @@ export default function VendorBudgets() {
                           />
                         </div>
                       )}
-                      
+
                       <div>
                         <Label>Valor do Desconto</Label>
                         <p className="text-lg font-semibold text-orange-600 mt-2">
@@ -1145,7 +1152,7 @@ export default function VendorBudgets() {
                               const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
                               return total + basePrice + customizationValue;
                             }, 0);
-                            
+
                             if (vendorBudgetForm.discountType === 'percentage') {
                               return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             } else {
@@ -1182,7 +1189,7 @@ export default function VendorBudgets() {
                           const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
                           return total + basePrice + customizationValue;
                         }, 0);
-                        
+
                         if (vendorBudgetForm.discountType === 'percentage') {
                           return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         } else {
@@ -1199,7 +1206,7 @@ export default function VendorBudgets() {
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
-                      R$ {(calculateBudgetTotal() + (vendorBudgetForm.shippingCost || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -1466,7 +1473,7 @@ export default function VendorBudgets() {
               Visualização completa do orçamento {budgetToView?.budgetNumber}
             </DialogDescription>
           </DialogHeader>
-          
+
           {budgetToView && (
             <div className="space-y-6">
               {/* Budget Header */}
@@ -1589,7 +1596,7 @@ export default function VendorBudgets() {
                           </p>
                         </div>
                       </div>
-                      
+
                       {/* Product Size Information */}
                       {(item.productWidth || item.productHeight || item.productDepth) && (
                         <div className="mt-3 p-3 bg-gray-50 rounded">
@@ -1616,7 +1623,7 @@ export default function VendorBudgets() {
                           </div>
                         </div>
                       )}
-                      
+
                       {item.hasItemCustomization && (
                         <div className="mt-3 p-3 bg-blue-50 rounded">
                           <div className="grid grid-cols-2 gap-4">
@@ -1723,7 +1730,7 @@ export default function VendorBudgets() {
                   <FileText className="h-4 w-4 mr-2" />
                   {generatePDFMutation.isPending ? 'Gerando...' : 'Baixar PDF'}
                 </Button>
-                
+
                 {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
                   <Button 
                     variant="outline"
@@ -1738,7 +1745,7 @@ export default function VendorBudgets() {
                     {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar WhatsApp'}
                   </Button>
                 )}
-                
+
                 {(budgetToView.status === 'sent' || budgetToView.status === 'approved') && (
                   <Button 
                     className="text-green-600 hover:text-green-900"
@@ -1751,7 +1758,7 @@ export default function VendorBudgets() {
                     Converter em Pedido
                   </Button>
                 )}
-                
+
                 <Button 
                   variant="outline" 
                   onClick={() => {

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +37,8 @@ export default function AdminBudgets() {
     hasDiscount: false,
     discountType: "percentage",
     discountPercentage: 0,
-    discountValue: 0
+    discountValue: 0,
+    shippingCost: 0,
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -107,7 +107,7 @@ export default function AdminBudgets() {
     setAdminBudgetForm(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
-      
+
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
@@ -117,7 +117,7 @@ export default function AdminBudgets() {
       } else {
         item[field] = value;
       }
-      
+
       newItems[index] = item;
       return { ...prev, items: newItems };
     });
@@ -156,6 +156,12 @@ export default function AdminBudgets() {
     return basePrice + customizationValue;
   };
 
+  const calculateAdminTotalWithShipping = () => {
+    const subtotal = calculateAdminBudgetTotal();
+    const shipping = adminBudgetForm.shippingCost || 0;
+    return subtotal + shipping;
+  };
+
   const resetAdminBudgetForm = () => {
     setAdminBudgetForm({
       title: "",
@@ -171,7 +177,8 @@ export default function AdminBudgets() {
       hasDiscount: false,
       discountType: "percentage",
       discountPercentage: 0,
-      discountValue: 0
+      discountValue: 0,
+      shippingCost: 0,
     });
   };
 
@@ -179,7 +186,7 @@ export default function AdminBudgets() {
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateAdminBudgetTotal().toFixed(2)
+        totalValue: calculateAdminTotalWithShipping().toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -268,7 +275,7 @@ export default function AdminBudgets() {
       try {
         const pdfGenerator = new PDFGenerator();
         const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
-        
+
         // Create download link
         const url = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
@@ -278,7 +285,7 @@ export default function AdminBudgets() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         toast({
           title: "Sucesso!",
           description: "PDF gerado e baixado com sucesso!"
@@ -331,10 +338,10 @@ export default function AdminBudgets() {
       product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
-    
+
     const matchesCategory = budgetCategoryFilter === "all" || 
       product.category === budgetCategoryFilter;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -502,7 +509,7 @@ export default function AdminBudgets() {
               {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
-                
+
                 {/* Selected Products */}
                 {adminBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
@@ -519,7 +526,7 @@ export default function AdminBudgets() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`admin-quantity-${index}`}>Quantidade</Label>
@@ -752,7 +759,7 @@ export default function AdminBudgets() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       {adminBudgetForm.discountType === 'percentage' ? (
                         <div>
                           <Label htmlFor="admin-discount-percentage">Desconto (%)</Label>
@@ -781,7 +788,7 @@ export default function AdminBudgets() {
                           />
                         </div>
                       )}
-                      
+
                       <div>
                         <Label>Valor do Desconto</Label>
                         <p className="text-lg font-semibold text-orange-600 mt-2">
@@ -791,7 +798,7 @@ export default function AdminBudgets() {
                               const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
                               return total + basePrice + customizationValue;
                             }, 0);
-                            
+
                             if (adminBudgetForm.discountType === 'percentage') {
                               return ((itemsSubtotal * adminBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             } else {
@@ -803,6 +810,20 @@ export default function AdminBudgets() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Shipping Cost */}
+              <div className="space-y-2">
+                <Label htmlFor="admin-shipping-cost">Custo do Frete (R$)</Label>
+                <Input
+                  id="admin-shipping-cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={adminBudgetForm.shippingCost}
+                  onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                />
               </div>
 
               {/* Budget Total */}
@@ -828,7 +849,7 @@ export default function AdminBudgets() {
                           const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
                           return total + basePrice + customizationValue;
                         }, 0);
-                        
+
                         if (adminBudgetForm.discountType === 'percentage') {
                           return ((itemsSubtotal * adminBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         } else {
@@ -841,7 +862,7 @@ export default function AdminBudgets() {
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
-                      R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {calculateAdminTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
