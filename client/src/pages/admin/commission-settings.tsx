@@ -30,7 +30,7 @@ export default function CommissionSettings() {
   const [editingVendor, setEditingVendor] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const { data: vendors, isLoading } = useQuery({
+  const { data: vendors = [], isLoading } = useQuery({
     queryKey: ["/api/vendors"],
   });
 
@@ -107,7 +107,7 @@ export default function CommissionSettings() {
       </div>
 
       <div className="grid gap-6">
-        {vendors?.map((vendor: any) => (
+        {vendors.map((vendor: any) => (
           <Card key={vendor.id} className="card-hover">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center justify-between">
@@ -193,7 +193,7 @@ export default function CommissionSettings() {
         ))}
       </div>
 
-      {vendors?.length === 0 && (
+      {vendors.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
