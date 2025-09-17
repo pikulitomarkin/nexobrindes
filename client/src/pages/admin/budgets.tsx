@@ -477,12 +477,15 @@ export default function AdminBudgets() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="admin-budget-client">Cliente Cadastrado (Opcional)</Label>
-                  <Select value={adminBudgetForm.clientId} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, clientId: value })}>
+                  <Select 
+                    value={adminBudgetForm.clientId || "none"} 
+                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, clientId: value === "none" ? "" : value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum cliente selecionado</SelectItem>
+                      <SelectItem value="none">Nenhum cliente selecionado</SelectItem>
                       {clients?.map((client: any) => (
                         <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                       ))}

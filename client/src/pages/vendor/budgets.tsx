@@ -669,12 +669,15 @@ export default function VendorBudgets() {
 
               <div>
                 <Label htmlFor="budget-client">Cliente Cadastrado (Opcional)</Label>
-                <Select value={vendorBudgetForm.clientId} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, clientId: value })}>
+                <Select 
+                  value={vendorBudgetForm.clientId || "none"} 
+                  onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, clientId: value === "none" ? "" : value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum cliente selecionado</SelectItem>
+                    <SelectItem value="none">Nenhum cliente selecionado</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
