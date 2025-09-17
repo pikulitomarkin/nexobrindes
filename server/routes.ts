@@ -1435,6 +1435,21 @@ Para mais detalhes, entre em contato conosco!`;
         .set(updateData)
         .where(eq(productionOrders.id, id));
 
+      // Also update the main order status if needed
+      if (status === 'production' || status === 'completed' || status === 'ready') {
+        const productionOrder = await db.select()
+          .from(productionOrders)
+          .where(eq(productionOrders.id, id))
+          .limit(1);
+        
+        if (productionOrder.length > 0) {
+          let orderStatus = status === 'completed' ? 'completed' : 'production';
+          await db.update(orders)
+            .set({ status: orderStatus })
+            .where(eq(orders.id, productionOrder[0].orderId));
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating production order status:", error);

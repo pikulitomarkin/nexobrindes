@@ -93,7 +93,7 @@ export default function ProducerOrderDetails() {
       quality_check: { label: "Controle Qualidade", color: "bg-orange-100 text-orange-800", icon: CheckCircle },
       ready: { label: "Pronto", color: "bg-green-100 text-green-800", icon: Package },
       shipped: { label: "Enviado", color: "bg-indigo-100 text-indigo-800", icon: Package },
-      completed: { label: "Concluído", color: "bg-green-100 text-green-800", icon: CheckCircle },
+      completed: { label: "Concluído", color: "bg-emerald-100 text-emerald-800", icon: CheckCircle },
       rejected: { label: "Rejeitado", color: "bg-red-100 text-red-800", icon: AlertTriangle },
     };
 
@@ -401,7 +401,7 @@ export default function ProducerOrderDetails() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Ações de Status</CardTitle>
+              <CardTitle>Controle de Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {productionOrder.status === 'pending' && (
@@ -426,26 +426,25 @@ export default function ProducerOrderDetails() {
                 </>
               )}
               
-              {productionOrder.status === 'accepted' && (
-                <Button 
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                  onClick={() => handleStatusUpdate('production')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Iniciar Produção
-                </Button>
-              )}
-              
-              {productionOrder.status === 'production' && (
-                <Button 
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                  onClick={() => handleStatusUpdate('quality_check')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Controle Qualidade
-                </Button>
+              {(productionOrder.status === 'accepted' || productionOrder.status === 'production') && (
+                <>
+                  <Button 
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                    onClick={() => handleStatusUpdate('production')}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {productionOrder.status === 'accepted' ? 'Iniciar' : 'Atualizar'} Produção
+                  </Button>
+                  <Button 
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                    onClick={() => handleStatusUpdate('quality_check')}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Controle Qualidade
+                  </Button>
+                </>
               )}
 
               {productionOrder.status === 'quality_check' && (
@@ -460,14 +459,41 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'ready' && (
+                <>
+                  <Button 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={() => handleStatusUpdate('shipped')}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    Marcar Enviado
+                  </Button>
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleStatusUpdate('completed')}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Finalizar Ordem
+                  </Button>
+                </>
+              )}
+
+              {productionOrder.status === 'shipped' && (
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => handleStatusUpdate('completed')}
                   disabled={updateStatusMutation.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Finalizar Ordem
+                  Confirmar Entrega
                 </Button>
+              )}
+
+              {['completed', 'rejected'].includes(productionOrder.status) && (
+                <div className="text-center text-sm text-gray-500 py-4">
+                  Ordem finalizada
+                </div>
               )}
             </CardContent>
           </Card>
@@ -480,10 +506,11 @@ export default function ProducerOrderDetails() {
               <div className="space-y-3">
                 {[
                   { status: 'pending', label: 'Aguardando', completed: true },
-                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'completed'].includes(productionOrder.status) },
-                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'completed'].includes(productionOrder.status) },
-                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'completed'].includes(productionOrder.status) },
-                  { status: 'ready', label: 'Pronto', completed: ['ready', 'completed'].includes(productionOrder.status) },
+                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'completed'].includes(productionOrder.status) },
                   { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
                 ].map((step, index) => (
                   <div key={step.status} className="flex items-center gap-3">

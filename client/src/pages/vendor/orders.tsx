@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,7 +98,7 @@ export default function VendorOrders() {
     setVendorOrderForm(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
-      
+
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
@@ -109,7 +108,7 @@ export default function VendorOrders() {
       } else {
         item[field] = value;
       }
-      
+
       newItems[index] = item;
       return { ...prev, items: newItems };
     });
@@ -204,20 +203,20 @@ export default function VendorOrders() {
     }
   });
 
-  const markNotesAsReadMutation = useMutation({
+  const markNotesReadMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const response = await fetch(`/api/orders/${orderId}/mark-notes-read`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
       });
-      if (!response.ok) throw new Error("Erro ao marcar como lido");
+      if (!response.ok) throw new Error("Erro ao marcar observações como lidas");
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
       toast({
-        title: "Sucesso!",
-        description: "Observações marcadas como lidas",
+        title: "Observações marcadas como lidas",
+        description: "As observações da produção foram marcadas como lidas",
       });
     },
   });
@@ -248,14 +247,14 @@ export default function VendorOrders() {
 
   // Filter products for order creation
   const filteredOrderProducts = products.filter((product: any) => {
-    const matchesSearch = !orderProductSearch || 
+    const matchesSearch = !orderProductSearch ||
       product.name.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
       product.description?.toLowerCase().includes(orderProductSearch.toLowerCase()) ||
       product.id.toLowerCase().includes(orderProductSearch.toLowerCase());
-    
-    const matchesCategory = orderCategoryFilter === "all" || 
+
+    const matchesCategory = orderCategoryFilter === "all" ||
       product.category === orderCategoryFilter;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -291,7 +290,7 @@ export default function VendorOrders() {
 
   const filteredOrders = orders?.filter((order: any) => {
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -381,7 +380,7 @@ export default function VendorOrders() {
               {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Pedido</h3>
-                
+
                 {/* Selected Products */}
                 {vendorOrderForm.items.length > 0 && (
                   <div className="space-y-4">
@@ -398,7 +397,7 @@ export default function VendorOrders() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
@@ -511,9 +510,9 @@ export default function VendorOrders() {
                       <div className="flex items-center justify-between text-sm text-gray-500">
                         <span>{filteredOrderProducts.length} produtos encontrados</span>
                         {(orderProductSearch || orderCategoryFilter !== "all") && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setOrderProductSearch("");
                               setOrderCategoryFilter("all");
@@ -529,15 +528,15 @@ export default function VendorOrders() {
                         <div className="col-span-full text-center py-8">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500">
-                            {orderProductSearch || orderCategoryFilter !== "all" ? 
-                              "Nenhum produto encontrado com os filtros aplicados" : 
+                            {orderProductSearch || orderCategoryFilter !== "all" ?
+                              "Nenhum produto encontrado com os filtros aplicados" :
                               "Nenhum produto disponível"}
                           </p>
                         </div>
                       ) : (
                         filteredOrderProducts.map((product: any) => (
-                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
-                               onClick={() => addProductToOrder(product)}>
+                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
+                            onClick={() => addProductToOrder(product)}>
                             <div className="flex items-center gap-2">
                               {product.imageLink ? (
                                 <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
@@ -572,9 +571,9 @@ export default function VendorOrders() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button 
-                  variant="outline" 
-                  type="button" 
+                <Button
+                  variant="outline"
+                  type="button"
                   onClick={() => {
                     setIsOrderDialogOpen(false);
                     resetOrderForm();
@@ -582,8 +581,8 @@ export default function VendorOrders() {
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={createOrderMutation.isPending || vendorOrderForm.items.length === 0}
                 >
                   {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
@@ -759,18 +758,18 @@ export default function VendorOrders() {
                         </div>
                         {(order.status === 'production' || order.status === 'delayed' || order.status === 'ready' || order.status === 'shipped' || order.status === 'delivered') && (
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                            <div
                               className={`h-2 rounded-full transition-all duration-500 ${
                                 order.status === 'delayed' ? 'bg-red-500' :
-                                order.status === 'ready' ? 'bg-yellow-500' : 
+                                order.status === 'ready' ? 'bg-yellow-500' :
                                 order.status === 'shipped' ? 'bg-blue-500' :
                                 order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
                               }`}
-                              style={{ 
-                                width: order.status === 'production' ? '25%' : 
-                                       order.status === 'delayed' ? '25%' : 
-                                       order.status === 'ready' ? '50%' : 
-                                       order.status === 'shipped' ? '75%' : '100%' 
+                              style={{
+                                width: order.status === 'production' ? '25%' :
+                                       order.status === 'delayed' ? '25%' :
+                                       order.status === 'ready' ? '50%' :
+                                       order.status === 'shipped' ? '75%' : '100%'
                               }}
                             ></div>
                           </div>
@@ -782,8 +781,8 @@ export default function VendorOrders() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-1">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedOrder(order);
@@ -795,21 +794,21 @@ export default function VendorOrders() {
                           Ver
                         </Button>
                         {order.hasUnreadNotes && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-red-600 hover:text-red-900"
-                            onClick={() => markNotesAsReadMutation.mutate(order.id)}
-                            disabled={markNotesAsReadMutation.isPending}
+                            onClick={() => markNotesReadMutation.mutate(order.id)}
+                            disabled={markNotesReadMutation.isPending}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Ciente
                           </Button>
                         )}
                         {(order.status === 'confirmed' || order.status === 'pending') && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => handleSendToProductionClick(order.id)}
                             disabled={sendToProductionMutation.isPending}
@@ -856,8 +855,8 @@ export default function VendorOrders() {
             </div>
           </div>
           <div className="flex gap-2 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowSendToProductionModal(false);
                 setOrderToSend(null);
@@ -867,7 +866,7 @@ export default function VendorOrders() {
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={confirmSendToProduction}
               disabled={sendToProductionMutation.isPending || !selectedProducer}
               className="flex-1"
@@ -909,7 +908,7 @@ export default function VendorOrders() {
                   </p>
                 </div>
               </div>
-              
+
               {selectedOrder.description && (
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Descrição</Label>
@@ -954,18 +953,18 @@ export default function VendorOrders() {
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Progresso da Produção</Label>
                   <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
-                    <div 
+                    <div
                       className={`h-4 rounded-full transition-all duration-500 ${
                         selectedOrder.status === 'delayed' ? 'bg-red-500' :
-                        selectedOrder.status === 'ready' ? 'bg-yellow-500' : 
+                        selectedOrder.status === 'ready' ? 'bg-yellow-500' :
                         selectedOrder.status === 'shipped' ? 'bg-blue-500' :
                         selectedOrder.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
                       }`}
-                      style={{ 
-                        width: selectedOrder.status === 'production' ? '25%' : 
-                               selectedOrder.status === 'delayed' ? '25%' : 
-                               selectedOrder.status === 'ready' ? '50%' : 
-                               selectedOrder.status === 'shipped' ? '75%' : '100%' 
+                      style={{
+                        width: selectedOrder.status === 'production' ? '25%' :
+                               selectedOrder.status === 'delayed' ? '25%' :
+                               selectedOrder.status === 'ready' ? '50%' :
+                               selectedOrder.status === 'shipped' ? '75%' : '100%'
                       }}
                     ></div>
                   </div>
@@ -985,9 +984,9 @@ export default function VendorOrders() {
                   <div className="grid grid-cols-3 gap-3">
                     {selectedOrder.budgetPhotos.map((photo: string, index: number) => (
                       <div key={index} className="border rounded-lg overflow-hidden">
-                        <img 
-                          src={photo} 
-                          alt={`Personalização ${index + 1}`} 
+                        <img
+                          src={photo}
+                          alt={`Personalização ${index + 1}`}
                           className="w-full h-32 object-cover"
                         />
                       </div>
@@ -1000,7 +999,7 @@ export default function VendorOrders() {
               <div className="flex justify-between items-center pt-4 border-t">
                 <div className="flex space-x-2">
                   {(selectedOrder.status === 'confirmed' || selectedOrder.status === 'pending') && (
-                    <Button 
+                    <Button
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={() => {
                         setShowOrderDetailsModal(false);
@@ -1012,8 +1011,8 @@ export default function VendorOrders() {
                     </Button>
                   )}
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowOrderDetailsModal(false)}
                 >
                   Fechar
