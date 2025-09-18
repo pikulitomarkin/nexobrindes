@@ -52,16 +52,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const decoded = Buffer.from(token, 'base64').toString();
-      const [userId] = decoded.split(':');
+      const [userId, username, timestamp] = decoded.split(':');
+      
+      // Check if token is not too old (24 hours)
+      const tokenAge = Date.now() - parseInt(timestamp);
+      if (tokenAge > 24 * 60 * 60 * 1000) {
+        return res.status(401).json({ error: "Token expirado" });
+      }
       
       const user = await storage.getUser(userId);
       if (!user || !user.isActive) {
         return res.status(401).json({ error: "Token inválido" });
       }
 
+      // Verify username matches
+      if (user.username !== username) {
+        return res.status(401).json({ error: "Token inválido" });
+      }
+
       const { password: _, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {
+      console.error("Token verification error:", error);
       res.status(401).json({ error: "Token inválido" });
     }
   });

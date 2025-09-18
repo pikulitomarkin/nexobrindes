@@ -27,38 +27,43 @@ export default function Login() {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         // Store user data in localStorage
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
 
-        // Redirect to appropriate panel based on user role (using existing panels)
-        const { role } = data.user;
-        switch (role) {
-          case "admin":
-            window.location.href = "/admin/orders";
-            break;
-          case "vendor":
-            window.location.href = "/vendor/orders";
-            break;
-          case "client":
-            window.location.href = "/client/orders";
-            break;
-          case "producer":
-            window.location.href = "/producer/orders";
-            break;
-          case "partner":
-            window.location.href = "/";
-            break;
-          default:
-            window.location.href = "/";
-        }
+        console.log("Login successful for user:", data.user.username, "Role:", data.user.role);
 
         toast({
           title: "Login realizado com sucesso!",
           description: `Bem-vindo, ${data.user.name}!`,
         });
+
+        // Wait a moment for localStorage to be set, then redirect
+        setTimeout(() => {
+          const { role } = data.user;
+          switch (role) {
+            case "admin":
+              window.location.href = "/admin/orders";
+              break;
+            case "vendor":
+              window.location.href = "/vendor/orders";
+              break;
+            case "client":
+              window.location.href = "/client/orders";
+              break;
+            case "producer":
+              window.location.href = "/producer/orders";
+              break;
+            case "partner":
+              window.location.href = "/";
+              break;
+            default:
+              window.location.href = "/";
+          }
+        }, 100);
       } else {
+        console.error("Login failed:", data);
         toast({
           title: "Erro no login",
           description: data.error || "Credenciais inválidas",

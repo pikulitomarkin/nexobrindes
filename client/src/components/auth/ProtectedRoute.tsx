@@ -25,14 +25,20 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         const response = await fetch("/api/auth/verify", {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Auth verification failed:", errorData);
           throw new Error("Token invalid");
         }
 
         const data = await response.json();
+        
+        // Update stored user data
+        localStorage.setItem("user", JSON.stringify(data.user));
         
         // Check if user role matches required role (but allow admin access to everything)
         if (requiredRole && data.user.role !== requiredRole && data.user.role !== "admin") {
@@ -57,14 +63,14 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         }
 
         setUser(data.user);
+        setLoading(false);
       } catch (error) {
+        console.error("Auth check error:", error);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setLocation("/login");
         return;
       }
-
-      setLoading(false);
     };
 
     checkAuth();
