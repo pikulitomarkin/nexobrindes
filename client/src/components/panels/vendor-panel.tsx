@@ -8,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function VendorPanel() {
   const { toast } = useToast();
-  const vendorId = "vendor-1"; // Mock current vendor ID
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const vendorId = user.id; // Use actual vendor ID from logged user
 
   const { data: vendorInfo, isLoading: vendorLoading } = useQuery({
     queryKey: ["/api/vendor", vendorId],

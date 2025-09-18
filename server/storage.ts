@@ -737,6 +737,8 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
+    
+    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
     this.clients.set(id, client);
     return client;
   }
@@ -815,7 +817,14 @@ export class MemStorage implements IStorage {
   }
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
-    return Array.from(this.clients.values()).filter(client => client.vendorId === vendorId);
+    console.log(`Storage: getClientsByVendor for vendorId: ${vendorId}`);
+    const allClients = Array.from(this.clients.values());
+    console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+    
+    const filteredClients = allClients.filter(client => client.vendorId === vendorId);
+    console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+    
+    return filteredClients;
   }
 
   // Production Order methods

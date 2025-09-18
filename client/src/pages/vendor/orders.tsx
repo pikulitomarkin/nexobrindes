@@ -14,9 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function VendorOrders() {
-  const vendorId = "vendor-1";
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const vendorId = user.id; // Use actual vendor ID from logged user
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderProductSearch, setOrderProductSearch] = useState("");
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");

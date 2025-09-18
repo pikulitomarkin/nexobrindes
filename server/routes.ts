@@ -1390,13 +1390,16 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/vendors/:id/clients", async (req, res) => {
     try {
       const vendorId = req.params.id;
+      console.log(`Fetching clients for vendor: ${vendorId}`);
+      
       const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
       // Enrich clients with order counts and total spent
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
-          if (!client.userId) return { ...client, ordersCount: 0, totalSpent: 0 };
-          const orders = await storage.getOrdersByClient(client.userId);
+          const clientId = client.userId || client.id;
+          const orders = await storage.getOrdersByClient(clientId);
           const vendorOrders = orders.filter(order => order.vendorId === vendorId);
 
           const ordersCount = vendorOrders.length;
@@ -1412,9 +1415,10 @@ Para mais detalhes, entre em contato conosco!`;
         })
       );
 
+      console.log(`Returning ${enrichedClients.length} enriched clients`);
       res.json(enrichedClients);
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching vendor clients:", error);
       res.status(500).json({ error: "Failed to fetch vendor clients" });
     }
   });

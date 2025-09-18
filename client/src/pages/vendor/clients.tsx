@@ -39,7 +39,8 @@ const clientFormSchema = z.object({
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 
 export default function VendorClients() {
-  const vendorId = "vendor-1"; // Em produção, buscar do contexto/auth
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const vendorId = user.id; // Use actual vendor ID from logged user
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 

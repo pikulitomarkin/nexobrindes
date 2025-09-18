@@ -15,7 +15,8 @@ import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 
 export default function VendorBudgets() {
-  const vendorId = "vendor-1";
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const vendorId = user.id; // Use actual vendor ID from logged user
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
