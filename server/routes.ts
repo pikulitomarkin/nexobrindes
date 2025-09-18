@@ -334,7 +334,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: vendor.id,
             name: vendor.name,
             email: vendor.email,
+            phone: vendor.phone,
             username: vendor.username,
+            userCode: vendor.username, // Use username as userCode for display
             commissionRate: vendorInfo?.commissionRate || '10.00',
             isActive: vendorInfo?.isActive || true
           };
@@ -349,15 +351,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors", async (req, res) => {
     try {
-      const { name, email, username, commissionRate } = req.body;
+      const { name, email, username, password, commissionRate, userCode } = req.body;
 
-      // Create user
+      // Create user with provided or generated username
       const user = await storage.createUser({
-        username,
-        password: "123456", // Default password
+        username: userCode || username,
+        password: password || "123456",
         role: "vendor",
         name,
-        email
+        email,
+        phone: req.body.phone || null
       });
 
       // Create vendor info
@@ -368,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         salesLink: null
       });
 
-      res.json({ success: true, user });
+      res.json({ success: true, user: { ...user, userCode: userCode } });
     } catch (error) {
       res.status(500).json({ error: "Failed to create vendor" });
     }

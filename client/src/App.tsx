@@ -11,7 +11,8 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 
 // Admin pages - Only the simplified ones
-import AdminClients from "@/pages/admin/clients";
+import AdminClients from "./pages/admin/clients";
+import AdminVendors from "./pages/admin/vendors";
 import AdminCommissionManagement from './pages/admin/commission-management';
 
 // Vendor pages
@@ -65,6 +66,14 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminClients />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/vendors">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminVendors />
               </MainLayout>
             </ProtectedRoute>
           </Route>

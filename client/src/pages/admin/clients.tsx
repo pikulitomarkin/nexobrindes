@@ -38,6 +38,8 @@ export default function AdminClients() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [showOrders, setShowOrders] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState(false);
+  const [showEditClient, setShowEditClient] = useState(false);
   const [userCode, setUserCode] = useState("");
   const { toast } = useToast();
 
@@ -356,10 +358,26 @@ export default function AdminClients() {
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" title="Ver Detalhes">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        title="Ver Detalhes"
+                        onClick={() => {
+                          setSelectedClientId(client.id);
+                          setShowClientDetails(true);
+                        }}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" title="Editar">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        title="Editar"
+                        onClick={() => {
+                          setSelectedClientId(client.id);
+                          setShowEditClient(true);
+                        }}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
                     </div>
@@ -490,6 +508,101 @@ export default function AdminClients() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para ver detalhes do cliente */}
+      <Dialog open={showClientDetails} onOpenChange={(open) => {
+        setShowClientDetails(open);
+        if (!open) {
+          setSelectedClientId(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Cliente</DialogTitle>
+          </DialogHeader>
+          {selectedClientId && (
+            <div className="space-y-4">
+              {(() => {
+                const client = clients?.find((c: any) => c.id === selectedClientId);
+                if (!client) return null;
+                
+                return (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Nome:</label>
+                      <p className="text-sm text-gray-900">{client.name}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
+                      <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {client.userCode || 'N/A'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Email:</label>
+                      <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Telefone:</label>
+                      <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
+                      <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
+                      <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-gray-600">Endereço:</label>
+                      <p className="text-sm text-gray-900">{client.address || 'N/A'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
+                      <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
+                      <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar cliente */}
+      <Dialog open={showEditClient} onOpenChange={(open) => {
+        setShowEditClient(open);
+        if (!open) {
+          setSelectedClientId(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          {selectedClientId && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">Funcionalidade de edição em desenvolvimento...</p>
+              <Button onClick={() => setShowEditClient(false)}>
+                Fechar
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

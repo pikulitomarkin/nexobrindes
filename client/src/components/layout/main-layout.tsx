@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
@@ -53,6 +52,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return [
           { href: "/", icon: Home, label: "Dashboard" },
           { href: "/admin/clients", icon: Users, label: "Clientes" },
+          { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
         ];
       case "vendor":
@@ -88,7 +88,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   const menuItems = getMenuItems();
-  
+
   // Define role labels
   const roleLabels = {
     admin: "Administrador",
