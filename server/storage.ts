@@ -285,8 +285,8 @@ export class MemStorage implements IStorage {
     this.users.clear();
     
     // Admin user
-    this.users.set("admin", {
-      id: "admin",
+    const adminUser = {
+      id: "admin-1",
       username: "admin",
       password: "123456", // In production, this should be hashed
       name: "Administrador do Sistema",
@@ -297,10 +297,11 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
+    this.users.set(adminUser.id, adminUser);
 
     // Vendor user
-    this.users.set("vendedor1", {
+    const vendorUser = {
       id: "vendor-1",
       username: "vendedor1", 
       password: "123456",
@@ -312,10 +313,11 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
+    this.users.set(vendorUser.id, vendorUser);
 
     // Client user
-    this.users.set("cliente1", {
+    const clientUser = {
       id: "client-1",
       username: "cliente1",
       password: "123456", 
@@ -327,10 +329,11 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
+    this.users.set(clientUser.id, clientUser);
 
     // Producer user
-    this.users.set("produtor1", {
+    const producerUser = {
       id: "producer-1",
       username: "produtor1",
       password: "123456",
@@ -342,10 +345,11 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
+    this.users.set(producerUser.id, producerUser);
 
     // Partner user
-    this.users.set("socio1", {
+    const partnerUser = {
       id: "partner-1",
       username: "socio1",
       password: "123456",
@@ -357,7 +361,8 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
+    this.users.set(partnerUser.id, partnerUser);
   }
 
   private initializeData() {
