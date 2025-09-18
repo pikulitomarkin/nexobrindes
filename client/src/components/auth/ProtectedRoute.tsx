@@ -22,6 +22,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       }
 
       try {
+        console.log("Checking auth with token:", token.substring(0, 20) + "...");
+        
         const response = await fetch("/api/auth/verify", {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -29,13 +31,16 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           },
         });
 
+        console.log("Auth response status:", response.status);
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error("Auth verification failed:", errorData);
+          console.error("Auth verification failed:", response.status, errorData);
           throw new Error("Token invalid");
         }
 
         const data = await response.json();
+        console.log("Auth verification successful:", data.user.username, data.user.role);
         
         // Update stored user data
         localStorage.setItem("user", JSON.stringify(data.user));

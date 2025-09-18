@@ -47,34 +47,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
     if (!token) {
+      console.log("No token provided");
       return res.status(401).json({ error: "Token não fornecido" });
     }
 
     try {
+      console.log("Verifying token:", token.substring(0, 20) + "...");
       const decoded = Buffer.from(token, 'base64').toString();
-      const [userId, username, timestamp] = decoded.split(':');
+      console.log("Decoded token:", decoded);
+      
+      const tokenParts = decoded.split(':');
+      if (tokenParts.length !== 3) {
+        console.log("Invalid token format, parts:", tokenParts.length);
+        return res.status(401).json({ error: "Formato de token inválido" });
+      }
+
+      const [userId, username, timestamp] = tokenParts;
+      console.log("Token parts - userId:", userId, "username:", username, "timestamp:", timestamp);
       
       // Check if token is not too old (24 hours)
-      const tokenAge = Date.now() - parseInt(timestamp);
+      const tokenTimestamp = parseInt(timestamp);
+      if (isNaN(tokenTimestamp)) {
+        console.log("Invalid timestamp:", timestamp);
+        return res.status(401).json({ error: "Token inválido" });
+      }
+
+      const tokenAge = Date.now() - tokenTimestamp;
       if (tokenAge > 24 * 60 * 60 * 1000) {
+        console.log("Token expired, age:", tokenAge);
         return res.status(401).json({ error: "Token expirado" });
       }
       
       const user = await storage.getUser(userId);
-      if (!user || !user.isActive) {
-        return res.status(401).json({ error: "Token inválido" });
+      console.log("User found:", user ? `${user.id} - ${user.username}` : "not found");
+      
+      if (!user) {
+        console.log("User not found for ID:", userId);
+        return res.status(401).json({ error: "Usuário não encontrado" });
+      }
+
+      if (!user.isActive) {
+        console.log("User inactive:", userId);
+        return res.status(401).json({ error: "Usuário inativo" });
       }
 
       // Verify username matches
       if (user.username !== username) {
+        console.log("Username mismatch. Token:", username, "User:", user.username);
         return res.status(401).json({ error: "Token inválido" });
       }
 
+      console.log("Token verification successful for user:", user.username);
       const { password: _, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {
       console.error("Token verification error:", error);
-      res.status(401).json({ error: "Token inválido" });
+      res.status(401).json({ error: "Erro na verificação do token" });
     }
   });
 
