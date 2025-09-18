@@ -49,7 +49,7 @@ function App() {
         <Toaster />
         <Switch>
           <Route path="/login" component={Login} />
-          
+
           {/* Default routes */}
           <Route path="/">
             <ProtectedRoute>
@@ -58,7 +58,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/dashboard">
             <ProtectedRoute>
               <MainLayout>
@@ -75,7 +75,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/budgets">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -83,7 +83,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/orders">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -91,7 +91,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/vendors">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -99,7 +99,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/clients">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -107,7 +107,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/producers">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -115,7 +115,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/finance">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -123,7 +123,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/settings">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -131,7 +131,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/admin/commission-management">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
@@ -148,7 +148,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/vendor/budgets">
             <ProtectedRoute>
               <MainLayout>
@@ -156,7 +156,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/vendor/orders">
             <ProtectedRoute>
               <MainLayout>
@@ -164,7 +164,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/vendor/clients">
             <ProtectedRoute>
               <MainLayout>
@@ -172,7 +172,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/vendor/commissions">
             <ProtectedRoute>
               <MainLayout>
@@ -189,7 +189,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/client/order/:id/timeline">
             <ProtectedRoute>
               <MainLayout>
@@ -206,7 +206,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/producer/orders">
             <ProtectedRoute>
               <MainLayout>
@@ -214,7 +214,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/producer/order/:id">
             <ProtectedRoute>
               <MainLayout>
@@ -222,7 +222,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/producer/profile-settings">
             <ProtectedRoute>
               <MainLayout>
@@ -239,7 +239,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
-          
+
           <Route path="/finance/reconciliation">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>

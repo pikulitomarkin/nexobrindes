@@ -47,6 +47,9 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     { id: "finance", label: "Financeiro", icon: TrendingUp },
   ];
 
+  // Assuming userRole is available, for example, from context or props
+  const userRole = "admin"; // Placeholder for actual user role
+
   return (
     <div className="w-64 gradient-bg text-white shadow-xl">
       <div className="p-6">
@@ -79,81 +82,95 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       </nav>
 
       {/* Admin Panel Specific Links */}
-      {activePanel === "admin" && (
-        <nav className="mt-8">
-          <div className="px-6 mb-4">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Gestão
-            </p>
-          </div>
-          <SidebarItem 
-            icon={ShoppingCart} 
-            label="Pedidos" 
-            href="/admin/orders"
-            isActive={location === "/admin/orders"}
-          />
-          <SidebarItem 
-            icon={Users} 
-            label="Clientes" 
-            href="/admin/clients"
-            isActive={location === "/admin/clients"}
-          />
-          <SidebarItem 
-            icon={Package} 
-            label="Produtos" 
-            href="/admin/products"
-            isActive={location === "/admin/products"}
-          />
-          <SidebarItem 
-            icon={FileText} 
-            label="Orçamentos" 
-            href="/admin/budgets"
-            isActive={location === "/admin/budgets"}
-          />
-          <SidebarItem 
-            icon={Factory} 
-            label="Produtores" 
-            href="/admin/producers"
-            isActive={location === "/admin/producers"}
-          />
-          <SidebarItem 
-            icon={UserCheck} 
-            label="Vendedores" 
-            href="/admin/vendors"
-            isActive={location === "/admin/vendors"}
-          />
-          
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Comissões
-            </p>
-          </div>
-          <SidebarItem 
-            icon={Calculator} 
-            label="Gerenciar Comissões" 
-            href="/admin/commission-management"
-            isActive={location === "/admin/commission-management"}
-          />
-          
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Configurações
-            </p>
-          </div>
-          <SidebarItem 
-            icon={Settings} 
-            label="Configurações Gerais" 
-            href="/admin/settings"
-            isActive={location === "/admin/settings"}
-          />
-          <SidebarItem 
-            icon={TrendingUp} 
-            label="Financeiro" 
-            href="/admin/finance"
-            isActive={location === "/admin/finance"}
-          />
-        </nav>
-      )}
+      {userRole === 'admin' && (
+          <>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/orders">
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>Pedidos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/budgets">
+                      <FileText className="h-4 w-4" />
+                      <span>Orçamentos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/products">
+                      <Package className="h-4 w-4" />
+                      <span>Produtos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/users">
+                      <Users className="h-4 w-4" />
+                      <span>Usuários</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/clients">
+                      <Users className="h-4 w-4" />
+                      <span>Clientes</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/vendors">
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>Vendedores</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/producers">
+                      <Factory className="h-4 w-4" />
+                      <span>Produtores</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/finance">
+                      <DollarSign className="h-4 w-4" />
+                      <span>Financeiro</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/commission-management">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Comissões</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href="/admin/settings">
+                      <Settings className="h-4 w-4" />
+                      <span>Configurações</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </>
+        )}
 
       {/* Vendor Panel Specific Links */}
       {activePanel === "vendor" && (
@@ -187,7 +204,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             href="/vendor/budgets"
             isActive={location === "/vendor/budgets"}
           />
-          
+
           <div className="px-6 mb-4 mt-6">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
               Financeiro

@@ -16,7 +16,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const user = await storage.getUserByUsername(username);
-      
+
       if (!user || user.password !== password) {
         return res.status(401).json({ error: "Credenciais inválidas" });
       }
@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify Token (middleware for protected routes)
   app.get("/api/auth/verify", async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
-    
+
     if (!token) {
       console.log("No token provided");
       return res.status(401).json({ error: "Token não fornecido" });
@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Verifying token:", token.substring(0, 20) + "...");
       const decoded = Buffer.from(token, 'base64').toString();
       console.log("Decoded token:", decoded);
-      
+
       const tokenParts = decoded.split(':');
       if (tokenParts.length !== 3) {
         console.log("Invalid token format, parts:", tokenParts.length);
@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [userId, username, timestamp] = tokenParts;
       console.log("Token parts - userId:", userId, "username:", username, "timestamp:", timestamp);
-      
+
       // Check if token is not too old (24 hours)
       const tokenTimestamp = parseInt(timestamp);
       if (isNaN(tokenTimestamp)) {
@@ -77,10 +77,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Token expired, age:", tokenAge);
         return res.status(401).json({ error: "Token expirado" });
       }
-      
+
       const user = await storage.getUser(userId);
       console.log("User found:", user ? `${user.id} - ${user.username}` : "not found");
-      
+
       if (!user) {
         console.log("User not found for ID:", userId);
         return res.status(401).json({ error: "Usuário não encontrado" });
@@ -1336,7 +1336,7 @@ Para mais detalhes, entre em contato conosco!`;
           let productionNotes = null;
           let productionDeadline = null;
           let lastNoteAt = null;
-          
+
           if (order.producerId) {
             const productionOrders = await storage.getProductionOrdersByOrder(order.id);
             if (productionOrders.length > 0) {
@@ -1536,7 +1536,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       // Use storage instead of db.update
       const result = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate);
-      
+
       if (!result) {
         return res.status(404).json({ error: "Production order not found" });
       }
@@ -1544,7 +1544,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Also update the main order status if needed
       if (status === 'production' || status === 'completed' || status === 'ready') {
         const productionOrder = await storage.getProductionOrder(id);
-        
+
         if (productionOrder) {
           let orderStatus = status === 'completed' ? 'completed' : 'production';
           await storage.updateOrder(productionOrder.orderId, { status: orderStatus });
@@ -2021,6 +2021,90 @@ Para mais detalhes, entre em contato conosco!`;
       res.json(settings);
     } catch (error) {
       res.status(500).json({ error: "Failed to update commission settings" });
+    }
+  });
+
+  // User routes
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", async (req, res) => {
+    try {
+      const { name, email, username, password, role } = req.body;
+      const newUser = await storage.createUser({
+        name,
+        email,
+        username,
+        password,
+        role,
+        isActive: true // Default to active
+      });
+      res.json(newUser);
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      // Exclude password from response
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Failed to fetch user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, email, username, role, isActive, specialty, address, phone } = req.body;
+
+      const updatedUser = await storage.updateUser(id, {
+        name,
+        email,
+        username,
+        role,
+        isActive,
+        specialty,
+        address,
+        phone
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
