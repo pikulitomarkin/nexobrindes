@@ -564,16 +564,16 @@ export class MemStorage implements IStorage {
 
     // Create additional payments for recent orders to show correct values
     const allOrders = Array.from(this.orders.values());
-    
+
     // Find orders that need test payments and ensure all orders have some payment
-    const ordersToAddPayments = allOrders.filter(o => 
+    const ordersToAddPayments = allOrders.filter(o =>
       o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
     );
 
     ordersToAddPayments.forEach((order, index) => {
       // Create test payment for each order with better amounts
       let paymentAmount = "567.00"; // Default
-      
+
       if (order.orderNumber?.includes("#12345")) {
         paymentAmount = "735.00"; // 30% of 2450
       } else if (order.orderNumber?.includes("#12346")) {
@@ -581,7 +581,7 @@ export class MemStorage implements IStorage {
       } else if (order.orderNumber?.includes("PED-")) {
         paymentAmount = "3000.00"; // Example for newer orders
       }
-      
+
       const testPayment: Payment = {
         id: `payment-visible-${index + 1}`,
         orderId: order.id,
@@ -593,7 +593,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
       };
       this.payments.set(testPayment.id, testPayment);
-      
+
       // Update the order's paid value immediately
       this.updateOrderPaidValue(order.id);
     });
@@ -834,9 +834,9 @@ export class MemStorage implements IStorage {
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (order) {
-      const updatedOrder = { 
-        ...order, 
-        ...updates, 
+      const updatedOrder = {
+        ...order,
+        ...updates,
         updatedAt: new Date(),
         trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode
       };
@@ -882,7 +882,7 @@ export class MemStorage implements IStorage {
         // Continue checking
       }
 
-      // Check if clientId is a client record ID and order.clientId is a user ID  
+      // Check if clientId is a client record ID and order.clientId is a user ID
       try {
         const userClientRecord = await this.getClientByUserId(clientId);
         if (userClientRecord && order.clientId === userClientRecord.id) {
@@ -1010,12 +1010,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date()
     };
     this.payments.set(id, payment);
-    
+
     // Se o pagamento está confirmado, atualizar o valor pago no pedido
     if (payment.status === 'confirmed') {
       await this.updateOrderPaidValue(payment.orderId);
     }
-    
+
     return payment;
   }
 
@@ -1028,7 +1028,7 @@ export class MemStorage implements IStorage {
     const totalPaid = payments
       .filter(payment => payment.status === 'confirmed')
       .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-    
+
     await this.updateOrder(orderId, { paidValue: totalPaid.toFixed(2) });
   }
 

@@ -149,7 +149,7 @@ export default function ClientOrders() {
                     <div className="text-sm text-gray-600">Saldo Restante</div>
                   </div>
                 </div>
-                
+
                 {/* Payment Details */}
                 {parseFloat(order.paidValue || '0') > 0 && order.payments && order.payments.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-gray-200">
@@ -233,8 +233,8 @@ export default function ClientOrders() {
                   <div className="flex items-center gap-2 mb-2">
                     <CreditCard className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-800">
-                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
-                        ? 'Pagamento completo realizado' 
+                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                        ? 'Pagamento completo realizado'
                         : 'Entrada paga'}: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>

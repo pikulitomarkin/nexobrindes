@@ -224,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Fetching orders for client: ${clientId}`);
 
       let orders = [];
-      
+
       // Get all orders to search through
       const allOrders = await storage.getOrders();
       console.log(`Total orders in system: ${allOrders.length}`);
@@ -302,18 +302,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const totalValue = parseFloat(order.totalValue);
           const remainingBalance = Math.max(0, totalValue - totalPaid);
 
+          // Get budget payment info if available
+          const budgetPaymentInfo = order.budgetId ? await storage.getBudgetPaymentInfo(order.budgetId) : null;
+          const downPayment = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.downPayment) : 0;
+          const calculatedRemainingBalance = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.remainingAmount) : remainingBalance;
+
           console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}, Payments:`, confirmedPayments.map(p => ({ amount: p.amount, method: p.method, status: p.status })));
 
           return {
             ...order,
-            paidValue: totalPaid.toFixed(2), // Update with actual paid amount
-            remainingValue: remainingBalance.toFixed(2), // Add remaining balance
+            clientName: client?.name || 'Unknown',
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
             trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-            estimatedDelivery: productionOrder?.deliveryDeadline || null,
-            payments: payments.filter(p => p.status === 'confirmed') // Include payment details
+            productionOrder,
+            paidValue: totalPaid.toFixed(2),
+            downPayment: downPayment.toFixed(2),
+            remainingBalance: calculatedRemainingBalance.toFixed(2),
+            budgetPaymentInfo
           };
         })
       );
@@ -1930,7 +1937,7 @@ Para mais detalhes, entre em contato conosco!`;
       const productionOrder = await storage.getProductionOrder(id);
       if (productionOrder) {
         let orderStatus = 'production'; // Default
-        
+
         switch (status) {
           case 'pending':
             orderStatus = 'pending';
@@ -1957,7 +1964,7 @@ Para mais detalhes, entre em contato conosco!`;
             orderStatus = 'cancelled';
             break;
         }
-        
+
         // Atualizar o pedido principal com o novo status
         await storage.updateOrder(productionOrder.orderId, { 
           status: orderStatus,
@@ -2221,17 +2228,24 @@ Para mais detalhes, entre em contato conosco!`;
       const totalValue = parseFloat(order.totalValue);
       const remainingBalance = Math.max(0, totalValue - totalPaid);
 
+      // Get budget payment info if available
+      const budgetPaymentInfo = order.budgetId ? await storage.getBudgetPaymentInfo(order.budgetId) : null;
+      const downPayment = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.downPayment) : 0;
+      const calculatedRemainingBalance = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.remainingAmount) : remainingBalance;
+
       // Create enriched order with all information including updated payment values
       const enrichedOrder = {
         ...order,
-        paidValue: totalPaid.toFixed(2), // Update with actual paid amount
-        remainingValue: remainingBalance.toFixed(2), // Add remaining balance
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null,
         trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
         productionOrder,
-        payments: confirmedPayments // Include only confirmed payments
+        payments: confirmedPayments, // Include only confirmed payments
+        paidValue: totalPaid.toFixed(2),
+        downPayment: downPayment.toFixed(2),
+        remainingBalance: calculatedRemainingBalance.toFixed(2),
+        budgetPaymentInfo
       };
 
       const timeline = [

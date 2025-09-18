@@ -174,72 +174,89 @@ export default function ClientOrderTimeline() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Data do Pedido</p>
-                    <p className="font-medium flex items-center">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  {order.deadline && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Informações do Pedido
+                  </h3>
+                  <div className="space-y-3">
                     <div>
-                      <p className="text-sm text-gray-600">Prazo de Entrega</p>
-                      <p className="font-medium flex items-center">
-                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                        {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                      <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
+                      <p className="text-lg font-bold">{order.orderNumber}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Status</label>
+                      <div className="mt-1">{getStatusBadge(order.status)}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Valor Total</label>
+                      <p className="text-lg font-bold text-green-600">
+                        R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
-                  )}
-                  {order.vendorName && (
                     <div>
-                      <p className="text-sm text-gray-600">Vendedor</p>
-                      <p className="font-medium">{order.vendorName}</p>
+                      <label className="text-sm font-medium text-gray-500">Data de Criação</label>
+                      <p className="text-sm text-gray-900">
+                        {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                      </p>
                     </div>
-                  )}
-                  {order.producerName && (
-                    <div>
-                      <p className="text-sm text-gray-600">Produtor</p>
-                      <p className="font-medium">{order.producerName}</p>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Valor Total</p>
-                    <p className="font-bold text-2xl text-green-600">
-                      R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
-                        ? 'Pagamento Completo' 
-                        : parseFloat(order.paidValue || '0') > 0 
-                          ? 'Entrada Paga' 
-                          : 'Nenhum Pagamento'}
-                    </p>
-                    <p className="font-semibold text-lg text-blue-600">
-                      R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    {parseFloat(order.paidValue || '0') > 0 && order.payments && order.payments.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        <div className="font-medium mb-1">Histórico de Pagamentos:</div>
-                        {order.payments.map((payment: any, index: number) => (
-                          <div key={payment.id || index} className="flex justify-between">
-                            <span>{payment.method?.toUpperCase()} - {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 'Data não informada'}</span>
-                            <span className="font-medium text-green-600">R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Informações de Pagamento
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Entrada paga */}
+                    {parseFloat(order.downPayment || '0') > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Entrada Paga</label>
+                        <p className="text-lg font-bold text-green-600">
+                          R$ {parseFloat(order.downPayment || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
                     )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Saldo Restante</p>
-                    <p className="font-semibold text-lg text-orange-600">
-                      R$ {(order.remainingValue ? parseFloat(order.remainingValue) : (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0'))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
+
+                    {/* Total pago */}
+                    {parseFloat(order.paidValue || '0') > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Total Pago</label>
+                        <p className="text-lg font-bold text-green-600">
+                          R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Saldo restante */}
+                    {parseFloat(order.remainingBalance || '0') > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Saldo Restante</label>
+                        <p className="text-lg font-bold text-orange-600">
+                          R$ {parseFloat(order.remainingBalance || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Status de pagamento */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Status de Pagamento</label>
+                      <p className={`text-sm font-medium ${
+                        parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                          ? 'text-green-600'
+                          : parseFloat(order.paidValue || '0') > 0
+                            ? 'text-orange-600'
+                            : 'text-red-600'
+                      }`}>
+                        {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                          ? 'Pago Integralmente'
+                          : parseFloat(order.paidValue || '0') > 0
+                            ? 'Pagamento Parcial'
+                            : 'Aguardando Pagamento'
+                        }
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -346,10 +363,10 @@ export default function ClientOrderTimeline() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">
-                  {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
-                    ? 'Pagamento Completo:' 
-                    : parseFloat(order.paidValue || '0') > 0 
-                      ? 'Entrada Paga:' 
+                  {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                    ? 'Pagamento Completo:'
+                    : parseFloat(order.paidValue || '0') > 0
+                      ? 'Entrada Paga:'
                       : 'Valor Pago:'}
                 </span>
                 <span className="font-semibold text-blue-600">
@@ -368,8 +385,8 @@ export default function ClientOrderTimeline() {
                   <div className="flex items-center text-sm text-green-800 mb-2">
                     <CheckCircle className="h-4 w-4 mr-2" />
                     <span className="font-medium">
-                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
-                        ? 'Pagamento completo realizado' 
+                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                        ? 'Pagamento completo realizado'
                         : 'Entrada paga - Saldo pendente'}
                     </span>
                   </div>
