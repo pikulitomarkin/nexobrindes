@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useNavigate } from "react-router-dom";
+import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +26,11 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function ProducerOrderDetails() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const [match, params] = useRoute("/producer/order/:id");
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  const id = params?.id;
 
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeadlineDialogOpen, setIsDeadlineDialogOpen] = useState(false);
@@ -136,7 +138,7 @@ export default function ProducerOrderDetails() {
     return (
       <div className="p-8 text-center">
         <p className="text-gray-500 mb-4">Ordem de produção não encontrada</p>
-        <Button onClick={() => navigate('/producer/orders')}>
+        <Button onClick={() => setLocation('/producer/production-dashboard')}>
           Voltar para Ordens
         </Button>
       </div>
@@ -148,7 +150,7 @@ export default function ProducerOrderDetails() {
       <div className="mb-6">
         <Button 
           variant="ghost" 
-          onClick={() => navigate('/producer/orders')}
+          onClick={() => setLocation('/producer/production-dashboard')}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
