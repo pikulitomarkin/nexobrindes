@@ -170,13 +170,7 @@ export default function AdminPanel() {
             <Link href="/admin/products">
               <Button className="w-full justify-start gradient-bg text-white">
                 <Package className="h-4 w-4 mr-2" />
-                Gestão de Produtos ({stats?.totalProducts || 0})
-              </Button>
-            </Link>
-            <Link href="/admin/budgets">
-              <Button variant="outline" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                Orçamentos ({stats?.totalBudgets || 0})
+                Gestão de Produtos & Orçamentos ({stats?.totalProducts || 0})
               </Button>
             </Link>
             <Link href="/admin/orders">
