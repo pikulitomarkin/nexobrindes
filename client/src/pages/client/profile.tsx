@@ -47,6 +47,7 @@ export default function ClientProfile() {
       
       return data;
     },
+    enabled: !!currentUser.id,
   });
 
   const updateProfileMutation = useMutation({

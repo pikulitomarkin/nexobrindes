@@ -222,52 +222,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
       console.log(`Fetching orders for client: ${clientId}`);
-      
+
       // Try multiple approaches to find orders for this client
       let orders = [];
-      
+
       // 1. Try to find orders by user ID directly
       const ordersByUserId = await storage.getOrdersByClient(clientId);
       orders = [...ordersByUserId];
-      
+
       // 2. Try to find client record and get orders by client record ID
       const clientRecord = await storage.getClientByUserId(clientId);
       if (clientRecord) {
         console.log(`Found client record: ${clientRecord.id}`);
         const ordersByClientId = await storage.getOrdersByClient(clientRecord.id);
-        
+
         // Merge orders and remove duplicates
         const existingOrderIds = new Set(orders.map(o => o.id));
         const newOrders = ordersByClientId.filter(o => !existingOrderIds.has(o.id));
         orders = [...orders, ...newOrders];
       }
-      
+
       // 3. Also check if there are orders where the user is referenced in different ways
       const allOrders = await storage.getOrders();
       const userMatchedOrders = allOrders.filter(order => 
         order.clientId === clientId || 
         (clientRecord && order.clientId === clientRecord.id)
       );
-      
+
       // Merge with existing and remove duplicates
       const existingIds = new Set(orders.map(o => o.id));
       const additionalOrders = userMatchedOrders.filter(o => !existingIds.has(o.id));
       orders = [...orders, ...additionalOrders];
-      
+
       console.log(`Found ${orders.length} orders for client ${clientId}`);
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           // Get budget photos if order was converted from budget
           let budgetPhotos = [];
           if (order.budgetId) {
             const photos = await storage.getBudgetPhotos(order.budgetId);
             budgetPhotos = photos.map(photo => photo.imageUrl);
           }
-          
+
           return {
             ...order,
             vendorName: vendor?.name || 'Unknown',
@@ -659,12 +659,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/clients/profile/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      
+      console.log(`Fetching profile for user: ${userId}`);
+
       // First try to find client by userId
       const clientRecord = await storage.getClientByUserId(userId);
       let clientData;
-      
+
       if (clientRecord) {
+        console.log(`Found client record: ${clientRecord.id}`);
         // Get vendor info if assigned
         const vendor = clientRecord.vendorId ? await storage.getUser(clientRecord.vendorId) : null;
         clientData = {
@@ -688,7 +690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedAt: new Date()
         };
       }
-      
+
       res.json(clientData);
     } catch (error) {
       console.error("Error fetching client profile:", error);
@@ -700,16 +702,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const { name, email, phone, address } = req.body;
-      
+
       // Update user record
       await storage.updateUser(userId, { name, email, phone, address });
-      
+
       // Update client record if exists
       const clientRecord = await storage.getClientByUserId(userId);
       if (clientRecord) {
         await storage.updateClient(clientRecord.id, { name, email, phone, address });
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating client profile:", error);
@@ -721,20 +723,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const { currentPassword, newPassword } = req.body;
-      
+
       // Verify current password
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
-      
+
       if (user.password !== currentPassword) {
         return res.status(400).json({ error: "Senha atual incorreta" });
       }
-      
+
       // Update password
       await storage.updateUser(userId, { password: newPassword });
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating client password:", error);
@@ -747,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all orders
       const orders = await storage.getOrders();
-      
+
       // Delete test orders (you can adjust the criteria)
       const testOrders = orders.filter(order => 
         order.orderNumber?.includes('TEST') || 
@@ -761,7 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const po of productionOrders) {
           await storage.deleteProductionOrder(po.id);
         }
-        
+
         // Delete the order
         await storage.deleteOrder(order.id);
       }
@@ -1626,7 +1628,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const vendorId = req.params.id;
       console.log(`Fetching clients for vendor: ${vendorId}`);
-      
+
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
@@ -1662,22 +1664,22 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();
-      
+
       // Enrich clients with userCode and order statistics
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
           const user = await storage.getUser(client.userId);
-          
+
           // Get orders using both userId and client id to ensure we catch all orders
           const ordersByUserId = await storage.getOrdersByClient(client.userId);
           const ordersByClientId = await storage.getOrdersByClient(client.id);
-          
+
           // Combine and deduplicate orders
           const allOrders = [...ordersByUserId, ...ordersByClientId];
           const uniqueOrders = allOrders.filter((order, index, self) => 
             index === self.findIndex(o => o.id === order.id)
           );
-          
+
           const ordersCount = uniqueOrders.length;
           const totalSpent = uniqueOrders.reduce((sum, order) => 
             sum + parseFloat(order.totalValue || '0'), 0
@@ -1728,7 +1730,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/clients", async (req, res) => {
     try {
       const { userCode, password, ...clientData } = req.body;
-      
+
       // Create user account first
       const user = await storage.createUser({
         username: userCode,

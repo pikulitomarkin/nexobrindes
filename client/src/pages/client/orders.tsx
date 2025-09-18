@@ -1,8 +1,10 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Clock, Truck, Home } from "lucide-react";
+import { CheckCircle, Clock, Truck, Home, Eye, Calendar, CreditCard, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 
 export default function ClientOrders() {
   // Get the current user from localStorage or context
@@ -11,6 +13,11 @@ export default function ClientOrders() {
   
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders/client", clientId],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/client/${clientId}`);
+      if (!response.ok) throw new Error('Failed to fetch client orders');
+      return response.json();
+    },
     enabled: !!clientId,
     refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
@@ -19,10 +26,39 @@ export default function ClientOrders() {
     const steps = [
       { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: true },
       { id: "production", label: "Em Produção", icon: Clock, completed: status !== "pending" },
+      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "delivered"].includes(status) },
       { id: "shipping", label: "Envio", icon: Truck, completed: ["shipped", "delivered"].includes(status) },
       { id: "delivered", label: "Entregue", icon: Home, completed: status === "delivered" },
     ];
     return steps;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusClasses = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      production: "bg-purple-100 text-purple-800",
+      ready: "bg-orange-100 text-orange-800",
+      shipped: "bg-indigo-100 text-indigo-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+
+    const statusLabels = {
+      pending: "Aguardando",
+      confirmed: "Confirmado",
+      production: "Em Produção",
+      ready: "Pronto para Envio",
+      shipped: "Enviado",
+      delivered: "Entregue",
+      cancelled: "Cancelado",
+    };
+
+    return (
+      <Badge className={`${statusClasses[status as keyof typeof statusClasses]} border-0`}>
+        {statusLabels[status as keyof typeof statusLabels]}
+      </Badge>
+    );
   };
 
   if (isLoading) {
@@ -30,7 +66,11 @@ export default function ClientOrders() {
       <div className="p-8">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded-xl"></div>
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded-xl"></div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -40,21 +80,69 @@ export default function ClientOrders() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Pedidos</h1>
-        <p className="text-gray-600">Acompanhe o status dos seus pedidos</p>
+        <p className="text-gray-600">Acompanhe o status e detalhes dos seus pedidos</p>
       </div>
 
       <div className="space-y-6">
         {orders?.map((order: any) => (
-          <Card key={order.id} className="card-hover">
+          <Card key={order.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>{order.orderNumber} - {order.product}</span>
-                <span className="text-lg font-bold gradient-text">
-                  R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </CardTitle>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-xl text-gray-900 mb-2">
+                    {order.orderNumber} - {order.product}
+                  </CardTitle>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      Pedido em: {order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
+                    </span>
+                    {order.deadline && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {getStatusBadge(order.status)}
+                  <div className="mt-2">
+                    <Link href={`/client/order/${order.id}/timeline`}>
+                      <Button size="sm" className="gradient-bg text-white">
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver Detalhes
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              {/* Financial Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Valor Total</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Valor Pago</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      R$ {(parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Saldo Devedor</div>
+                  </div>
+                </div>
+              </div>
+
               {/* Timeline */}
               <div className="relative mb-6">
                 <div className="flex items-center justify-between">
@@ -62,14 +150,14 @@ export default function ClientOrders() {
                     const Icon = step.icon;
                     return (
                       <div key={step.id} className="flex flex-col items-center relative z-10">
-                        <div className={`w-8 h-8 ${step.completed ? 'gradient-bg' : 'bg-gray-300'} rounded-full flex items-center justify-center mb-2`}>
-                          <Icon className={`h-4 w-4 ${step.completed ? 'text-white' : 'text-gray-500'}`} />
+                        <div className={`w-10 h-10 ${step.completed ? 'gradient-bg' : 'bg-gray-300'} rounded-full flex items-center justify-center mb-2`}>
+                          <Icon className={`h-5 w-5 ${step.completed ? 'text-white' : 'text-gray-500'}`} />
                         </div>
-                        <p className={`text-sm font-medium ${step.completed ? 'text-gray-900' : 'text-gray-500'}`}>
+                        <p className={`text-sm font-medium text-center ${step.completed ? 'text-gray-900' : 'text-gray-500'}`}>
                           {step.label}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {step.completed ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Previsto'}
+                        <p className="text-xs text-gray-500 mt-1 text-center">
+                          {step.completed ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Aguardando'}
                         </p>
                       </div>
                     );
@@ -77,13 +165,15 @@ export default function ClientOrders() {
                 </div>
 
                 {/* Progress Line */}
-                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200">
+                <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200">
                   <div
                     className="h-full gradient-bg transition-all duration-500"
                     style={{
-                      width: order.status === "pending" ? "25%" :
+                      width: order.status === "pending" ? "0%" :
+                             order.status === "confirmed" ? "25%" :
                              order.status === "production" ? "50%" :
-                             order.status === "shipped" ? "75%" : "100%"
+                             order.status === "ready" ? "75%" :
+                             order.status === "shipped" ? "90%" : "100%"
                     }}
                   ></div>
                 </div>
@@ -93,13 +183,7 @@ export default function ClientOrders() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Descrição</p>
-                  <p className="font-medium text-gray-900">{order.description || 'Não informado'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Prazo de Entrega</p>
-                  <p className="font-medium text-gray-900">
-                    {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'A definir'}
-                  </p>
+                  <p className="font-medium text-gray-900">{order.description || 'Descrição não informada'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Produtor</p>
@@ -107,18 +191,25 @@ export default function ClientOrders() {
                     {order.producerName || 'Em definição'}
                   </p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Vendedor</p>
+                  <p className="font-medium text-gray-900">
+                    {order.vendorName || 'Não informado'}
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-4 flex justify-end">
-                <Button
-                  size="sm"
-                  className="gradient-bg text-white"
-                  onClick={() => window.location.href = `/client/order/${order.id}/timeline`}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Ver Status
-                </Button>
-              </div>
+              {/* Payment Information */}
+              {parseFloat(order.paidValue || '0') > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      Pagamento parcial realizado: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -127,7 +218,9 @@ export default function ClientOrders() {
       {orders?.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500">Nenhum pedido encontrado.</p>
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-xl font-medium text-gray-600 mb-2">Nenhum pedido encontrado</p>
+            <p className="text-gray-500">Seus pedidos aparecerão aqui quando forem criados.</p>
           </CardContent>
         </Card>
       )}

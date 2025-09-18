@@ -237,7 +237,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
         <nav className="mt-8">
           <div className="px-6 mb-4">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Minha Conta
+              Pedidos
             </p>
           </div>
           <SidebarItem 
@@ -246,6 +246,18 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             href="/client/orders"
             isActive={location === "/client/orders"}
           />
+          <SidebarItem 
+            icon={ClipboardList} 
+            label="Status dos Pedidos" 
+            href="/client/orders"
+            isActive={location.includes("/client/order/") && location.includes("/timeline")}
+          />
+
+          <div className="px-6 mb-4 mt-6">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Minha Conta
+            </p>
+          </div>
           <SidebarItem 
             icon={User} 
             label="Meu Perfil" 
