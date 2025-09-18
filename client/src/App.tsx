@@ -5,8 +5,17 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import MainLayout from "@/components/layout/main-layout";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+
+// Dashboard imports
+import AdminDashboard from "@/pages/dashboards/admin-dashboard";
+import VendorDashboard from "@/pages/dashboards/vendor-dashboard";
+import ClientDashboard from "@/pages/dashboards/client-dashboard";
+import ProducerDashboard from "@/pages/dashboards/producer-dashboard";
+import PartnerDashboard from "@/pages/dashboards/partner-dashboard";
 
 // Admin pages
 import AdminVendors from "@/pages/admin/vendors";
@@ -44,47 +53,241 @@ import FinanceReconciliation from "@/pages/finance/reconciliation";
 
 function Router() {
   return (
-    <MainLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard" component={Dashboard} />
+    <Switch>
+      <Route path="/login" component={Login} />
+      
+      {/* Dashboard Routes */}
+      <Route path="/admin/dashboard">
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/vendor/dashboard">
+        <ProtectedRoute requiredRole="vendor">
+          <VendorDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/client/dashboard">
+        <ProtectedRoute requiredRole="client">
+          <ClientDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/producer/dashboard">
+        <ProtectedRoute requiredRole="producer">
+          <ProducerDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/partner/dashboard">
+        <ProtectedRoute requiredRole="partner">
+          <PartnerDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Protected routes with MainLayout */}
+      <Route path="/">
+        <ProtectedRoute>
+          <MainLayout>
+            <Dashboard />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/dashboard">
+        <ProtectedRoute>
+          <MainLayout>
+            <Dashboard />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
 
         {/* Admin Routes */}
-        <Route path="/admin/products" component={AdminProducts} />
-        <Route path="/admin/budgets" component={AdminBudgets} />
-        <Route path="/admin/orders" component={AdminOrders} />
-        <Route path="/admin/vendors" component={AdminVendors} />
-        <Route path="/admin/clients" component={AdminClients} />
-        <Route path="/admin/producers" component={AdminProducers} />
-        <Route path="/admin/finance" component={AdminFinance} />
-        <Route path="/admin/settings" component={AdminSettings} />
-        <Route path="/admin/commission-management" component={AdminCommissionManagement} />
+        <Route path="/admin/products">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminProducts />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/budgets">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminBudgets />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/orders">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminOrders />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/vendors">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminVendors />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/clients">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminClients />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/producers">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminProducers />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/finance">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminFinance />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/settings">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminSettings />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/commission-management">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <AdminCommissionManagement />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
 
 
         {/* Vendor Routes */}
-        <Route path="/vendor/products" component={VendorProducts} />
-        <Route path="/vendor/budgets" component={VendorBudgets} />
-        <Route path="/vendor/orders" component={VendorOrders} />
-        <Route path="/vendor/clients" component={VendorClients} />
-        <Route path="/vendor/commissions" component={VendorCommissions} />
+        <Route path="/vendor/products">
+          <ProtectedRoute requiredRole="vendor">
+            <MainLayout>
+              <VendorProducts />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/vendor/budgets">
+          <ProtectedRoute requiredRole="vendor">
+            <MainLayout>
+              <VendorBudgets />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/vendor/orders">
+          <ProtectedRoute requiredRole="vendor">
+            <MainLayout>
+              <VendorOrders />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/vendor/clients">
+          <ProtectedRoute requiredRole="vendor">
+            <MainLayout>
+              <VendorClients />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/vendor/commissions">
+          <ProtectedRoute requiredRole="vendor">
+            <MainLayout>
+              <VendorCommissions />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
 
         {/* Client Routes */}
-        <Route path="/client/orders" component={ClientOrders} />
-        <Route path="/client/order/:id/timeline" component={ClientOrderTimeline} />
+        <Route path="/client/orders">
+          <ProtectedRoute requiredRole="client">
+            <MainLayout>
+              <ClientOrders />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/client/order/:id/timeline">
+          <ProtectedRoute requiredRole="client">
+            <MainLayout>
+              <ClientOrderTimeline />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
 
         {/* Producer Routes */}
-        <Route path="/producer/production-dashboard" component={ProductionDashboard} />
-        <Route path="/producer/orders" component={ProducerOrders} />
-        <Route path="/producer/order/:id" component={ProducerOrderDetails} />
-        <Route path="/producer/profile-settings" component={ProducerProfileSettings} />
+        <Route path="/producer/production-dashboard">
+          <ProtectedRoute requiredRole="producer">
+            <MainLayout>
+              <ProductionDashboard />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/producer/orders">
+          <ProtectedRoute requiredRole="producer">
+            <MainLayout>
+              <ProducerOrders />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/producer/order/:id">
+          <ProtectedRoute requiredRole="producer">
+            <MainLayout>
+              <ProducerOrderDetails />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/producer/profile-settings">
+          <ProtectedRoute requiredRole="producer">
+            <MainLayout>
+              <ProducerProfileSettings />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
 
         {/* Finance Routes */}
-        <Route path="/finance/payments" component={FinancePayments} />
-        <Route path="/finance/reconciliation" component={FinanceReconciliation} />
+        <Route path="/finance/payments">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <FinancePayments />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/finance/reconciliation">
+          <ProtectedRoute requiredRole="admin">
+            <MainLayout>
+              <FinanceReconciliation />
+            </MainLayout>
+          </ProtectedRoute>
+        </Route>
 
         <Route component={NotFound} />
       </Switch>
-    </MainLayout>
   );
 }
 

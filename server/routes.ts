@@ -10,6 +10,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
+  // Authentication
+  app.post("/api/auth/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || user.password !== password) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ error: "Usuário inativo" });
+      }
+
+      // Create a simple token (in production, use JWT)
+      const token = Buffer.from(`${user.id}:${user.username}:${Date.now()}`).toString('base64');
+
+      // Return user data without password
+      const { password: _, ...userWithoutPassword } = user;
+
+      res.json({
+        success: true,
+        user: userWithoutPassword,
+        token
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Verify Token (middleware for protected routes)
+  app.get("/api/auth/verify", async (req, res) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: "Token não fornecido" });
+    }
+
+    try {
+      const decoded = Buffer.from(token, 'base64').toString();
+      const [userId] = decoded.split(':');
+      
+      const user = await storage.getUser(userId);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ error: "Token inválido" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      res.status(401).json({ error: "Token inválido" });
+    }
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {

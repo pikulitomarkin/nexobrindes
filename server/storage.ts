@@ -276,10 +276,92 @@ export class MemStorage implements IStorage {
     };
     
     this.initializeData();
+    this.createTestUsers();
+  }
+
+  // Create test users for each role
+  private createTestUsers() {
+    // Override existing users with test users
+    this.users.clear();
+    
+    // Admin user
+    this.users.set("admin", {
+      id: "admin",
+      username: "admin",
+      password: "123456", // In production, this should be hashed
+      name: "Administrador do Sistema",
+      email: "admin@erp.com",
+      phone: null,
+      vendorId: null,
+      role: "admin",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Vendor user
+    this.users.set("vendedor1", {
+      id: "vendor-1",
+      username: "vendedor1", 
+      password: "123456",
+      name: "Maria Santos",
+      email: "maria.santos@erp.com",
+      phone: null,
+      vendorId: "vendor-1",
+      role: "vendor",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Client user
+    this.users.set("cliente1", {
+      id: "client-1",
+      username: "cliente1",
+      password: "123456", 
+      name: "João Silva",
+      email: "joao.silva@email.com",
+      phone: null,
+      vendorId: null,
+      role: "client",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Producer user
+    this.users.set("produtor1", {
+      id: "producer-1",
+      username: "produtor1",
+      password: "123456",
+      name: "Marcenaria Santos",
+      email: "contato@marcenariasantos.com", 
+      phone: null,
+      vendorId: null,
+      role: "producer",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Partner user
+    this.users.set("socio1", {
+      id: "partner-1",
+      username: "socio1",
+      password: "123456",
+      name: "João Sócio",
+      email: "joao.socio@erp.com",
+      phone: null,
+      vendorId: null,
+      role: "partner",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 
   private initializeData() {
-    // Create sample users
+    // This will be called first, then createTestUsers() will override with test users
     const adminUser: User = {
       id: "admin-1",
       username: "admin",
@@ -577,7 +659,7 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    return this.users.get(username) || Array.from(this.users.values()).find(user => user.username === username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
