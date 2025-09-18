@@ -562,24 +562,31 @@ export class MemStorage implements IStorage {
     };
     this.commissions.set(commission.id, commission);
 
-    // Create additional payment for the new order if it exists
-    const recentOrder = Array.from(this.orders.values()).find(o => o.orderNumber?.includes("PED-"));
-    if (recentOrder) {
+    // Create additional payments for recent orders to show correct values
+    const allOrders = Array.from(this.orders.values());
+    
+    // Find orders that need test payments
+    const ordersToAddPayments = allOrders.filter(o => 
+      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346")
+    );
+
+    ordersToAddPayments.forEach((order, index) => {
+      // Create test payment for each order
       const testPayment: Payment = {
-        id: "payment-test-1",
-        orderId: recentOrder.id,
-        amount: "567.00",
+        id: `payment-test-${index + 1}`,
+        orderId: order.id,
+        amount: index === 0 ? "1500.00" : "567.00", // Different amounts for different orders
         method: "pix",
         status: "confirmed",
-        transactionId: "PIX-TEST-001",
-        paidAt: new Date(),
-        createdAt: new Date()
+        transactionId: `PIX-TEST-00${index + 1}`,
+        paidAt: new Date(Date.now() - (index * 24 * 60 * 60 * 1000)), // Different dates
+        createdAt: new Date(Date.now() - (index * 24 * 60 * 60 * 1000))
       };
       this.payments.set(testPayment.id, testPayment);
       
-      // Update the order's paid value
-      this.updateOrderPaidValue(recentOrder.id);
-    }
+      // Update the order's paid value immediately
+      this.updateOrderPaidValue(order.id);
+    });
 
     // Initialize mock budgets
     mockBudgets = [

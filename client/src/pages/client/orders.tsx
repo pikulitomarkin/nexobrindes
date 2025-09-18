@@ -133,15 +133,36 @@ export default function ClientOrders() {
                     <div className="text-2xl font-bold text-green-600">
                       R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
-                    <div className="text-sm text-gray-600">Valor Pago</div>
+                    <div className="text-sm text-gray-600">
+                      {parseFloat(order.paidValue || '0') > 0 ? 'Entrada Paga' : 'Nenhum Pagamento'}
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
-                      R$ {(parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(order.remainingValue ? parseFloat(order.remainingValue) : (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0'))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
-                    <div className="text-sm text-gray-600">Saldo Devedor</div>
+                    <div className="text-sm text-gray-600">Saldo Restante</div>
                   </div>
                 </div>
+                
+                {/* Payment Details */}
+                {parseFloat(order.paidValue || '0') > 0 && order.payments && order.payments.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Histórico de Pagamentos:</p>
+                    <div className="space-y-1">
+                      {order.payments.map((payment: any, index: number) => (
+                        <div key={payment.id || index} className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {payment.method?.toUpperCase()} - {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 'Data não informada'}
+                          </span>
+                          <span className="font-medium text-green-600">
+                            +R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Timeline */}

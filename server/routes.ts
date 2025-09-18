@@ -299,14 +299,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .filter(payment => payment.status === 'confirmed')
             .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
+          // Calculate remaining balance
+          const totalValue = parseFloat(order.totalValue);
+          const remainingBalance = Math.max(0, totalValue - totalPaid);
+
+          console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}`);
+
           return {
             ...order,
             paidValue: totalPaid.toFixed(2), // Update with actual paid amount
+            remainingValue: remainingBalance.toFixed(2), // Add remaining balance
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
             trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-            estimatedDelivery: productionOrder?.deliveryDeadline || null
+            estimatedDelivery: productionOrder?.deliveryDeadline || null,
+            payments: payments.filter(p => p.status === 'confirmed') // Include payment details
           };
         })
       );
@@ -2211,15 +2219,23 @@ Para mais detalhes, entre em contato conosco!`;
         .filter(payment => payment.status === 'confirmed')
         .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
+      // Calculate remaining balance
+      const totalValue = parseFloat(order.totalValue);
+      const remainingBalance = Math.max(0, totalValue - totalPaid);
+
+      console.log(`Timeline - Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}`);
+
       // Create enriched order with all information including updated payment values
       const enrichedOrder = {
         ...order,
         paidValue: totalPaid.toFixed(2), // Update with actual paid amount
+        remainingValue: remainingBalance.toFixed(2), // Add remaining balance
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null,
         trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-        productionOrder
+        productionOrder,
+        payments: payments.filter(p => p.status === 'confirmed') // Include confirmed payments
       };
 
       const timeline = [
