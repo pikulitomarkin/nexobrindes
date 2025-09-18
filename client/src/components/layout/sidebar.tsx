@@ -105,7 +105,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                   <SidebarMenuButton asChild>
                     <Link href="/admin/products">
                       <Package className="h-4 w-4" />
-                      <span>Gestão de Produtos & Orçamentos</span>
+                      <span>Produtos</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
