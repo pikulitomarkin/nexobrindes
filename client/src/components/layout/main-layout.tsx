@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
@@ -51,15 +52,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "admin":
         return [
           { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/admin/products", icon: Package, label: "Produtos" },
-          { href: "/admin/budgets", icon: FileText, label: "Orçamentos" },
-          { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
-          { href: "/admin/vendors", icon: Users, label: "Vendedores" },
           { href: "/admin/clients", icon: Users, label: "Clientes" },
-          { href: "/admin/producers", icon: Factory, label: "Produtores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
-          { href: "/admin/commission-settings", icon: Settings, label: "Config. Comissões" },
-          { href: "/admin/finance", icon: CreditCard, label: "Financeiro" },
         ];
       case "vendor":
         return [

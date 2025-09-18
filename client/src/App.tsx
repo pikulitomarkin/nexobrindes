@@ -10,16 +10,9 @@ import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 
-// Admin pages
-import AdminVendors from "@/pages/admin/vendors";
+// Admin pages - Only the simplified ones
 import AdminClients from "@/pages/admin/clients";
-import AdminOrders from "@/pages/admin/orders";
-import AdminProducers from "@/pages/admin/producers";
-import AdminFinance from "@/pages/admin/finance";
-import AdminProducts from "@/pages/admin/products";
-import AdminBudgets from "@/pages/admin/budgets";
 import AdminCommissionManagement from './pages/admin/commission-management';
-import AdminSettings from './pages/admin/settings';
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
@@ -67,67 +60,11 @@ function App() {
             </ProtectedRoute>
           </Route>
 
-          {/* Admin Routes - Only accessible by admin users */}
-          <Route path="/admin/products">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/budgets">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminBudgets />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/orders">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/vendors">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminVendors />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
+          {/* Admin Routes - Only simplified ones */}
           <Route path="/admin/clients">
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminClients />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/producers">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminProducers />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/finance">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminFinance />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/settings">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminSettings />
               </MainLayout>
             </ProtectedRoute>
           </Route>
