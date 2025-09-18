@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, RefreshCw, CheckCircle, Clock, AlertTriangle, Calendar, Package, Truck, MapPin, User, Phone, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 
 export default function ProductionDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -22,7 +22,7 @@ export default function ProductionDashboard() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   const producerId = "producer-1";
   const { data: productionOrders, isLoading } = useQuery({
@@ -381,7 +381,7 @@ export default function ProductionDashboard() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/producer/orders/${order.id}`)}
+                        onClick={() => setLocation(`/producer/order/${order.id}`)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         Ver Detalhes
