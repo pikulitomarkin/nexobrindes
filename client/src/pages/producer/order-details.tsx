@@ -398,11 +398,9 @@ export default function ProducerOrderDetails() {
               <div className="space-y-3">
                 {[
                   { status: 'pending', label: 'Aguardando', completed: true },
-                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'ready', label: 'Pronto', completed: ['ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'preparing_shipment', label: 'Preparando Envio', completed: ['preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'production', label: 'Em Produção', completed: ['production', 'ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
                   { status: 'shipped', label: 'Enviado', completed: ['shipped', 'delivered', 'completed'].includes(productionOrder.status) },
                   { status: 'delivered', label: 'Entregue', completed: ['delivered', 'completed'].includes(productionOrder.status) },
                   { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
@@ -445,28 +443,18 @@ export default function ProducerOrderDetails() {
                 </>
               )}
 
-              {(productionOrder.status === 'accepted' || productionOrder.status === 'production') && (
-                <>
-                  <Button 
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                    onClick={() => handleStatusUpdate('production')}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    {productionOrder.status === 'accepted' ? 'Iniciar Produção' : 'Em Produção'}
-                  </Button>
-                  <Button 
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={() => handleStatusUpdate('quality_check')}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Enviar p/ Qualidade
-                  </Button>
-                </>
+              {productionOrder.status === 'accepted' && (
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={() => handleStatusUpdate('production')}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Iniciar Produção
+                </Button>
               )}
 
-              {productionOrder.status === 'quality_check' && (
+              {productionOrder.status === 'production' && (
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => handleStatusUpdate('ready')}
@@ -479,18 +467,7 @@ export default function ProducerOrderDetails() {
 
               {productionOrder.status === 'ready' && (
                 <Button 
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                  onClick={() => handleStatusUpdate('preparing_shipment')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  Preparar Envio
-                </Button>
-              )}
-
-              {productionOrder.status === 'preparing_shipment' && (
-                <Button 
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
                   onClick={() => {
                     setSelectedStatus('shipped');
                     setIsUpdateDialogOpen(true);

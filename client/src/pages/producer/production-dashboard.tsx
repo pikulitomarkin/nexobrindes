@@ -89,9 +89,7 @@ export default function ProductionDashboard() {
       pending: { label: "Aguardando", className: "bg-yellow-100 text-yellow-800" },
       accepted: { label: "Aceito", className: "bg-blue-100 text-blue-800" },
       production: { label: "Em Produção", className: "bg-purple-100 text-purple-800" },
-      quality_check: { label: "Controle Qualidade", className: "bg-indigo-100 text-indigo-800" },
       ready: { label: "Pronto", className: "bg-green-100 text-green-800" },
-      preparing_shipment: { label: "Preparando Envio", className: "bg-orange-100 text-orange-800" },
       shipped: { label: "Enviado", className: "bg-cyan-100 text-cyan-800" },
       delivered: { label: "Entregue", className: "bg-emerald-100 text-emerald-800" },
       completed: { label: "Finalizado", className: "bg-green-100 text-green-800" },
@@ -146,17 +144,6 @@ export default function ProductionDashboard() {
         return (
           <Button 
             size="sm" 
-            className="bg-indigo-600 hover:bg-indigo-700"
-            onClick={() => handleStatusUpdate(order, 'quality_check')}
-          >
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Controle Qualidade
-          </Button>
-        );
-      case 'quality_check':
-        return (
-          <Button 
-            size="sm" 
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'ready')}
           >
@@ -165,17 +152,6 @@ export default function ProductionDashboard() {
           </Button>
         );
       case 'ready':
-        return (
-          <Button 
-            size="sm" 
-            className="bg-orange-600 hover:bg-orange-700"
-            onClick={() => handleStatusUpdate(order, 'preparing_shipment')}
-          >
-            <Package className="h-4 w-4 mr-1" />
-            Preparar Envio
-          </Button>
-        );
-      case 'preparing_shipment':
         return (
           <Button 
             size="sm" 
@@ -295,7 +271,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Em Produção</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {filteredOrders.filter(o => ['accepted', 'production', 'quality_check'].includes(o.status)).length}
+                  {filteredOrders.filter(o => ['accepted', 'production'].includes(o.status)).length}
                 </p>
               </div>
               <RefreshCw className="h-8 w-8 text-purple-600" />
@@ -329,9 +305,7 @@ export default function ProductionDashboard() {
             <SelectItem value="pending">Aguardando</SelectItem>
             <SelectItem value="accepted">Aceito</SelectItem>
             <SelectItem value="production">Em Produção</SelectItem>
-            <SelectItem value="quality_check">Controle Qualidade</SelectItem>
             <SelectItem value="ready">Pronto</SelectItem>
-            <SelectItem value="preparing_shipment">Preparando Envio</SelectItem>
             <SelectItem value="shipped">Enviado</SelectItem>
             <SelectItem value="delivered">Entregue</SelectItem>
             <SelectItem value="completed">Finalizado</SelectItem>
