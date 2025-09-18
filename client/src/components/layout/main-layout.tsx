@@ -21,7 +21,8 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentRole, setCurrentRole] = useState("admin");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [currentRole, setCurrentRole] = useState(user.role || "admin");
   const [location] = useLocation();
 
   const roleOptions = [
@@ -80,6 +81,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   const menuItems = getMenuItems();
+  
+  // Define role labels
+  const roleLabels = {
+    admin: "Administrador",
+    vendor: "Vendedor", 
+    client: "Cliente",
+    producer: "Produtor",
+    partner: "Sócio",
+    finance: "Financeiro"
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -110,22 +121,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </Button>
           </div>
 
-          {/* Role Selector */}
+          {/* User Info */}
           <div className="p-6 border-b border-white/20">
-            <label className="text-sm font-medium text-white/90 mb-3 block">
-              Perfil Ativo
-            </label>
-            <select
-              value={currentRole}
-              onChange={(e) => setCurrentRole(e.target.value)}
-              className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm"
-            >
-              {roleOptions.map((role) => (
-                <option key={role.value} value={role.value} className="text-gray-900">
-                  {role.label}
-                </option>
-              ))}
-            </select>
+            <div className="text-sm font-medium text-white/90">
+              {user.name || "Usuário"}
+            </div>
+            <div className="text-xs text-white/70">
+              {roleLabels[currentRole as keyof typeof roleLabels] || "Usuário"}
+            </div>
           </div>
 
           {/* Navigation */}

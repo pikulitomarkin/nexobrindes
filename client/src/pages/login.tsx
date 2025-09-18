@@ -32,23 +32,23 @@ export default function Login() {
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
 
-        // Redirect to appropriate dashboard based on user role
+        // Redirect to appropriate panel based on user role (using existing panels)
         const { role } = data.user;
         switch (role) {
           case "admin":
-            window.location.href = "/admin/dashboard";
+            window.location.href = "/admin/orders";
             break;
           case "vendor":
-            window.location.href = "/vendor/dashboard";
+            window.location.href = "/vendor/orders";
             break;
           case "client":
-            window.location.href = "/client/dashboard";
+            window.location.href = "/client/orders";
             break;
           case "producer":
-            window.location.href = "/producer/dashboard";
+            window.location.href = "/producer/orders";
             break;
           case "partner":
-            window.location.href = "/partner/dashboard";
+            window.location.href = "/";
             break;
           default:
             window.location.href = "/";

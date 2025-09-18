@@ -34,24 +34,21 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
         const data = await response.json();
         
-        // Check if user role matches required role
-        if (requiredRole && data.user.role !== requiredRole) {
-          // Redirect to appropriate dashboard
+        // Check if user role matches required role (but allow admin access to everything)
+        if (requiredRole && data.user.role !== requiredRole && data.user.role !== "admin") {
+          // Redirect to appropriate main dashboard
           switch (data.user.role) {
-            case "admin":
-              setLocation("/admin/dashboard");
-              break;
             case "vendor":
-              setLocation("/vendor/dashboard");
+              setLocation("/vendor/orders");
               break;
             case "client":
-              setLocation("/client/dashboard");
+              setLocation("/client/orders");
               break;
             case "producer":
-              setLocation("/producer/dashboard");
+              setLocation("/producer/orders");
               break;
             case "partner":
-              setLocation("/partner/dashboard");
+              setLocation("/");
               break;
             default:
               setLocation("/login");
