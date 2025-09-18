@@ -24,11 +24,11 @@ export default function ClientOrders() {
 
   const getTimelineSteps = (status: string) => {
     const steps = [
-      { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: true },
-      { id: "production", label: "Em Produção", icon: Clock, completed: status !== "pending" },
-      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "delivered"].includes(status) },
-      { id: "shipping", label: "Envio", icon: Truck, completed: ["shipped", "delivered"].includes(status) },
-      { id: "delivered", label: "Entregue", icon: Home, completed: status === "delivered" },
+      { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: ["confirmed", "production", "ready", "shipped", "delivered", "completed"].includes(status) },
+      { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "ready", "shipped", "delivered", "completed"].includes(status) },
+      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "delivered", "completed"].includes(status) },
+      { id: "shipping", label: "Envio", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
+      { id: "delivered", label: "Entregue", icon: Home, completed: ["delivered", "completed"].includes(status) },
     ];
     return steps;
   };
@@ -41,6 +41,7 @@ export default function ClientOrders() {
       ready: "bg-orange-100 text-orange-800",
       shipped: "bg-indigo-100 text-indigo-800",
       delivered: "bg-green-100 text-green-800",
+      completed: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
     };
 
@@ -51,12 +52,13 @@ export default function ClientOrders() {
       ready: "Pronto para Envio",
       shipped: "Enviado",
       delivered: "Entregue",
+      completed: "Finalizado",
       cancelled: "Cancelado",
     };
 
     return (
       <Badge className={`${statusClasses[status as keyof typeof statusClasses]} border-0`}>
-        {statusLabels[status as keyof typeof statusLabels]}
+        {statusLabels[status as keyof typeof statusLabels] || status}
       </Badge>
     );
   };
@@ -170,10 +172,11 @@ export default function ClientOrders() {
                     className="h-full gradient-bg transition-all duration-500"
                     style={{
                       width: order.status === "pending" ? "0%" :
-                             order.status === "confirmed" ? "25%" :
-                             order.status === "production" ? "50%" :
-                             order.status === "ready" ? "75%" :
-                             order.status === "shipped" ? "90%" : "100%"
+                             order.status === "confirmed" ? "20%" :
+                             order.status === "production" ? "40%" :
+                             order.status === "ready" ? "60%" :
+                             order.status === "shipped" ? "80%" :
+                             ["delivered", "completed"].includes(order.status) ? "100%" : "0%"
                     }}
                   ></div>
                 </div>

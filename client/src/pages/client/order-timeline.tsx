@@ -51,15 +51,64 @@ export default function ClientOrderTimeline() {
     );
   };
 
-  const getTimelineSteps = (status: string) => {
+  const getTimelineSteps = (order: any) => {
     const steps = [
-      { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: true },
-      { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "quality_check", "ready", "preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
-      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
-      { id: "preparing_shipment", label: "Preparando Envio", icon: Package, completed: ["preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
-      { id: "shipping", label: "Enviado", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
-      { id: "delivered", label: "Entregue", icon: Home, completed: ["delivered", "completed"].includes(status) },
+      {
+        id: 'created',
+        status: 'created',
+        title: 'Pedido Criado',
+        description: 'Pedido foi criado e está aguardando confirmação',
+        date: order.createdAt,
+        completed: true,
+        icon: 'file-plus'
+      },
+      {
+        id: 'confirmed',
+        status: 'confirmed',
+        title: 'Pedido Confirmado',
+        description: 'Pedido foi confirmado e enviado para produção',
+        date: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+        completed: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
+        icon: 'check-circle'
+      },
+      {
+        id: 'production',
+        status: 'production',
+        title: 'Em Produção',
+        description: order.productionOrder?.notes || 'Pedido em processo de produção',
+        date: order.productionOrder?.acceptedAt || (['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null),
+        completed: ['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
+        icon: 'settings'
+      },
+      {
+        id: 'ready',
+        status: 'ready',
+        title: 'Pronto para Envio',
+        description: 'Produto finalizado e pronto para envio',
+        date: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+        completed: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status),
+        icon: 'package'
+      },
+      {
+        id: 'shipped',
+        status: 'shipped',
+        title: 'Enviado',
+        description: order.productionOrder?.trackingCode ? `Código de rastreamento: ${order.productionOrder.trackingCode}` : 'Produto foi enviado para o cliente',
+        date: ['shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+        completed: ['shipped', 'delivered', 'completed'].includes(order.status),
+        icon: 'truck'
+      },
+      {
+        id: 'completed',
+        status: 'completed',
+        title: 'Entregue',
+        description: 'Pedido foi entregue com sucesso',
+        date: ['delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+        completed: ['delivered', 'completed'].includes(order.status),
+        icon: 'check-circle-2'
+      }
     ];
+
     return steps;
   };
 
@@ -217,7 +266,7 @@ export default function ClientOrderTimeline() {
                       <div className="flex-1 pb-8 border-l-2 border-gray-200 pl-6 ml-5 relative">
                         <div className={`absolute -left-2 top-0 w-4 h-4 ${isCompleted ? 'bg-blue-500' : 'bg-white border-2 border-gray-300'} rounded-full`}></div>
                         <h4 className={`font-bold text-lg mb-2 ${isCompleted ? 'text-gray-900' : 'text-gray-500'}`}>
-                          {step.label}
+                          {step.title}
                         </h4>
                         <p className={`text-sm mb-3 ${isCompleted ? 'text-gray-700' : 'text-gray-400'}`}>
                           {step.description}
@@ -225,11 +274,11 @@ export default function ClientOrderTimeline() {
                         {step.date && (
                           <div className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-flex">
                             <Calendar className="h-4 w-4 mr-2" />
-                            {new Date(step.date).toLocaleDateString('pt-BR', { 
+                            {new Date(step.date).toLocaleDateString('pt-BR', {
                               weekday: 'long',
-                              year: 'numeric', 
-                              month: 'long', 
-                              day: 'numeric' 
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
                             })}
                           </div>
                         )}

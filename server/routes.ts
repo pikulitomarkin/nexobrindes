@@ -1847,24 +1847,47 @@ Para mais detalhes, entre em contato conosco!`;
   // Update production order status
   app.patch("/api/production-orders/:id/status", async (req, res) => {
     const { id } = req.params;
-    const { status, notes, deliveryDate } = req.body;
+    const { status, notes, deliveryDate, trackingCode } = req.body;
 
     try {
       // Use storage instead of db.update
-      const result = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate);
+      const result = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate, trackingCode);
 
       if (!result) {
         return res.status(404).json({ error: "Production order not found" });
       }
 
-      // Also update the main order status if needed
-      if (status === 'production' || status === 'completed' || status === 'ready') {
-        const productionOrder = await storage.getProductionOrder(id);
-
-        if (productionOrder) {
-          let orderStatus = status === 'completed' ? 'completed' : 'production';
-          await storage.updateOrder(productionOrder.orderId, { status: orderStatus });
+      // Update the main order status to match production status
+      const productionOrder = await storage.getProductionOrder(id);
+      if (productionOrder) {
+        let orderStatus = 'production'; // Default
+        
+        switch (status) {
+          case 'pending':
+            orderStatus = 'confirmed';
+            break;
+          case 'accepted':
+          case 'production':
+            orderStatus = 'production';
+            break;
+          case 'ready':
+            orderStatus = 'ready';
+            break;
+          case 'shipped':
+            orderStatus = 'shipped';
+            break;
+          case 'delivered':
+            orderStatus = 'delivered';
+            break;
+          case 'completed':
+            orderStatus = 'completed';
+            break;
+          case 'rejected':
+            orderStatus = 'cancelled';
+            break;
         }
+        
+        await storage.updateOrder(productionOrder.orderId, { status: orderStatus });
       }
 
       res.json({ success: true, productionOrder: result });
