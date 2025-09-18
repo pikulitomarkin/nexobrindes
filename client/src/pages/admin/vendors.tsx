@@ -22,10 +22,10 @@ import { queryClient } from "@/lib/queryClient";
 
 const vendorFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  email: z.string().email("Email inválido").optional(),
-  username: z.string().min(3, "Username deve ter pelo menos 3 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   phone: z.string().optional(),
+  address: z.string().optional(),
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
 });
 
@@ -72,9 +72,9 @@ export default function AdminVendors() {
     defaultValues: {
       name: "",
       email: "",
-      username: "",
       password: "",
       phone: "",
+      address: "",
       commissionRate: "10.00",
     },
   });
@@ -82,15 +82,23 @@ export default function AdminVendors() {
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormValues) => {
       const vendorData = {
-        ...data,
-        userCode: userCode
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        password: data.password,
+        userCode: userCode,
+        commissionRate: data.commissionRate
       };
       const response = await fetch("/api/vendors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(vendorData),
       });
-      if (!response.ok) throw new Error("Erro ao criar vendedor");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao criar vendedor");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -231,6 +239,20 @@ export default function AdminVendors() {
 
                 <FormField
                   control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Rua das Flores, 123, Centro, São Paulo, SP" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="commissionRate"
                   render={({ field }) => (
                     <FormItem>
@@ -333,6 +355,12 @@ export default function AdminVendors() {
                       <div className="flex items-center text-sm text-gray-600">
                         <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
                         <span>{vendor.phone}</span>
+                      </div>
+                    )}
+                    {vendor.address && (
+                      <div className="flex items-start text-sm text-gray-600">
+                        <div className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5">📍</div>
+                        <span className="line-clamp-2">{vendor.address}</span>
                       </div>
                     )}
                   </div>
@@ -480,6 +508,11 @@ export default function AdminVendors() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Telefone:</label>
                       <p className="text-sm text-gray-900">{vendor.phone || 'N/A'}</p>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-gray-600">Endereço:</label>
+                      <p className="text-sm text-gray-900">{vendor.address || 'N/A'}</p>
                     </div>
                     
                     <div>

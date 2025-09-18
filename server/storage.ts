@@ -263,7 +263,7 @@ export class MemStorage implements IStorage {
     this.budgets = new Map();
     this.budgetItems = []; // Initialize as empty array
     this.budgetPhotos = []; // Initialize as empty array
-    
+
     // Initialize commission settings
     this.commissionSettings = {
       id: "settings-1",
@@ -274,7 +274,7 @@ export class MemStorage implements IStorage {
       isActive: true,
       updatedAt: new Date()
     };
-    
+
     this.initializeData();
     this.createTestUsers();
   }
@@ -283,7 +283,7 @@ export class MemStorage implements IStorage {
   private createTestUsers() {
     // Override existing users with test users
     this.users.clear();
-    
+
     // Admin user
     const adminUser = {
       id: "admin-1",
@@ -675,6 +675,8 @@ export class MemStorage implements IStorage {
       vendorId: insertUser.vendorId || null,
       email: insertUser.email || null,
       phone: insertUser.phone || null,
+      address: insertUser.address || null, // Added address field
+      specialty: insertUser.specialty || null, // Added specialty field
       isActive: insertUser.isActive !== undefined ? insertUser.isActive : true
     };
     this.users.set(id, user);
@@ -872,7 +874,7 @@ export class MemStorage implements IStorage {
     const mainOrder = this.orders.get(productionOrder.orderId);
     if (mainOrder) {
       let orderStatus = mainOrder.status;
-      
+
       switch (status) {
         case 'production':
           orderStatus = 'production';
@@ -1028,10 +1030,10 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     let remainingToDeduct = parseFloat(amount);
-    
+
     for (const commission of partnerCommissions) {
       if (remainingToDeduct <= 0) break;
-      
+
       const commissionAmount = parseFloat(commission.amount);
       if (commissionAmount <= remainingToDeduct) {
         // Deduct entire commission
