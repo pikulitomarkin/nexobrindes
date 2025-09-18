@@ -221,22 +221,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/client/:clientId", async (req, res) => {
     try {
       const { clientId } = req.params;
+      console.log(`Fetching orders for client: ${clientId}`);
+      
       const orders = await storage.getOrdersByClient(clientId);
+      console.log(`Found ${orders.length} orders for client ${clientId}`);
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          
+          // Get budget photos if order was converted from budget
+          let budgetPhotos = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl);
+          }
+          
           return {
             ...order,
             vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null
+            producerName: producer?.name || null,
+            budgetPhotos: budgetPhotos
           };
         })
       );
 
       res.json(enrichedOrders);
     } catch (error) {
+      console.error("Error fetching client orders:", error);
       res.status(500).json({ error: "Failed to fetch client orders" });
     }
   });
@@ -261,17 +274,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
 
-          // Get client user first
-          const clientUser = await storage.getUser(order.clientId);
-          // Then get client details
-          const clientDetails = await storage.getClient(order.clientId);
-
-          // Use client details name if available, otherwise user name
+          // Get client details - first check if clientId refers to a client record
           let clientName = 'Unknown';
-          if (clientDetails?.name) {
+          let clientAddress = null;
+          let clientPhone = null;
+
+          // Try to get client by ID first
+          const clientDetails = await storage.getClient(order.clientId);
+          if (clientDetails) {
             clientName = clientDetails.name;
-          } else if (clientUser?.name) {
-            clientName = clientUser.name;
+            clientAddress = clientDetails.address;
+            clientPhone = clientDetails.phone;
+          } else {
+            // Fallback to user table
+            const clientUser = await storage.getUser(order.clientId);
+            if (clientUser) {
+              clientName = clientUser.name;
+              clientPhone = clientUser.phone;
+            }
           }
 
           return {
@@ -279,8 +299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             product: order.product || 'Unknown',
             orderNumber: order.orderNumber || 'Unknown',
             clientName: clientName,
-            clientAddress: clientDetails?.address || null,
-            clientPhone: clientDetails?.phone || clientUser?.phone || null
+            clientAddress: clientAddress,
+            clientPhone: clientPhone
           };
         })
       );
@@ -918,14 +938,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Return enriched order data
-      const client = await storage.getUser(order.clientId);
+      // Return enriched order data with proper client name
+      let clientName = 'Unknown';
+      const clientDetails = await storage.getClient(order.clientId);
+      if (clientDetails) {
+        clientName = clientDetails.name;
+      } else {
+        const clientUser = await storage.getUser(order.clientId);
+        if (clientUser) {
+          clientName = clientUser.name;
+        }
+      }
+
       const vendor = await storage.getUser(order.vendorId);
       const producer = producerId ? await storage.getUser(producerId) : null;
 
       const enrichedOrder = {
         ...order,
-        clientName: client?.name || 'Unknown',
+        clientName: clientName,
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null
       };
@@ -1503,16 +1533,27 @@ Para mais detalhes, entre em contato conosco!`;
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
           const user = await storage.getUser(client.userId);
-          const orders = await storage.getOrdersByClient(client.userId || client.id);
           
-          const ordersCount = orders.length;
-          const totalSpent = orders.reduce((sum, order) => 
+          // Get orders using both userId and client id to ensure we catch all orders
+          const ordersByUserId = await storage.getOrdersByClient(client.userId);
+          const ordersByClientId = await storage.getOrdersByClient(client.id);
+          
+          // Combine and deduplicate orders
+          const allOrders = [...ordersByUserId, ...ordersByClientId];
+          const uniqueOrders = allOrders.filter((order, index, self) => 
+            index === self.findIndex(o => o.id === order.id)
+          );
+          
+          const ordersCount = uniqueOrders.length;
+          const totalSpent = uniqueOrders.reduce((sum, order) => 
             sum + parseFloat(order.totalValue || '0'), 0
           );
 
           return {
             ...client,
-            userCode: user?.username || client.userCode,
+            id: client.id,
+            userId: client.userId,
+            userCode: user?.username || 'N/A',
             username: user?.username,
             ordersCount,
             totalSpent
@@ -1522,7 +1563,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       res.json(enrichedClients);
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching clients:", error);
       res.status(500).json({ error: "Failed to fetch clients" });
     }
   });

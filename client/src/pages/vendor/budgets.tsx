@@ -401,9 +401,16 @@ export default function VendorBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/client"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer"] });
+      
+      // Invalidate specific client orders
+      if (convertClientId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/orders/client", convertClientId] });
+      }
 
       setConvertDialogOpen(false);
       setBudgetToConvert(null);

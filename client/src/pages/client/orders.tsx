@@ -6,12 +6,13 @@ import { Eye } from "lucide-react";
 
 export default function ClientOrders() {
   // Get the current user from localStorage or context
-  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const clientId = currentUser.id;
   
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders/client", clientId],
     enabled: !!clientId,
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 
   const getTimelineSteps = (status: string) => {

@@ -540,7 +540,7 @@ export default function AdminClients() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
                       <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {client.userCode || client.username || 'N/A'}
+                        {client.userCode || 'N/A'}
                       </p>
                     </div>
                     
