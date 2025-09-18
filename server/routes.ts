@@ -2215,15 +2215,12 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Get payments for this order to calculate correct paid value
       const payments = await storage.getPaymentsByOrder(order.id);
-      const totalPaid = payments
-        .filter(payment => payment.status === 'confirmed')
-        .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+      const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
+      const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
       // Calculate remaining balance
       const totalValue = parseFloat(order.totalValue);
       const remainingBalance = Math.max(0, totalValue - totalPaid);
-
-      console.log(`Timeline - Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}`);
 
       // Create enriched order with all information including updated payment values
       const enrichedOrder = {
@@ -2235,7 +2232,7 @@ Para mais detalhes, entre em contato conosco!`;
         producerName: producer?.name || null,
         trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
         productionOrder,
-        payments: payments.filter(p => p.status === 'confirmed') // Include confirmed payments
+        payments: confirmedPayments // Include only confirmed payments
       };
 
       const timeline = [
