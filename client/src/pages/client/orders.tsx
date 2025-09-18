@@ -134,8 +134,13 @@ export default function ClientOrders() {
                       R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {parseFloat(order.paidValue || '0') > 0 ? 'Entrada Paga' : 'Nenhum Pagamento'}
+                      {parseFloat(order.paidValue || '0') > 0 ? 'Valor Pago' : 'Nenhum Pagamento'}
                     </div>
+                    {parseFloat(order.paidValue || '0') > 0 && parseFloat(order.paidValue || '0') < parseFloat(order.totalValue) && (
+                      <div className="text-xs text-blue-600 font-medium mt-1">
+                        Entrada Paga
+                      </div>
+                    )}
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
@@ -225,12 +230,25 @@ export default function ClientOrders() {
               {/* Payment Information */}
               {parseFloat(order.paidValue || '0') > 0 && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <CreditCard className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-800">
-                      Pagamento parcial realizado: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
+                        ? 'Pagamento completo realizado' 
+                        : 'Entrada paga'}: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+                  {order.payments && order.payments.length > 0 && (
+                    <div className="text-xs text-green-700">
+                      <strong>Histórico:</strong>
+                      {order.payments.map((payment: any, index: number) => (
+                        <div key={payment.id || index} className="ml-2 flex justify-between">
+                          <span>{payment.method?.toUpperCase()} - {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 'Data não informada'}</span>
+                          <span className="font-medium">R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

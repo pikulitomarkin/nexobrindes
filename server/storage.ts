@@ -565,22 +565,32 @@ export class MemStorage implements IStorage {
     // Create additional payments for recent orders to show correct values
     const allOrders = Array.from(this.orders.values());
     
-    // Find orders that need test payments
+    // Find orders that need test payments and ensure all orders have some payment
     const ordersToAddPayments = allOrders.filter(o => 
-      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346")
+      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
     );
 
     ordersToAddPayments.forEach((order, index) => {
-      // Create test payment for each order
+      // Create test payment for each order with better amounts
+      let paymentAmount = "567.00"; // Default
+      
+      if (order.orderNumber?.includes("#12345")) {
+        paymentAmount = "735.00"; // 30% of 2450
+      } else if (order.orderNumber?.includes("#12346")) {
+        paymentAmount = "567.00"; // 30% of 1890
+      } else if (order.orderNumber?.includes("PED-")) {
+        paymentAmount = "3000.00"; // Example for newer orders
+      }
+      
       const testPayment: Payment = {
-        id: `payment-test-${index + 1}`,
+        id: `payment-visible-${index + 1}`,
         orderId: order.id,
-        amount: index === 0 ? "1500.00" : "567.00", // Different amounts for different orders
+        amount: paymentAmount,
         method: "pix",
         status: "confirmed",
-        transactionId: `PIX-TEST-00${index + 1}`,
-        paidAt: new Date(Date.now() - (index * 24 * 60 * 60 * 1000)), // Different dates
-        createdAt: new Date(Date.now() - (index * 24 * 60 * 60 * 1000))
+        transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
+        paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
+        createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
       };
       this.payments.set(testPayment.id, testPayment);
       

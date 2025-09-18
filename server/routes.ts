@@ -295,15 +295,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Get payments for this order to calculate correct paid value
           const payments = await storage.getPaymentsByOrder(order.id);
-          const totalPaid = payments
-            .filter(payment => payment.status === 'confirmed')
-            .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+          const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
+          const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
           // Calculate remaining balance
           const totalValue = parseFloat(order.totalValue);
           const remainingBalance = Math.max(0, totalValue - totalPaid);
 
-          console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}`);
+          console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}, Payments:`, confirmedPayments.map(p => ({ amount: p.amount, method: p.method, status: p.status })));
 
           return {
             ...order,
