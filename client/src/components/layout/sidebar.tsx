@@ -103,6 +103,14 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
+                    <Link href="/admin/products">
+                      <Package className="h-4 w-4" />
+                      <span>Gestão de Produtos & Orçamentos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
                     <Link href="/admin/orders">
                       <ShoppingCart className="h-4 w-4" />
                       <span>Pedidos</span>
@@ -114,14 +122,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                     <Link href="/admin/budgets">
                       <FileText className="h-4 w-4" />
                       <span>Orçamentos</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/products">
-                      <Package className="h-4 w-4" />
-                      <span>Produtos</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
