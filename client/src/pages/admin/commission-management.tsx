@@ -38,14 +38,8 @@ const partnerFormSchema = z.object({
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
 });
 
-const settingsFormSchema = z.object({
-  vendorCommissionRate: z.string().min(1, "Taxa de comissão do vendedor é obrigatória"),
-  partnerCommissionRate: z.string().min(1, "Taxa de comissão do sócio é obrigatória"),
-});
-
 type CommissionFormValues = z.infer<typeof commissionFormSchema>;
 type PartnerFormValues = z.infer<typeof partnerFormSchema>;
-type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
 export default function CommissionManagement() {
   const [editingVendor, setEditingVendor] = useState<string | null>(null);
@@ -66,10 +60,6 @@ export default function CommissionManagement() {
     queryKey: ["/api/partners"],
   });
 
-  const { data: settings, isLoading: loadingSettings } = useQuery({
-    queryKey: ["/api/commission-settings"],
-  });
-
   // Forms
   const commissionForm = useForm<CommissionFormValues>({
     resolver: zodResolver(commissionFormSchema),
@@ -83,14 +73,6 @@ export default function CommissionManagement() {
       email: "",
       username: "",
       commissionRate: "15.00",
-    },
-  });
-
-  const settingsForm = useForm<SettingsFormValues>({
-    resolver: zodResolver(settingsFormSchema),
-    defaultValues: {
-      vendorCommissionRate: settings?.vendorCommissionRate || "10.00",
-      partnerCommissionRate: settings?.partnerCommissionRate || "15.00",
     },
   });
 
@@ -158,24 +140,7 @@ export default function CommissionManagement() {
     },
   });
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (data: SettingsFormValues) => {
-      const response = await fetch("/api/commission-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar configurações");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/commission-settings"] });
-      toast({ title: "Sucesso!", description: "Configurações atualizadas" });
-    },
-    onError: () => {
-      toast({ title: "Erro", description: "Não foi possível atualizar as configurações", variant: "destructive" });
-    },
-  });
+  
 
   const updateCommissionStatusMutation = useMutation({
     mutationFn: async ({ commissionId, status }: { commissionId: string, status: string }) => {
@@ -225,16 +190,14 @@ export default function CommissionManagement() {
     createPartnerMutation.mutate(data);
   };
 
-  const onSettingsSubmit = (data: SettingsFormValues) => {
-    updateSettingsMutation.mutate(data);
-  };
+  
 
   // Calculate totals
   const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
   const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
   const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
 
-  if (loadingCommissions || loadingVendors || loadingPartners || loadingSettings) {
+  if (loadingCommissions || loadingVendors || loadingPartners) {
     return (
       <div className="p-8">
         <div className="animate-pulse">
@@ -314,79 +277,14 @@ export default function CommissionManagement() {
         </Card>
       </div>
 
-      <Tabs defaultValue="settings" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
+      <Tabs defaultValue="vendors" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="vendors">Vendedores</TabsTrigger>
           <TabsTrigger value="partners">Sócios</TabsTrigger>
           <TabsTrigger value="commissions">Histórico</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações Gerais de Comissão</CardTitle>
-              <p className="text-sm text-gray-600">
-                Configure as regras de comissão para vendedores e sócios
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Form {...settingsForm}>
-                <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <FormField
-                      control={settingsForm.control}
-                      name="vendorCommissionRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Taxa de Comissão dos Vendedores (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                          </FormControl>
-                          <p className="text-xs text-gray-500">Paga na finalização do pedido</p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={settingsForm.control}
-                      name="partnerCommissionRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Taxa de Comissão dos Sócios (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                          </FormControl>
-                          <p className="text-xs text-gray-500">Paga no início do pedido</p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Regras de Comissão:</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• <strong>Vendedores:</strong> Recebem comissão apenas na finalização do pedido</li>
-                      <li>• <strong>Sócios:</strong> Recebem comissão no início do pedido</li>
-                      <li>• <strong>Cancelamentos:</strong> Comissão do sócio é abatida no próximo pedido</li>
-                      <li>• <strong>Cancelamentos:</strong> Comissão do vendedor não é abatida</li>
-                    </ul>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="gradient-bg text-white"
-                    disabled={updateSettingsMutation.isPending}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Configurações
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        
 
         <TabsContent value="vendors" className="space-y-6">
           <Card>

@@ -134,12 +134,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             href="/admin/commission-management"
             isActive={location === "/admin/commission-management"}
           />
-          <SidebarItem 
-            icon={Settings} 
-            label="Configuração de Comissões" 
-            href="/admin/commission-settings"
-            isActive={location === "/admin/commission-settings"}
-          />
           
           <div className="px-6 mb-4 mt-6">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
