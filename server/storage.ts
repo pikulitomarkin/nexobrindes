@@ -738,6 +738,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
   }
 
+  async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {
+    return Array.from(this.productionOrders.values()).filter(po => po.orderId === orderId);
+  }
+
   async createProductionOrder(insertProductionOrder: InsertProductionOrder): Promise<ProductionOrder> {
     const id = randomUUID();
     const productionOrder: ProductionOrder = {
@@ -747,10 +751,79 @@ export class MemStorage implements IStorage {
       deadline: insertProductionOrder.deadline || null,
       acceptedAt: insertProductionOrder.acceptedAt || null,
       completedAt: insertProductionOrder.completedAt || null,
-      notes: insertProductionOrder.notes || null
+      notes: insertProductionOrder.notes || null,
+      deliveryDeadline: insertProductionOrder.deliveryDeadline || null,
+      hasUnreadNotes: insertProductionOrder.hasUnreadNotes || false,
+      lastNoteAt: insertProductionOrder.lastNoteAt || null
     };
     this.productionOrders.set(id, productionOrder);
     return productionOrder;
+  }
+
+  async getProductionOrder(id: string): Promise<ProductionOrder | null> {
+    return this.productionOrders.get(id) || null;
+  }
+
+  async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | null> {
+    const productionOrder = this.productionOrders.get(id);
+    if (!productionOrder) return null;
+
+    const updatedOrder: ProductionOrder = {
+      ...productionOrder,
+      status,
+      notes: notes || productionOrder.notes,
+      hasUnreadNotes: notes ? true : productionOrder.hasUnreadNotes,
+      lastNoteAt: notes ? new Date() : productionOrder.lastNoteAt,
+      deliveryDeadline: deliveryDate ? new Date(deliveryDate) : productionOrder.deliveryDeadline,
+      acceptedAt: (status === 'accepted' && !productionOrder.acceptedAt) ? new Date() : productionOrder.acceptedAt,
+      completedAt: (status === 'completed' && !productionOrder.completedAt) ? new Date() : productionOrder.completedAt
+    };
+
+    this.productionOrders.set(id, updatedOrder);
+
+    // Update main order status based on production status
+    const mainOrder = this.orders.get(productionOrder.orderId);
+    if (mainOrder) {
+      let orderStatus = mainOrder.status;
+      
+      switch (status) {
+        case 'production':
+          orderStatus = 'production';
+          break;
+        case 'ready':
+          orderStatus = 'ready';
+          break;
+        case 'shipped':
+          orderStatus = 'shipped';
+          break;
+        case 'completed':
+          orderStatus = 'delivered';
+          break;
+        case 'rejected':
+          orderStatus = 'cancelled';
+          break;
+      }
+
+      const updatedMainOrder = { ...mainOrder, status: orderStatus };
+      this.orders.set(productionOrder.orderId, updatedMainOrder);
+    }
+
+    return updatedOrder;
+  }
+
+  async updateProductionOrderNotes(id: string, notes: string, hasUnreadNotes: boolean): Promise<ProductionOrder | null> {
+    const productionOrder = this.productionOrders.get(id);
+    if (!productionOrder) return null;
+
+    const updatedOrder: ProductionOrder = {
+      ...productionOrder,
+      notes,
+      hasUnreadNotes,
+      lastNoteAt: hasUnreadNotes ? new Date() : productionOrder.lastNoteAt
+    };
+
+    this.productionOrders.set(id, updatedOrder);
+    return updatedOrder;
   }
 
   async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined> {

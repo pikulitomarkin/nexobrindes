@@ -1221,33 +1221,51 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/vendors/:vendorId/orders", async (req, res) => {
     const { vendorId } = req.params;
     try {
-      const vendorOrders = await db.select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        title: budgets.title,
-        clientName: clients.name,
-        product: orders.product,
-        description: orders.description,
-        totalValue: orders.totalValue,
-        status: orders.status,
-        deadline: orders.deadline,
-        createdAt: orders.createdAt,
-        budgetPhotos: sql<string[]>`COALESCE(array_agg(DISTINCT ${budgetPhotos.photoUrl}) FILTER (WHERE ${budgetPhotos.photoUrl} IS NOT NULL), '{}')`,
-        hasUnreadNotes: productionOrders.hasUnreadNotes,
-        productionNotes: productionOrders.notes,
-        productionDeadline: productionOrders.deliveryDeadline,
-        lastNoteAt: productionOrders.lastNoteAt
-      })
-      .from(orders)
-      .leftJoin(clients, eq(orders.clientId, clients.id))
-      .leftJoin(budgets, eq(orders.budgetId, budgets.id))
-      .leftJoin(budgetPhotos, eq(budgets.id, budgetPhotos.budgetId))
-      .leftJoin(productionOrders, eq(orders.id, productionOrders.orderId))
-      .where(eq(orders.vendorId, vendorId))
-      .groupBy(orders.id, clients.name, budgets.title, productionOrders.hasUnreadNotes, productionOrders.notes, productionOrders.deliveryDeadline, productionOrders.lastNoteAt)
-      .orderBy(desc(orders.createdAt));
+      const orders = await storage.getOrdersByVendor(vendorId);
 
-      res.json(vendorOrders);
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const client = await storage.getUser(order.clientId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          // Get budget photos if order was converted from budget
+          let budgetPhotos = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+          }
+
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          let productionNotes = null;
+          let productionDeadline = null;
+          let lastNoteAt = null;
+          
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            if (productionOrders.length > 0) {
+              const po = productionOrders[0];
+              hasUnreadNotes = po.hasUnreadNotes || false;
+              productionNotes = po.notes;
+              productionDeadline = po.deliveryDeadline;
+              lastNoteAt = po.lastNoteAt;
+            }
+          }
+
+          return {
+            ...order,
+            clientName: client?.name || 'Unknown',
+            producerName: producer?.name || null,
+            budgetPhotos: budgetPhotos,
+            hasUnreadNotes: hasUnreadNotes,
+            productionNotes: productionNotes,
+            productionDeadline: productionDeadline,
+            lastNoteAt: lastNoteAt
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching vendor orders:", error);
       res.status(500).json({ error: "Failed to fetch vendor orders" });

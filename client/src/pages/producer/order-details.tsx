@@ -1,44 +1,50 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Package, 
-  Settings, 
+  ArrowLeft, 
   CheckCircle, 
+  Clock, 
+  Package, 
+  Truck, 
   AlertTriangle,
-  ArrowLeft,
-  Image as ImageIcon
+  FileText,
+  Calendar,
+  User,
+  Phone,
+  Mail,
+  MapPin
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function ProducerOrderDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDeadlineDialogOpen, setIsDeadlineDialogOpen] = useState(false);
   const [updateNotes, setUpdateNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [newStatus, setNewStatus] = useState("");
-  const { toast } = useToast();
+  const [selectedStatus, setSelectedStatus] = useState("");
 
   const { data: productionOrder, isLoading } = useQuery({
     queryKey: ["/api/production-orders", id],
+    enabled: !!id,
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ status, notes, deliveryDate }: { 
       status: string; 
-      notes: string;
+      notes?: string;
       deliveryDate?: string;
     }) => {
       const response = await fetch(`/api/production-orders/${id}/status`, {
@@ -51,7 +57,9 @@ export default function ProducerOrderDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer"] });
       setIsUpdateDialogOpen(false);
+      setIsDeadlineDialogOpen(false);
       setUpdateNotes("");
       setDeliveryDate("");
       toast({
@@ -61,83 +69,59 @@ export default function ProducerOrderDetails() {
     },
   });
 
-  const updateNotesMutation = useMutation({
-    mutationFn: async ({ notes, deliveryDeadline }: { 
-      notes: string;
-      deliveryDeadline?: string;
-    }) => {
-      const response = await fetch(`/api/production-orders/${id}/notes`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes, deliveryDeadline }),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar observações");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-orders", id] });
-      setUpdateNotes("");
-      setDeliveryDate("");
-      toast({
-        title: "Sucesso!",
-        description: "Observações atualizadas com sucesso",
-      });
-    },
-  });
+  const handleStatusUpdate = (status: string) => {
+    if (status === 'completed' || status === 'rejected') {
+      setSelectedStatus(status);
+      setIsUpdateDialogOpen(true);
+    } else {
+      updateStatusMutation.mutate({ status });
+    }
+  };
+
+  const handleStatusUpdateWithNotes = () => {
+    updateStatusMutation.mutate({ 
+      status: selectedStatus, 
+      notes: updateNotes,
+      deliveryDate: deliveryDate || undefined
+    });
+  };
+
+  const handleDeadlineUpdate = () => {
+    updateStatusMutation.mutate({ 
+      status: productionOrder?.status,
+      notes: updateNotes,
+      deliveryDate: deliveryDate
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { label: "Aguardando", color: "bg-yellow-100 text-yellow-800", icon: Clock },
-      accepted: { label: "Aceito", color: "bg-blue-100 text-blue-800", icon: CheckCircle },
-      production: { label: "Em Produção", color: "bg-purple-100 text-purple-800", icon: Settings },
-      quality_check: { label: "Controle Qualidade", color: "bg-orange-100 text-orange-800", icon: CheckCircle },
-      ready: { label: "Pronto", color: "bg-green-100 text-green-800", icon: Package },
-      shipped: { label: "Enviado", color: "bg-indigo-100 text-indigo-800", icon: Package },
-      completed: { label: "Concluído", color: "bg-emerald-100 text-emerald-800", icon: CheckCircle },
-      rejected: { label: "Rejeitado", color: "bg-red-100 text-red-800", icon: AlertTriangle },
+      pending: { label: "Aguardando", className: "bg-yellow-100 text-yellow-800" },
+      accepted: { label: "Aceito", className: "bg-blue-100 text-blue-800" },
+      production: { label: "Em Produção", className: "bg-purple-100 text-purple-800" },
+      quality_check: { label: "Controle Qualidade", className: "bg-indigo-100 text-indigo-800" },
+      ready: { label: "Pronto", className: "bg-green-100 text-green-800" },
+      shipped: { label: "Enviado", className: "bg-cyan-100 text-cyan-800" },
+      completed: { label: "Finalizado", className: "bg-green-100 text-green-800" },
+      rejected: { label: "Rejeitado", className: "bg-red-100 text-red-800" },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    const Icon = config.icon;
+    const config = statusConfig[status as keyof typeof statusConfig] || 
+                   { label: status, className: "bg-gray-100 text-gray-800" };
 
     return (
-      <Badge className={`${config.color} flex items-center gap-1`}>
-        <Icon className="h-3 w-3" />
+      <Badge className={config.className}>
         {config.label}
       </Badge>
     );
   };
 
-  const handleStatusUpdate = (status: string) => {
-    setNewStatus(status);
-    if (status === 'completed' || status === 'ready') {
-      setIsUpdateDialogOpen(true);
-    } else {
-      updateStatusMutation.mutate({ status, notes: "" });
-    }
-  };
-
-  const formatDate = (dateString: string | Date | null) => {
-    if (!dateString) return "Não definido";
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  };
-
-  const getDaysUntilDeadline = (deadline: string | Date | null) => {
-    if (!deadline) return null;
-    const today = new Date();
-    const deadlineDate = new Date(deadline);
-    const diffTime = deadlineDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
   if (isLoading) {
     return (
       <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded-xl mb-8"></div>
-          <div className="h-48 bg-gray-200 rounded-xl"></div>
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-64 bg-gray-200 rounded-xl"></div>
         </div>
       </div>
     );
@@ -145,131 +129,155 @@ export default function ProducerOrderDetails() {
 
   if (!productionOrder) {
     return (
-      <div className="p-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Ordem não encontrada</h2>
-          <p className="text-gray-600 mt-2">A ordem de produção solicitada não foi encontrada.</p>
-        </div>
+      <div className="p-8 text-center">
+        <p className="text-gray-500 mb-4">Ordem de produção não encontrada</p>
+        <Button onClick={() => navigate('/producer/orders')}>
+          Voltar para Ordens
+        </Button>
       </div>
     );
   }
 
-  const daysUntilDeadline = getDaysUntilDeadline(productionOrder.deadline);
-  const isOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
-
   return (
     <div className="p-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => window.history.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate('/producer/orders')}
+          className="mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar para Ordens
+        </Button>
+
+        <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Ordem #{productionOrder.id.slice(-6)}
             </h1>
             <p className="text-gray-600">
-              Pedido: {productionOrder.order.orderNumber} - {productionOrder.order.clientName}
+              Pedido: {productionOrder.order?.orderNumber || 'N/A'}
             </p>
           </div>
-        </div>
-        <div className="text-right">
-          {getStatusBadge(productionOrder.status)}
+          <div className="text-right">
+            {getStatusBadge(productionOrder.status)}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Order Information */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Order Info */}
           <Card>
             <CardHeader>
-              <CardTitle>Informações do Pedido</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Informações do Pedido
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Cliente</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span className="font-medium">{productionOrder.order.clientName}</span>
-                  </div>
-                  {productionOrder.order.clientAddress && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                      <Label className="text-xs font-medium text-gray-600">Endereço de Entrega</Label>
-                      <p className="text-sm text-gray-700 mt-1">{productionOrder.order.clientAddress}</p>
-                    </div>
-                  )}
-                  {productionOrder.order.clientPhone && (
-                    <div className="mt-2">
-                      <Label className="text-xs font-medium text-gray-600">Telefone</Label>
-                      <p className="text-sm text-gray-700">{productionOrder.order.clientPhone}</p>
-                    </div>
-                  )}
+                  <Label className="text-sm font-medium text-gray-500">Produto</Label>
+                  <p className="text-lg font-semibold">{productionOrder.order?.product || 'N/A'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Produto</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Package className="h-4 w-4 text-gray-400" />
-                    <span className="font-medium">{productionOrder.order.product}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Data de Entrada</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>{formatDate(productionOrder.order.createdAt)}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Prazo Limite</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span className={isOverdue ? "text-red-600 font-semibold" : ""}>
-                      {formatDate(productionOrder.deadline)}
-                    </span>
-                    {daysUntilDeadline !== null && (
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        isOverdue 
-                          ? "bg-red-100 text-red-800" 
-                          : daysUntilDeadline <= 3 
-                            ? "bg-yellow-100 text-yellow-800" 
-                            : "bg-green-100 text-green-800"
-                      }`}>
-                        {isOverdue 
-                          ? `${Math.abs(daysUntilDeadline)} dias em atraso`
-                          : daysUntilDeadline === 0
-                            ? "Vence hoje"
-                            : `${daysUntilDeadline} dias restantes`
-                        }
-                      </span>
-                    )}
-                  </div>
+                  <Label className="text-sm font-medium text-gray-500">Valor Total</Label>
+                  <p className="text-lg font-semibold text-green-600">
+                    R$ {parseFloat(productionOrder.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
               </div>
 
-              {productionOrder.order.description && (
+              {productionOrder.order?.description && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Descrição</Label>
-                  <p className="mt-1 p-3 bg-gray-50 rounded-lg text-gray-700">
+                  <Label className="text-sm font-medium text-gray-500">Descrição</Label>
+                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg mt-1">
                     {productionOrder.order.description}
                   </p>
                 </div>
               )}
 
-              {productionOrder.notes && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Observações da Produção</Label>
-                  <p className="mt-1 p-3 bg-blue-50 rounded-lg text-blue-700">
-                    {productionOrder.notes}
+                  <Label className="text-sm font-medium text-gray-500">Prazo Original</Label>
+                  <p>{productionOrder.deadline ? new Date(productionOrder.deadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Prazo Atualizado</Label>
+                  <p className={productionOrder.deliveryDeadline ? "font-semibold text-blue-600" : ""}>
+                    {productionOrder.deliveryDeadline ? 
+                      new Date(productionOrder.deliveryDeadline).toLocaleDateString('pt-BR') : 
+                      'Não definido'
+                    }
                   </p>
                 </div>
+              </div>
+
+              {productionOrder.notes && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Observações</Label>
+                  <p className="text-gray-700 bg-blue-50 p-3 rounded-lg mt-1">
+                    {productionOrder.notes}
+                  </p>
+                  {productionOrder.lastNoteAt && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Última atualização: {new Date(productionOrder.lastNoteAt).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Informações do Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <Label className="text-sm text-gray-500">Nome</Label>
+                    <p className="font-medium">{productionOrder.order?.clientName || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {productionOrder.order?.clientPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <Label className="text-sm text-gray-500">Telefone</Label>
+                      <p className="font-medium">{productionOrder.order.clientPhone}</p>
+                    </div>
+                  </div>
+                )}
+
+                {productionOrder.order?.clientEmail && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <Label className="text-sm text-gray-500">E-mail</Label>
+                      <p className="font-medium">{productionOrder.order.clientEmail}</p>
+                    </div>
+                  </div>
+                )}
+
+                {productionOrder.order?.clientAddress && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <Label className="text-sm text-gray-500">Endereço</Label>
+                      <p className="font-medium">{productionOrder.order.clientAddress}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -281,47 +289,29 @@ export default function ProducerOrderDetails() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {productionOrder.items.map((item: any) => (
-                    <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{item.product.name}</h4>
-                          {item.product.description && (
-                            <p className="text-sm text-gray-600 mt-1">{item.product.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-sm text-gray-600">
-                              <strong>Quantidade:</strong> {item.quantity} {item.product.unit || 'un'}
-                            </span>
-                            {item.product.category && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                                {item.product.category}
-                              </span>
-                            )}
-                          </div>
+                  {productionOrder.items.map((item: any, index: number) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium">{item.product?.name || 'Produto'}</h4>
+                        <span className="font-semibold text-green-600">
+                          R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">Quantidade:</span> {item.quantity}
+                        </div>
+                        <div>
+                          <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </div>
                       </div>
-
                       {item.hasItemCustomization && (
-                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                          <h5 className="font-medium text-blue-900 mb-2">Personalização</h5>
-                          {item.itemCustomizationDescription && (
-                            <p className="text-sm text-blue-700 mb-2">
-                              {item.itemCustomizationDescription}
-                            </p>
-                          )}
-                          {item.customizationPhoto && (
-                            <div className="mt-2">
-                              <img
-                                src={item.customizationPhoto}
-                                alt="Personalização do produto"
-                                className="max-w-xs rounded-lg border border-blue-200"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                            </div>
-                          )}
+                        <div className="mt-2 p-2 bg-yellow-50 rounded">
+                          <p className="text-sm"><strong>Personalização:</strong> {item.itemCustomizationDescription}</p>
+                          <p className="text-sm"><strong>Valor adicional:</strong> R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                       )}
                     </div>
@@ -335,22 +325,17 @@ export default function ProducerOrderDetails() {
           {productionOrder.photos && productionOrder.photos.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5" />
-                  Imagens de Referência
-                </CardTitle>
+                <CardTitle>Fotos de Referência</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {productionOrder.photos.map((photo: string, index: number) => (
-                    <div key={index} className="relative">
+                    <div key={index} className="border rounded-lg overflow-hidden">
                       <img
                         src={photo}
                         alt={`Referência ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                        onError={(e) => {
-                          e.currentTarget.src = '/api/placeholder/150/150';
-                        }}
+                        className="w-full h-32 object-cover cursor-pointer hover:opacity-80"
+                        onClick={() => window.open(photo, '_blank')}
                       />
                     </div>
                   ))}
@@ -360,42 +345,31 @@ export default function ProducerOrderDetails() {
           )}
         </div>
 
-        {/* Actions Sidebar */}
+        {/* Status Control Panel */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Atualizar Informações</CardTitle>
+              <CardTitle>Status Timeline</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="delivery-deadline">Prazo de Entrega</Label>
-                <Input
-                  id="delivery-deadline"
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                />
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { status: 'pending', label: 'Aguardando', completed: true },
+                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
+                ].map((step, index) => (
+                  <div key={step.status} className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                    <span className={`text-sm ${step.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label htmlFor="production-notes">Observações</Label>
-                <Textarea
-                  id="production-notes"
-                  placeholder="Adicione observações sobre a produção..."
-                  value={updateNotes}
-                  onChange={(e) => setUpdateNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => updateNotesMutation.mutate({ 
-                  notes: updateNotes, 
-                  deliveryDeadline: deliveryDate 
-                })}
-                disabled={updateNotesMutation.isPending}
-              >
-                {updateNotesMutation.isPending ? "Salvando..." : "Salvar Informações"}
-              </Button>
             </CardContent>
           </Card>
 
@@ -425,7 +399,7 @@ export default function ProducerOrderDetails() {
                   </Button>
                 </>
               )}
-              
+
               {(productionOrder.status === 'accepted' || productionOrder.status === 'production') && (
                 <>
                   <Button 
@@ -433,16 +407,16 @@ export default function ProducerOrderDetails() {
                     onClick={() => handleStatusUpdate('production')}
                     disabled={updateStatusMutation.isPending}
                   >
-                    <Settings className="h-4 w-4 mr-2" />
-                    {productionOrder.status === 'accepted' ? 'Iniciar' : 'Atualizar'} Produção
+                    <Clock className="h-4 w-4 mr-2" />
+                    {productionOrder.status === 'accepted' ? 'Iniciar Produção' : 'Em Produção'}
                   </Button>
                   <Button 
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                     onClick={() => handleStatusUpdate('quality_check')}
                     disabled={updateStatusMutation.isPending}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Controle Qualidade
+                    Enviar p/ Qualidade
                   </Button>
                 </>
               )}
@@ -486,92 +460,136 @@ export default function ProducerOrderDetails() {
                   disabled={updateStatusMutation.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar Entrega
+                  Finalizar Ordem
                 </Button>
               )}
 
-              {['completed', 'rejected'].includes(productionOrder.status) && (
-                <div className="text-center text-sm text-gray-500 py-4">
-                  Ordem finalizada
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Status Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  { status: 'pending', label: 'Aguardando', completed: true },
-                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
-                ].map((step, index) => (
-                  <div key={step.status} className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`} />
-                    <span className={`text-sm ${step.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                      {step.label}
-                    </span>
-                  </div>
-                ))}
+              {/* Action Buttons */}
+              <div className="border-t pt-3 space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsDeadlineDialogOpen(true);
+                    setDeliveryDate(productionOrder.deliveryDeadline ? 
+                      new Date(productionOrder.deliveryDeadline).toISOString().split('T')[0] : 
+                      '');
+                  }}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Alterar Prazo
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setIsUpdateDialogOpen(true);
+                    setSelectedStatus(productionOrder.status);
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Adicionar Observação
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Update Dialog */}
+      {/* Update Status Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {newStatus === 'ready' ? 'Marcar como Pronto' : 'Finalizar Ordem'}
+              {selectedStatus === 'completed' ? 'Finalizar Ordem' : 
+               selectedStatus === 'rejected' ? 'Rejeitar Ordem' : 'Adicionar Observação'}
             </DialogTitle>
             <DialogDescription>
-              Adicione informações sobre a conclusão
+              {selectedStatus === 'completed' ? 'Adicione observações finais sobre a conclusão' :
+               selectedStatus === 'rejected' ? 'Explique o motivo da rejeição' :
+               'Adicione observações sobre o andamento'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="deliveryDate">Data de Entrega Prevista</Label>
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                placeholder="Descreva o andamento, observações técnicas, etc."
+                value={updateNotes}
+                onChange={(e) => setUpdateNotes(e.target.value)}
+                rows={4}
+              />
+            </div>
+            {(selectedStatus === 'completed' || selectedStatus === 'rejected') && (
+              <div>
+                <Label htmlFor="delivery-date">Data de Entrega (Opcional)</Label>
+                <Input
+                  id="delivery-date"
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleStatusUpdateWithNotes}
+              disabled={updateStatusMutation.isPending}
+              className={selectedStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              {updateStatusMutation.isPending ? "Salvando..." : 
+               selectedStatus === 'completed' ? 'Finalizar' :
+               selectedStatus === 'rejected' ? 'Rejeitar' : 'Salvar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Deadline Dialog */}
+      <Dialog open={isDeadlineDialogOpen} onOpenChange={setIsDeadlineDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Prazo de Entrega</DialogTitle>
+            <DialogDescription>
+              Defina um novo prazo para a entrega deste pedido
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-deadline">Nova Data de Entrega</Label>
               <Input
-                id="deliveryDate"
+                id="new-deadline"
                 type="date"
                 value={deliveryDate}
                 onChange={(e) => setDeliveryDate(e.target.value)}
               />
             </div>
             <div>
-              <Label htmlFor="notes">Observações</Label>
+              <Label htmlFor="deadline-notes">Motivo da Alteração (Opcional)</Label>
               <Textarea
-                id="notes"
-                placeholder="Observações sobre a finalização, qualidade, etc."
+                id="deadline-notes"
+                placeholder="Explique o motivo da alteração do prazo..."
                 value={updateNotes}
                 onChange={(e) => setUpdateNotes(e.target.value)}
+                rows={3}
               />
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => updateStatusMutation.mutate({ 
-                  status: newStatus, 
-                  notes: updateNotes,
-                  deliveryDate: deliveryDate
-                })}
-                disabled={updateStatusMutation.isPending}
-              >
-                {updateStatusMutation.isPending ? "Finalizando..." : "Confirmar"}
-              </Button>
-            </div>
+          </div>
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button variant="outline" onClick={() => setIsDeadlineDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDeadlineUpdate}
+              disabled={updateStatusMutation.isPending || !deliveryDate}
+            >
+              {updateStatusMutation.isPending ? "Salvando..." : "Alterar Prazo"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
