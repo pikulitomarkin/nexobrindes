@@ -150,8 +150,11 @@ export default function VendorOrders() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Ensure we're using the userId for clientId to match the order structure
+      const selectedClient = clients?.find(c => c.id === data.clientId);
       const orderData = {
         ...data,
+        clientId: selectedClient?.userId || data.clientId, // Use userId for proper client linking
         totalValue: calculateOrderTotal().toFixed(2),
         status: "confirmed"
       };
@@ -400,7 +403,9 @@ export default function VendorOrders() {
                   </SelectTrigger>
                   <SelectContent>
                     {clients?.map((client: any) => (
-                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} ({client.userCode || client.username || 'Sem código'})
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

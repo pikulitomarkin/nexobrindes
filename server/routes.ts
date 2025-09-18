@@ -1731,14 +1731,23 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { userCode, password, ...clientData } = req.body;
 
-      // Create user account first
+      console.log('Creating client with data:', { name: clientData.name, userCode, vendorId: clientData.vendorId });
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(userCode);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      // Create user first
       const user = await storage.createUser({
         username: userCode,
         password: password,
         role: "client",
         name: clientData.name,
-        email: clientData.email,
-        phone: clientData.phone,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        address: clientData.address || null,
         isActive: true
       });
 
@@ -1748,10 +1757,13 @@ Para mais detalhes, entre em contato conosco!`;
         userId: user.id
       });
 
+      // Return enriched client data
       res.json({ 
         ...newClient, 
         userCode: userCode,
-        userId: user.id 
+        username: userCode,
+        userId: user.id,
+        name: clientData.name
       });
     } catch (error) {
       console.log(error);

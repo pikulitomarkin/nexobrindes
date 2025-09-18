@@ -105,13 +105,23 @@ export default function VendorClients() {
     },
     onSuccess: (newClient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
       form.reset();
       toast({
         title: "Sucesso!",
-        description: `Cliente criado com sucesso! Código de acesso: ${userCode}`,
+        description: `Cliente ${newClient.name} criado com sucesso!`,
       });
+      
+      // Show the user code in a separate toast
+      setTimeout(() => {
+        toast({
+          title: "Código de Acesso do Cliente:",
+          description: `${userCode} - Anote este código para fornecer ao cliente`,
+          duration: 10000,
+        });
+      }, 1000);
     },
   });
 
@@ -316,16 +326,17 @@ export default function VendorClients() {
               <Card key={client.id} className="card-hover">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
-                      {client.userCode && (
-                        <div className="flex items-center mt-1">
-                          <User className="h-3 w-3 text-blue-600 mr-1" />
-                          <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {client.userCode}
+                      <div className="flex items-center mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                        <User className="h-4 w-4 text-blue-600 mr-2" />
+                        <div>
+                          <span className="text-xs text-blue-600 font-medium">Código de Acesso:</span>
+                          <span className="text-sm font-mono font-bold text-blue-800 ml-2">
+                            {client.userCode || client.username || 'N/A'}
                           </span>
                         </div>
-                      )}
+                      </div>
                     </div>
                     <div className="flex space-x-2">
                       <Button 
