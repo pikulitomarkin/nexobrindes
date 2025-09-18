@@ -2063,9 +2063,13 @@ Para mais detalhes, entre em contato conosco!`;
         order: {
           ...order,
           clientName: clientUser?.name || 'Cliente não encontrado',
-          clientAddress: clientDetails?.address || null,
+          clientAddress: clientDetails?.address || clientUser?.address || 'Endereço não informado',
           clientPhone: clientDetails?.phone || clientUser?.phone || null,
-          clientEmail: clientDetails?.email || clientUser?.email || null
+          clientEmail: clientDetails?.email || clientUser?.email || null,
+          shippingAddress: order.deliveryType === 'pickup' 
+            ? 'Sede Principal - Retirada no Local'
+            : (clientDetails?.address || clientUser?.address || 'Endereço não informado'),
+          deliveryType: order.deliveryType || 'delivery'
         },
         items: budgetItems,
         photos: budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl)
