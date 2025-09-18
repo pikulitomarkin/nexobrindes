@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, MessageCircle, FileText, Building, MapPin, Hash } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, MessageCircle, FileText, Building, MapPin, Hash, RefreshCw, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,7 @@ const clientFormSchema = z.object({
   cpfCnpj: z.string().optional(),
   address: z.string().optional(),
   vendorId: z.string().optional(),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -37,7 +38,20 @@ export default function AdminClients() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [showOrders, setShowOrders] = useState(false);
+  const [userCode, setUserCode] = useState("");
   const { toast } = useToast();
+
+  const generateUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `CLI${timestamp}${randomStr}`;
+  };
+
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      setUserCode(generateUserCode());
+    }
+  }, [isCreateDialogOpen]);
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["/api/clients"],
@@ -68,26 +82,31 @@ export default function AdminClients() {
       cpfCnpj: "",
       address: "",
       vendorId: "",
+      password: "",
     },
   });
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
+      const clientData = {
+        ...data,
+        userCode: userCode
+      };
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(clientData),
       });
       if (!response.ok) throw new Error("Erro ao criar cliente");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newClient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setIsCreateDialogOpen(false);
       form.reset();
       toast({
         title: "Sucesso!",
-        description: "Cliente criado com sucesso",
+        description: `Cliente criado com sucesso! Código de acesso: ${userCode}`,
       });
     },
   });
@@ -130,6 +149,28 @@ export default function AdminClients() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <FormLabel className="text-blue-700">Código de Acesso do Cliente</FormLabel>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <User className="h-4 w-4 text-blue-600" />
+                        <span className="font-mono font-bold text-blue-800">{userCode}</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">Este código será usado para login no sistema</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUserCode(generateUserCode())}
+                      className="border-blue-300 text-blue-600 hover:bg-blue-100"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="name"
@@ -140,6 +181,21 @@ export default function AdminClients() {
                         <Input placeholder="João Silva" {...field} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha de Acesso *</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Digite uma senha" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-gray-600">Senha que o cliente usará para acessar o sistema</p>
                     </FormItem>
                   )}
                 />
@@ -277,7 +333,17 @@ export default function AdminClients() {
               <Card key={client.id} className="card-hover">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
+                      {client.userCode && (
+                        <div className="flex items-center mt-1">
+                          <User className="h-3 w-3 text-blue-600 mr-1" />
+                          <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {client.userCode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex space-x-2">
                       <Button 
                         variant="ghost" 

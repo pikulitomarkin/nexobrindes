@@ -1447,8 +1447,30 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/clients", async (req, res) => {
     try {
-      const newClient = await storage.createClient(req.body);
-      res.json(newClient);
+      const { userCode, password, ...clientData } = req.body;
+      
+      // Create user account first
+      const user = await storage.createUser({
+        username: userCode,
+        password: password,
+        role: "client",
+        name: clientData.name,
+        email: clientData.email,
+        phone: clientData.phone,
+        isActive: true
+      });
+
+      // Create client record linked to user
+      const newClient = await storage.createClient({
+        ...clientData,
+        userId: user.id
+      });
+
+      res.json({ 
+        ...newClient, 
+        userCode: userCode,
+        userId: user.id 
+      });
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to create client" });

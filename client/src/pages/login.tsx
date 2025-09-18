@@ -113,11 +113,14 @@ export default function Login() {
                   id="username"
                   data-testid="input-username"
                   type="text"
-                  placeholder="Digite seu usuário"
+                  placeholder="Digite seu usuário ou código"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
                 />
+                <p className="text-xs text-gray-500">
+                  Clientes: use o código fornecido no cadastro (ex: CLI123456ABCD)
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
