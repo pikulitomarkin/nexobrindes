@@ -42,15 +42,16 @@ export default function ProducerOrderDetails() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ status, notes, deliveryDate }: { 
+    mutationFn: async ({ status, notes, deliveryDate, trackingCode }: { 
       status: string; 
       notes?: string;
       deliveryDate?: string;
+      trackingCode?: string;
     }) => {
       const response = await fetch(`/api/production-orders/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, notes, deliveryDate }),
+        body: JSON.stringify({ status, notes, deliveryDate, trackingCode }),
       });
       if (!response.ok) throw new Error("Erro ao atualizar status");
       return response.json();
@@ -62,6 +63,7 @@ export default function ProducerOrderDetails() {
       setIsDeadlineDialogOpen(false);
       setUpdateNotes("");
       setDeliveryDate("");
+      setTrackingCode("");
       toast({
         title: "Sucesso!",
         description: "Status atualizado com sucesso",
@@ -78,11 +80,14 @@ export default function ProducerOrderDetails() {
     }
   };
 
+  const [trackingCode, setTrackingCode] = useState("");
+
   const handleStatusUpdateWithNotes = () => {
     updateStatusMutation.mutate({ 
       status: selectedStatus, 
       notes: updateNotes,
-      deliveryDate: deliveryDate || undefined
+      deliveryDate: deliveryDate || undefined,
+      trackingCode: trackingCode || undefined
     });
   };
 
@@ -345,8 +350,44 @@ export default function ProducerOrderDetails() {
           )}
         </div>
 
-        {/* Status Control Panel */}
+        {/* Shipping Information */}
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Informações de Envio
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Tipo de Entrega</Label>
+                <p className="font-medium">
+                  {productionOrder.order?.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
+                </p>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Endereço de Envio</Label>
+                <p className="font-medium text-gray-900">
+                  {productionOrder.order?.deliveryType === 'pickup' 
+                    ? 'Sede Principal - Retirada no Local'
+                    : (productionOrder.order?.shippingAddress || productionOrder.order?.clientAddress || 'Endereço não informado')
+                  }
+                </p>
+              </div>
+
+              {productionOrder.trackingCode && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Código de Rastreamento</Label>
+                  <p className="font-medium text-blue-600 bg-blue-50 p-2 rounded">
+                    {productionOrder.trackingCode}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Status Timeline</CardTitle>
@@ -355,11 +396,13 @@ export default function ProducerOrderDetails() {
               <div className="space-y-3">
                 {[
                   { status: 'pending', label: 'Aguardando', completed: true },
-                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'completed'].includes(productionOrder.status) },
-                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'completed'].includes(productionOrder.status) },
+                  { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'production', label: 'Em Produção', completed: ['production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'quality_check', label: 'Controle Qualidade', completed: ['quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'ready', label: 'Pronto', completed: ['ready', 'preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'preparing_shipment', label: 'Preparando Envio', completed: ['preparing_shipment', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'delivered', label: 'Entregue', completed: ['delivered', 'completed'].includes(productionOrder.status) },
                   { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
                 ].map((step, index) => (
                   <div key={step.status} className="flex items-center gap-3">
@@ -433,14 +476,39 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'ready' && (
+                <Button 
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={() => handleStatusUpdate('preparing_shipment')}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Preparar Envio
+                </Button>
+              )}
+
+              {productionOrder.status === 'preparing_shipment' && (
+                <Button 
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={() => {
+                    setSelectedStatus('shipped');
+                    setIsUpdateDialogOpen(true);
+                  }}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Marcar Enviado
+                </Button>
+              )}
+
+              {productionOrder.status === 'shipped' && (
                 <>
                   <Button 
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={() => handleStatusUpdate('shipped')}
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                    onClick={() => handleStatusUpdate('delivered')}
                     disabled={updateStatusMutation.isPending}
                   >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Marcar Enviado
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Marcar Entregue
                   </Button>
                   <Button 
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -453,7 +521,7 @@ export default function ProducerOrderDetails() {
                 </>
               )}
 
-              {productionOrder.status === 'shipped' && (
+              {(productionOrder.status === 'delivered') && (
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => handleStatusUpdate('completed')}
@@ -521,7 +589,19 @@ export default function ProducerOrderDetails() {
                 rows={4}
               />
             </div>
-            {(selectedStatus === 'completed' || selectedStatus === 'rejected') && (
+            {selectedStatus === 'shipped' && (
+              <div>
+                <Label htmlFor="tracking-code">Código de Rastreamento</Label>
+                <Input
+                  id="tracking-code"
+                  placeholder="Ex: BR123456789..."
+                  value={trackingCode}
+                  onChange={(e) => setTrackingCode(e.target.value)}
+                />
+              </div>
+            )}
+            
+            {(selectedStatus === 'completed' || selectedStatus === 'rejected' || selectedStatus === 'shipped') && (
               <div>
                 <Label htmlFor="delivery-date">Data de Entrega (Opcional)</Label>
                 <Input

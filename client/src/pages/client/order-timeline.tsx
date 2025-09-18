@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin, Home } from "lucide-react";
 import { Link } from "wouter";
 
 export default function ClientOrderTimeline() {
@@ -25,19 +25,23 @@ export default function ClientOrderTimeline() {
       confirmed: "bg-blue-100 text-blue-800",
       production: "bg-purple-100 text-purple-800",
       ready: "bg-orange-100 text-orange-800",
+      preparing_shipment: "bg-yellow-200 text-yellow-800",
       shipped: "bg-indigo-100 text-indigo-800",
       delivered: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
+      completed: "bg-gray-100 text-gray-800",
     };
 
     const statusLabels = {
       pending: "Aguardando",
       confirmed: "Confirmado",
       production: "Em Produção",
-      ready: "Pronto para Envio",
+      ready: "Pronto",
+      preparing_shipment: "Preparando Envio",
       shipped: "Enviado",
       delivered: "Entregue",
       cancelled: "Cancelado",
+      completed: "Finalizado",
     };
 
     return (
@@ -45,6 +49,18 @@ export default function ClientOrderTimeline() {
         {statusLabels[status as keyof typeof statusLabels]}
       </Badge>
     );
+  };
+
+  const getTimelineSteps = (status: string) => {
+    const steps = [
+      { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: true },
+      { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "quality_check", "ready", "preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
+      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
+      { id: "preparing_shipment", label: "Preparando Envio", icon: Package, completed: ["preparing_shipment", "shipped", "delivered", "completed"].includes(status) },
+      { id: "shipping", label: "Enviado", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
+      { id: "delivered", label: "Entregue", icon: Home, completed: ["delivered", "completed"].includes(status) },
+    ];
+    return steps;
   };
 
   if (isLoading) {
@@ -177,41 +193,60 @@ export default function ClientOrderTimeline() {
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
-                {timeline.map((step: any, index: number) => (
-                  <div key={step.id} className="flex items-start">
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
-                      step.completed ? 'gradient-bg text-white' : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {step.icon === 'check-circle' && <CheckCircle className="h-5 w-5" />}
-                      {step.icon === 'clock' && <Clock className="h-5 w-5" />}
-                      {step.icon === 'package' && <Package className="h-5 w-5" />}
-                      {step.icon === 'truck' && <Truck className="h-5 w-5" />}
-                      {step.icon === 'file-plus' && <FileText className="h-5 w-5" />}
-                      {step.icon === 'settings' && <Package className="h-5 w-5" />}
-                      {step.icon === 'check-circle-2' && <CheckCircle className="h-5 w-5" />}
+                {timeline.map((step: any, index: number) => {
+                  const isCurrentStatus = order.status === step.id;
+                  const isCompleted = step.completed;
+                  const isShipped = step.id === "shipping";
+                  const isDelivered = step.id === "delivered";
+                  const isPreparingShipment = step.id === "preparing_shipment";
+
+                  return (
+                    <div key={step.id} className="flex items-start">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                        isCompleted ? 'gradient-bg text-white' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {step.icon === 'check-circle' && <CheckCircle className="h-5 w-5" />}
+                        {step.icon === 'clock' && <Clock className="h-5 w-5" />}
+                        {step.icon === 'package' && <Package className="h-5 w-5" />}
+                        {step.icon === 'truck' && <Truck className="h-5 w-5" />}
+                        {step.icon === 'file-plus' && <FileText className="h-5 w-5" />}
+                        {step.icon === 'settings' && <Package className="h-5 w-5" />}
+                        {step.icon === 'check-circle-2' && <CheckCircle className="h-5 w-5" />}
+                        {step.icon === 'home' && <Home className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 pb-8 border-l-2 border-gray-200 pl-6 ml-5 relative">
+                        <div className={`absolute -left-2 top-0 w-4 h-4 ${isCompleted ? 'bg-blue-500' : 'bg-white border-2 border-gray-300'} rounded-full`}></div>
+                        <h4 className={`font-bold text-lg mb-2 ${isCompleted ? 'text-gray-900' : 'text-gray-500'}`}>
+                          {step.label}
+                        </h4>
+                        <p className={`text-sm mb-3 ${isCompleted ? 'text-gray-700' : 'text-gray-400'}`}>
+                          {step.description}
+                        </p>
+                        {step.date && (
+                          <div className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-flex">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            {new Date(step.date).toLocaleDateString('pt-BR', { 
+                              weekday: 'long',
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        )}
+                        {(isShipped || isDelivered || isPreparingShipment) && order.trackingNumber && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-600">Rastreamento:</p>
+                            <p className="font-medium text-blue-600 underline">
+                              <a href={`https://rastreamento.com/${order.trackingNumber}`} target="_blank" rel="noopener noreferrer">
+                                {order.trackingNumber}
+                              </a>
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 pb-8 border-l-2 border-gray-200 pl-6 ml-5 relative">
-                      <div className="absolute -left-2 top-0 w-4 h-4 bg-white border-2 border-gray-300 rounded-full"></div>
-                      <h4 className={`font-bold text-lg mb-2 ${step.completed ? 'text-gray-900' : 'text-gray-500'}`}>
-                        {step.title}
-                      </h4>
-                      <p className={`text-sm mb-3 ${step.completed ? 'text-gray-700' : 'text-gray-400'}`}>
-                        {step.description}
-                      </p>
-                      {step.date && (
-                        <div className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-flex">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {new Date(step.date).toLocaleDateString('pt-BR', { 
-                            weekday: 'long',
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

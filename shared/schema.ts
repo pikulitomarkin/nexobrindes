@@ -54,7 +54,7 @@ export const productionOrders = pgTable("production_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").references(() => orders.id).notNull(),
   producerId: varchar("producer_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), // 'pending', 'accepted', 'production', 'completed', 'rejected'
+  status: text("status").notNull().default('pending'), // 'pending', 'accepted', 'production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed', 'rejected'
   deadline: timestamp("deadline"),
   acceptedAt: timestamp("accepted_at"),
   completedAt: timestamp("completed_at"),
@@ -62,6 +62,8 @@ export const productionOrders = pgTable("production_orders", {
   deliveryDeadline: timestamp("delivery_deadline"),
   hasUnreadNotes: boolean("has_unread_notes").default(false),
   lastNoteAt: timestamp("last_note_at"),
+  trackingCode: text("tracking_code"), // Código de rastreamento
+  shippingAddress: text("shipping_address"), // Endereço de envio
 });
 
 export const payments = pgTable("payments", {

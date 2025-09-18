@@ -68,7 +68,7 @@ export interface IStorage {
   getProductionOrder(id: string): Promise<ProductionOrder | undefined>;
   getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
-  updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined>;
+  updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined>;
 
   // Payments
   getPayments(): Promise<Payment[]>;
@@ -303,7 +303,7 @@ export class MemStorage implements IStorage {
     // Vendor user
     const vendorUser = {
       id: "vendor-1",
-      username: "vendedor1", 
+      username: "vendedor1",
       password: "123456",
       name: "Maria Santos",
       email: "maria.santos@erp.com",
@@ -320,7 +320,7 @@ export class MemStorage implements IStorage {
     const clientUser = {
       id: "client-1",
       username: "cliente1",
-      password: "123456", 
+      password: "123456",
       name: "João Silva",
       email: "joao.silva@email.com",
       phone: null,
@@ -338,7 +338,7 @@ export class MemStorage implements IStorage {
       username: "produtor1",
       password: "123456",
       name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com", 
+      email: "contato@marcenariasantos.com",
       phone: null,
       vendorId: null,
       role: "producer",
@@ -737,7 +737,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
     this.clients.set(id, client);
     return client;
@@ -824,10 +824,10 @@ export class MemStorage implements IStorage {
     console.log(`Storage: getClientsByVendor for vendorId: ${vendorId}`);
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-    
+
     const filteredClients = allClients.filter(client => client.vendorId === vendorId);
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-    
+
     return filteredClients;
   }
 
@@ -856,7 +856,9 @@ export class MemStorage implements IStorage {
       notes: insertProductionOrder.notes || null,
       deliveryDeadline: insertProductionOrder.deliveryDeadline || null,
       hasUnreadNotes: insertProductionOrder.hasUnreadNotes || false,
-      lastNoteAt: insertProductionOrder.lastNoteAt || null
+      lastNoteAt: insertProductionOrder.lastNoteAt || null,
+      trackingCode: insertProductionOrder.trackingCode || null,
+      shippingAddress: insertProductionOrder.shippingAddress || null
     };
     this.productionOrders.set(id, productionOrder);
     return productionOrder;
@@ -866,69 +868,7 @@ export class MemStorage implements IStorage {
     return this.productionOrders.get(id) || null;
   }
 
-  async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | null> {
-    const productionOrder = this.productionOrders.get(id);
-    if (!productionOrder) return null;
-
-    const updatedOrder: ProductionOrder = {
-      ...productionOrder,
-      status,
-      notes: notes || productionOrder.notes,
-      hasUnreadNotes: notes ? true : productionOrder.hasUnreadNotes,
-      lastNoteAt: notes ? new Date() : productionOrder.lastNoteAt,
-      deliveryDeadline: deliveryDate ? new Date(deliveryDate) : productionOrder.deliveryDeadline,
-      acceptedAt: (status === 'accepted' && !productionOrder.acceptedAt) ? new Date() : productionOrder.acceptedAt,
-      completedAt: (status === 'completed' && !productionOrder.completedAt) ? new Date() : productionOrder.completedAt
-    };
-
-    this.productionOrders.set(id, updatedOrder);
-
-    // Update main order status based on production status
-    const mainOrder = this.orders.get(productionOrder.orderId);
-    if (mainOrder) {
-      let orderStatus = mainOrder.status;
-
-      switch (status) {
-        case 'production':
-          orderStatus = 'production';
-          break;
-        case 'ready':
-          orderStatus = 'ready';
-          break;
-        case 'shipped':
-          orderStatus = 'shipped';
-          break;
-        case 'completed':
-          orderStatus = 'delivered';
-          break;
-        case 'rejected':
-          orderStatus = 'cancelled';
-          break;
-      }
-
-      const updatedMainOrder = { ...mainOrder, status: orderStatus };
-      this.orders.set(productionOrder.orderId, updatedMainOrder);
-    }
-
-    return updatedOrder;
-  }
-
-  async updateProductionOrderNotes(id: string, notes: string, hasUnreadNotes: boolean): Promise<ProductionOrder | null> {
-    const productionOrder = this.productionOrders.get(id);
-    if (!productionOrder) return null;
-
-    const updatedOrder: ProductionOrder = {
-      ...productionOrder,
-      notes,
-      hasUnreadNotes,
-      lastNoteAt: hasUnreadNotes ? new Date() : productionOrder.lastNoteAt
-    };
-
-    this.productionOrders.set(id, updatedOrder);
-    return updatedOrder;
-  }
-
-  async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string): Promise<ProductionOrder | undefined> {
+  async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined> {
     const productionOrder = this.productionOrders.get(id);
     if (productionOrder) {
       const updatedPO = {
@@ -938,10 +878,17 @@ export class MemStorage implements IStorage {
         hasUnreadNotes: notes ? true : productionOrder.hasUnreadNotes,
         lastNoteAt: notes ? new Date() : productionOrder.lastNoteAt,
         acceptedAt: status === 'accepted' && !productionOrder.acceptedAt ? new Date() : (typeof productionOrder.acceptedAt === 'string' ? new Date(productionOrder.acceptedAt) : productionOrder.acceptedAt),
-        completedAt: (status === 'completed' || status === 'ready') && !productionOrder.completedAt ? new Date() : (typeof productionOrder.completedAt === 'string' ? new Date(productionOrder.completedAt) : productionOrder.completedAt),
+        completedAt: (status === 'completed' || status === 'shipped' || status === 'delivered') && !productionOrder.completedAt ? new Date() : (typeof productionOrder.completedAt === 'string' ? new Date(productionOrder.completedAt) : productionOrder.completedAt),
         deadline: deliveryDate ? new Date(deliveryDate) : (typeof productionOrder.deadline === 'string' ? new Date(productionOrder.deadline) : productionOrder.deadline),
-        deliveryDeadline: deliveryDate ? new Date(deliveryDate) : productionOrder.deliveryDeadline
+        deliveryDeadline: deliveryDate ? new Date(deliveryDate) : productionOrder.deliveryDeadline,
+        trackingCode: trackingCode !== undefined ? trackingCode : productionOrder.trackingCode,
       };
+
+      // If the order is 'shipped' or 'delivered', and the status was not already one of those, set completedAt
+      if (['shipped', 'delivered'].includes(status) && !['shipped', 'delivered'].includes(productionOrder.status)) {
+        updatedPO.completedAt = new Date();
+      }
+
       this.productionOrders.set(id, updatedPO);
       return updatedPO;
     }
@@ -1024,8 +971,8 @@ export class MemStorage implements IStorage {
   async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
     const commission = this.commissions.get(id);
     if (commission) {
-      const updatedCommission = { 
-        ...commission, 
+      const updatedCommission = {
+        ...commission,
         status,
         paidAt: status === 'paid' ? new Date() : commission.paidAt,
         deductedAt: status === 'deducted' ? new Date() : commission.deductedAt
@@ -1378,6 +1325,14 @@ export class MemStorage implements IStorage {
       throw new Error("Budget not found");
     }
 
+    // Determine shipping address based on delivery type
+    let shippingAddress = budget.shippingAddress || null;
+    if (budget.deliveryType === 'pickup') {
+      // If pickup, find the main company address or a default pickup location
+      // For now, setting to null, but ideally this would be a specific pickup point address
+      shippingAddress = null;
+    }
+
     // Create order from budget
     const orderNumber = `PED-${Date.now()}`;
     const order = await this.createOrder({
@@ -1389,8 +1344,10 @@ export class MemStorage implements IStorage {
       product: budget.title,
       description: budget.description,
       totalValue: budget.totalValue,
-      status: 'confirmed',
-      deadline: budget.validUntil
+      status: 'confirmed', // Default status for a new order from budget
+      deadline: budget.validUntil,
+      shippingAddress: shippingAddress, // Include shipping address
+      deliveryType: budget.deliveryType
     });
 
     // Update budget status

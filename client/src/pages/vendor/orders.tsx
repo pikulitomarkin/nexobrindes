@@ -985,6 +985,27 @@ export default function VendorOrders() {
                 </div>
               )}
 
+              {selectedOrder.trackingCode && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Código de Rastreamento</Label>
+                  <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-mono font-semibold">{selectedOrder.trackingCode}</p>
+                    <p className="text-xs text-blue-600 mt-2">
+                      Cliente pode usar este código para rastrear o pedido
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.deliveryType && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Tipo de Entrega</Label>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {selectedOrder.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
+                  </p>
+                </div>
+              )}
+
               {/* Progress Bar for Production Status */}
               {(selectedOrder.status === 'production' || selectedOrder.status === 'delayed' || selectedOrder.status === 'ready' || selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered') && (
                 <div>
