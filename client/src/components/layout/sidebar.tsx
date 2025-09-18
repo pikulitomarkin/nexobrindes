@@ -21,6 +21,20 @@ import {
 
 import { useLocation } from "wouter";
 
+// Assuming Link and SidebarMenu related components are imported from a UI library
+// For demonstration, let's assume they are available or mock them if necessary.
+// Example: import { Link } from 'your-link-component-library';
+// Example: import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent } from 'your-sidebar-library';
+
+// Mocking Link, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent for demonstration
+const Link = ({ href, children }: any) => <a href={href}>{children}</a>;
+const SidebarMenu = ({ children }: any) => <nav>{children}</nav>;
+const SidebarMenuItem = ({ children }: any) => <li>{children}</li>;
+const SidebarMenuButton = ({ asChild, children }: any) => <>{children}</>;
+const SidebarGroupLabel = ({ children }: any) => <h3 className="text-sm font-semibold text-gray-400 uppercase px-6 mt-6 mb-2">{children}</h3>;
+const SidebarGroupContent = ({ children }: any) => <div>{children}</div>;
+
+
 interface SidebarProps {
   activePanel: string;
   onPanelChange: (panel: string) => void;
@@ -215,6 +229,28 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             label="Comissões" 
             href="/vendor/commissions"
             isActive={location === "/vendor/commissions"}
+          />
+        </nav>
+      )}
+
+      {activePanel === "client" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Minha Conta
+            </p>
+          </div>
+          <SidebarItem 
+            icon={ShoppingCart} 
+            label="Meus Pedidos" 
+            href="/client/orders"
+            isActive={location === "/client/orders"}
+          />
+          <SidebarItem 
+            icon={User} 
+            label="Meu Perfil" 
+            href="/client/profile"
+            isActive={location === "/client/profile"}
           />
         </nav>
       )}

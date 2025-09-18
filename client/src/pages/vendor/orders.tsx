@@ -26,6 +26,7 @@ export default function VendorOrders() {
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all"); // Added periodFilter state
   const { toast } = useToast();
 
   // Order form state - isolated for vendor
@@ -289,13 +290,42 @@ export default function VendorOrders() {
     );
   };
 
+  // Filter orders based on search term, status, and period
   const filteredOrders = orders?.filter((order: any) => {
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesSearch = searchTerm === "" ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+
+    // Period filter logic
+    let matchesPeriod = true;
+    if (periodFilter !== "all" && order.createdAt) {
+      const orderDate = new Date(order.createdAt);
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const startOfQuarter = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
+
+      switch (periodFilter) {
+        case "today":
+          matchesPeriod = orderDate >= startOfDay;
+          break;
+        case "week":
+          matchesPeriod = orderDate >= startOfWeek;
+          break;
+        case "month":
+          matchesPeriod = orderDate >= startOfMonth;
+          break;
+        case "quarter":
+          matchesPeriod = orderDate >= startOfQuarter;
+          break;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesPeriod;
   });
 
   if (isLoading) {
@@ -661,39 +691,45 @@ export default function VendorOrders() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Search */}
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por número, título ou cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+            <div className="relative flex-1 min-w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar por número, título ou cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="pending">Aguardando</SelectItem>
-                  <SelectItem value="confirmed">Confirmado</SelectItem>
-                  <SelectItem value="production">Em Produção</SelectItem>
-                  <SelectItem value="delayed">Em Atraso</SelectItem>
-                  <SelectItem value="ready">Pronto</SelectItem>
-                  <SelectItem value="shipped">Enviado</SelectItem>
-                  <SelectItem value="delivered">Entregue</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="confirmed">Confirmado</SelectItem>
+                <SelectItem value="production">Em Produção</SelectItem>
+                <SelectItem value="shipped">Enviado</SelectItem>
+                <SelectItem value="delivered">Entregue</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Períodos</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="week">Esta Semana</SelectItem>
+                <SelectItem value="month">Este Mês</SelectItem>
+                <SelectItem value="quarter">Trimestre</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

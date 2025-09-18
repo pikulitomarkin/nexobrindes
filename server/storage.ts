@@ -761,6 +761,10 @@ export class MemStorage implements IStorage {
     return this.clients.delete(id);
   }
 
+  async getClientByUserId(userId: string): Promise<Client | undefined> {
+    return Array.from(this.clients.values()).find(client => client.userId === userId);
+  }
+
   // Order methods
   async getOrders(): Promise<Order[]> {
     return Array.from(this.orders.values());
@@ -1076,13 +1080,15 @@ export class MemStorage implements IStorage {
       name: vendorData.name,
       email: vendorData.email || null,
       phone: vendorData.phone || null,
+      address: vendorData.address || null,
+      specialty: vendorData.specialty || null,
       vendorId: null,
       isActive: true
     };
 
     this.users.set(newUser.id, newUser);
 
-    // Also create vendor profile
+    // Create vendor profile
     const vendorProfile: Vendor = {
       id: randomUUID(),
       userId: newUser.id,

@@ -223,7 +223,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       console.log(`Fetching orders for client: ${clientId}`);
       
-      const orders = await storage.getOrdersByClient(clientId);
+      // First, try to find orders by user ID (for backward compatibility)
+      let orders = await storage.getOrdersByClient(clientId);
+      
+      // If no orders found by user ID, try to find client record and get orders by client record ID
+      if (orders.length === 0) {
+        const clientRecord = await storage.getClientByUserId(clientId);
+        if (clientRecord) {
+          console.log(`Found client record: ${clientRecord.id}`);
+          orders = await storage.getOrdersByClient(clientRecord.id);
+        }
+      }
+      
       console.log(`Found ${orders.length} orders for client ${clientId}`);
 
       const enrichedOrders = await Promise.all(
@@ -399,26 +410,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate });
 
-      // Create user with provided userCode as username
-      const user = await storage.createUser({
+      // Create vendor with all data in one call to avoid duplicates
+      const vendor = await storage.createVendor({
         username: userCode,
         password: password,
-        role: "vendor",
         name,
         email: email || null,
         phone: phone || null,
-        address: address || null
+        address: address || null,
+        commissionRate: commissionRate || '10.00'
       });
 
-      // Create vendor info
-      await storage.createVendor({
-        userId: user.id,
-        commissionRate: commissionRate || '10.00',
-        isActive: true,
-        salesLink: null
-      });
-
-      res.json({ success: true, user: { ...user, userCode: userCode } });
+      res.json({ success: true, user: { ...vendor, userCode: userCode } });
     } catch (error) {
       console.error('Error creating vendor:', error);
       res.status(500).json({ error: "Failed to create vendor" });
@@ -606,6 +609,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
+  });
+
+  // Client profile endpoints
+  app.get("/api/clients/profile/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // First try to find client by userId
+      const clientRecord = await storage.getClientByUserId(userId);
+      let clientData;
+      
+      if (clientRecord) {
+        // Get vendor info if assigned
+        const vendor = clientRecord.vendorId ? await storage.getUser(clientRecord.vendorId) : null;
+        clientData = {
+          ...clientRecord,
+          vendorName: vendor?.name || null
+        };
+      } else {
+        // Fallback to user data
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ error: "Cliente não encontrado" });
+        }
+        clientData = {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          isActive: user.isActive,
+          vendorName: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+      
+      res.json(clientData);
+    } catch (error) {
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  app.put("/api/clients/profile/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { name, email, phone, address } = req.body;
+      
+      // Update user record
+      await storage.updateUser(userId, { name, email, phone, address });
+      
+      // Update client record if exists
+      const clientRecord = await storage.getClientByUserId(userId);
+      if (clientRecord) {
+        await storage.updateClient(clientRecord.id, { name, email, phone, address });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating client profile:", error);
+      res.status(500).json({ error: "Failed to update client profile" });
+    }
+  });
+
+  app.put("/api/clients/password/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { currentPassword, newPassword } = req.body;
+      
+      // Verify current password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      
+      if (user.password !== currentPassword) {
+        return res.status(400).json({ error: "Senha atual incorreta" });
+      }
+      
+      // Update password
+      await storage.updateUser(userId, { password: newPassword });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating client password:", error);
+      res.status(500).json({ error: "Failed to update password" });
+    }
   });
 
   // Clear test data endpoint

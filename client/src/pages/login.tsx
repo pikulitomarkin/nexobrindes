@@ -53,13 +53,16 @@ export default function Login() {
               window.location.href = "/client/orders";
               break;
             case "producer":
-              window.location.href = "/producer/orders";
+              window.location.href = "/producer/production-dashboard";
+              break;
+            case "finance":
+              window.location.href = "/finance/payments";
               break;
             case "partner":
-              window.location.href = "/";
+              window.location.href = "/partner/dashboard";
               break;
             default:
-              window.location.href = "/";
+              window.location.href = "/dashboard";
           }
         }, 100);
       } else {

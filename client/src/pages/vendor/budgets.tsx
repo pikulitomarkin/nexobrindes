@@ -401,6 +401,7 @@ export default function VendorBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders/client"] });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
