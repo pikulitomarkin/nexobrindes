@@ -496,6 +496,7 @@ export class MemStorage implements IStorage {
         paidValue: "735.00",
         status: "production",
         deadline: new Date("2024-11-22"),
+        trackingCode: null,
         createdAt: new Date("2024-11-15"),
         updatedAt: new Date("2024-11-16")
       },
@@ -512,6 +513,7 @@ export class MemStorage implements IStorage {
         paidValue: "567.00",
         status: "pending",
         deadline: new Date("2024-11-25"),
+        trackingCode: null,
         createdAt: new Date("2024-11-14"),
         updatedAt: new Date("2024-11-14")
       }
@@ -784,6 +786,7 @@ export class MemStorage implements IStorage {
       description: insertOrder.description || null,
       paidValue: insertOrder.paidValue || null,
       deadline: insertOrder.deadline || null,
+      trackingCode: insertOrder.trackingCode || null,
       status: insertOrder.status || 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
@@ -795,7 +798,12 @@ export class MemStorage implements IStorage {
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (order) {
-      const updatedOrder = { ...order, ...updates, updatedAt: new Date() };
+      const updatedOrder = { 
+        ...order, 
+        ...updates, 
+        updatedAt: new Date(),
+        trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode
+      };
       this.orders.set(id, updatedOrder);
       return updatedOrder;
     }

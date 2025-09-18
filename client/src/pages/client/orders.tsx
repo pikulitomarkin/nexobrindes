@@ -24,10 +24,10 @@ export default function ClientOrders() {
 
   const getTimelineSteps = (status: string) => {
     const steps = [
-      { id: "confirmed", label: "Pedido Confirmado", icon: CheckCircle, completed: ["confirmed", "production", "ready", "shipped", "delivered", "completed"].includes(status) },
+      { id: "confirmed", label: "Confirmado", icon: CheckCircle, completed: ["confirmed", "production", "ready", "shipped", "delivered", "completed"].includes(status) },
       { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "ready", "shipped", "delivered", "completed"].includes(status) },
       { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "delivered", "completed"].includes(status) },
-      { id: "shipping", label: "Envio", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
+      { id: "shipped", label: "Enviado", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
       { id: "delivered", label: "Entregue", icon: Home, completed: ["delivered", "completed"].includes(status) },
     ];
     return steps;
@@ -159,7 +159,7 @@ export default function ClientOrders() {
                           {step.label}
                         </p>
                         <p className="text-xs text-gray-500 mt-1 text-center">
-                          {step.completed ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Aguardando'}
+                          {step.completed ? new Date(order.updatedAt || order.createdAt).toLocaleDateString('pt-BR') : 'Aguardando'}
                         </p>
                       </div>
                     );

@@ -1864,9 +1864,11 @@ Para mais detalhes, entre em contato conosco!`;
         
         switch (status) {
           case 'pending':
-            orderStatus = 'confirmed';
+            orderStatus = 'pending';
             break;
           case 'accepted':
+            orderStatus = 'confirmed';
+            break;
           case 'production':
             orderStatus = 'production';
             break;
@@ -1887,7 +1889,11 @@ Para mais detalhes, entre em contato conosco!`;
             break;
         }
         
-        await storage.updateOrder(productionOrder.orderId, { status: orderStatus });
+        // Atualizar o pedido principal com o novo status
+        await storage.updateOrder(productionOrder.orderId, { 
+          status: orderStatus,
+          trackingCode: trackingCode || null
+        });
       }
 
       res.json({ success: true, productionOrder: result });

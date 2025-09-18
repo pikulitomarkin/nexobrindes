@@ -93,7 +93,7 @@ export default function ClientOrderTimeline() {
         id: 'shipped',
         status: 'shipped',
         title: 'Enviado',
-        description: order.productionOrder?.trackingCode ? `Código de rastreamento: ${order.productionOrder.trackingCode}` : 'Produto foi enviado para o cliente',
+        description: order.trackingCode ? `Código de rastreamento: ${order.trackingCode}` : (order.productionOrder?.trackingCode ? `Código de rastreamento: ${order.productionOrder.trackingCode}` : 'Produto foi enviado para o cliente'),
         date: ['shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
         completed: ['shipped', 'delivered', 'completed'].includes(order.status),
         icon: 'truck'
@@ -282,12 +282,12 @@ export default function ClientOrderTimeline() {
                             })}
                           </div>
                         )}
-                        {(isShipped || isDelivered || isPreparingShipment) && order.trackingNumber && (
+                        {(isShipped || isDelivered) && (order.trackingCode || order.trackingNumber) && (
                           <div className="mt-3">
                             <p className="text-sm text-gray-600">Rastreamento:</p>
                             <p className="font-medium text-blue-600 underline">
-                              <a href={`https://rastreamento.com/${order.trackingNumber}`} target="_blank" rel="noopener noreferrer">
-                                {order.trackingNumber}
+                              <a href={`https://rastreamento.correios.com.br/${order.trackingCode || order.trackingNumber}`} target="_blank" rel="noopener noreferrer">
+                                {order.trackingCode || order.trackingNumber}
                               </a>
                             </p>
                           </div>

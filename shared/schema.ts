@@ -132,7 +132,7 @@ export const products = pgTable("products", {
   // Campos adicionais do JSON XBZ
   externalId: text("external_id"), // IdProduto
   externalCode: text("external_code"), // CodigoXbz
-  compositeCode: text("composite_code"), // CodigoComposto
+  compositeCode: text("composite_code"), // CodigoAmigavel
   friendlyCode: text("friendly_code"), // CodigoAmigavel
   siteLink: text("site_link"), // SiteLink
   imageLink: text("image_link"), // ImageLink
