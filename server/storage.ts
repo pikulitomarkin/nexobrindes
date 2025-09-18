@@ -1334,6 +1334,7 @@ export class MemStorage implements IStorage {
       ...budgetData,
       totalValue: budgetData.totalValue || '0.00',
       status: budgetData.status || 'draft',
+      deliveryType: budgetData.deliveryType || 'delivery',
       hasCustomization: budgetData.hasCustomization || false,
       customizationPercentage: budgetData.customizationPercentage || '0.00',
       customizationValue: budgetData.customizationValue || '0.00',

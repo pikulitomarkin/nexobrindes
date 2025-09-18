@@ -33,6 +33,7 @@ export default function AdminBudgets() {
     vendorId: "",
     validUntil: "",
     deliveryDeadline: "",
+    deliveryType: "delivery",
     items: [] as any[],
     photos: [] as string[],
     hasDiscount: false,
@@ -159,7 +160,7 @@ export default function AdminBudgets() {
 
   const calculateAdminTotalWithShipping = () => {
     const subtotal = calculateAdminBudgetTotal();
-    const shipping = adminBudgetForm.shippingCost || 0;
+    const shipping = adminBudgetForm.deliveryType === "pickup" ? 0 : (adminBudgetForm.shippingCost || 0);
     return subtotal + shipping;
   };
 
@@ -174,6 +175,7 @@ export default function AdminBudgets() {
       vendorId: "",
       validUntil: "",
       deliveryDeadline: "",
+      deliveryType: "delivery",
       items: [],
       photos: [],
       hasDiscount: false,
@@ -413,7 +415,7 @@ export default function AdminBudgets() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAdminBudgetSubmit} className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="admin-budget-title">Título do Orçamento</Label>
                   <Input
@@ -440,6 +442,21 @@ export default function AdminBudgets() {
                     value={adminBudgetForm.deliveryDeadline || ""}
                     onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega</Label>
+                  <Select 
+                    value={adminBudgetForm.deliveryType} 
+                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delivery">Entrega com Frete</SelectItem>
+                      <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -827,18 +844,27 @@ export default function AdminBudgets() {
               </div>
 
               {/* Shipping Cost */}
-              <div className="space-y-2">
-                <Label htmlFor="admin-shipping-cost">Custo do Frete (R$)</Label>
-                <Input
-                  id="admin-shipping-cost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={adminBudgetForm.shippingCost}
-                  onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
-                />
-              </div>
+              {adminBudgetForm.deliveryType === "pickup" ? (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-800">Retirada no Local</h4>
+                  <p className="text-sm text-blue-700 mt-2">
+                    O cliente irá retirar o pedido no local. Não há cobrança de frete.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="admin-shipping-cost">Custo do Frete (R$)</Label>
+                  <Input
+                    id="admin-shipping-cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={adminBudgetForm.shippingCost}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
+                    placeholder="0,00"
+                  />
+                </div>
+              )}
 
               {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
@@ -872,6 +898,15 @@ export default function AdminBudgets() {
                       })()}</span>
                     </div>
                   )}
+                  <div className="flex justify-between text-sm">
+                    <span>Frete:</span>
+                    <span>
+                      {adminBudgetForm.deliveryType === "pickup" ? 
+                        "Retirada no local" : 
+                        `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      }
+                    </span>
+                  </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>

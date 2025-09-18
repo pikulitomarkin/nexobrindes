@@ -163,6 +163,9 @@ export const budgets = pgTable("budgets", {
   validUntil: timestamp("valid_until"),
   deliveryDeadline: timestamp("delivery_deadline"),
 
+  // Campo para tipo de entrega
+  deliveryType: text("delivery_type").default('delivery'), // 'delivery' or 'pickup'
+
   // Campos para personalização
   hasCustomization: boolean("has_customization").default(false),
   customizationPercentage: decimal("customization_percentage", { precision: 5, scale: 2 }).default('0.00'),

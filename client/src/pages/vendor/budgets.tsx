@@ -84,6 +84,7 @@ export default function VendorBudgets() {
     vendorId: vendorId,
     validUntil: "",
     deliveryDeadline: "",
+    deliveryType: "delivery", // 'delivery' or 'pickup'
     items: [] as any[],
     paymentMethodId: "",
     shippingMethodId: "",
@@ -149,8 +150,11 @@ export default function VendorBudgets() {
   const selectedPaymentMethod = paymentMethods?.find((pm: any) => pm.id === vendorBudgetForm.paymentMethodId);
   const selectedShippingMethod = shippingMethods?.find((sm: any) => sm.id === vendorBudgetForm.shippingMethodId);
 
-  // Calculate shipping cost based on selected method
+  // Calculate shipping cost based on selected method and delivery type
   const calculateShippingCost = () => {
+    // If pickup, no shipping cost
+    if (vendorBudgetForm.deliveryType === "pickup") return 0;
+    
     if (!selectedShippingMethod) return 0;
 
     const subtotal = calculateBudgetTotal();
@@ -257,6 +261,7 @@ export default function VendorBudgets() {
       vendorId: vendorId,
       validUntil: "",
       deliveryDeadline: "",
+      deliveryType: "delivery",
       items: [],
       paymentMethodId: "",
       shippingMethodId: "",
@@ -477,6 +482,7 @@ export default function VendorBudgets() {
       vendorId: budget.vendorId,
       validUntil: budget.validUntil || "",
       deliveryDeadline: budget.deliveryDeadline || "",
+      deliveryType: budget.deliveryType || "delivery",
       items: budget.items.map((item: any) => ({
         productId: item.productId,
         productName: item.productName,
@@ -623,7 +629,7 @@ export default function VendorBudgets() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleBudgetSubmit} className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="budget-title">Título do Orçamento</Label>
                   <Input
@@ -650,6 +656,21 @@ export default function VendorBudgets() {
                     value={vendorBudgetForm.deliveryDeadline || ""}
                     onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="budget-delivery-type">Tipo de Entrega</Label>
+                  <Select 
+                    value={vendorBudgetForm.deliveryType} 
+                    onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryType: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delivery">Entrega com Frete</SelectItem>
+                      <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1079,7 +1100,14 @@ export default function VendorBudgets() {
                 )}
 
                 {/* Shipping Configuration */}
-                {selectedShippingMethod && (
+                {vendorBudgetForm.deliveryType === "pickup" ? (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800">Retirada no Local</h4>
+                    <p className="text-sm text-blue-700 mt-2">
+                      O cliente irá retirar o pedido no local. Não há cobrança de frete.
+                    </p>
+                  </div>
+                ) : selectedShippingMethod && (
                   <div className="bg-green-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
@@ -1231,7 +1259,12 @@ export default function VendorBudgets() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span>Frete:</span>
-                    <span>R$ {(vendorBudgetForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      {vendorBudgetForm.deliveryType === "pickup" ? 
+                        "Retirada no local" : 
+                        `R$ ${(vendorBudgetForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      }
+                    </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
@@ -1550,6 +1583,12 @@ export default function VendorBudgets() {
                 <div>
                   <Label className="font-semibold">Prazo de Entrega</Label>
                   <p>{budgetToView.deliveryDeadline ? new Date(budgetToView.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Tipo de Entrega</Label>
+                  <p className={budgetToView.deliveryType === 'pickup' ? 'text-blue-600 font-medium' : 'text-green-600 font-medium'}>
+                    {budgetToView.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega com Frete'}
+                  </p>
                 </div>
                 <div>
                   <Label className="font-semibold">Valor Total</Label>
