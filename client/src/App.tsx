@@ -14,6 +14,7 @@ import Login from "@/pages/login";
 import AdminClients from "./pages/admin/clients";
 import AdminVendors from "./pages/admin/vendors";
 import AdminCommissionManagement from './pages/admin/commission-management';
+import AdminProducts from "@/pages/admin/products";
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
@@ -83,6 +84,14 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminCommissionManagement />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/products">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminProducts />
               </MainLayout>
             </ProtectedRoute>
           </Route>
