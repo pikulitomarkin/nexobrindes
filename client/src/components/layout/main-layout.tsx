@@ -11,9 +11,11 @@ import {
   Menu,
   X,
   Home,
-  Settings // Added Settings icon import
+  Settings, // Added Settings icon import
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -23,7 +25,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const [currentRole, setCurrentRole] = useState(user.role || "admin");
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    toast({
+      title: "Logout realizado com sucesso",
+      description: "Você foi desconectado do sistema.",
+    });
+    setLocation("/login");
+  };
 
   const roleOptions = [
     { value: "admin", label: "Administrador" },
@@ -187,6 +200,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <span className="text-sm text-gray-600">
                 {roleOptions.find(role => role.value === currentRole)?.label}
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-gray-600 hover:text-red-600 hover:border-red-300"
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
             </div>
           </div>
         </header>
