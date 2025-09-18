@@ -44,7 +44,7 @@ export default function Login() {
           const { role } = data.user;
           switch (role) {
             case "admin":
-              window.location.href = "/admin/orders";
+              window.location.href = "/dashboard";
               break;
             case "vendor":
               window.location.href = "/vendor/orders";
