@@ -825,7 +825,39 @@ export class MemStorage implements IStorage {
   }
 
   async getOrdersByClient(clientId: string): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(order => order.clientId === clientId);
+    const allOrders = Array.from(this.orders.values());
+    const matchingOrders = [];
+
+    for (const order of allOrders) {
+      // Direct match
+      if (order.clientId === clientId) {
+        matchingOrders.push(order);
+        continue;
+      }
+
+      // Check if clientId is a user ID and order.clientId is a client record
+      try {
+        const clientRecord = await this.getClient(order.clientId);
+        if (clientRecord && clientRecord.userId === clientId) {
+          matchingOrders.push(order);
+          continue;
+        }
+      } catch (e) {
+        // Continue checking
+      }
+
+      // Check if clientId is a client record ID and order.clientId is a user ID  
+      try {
+        const userClientRecord = await this.getClientByUserId(clientId);
+        if (userClientRecord && order.clientId === userClientRecord.id) {
+          matchingOrders.push(order);
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+
+    return matchingOrders;
   }
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {

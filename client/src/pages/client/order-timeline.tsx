@@ -17,6 +17,7 @@ export default function ClientOrderTimeline() {
       return response.json();
     },
     enabled: !!params?.id,
+    refetchInterval: 30000, // Refetch every 30 seconds to get updates
   });
 
   const getStatusBadge = (status: string) => {
@@ -282,13 +283,21 @@ export default function ClientOrderTimeline() {
                             })}
                           </div>
                         )}
-                        {(isShipped || isDelivered) && (order.trackingCode || order.trackingNumber) && (
+                        {step.trackingCode && (
                           <div className="mt-3">
-                            <p className="text-sm text-gray-600">Rastreamento:</p>
-                            <p className="font-medium text-blue-600 underline">
-                              <a href={`https://rastreamento.correios.com.br/${order.trackingCode || order.trackingNumber}`} target="_blank" rel="noopener noreferrer">
-                                {order.trackingCode || order.trackingNumber}
+                            <p className="text-sm text-gray-600">Código de Rastreamento:</p>
+                            <p className="font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              <a href={`https://rastreamento.correios.com.br/${step.trackingCode}`} target="_blank" rel="noopener noreferrer">
+                                {step.trackingCode}
                               </a>
+                            </p>
+                          </div>
+                        )}
+                        {step.estimatedDelivery && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-600">Data Prevista de Entrega:</p>
+                            <p className="font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                              {new Date(step.estimatedDelivery).toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                         )}

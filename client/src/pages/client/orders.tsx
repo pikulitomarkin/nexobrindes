@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, Truck, Home, Eye, Calendar, CreditCard, Package } from "lucide-react";
@@ -7,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 
 export default function ClientOrders() {
-  // Get the current user from localStorage or context
+  // Get current user ID from localStorage (or auth context)
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const clientId = currentUser.id;
-  
+
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders/client", clientId],
     queryFn: async () => {

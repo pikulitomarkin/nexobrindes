@@ -223,56 +223,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       console.log(`Fetching orders for client: ${clientId}`);
 
-      // Try multiple approaches to find orders for this client
       let orders = [];
+      
+      // Get all orders to search through
+      const allOrders = await storage.getOrders();
+      console.log(`Total orders in system: ${allOrders.length}`);
 
-      // 1. Try to find orders by user ID directly
-      const ordersByUserId = await storage.getOrdersByClient(clientId);
-      orders = [...ordersByUserId];
+      // Find orders that match this client ID in various ways
+      for (const order of allOrders) {
+        let shouldInclude = false;
 
-      // 2. Try to find client record and get orders by client record ID
-      const clientRecord = await storage.getClientByUserId(clientId);
-      if (clientRecord) {
-        console.log(`Found client record: ${clientRecord.id}`);
-        const ordersByClientId = await storage.getOrdersByClient(clientRecord.id);
+        // Direct match with clientId
+        if (order.clientId === clientId) {
+          shouldInclude = true;
+        }
 
-        // Merge orders and remove duplicates
-        const existingOrderIds = new Set(orders.map(o => o.id));
-        const newOrders = ordersByClientId.filter(o => !existingOrderIds.has(o.id));
-        orders = [...orders, ...newOrders];
+        // Check if clientId refers to a user, and find client record
+        if (!shouldInclude) {
+          try {
+            const clientRecord = await storage.getClientByUserId(clientId);
+            if (clientRecord && order.clientId === clientRecord.id) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
+        // Check if order.clientId is a client record, and see if its userId matches
+        if (!shouldInclude) {
+          try {
+            const orderClientRecord = await storage.getClient(order.clientId);
+            if (orderClientRecord && orderClientRecord.userId === clientId) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
+        if (shouldInclude) {
+          orders.push(order);
+        }
       }
 
-      // 3. Also check if there are orders where the user is referenced in different ways
-      const allOrders = await storage.getOrders();
-      const userMatchedOrders = allOrders.filter(order => 
-        order.clientId === clientId || 
-        (clientRecord && order.clientId === clientRecord.id)
+      // Remove duplicates
+      const uniqueOrders = orders.filter((order, index, self) => 
+        index === self.findIndex(o => o.id === order.id)
       );
 
-      // Merge with existing and remove duplicates
-      const existingIds = new Set(orders.map(o => o.id));
-      const additionalOrders = userMatchedOrders.filter(o => !existingIds.has(o.id));
-      orders = [...orders, ...additionalOrders];
-
-      console.log(`Found ${orders.length} orders for client ${clientId}`);
+      console.log(`Found ${uniqueOrders.length} unique orders for client ${clientId}`);
 
       const enrichedOrders = await Promise.all(
-        orders.map(async (order) => {
+        uniqueOrders.map(async (order) => {
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          // Get production order for tracking info
+          let productionOrder = null;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            productionOrder = productionOrders[0] || null;
+          }
 
           // Get budget photos if order was converted from budget
           let budgetPhotos = [];
           if (order.budgetId) {
             const photos = await storage.getBudgetPhotos(order.budgetId);
-            budgetPhotos = photos.map(photo => photo.imageUrl);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
           }
 
           return {
             ...order,
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
-            budgetPhotos: budgetPhotos
+            budgetPhotos: budgetPhotos,
+            trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
+            estimatedDelivery: productionOrder?.deliveryDeadline || null
           };
         })
       );
@@ -2131,12 +2158,27 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(404).json({ error: "Order not found" });
       }
 
+      // Get enriched order data
+      const client = await storage.getUser(order.clientId);
+      const vendor = await storage.getUser(order.vendorId);
+      const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
       // Get production order if exists
       let productionOrder = null;
       if (order.producerId) {
         const productionOrders = await storage.getProductionOrdersByOrder(order.id);
         productionOrder = productionOrders[0] || null;
       }
+
+      // Create enriched order with all information
+      const enrichedOrder = {
+        ...order,
+        clientName: client?.name || 'Unknown',
+        vendorName: vendor?.name || 'Unknown',
+        producerName: producer?.name || null,
+        trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
+        productionOrder
+      };
 
       const timeline = [
         {
@@ -2150,11 +2192,11 @@ Para mais detalhes, entre em contato conosco!`;
         },
         {
           id: 'confirmed',
-          status: 'confirmed',
+          status: 'confirmed', 
           title: 'Pedido Confirmado',
           description: 'Pedido foi confirmado e enviado para produção',
-          date: order.status !== 'pending' ? order.updatedAt : null,
-          completed: order.status !== 'pending',
+          date: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+          completed: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
           icon: 'check-circle'
         },
         {
@@ -2162,44 +2204,43 @@ Para mais detalhes, entre em contato conosco!`;
           status: 'production',
           title: 'Em Produção',
           description: productionOrder?.notes || 'Pedido em processo de produção',
-          date: productionOrder?.acceptedAt || null,
-          completed: productionOrder && ['accepted', 'production', 'quality_check', 'ready', 'shipped', 'completed'].includes(productionOrder.status),
-          icon: 'settings'
+          date: productionOrder?.acceptedAt || (['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null),
+          completed: ['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
+          icon: 'settings',
+          estimatedDelivery: productionOrder?.deliveryDeadline || null
         },
         {
           id: 'ready',
           status: 'ready',
           title: 'Pronto para Envio',
           description: 'Produto finalizado e pronto para envio',
-          date: productionOrder?.status === 'ready' || productionOrder?.status === 'completed' ? productionOrder?.completedAt : null,
-          completed: productionOrder && ['ready', 'shipped', 'completed'].includes(productionOrder.status),
+          date: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+          completed: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status),
           icon: 'package'
         },
         {
           id: 'shipped',
           status: 'shipped',
           title: 'Enviado',
-          description: 'Produto foi enviado para o cliente',
-          date: productionOrder?.status === 'shipped' ? productionOrder?.completedAt : null,
-          completed: productionOrder && ['shipped', 'completed'].includes(productionOrder.status),
-          icon: 'truck'
+          description: enrichedOrder.trackingCode ? `Código de rastreamento: ${enrichedOrder.trackingCode}` : 'Produto foi enviado para o cliente',
+          date: ['shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+          completed: ['shipped', 'delivered', 'completed'].includes(order.status),
+          icon: 'truck',
+          trackingCode: enrichedOrder.trackingCode
         },
         {
           id: 'completed',
           status: 'completed',
           title: 'Entregue',
           description: 'Pedido foi entregue com sucesso',
-          date: productionOrder?.status === 'completed' ? productionOrder?.completedAt : null,
-          completed: productionOrder?.status === 'completed',
+          date: ['delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+          completed: ['delivered', 'completed'].includes(order.status),
           icon: 'check-circle-2'
         }
       ];
 
       res.json({
-        order: {
-          ...order,
-          productionOrder
-        },
+        order: enrichedOrder,
         timeline
       });
     } catch (error) {
