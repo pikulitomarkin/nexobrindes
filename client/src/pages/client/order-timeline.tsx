@@ -1,53 +1,50 @@
 import { useQuery } from "@tanstack/react-query";
+import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  Settings, 
-  Package, 
-  Truck, 
-  CheckCircle2,
-  FilePlus,
-  ArrowLeft,
-  User,
-  Phone,
-  MapPin
-} from "lucide-react";
-import { useRoute } from "wouter";
+import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin } from "lucide-react";
+import { Link } from "wouter";
 
 export default function ClientOrderTimeline() {
-  const [match, params] = useRoute("/client/orders/:id/timeline");
-  const orderId = params?.id;
+  const [, params] = useRoute("/client/order/:id/timeline");
 
   const { data: orderData, isLoading } = useQuery({
-    queryKey: ["/api/orders", orderId, "timeline"],
-    enabled: !!orderId,
+    queryKey: [`/api/orders/${params?.id}/timeline`],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/${params?.id}/timeline`);
+      if (!response.ok) throw new Error('Failed to fetch order timeline');
+      return response.json();
+    },
+    enabled: !!params?.id,
   });
 
-  const getIcon = (iconName: string) => {
-    const icons: { [key: string]: any } = {
-      'file-plus': FilePlus,
-      'check-circle': CheckCircle,
-      'settings': Settings,
-      'package': Package,
-      'truck': Truck,
-      'check-circle-2': CheckCircle2
+  const getStatusBadge = (status: string) => {
+    const statusClasses = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      production: "bg-purple-100 text-purple-800",
+      ready: "bg-orange-100 text-orange-800",
+      shipped: "bg-indigo-100 text-indigo-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
     };
-    return icons[iconName] || Clock;
-  };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return null;
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const statusLabels = {
+      pending: "Aguardando",
+      confirmed: "Confirmado",
+      production: "Em Produção",
+      ready: "Pronto para Envio",
+      shipped: "Enviado",
+      delivered: "Entregue",
+      cancelled: "Cancelado",
+    };
+
+    return (
+      <Badge className={`${statusClasses[status as keyof typeof statusClasses]} border-0`}>
+        {statusLabels[status as keyof typeof statusLabels]}
+      </Badge>
+    );
   };
 
   if (isLoading) {
@@ -55,8 +52,11 @@ export default function ClientOrderTimeline() {
       <div className="p-8">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded-xl mb-8"></div>
-          <div className="h-48 bg-gray-200 rounded-xl"></div>
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded-xl"></div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -65,10 +65,12 @@ export default function ClientOrderTimeline() {
   if (!orderData) {
     return (
       <div className="p-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Pedido não encontrado</h2>
-          <p className="text-gray-600 mt-2">O pedido solicitado não foi encontrado.</p>
-        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-xl font-medium text-gray-600">Pedido não encontrado</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -76,179 +78,235 @@ export default function ClientOrderTimeline() {
   const { order, timeline } = orderData;
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => window.history.back()}>
+    <div className="p-8 max-w-6xl mx-auto">
+      <div className="mb-8">
+        <Link href="/client/orders">
+          <Button variant="ghost" className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
+            Voltar para Pedidos
           </Button>
+        </Link>
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {order.orderNumber}
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Pedido #{order.orderNumber}
             </h1>
-            <p className="text-gray-600">Acompanhe o status do seu pedido</p>
+            <p className="text-gray-600">{order.product}</p>
+          </div>
+          <div className="text-right">
+            {getStatusBadge(order.status)}
           </div>
         </div>
-        <Badge className="bg-blue-100 text-blue-800">
-          {order.status}
-        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Timeline */}
+        {/* Order Summary */}
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Progresso do Pedido</CardTitle>
+              <CardTitle>Resumo do Pedido</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="relative">
-                {/* Vertical line */}
-                <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-
-                <div className="space-y-8">
-                  {timeline.map((step: any, index: number) => {
-                    const Icon = getIcon(step.icon);
-                    return (
-                      <div key={step.id} className="relative flex items-start gap-4">
-                        {/* Icon */}
-                        <div className={`
-                          relative z-10 w-12 h-12 rounded-full flex items-center justify-center border-2
-                          ${step.completed 
-                            ? 'bg-green-500 border-green-500 text-white' 
-                            : 'bg-white border-gray-300 text-gray-400'
-                          }
-                        `}>
-                          <Icon className="h-6 w-6" />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 pb-8">
-                          <div className="flex items-center justify-between">
-                            <h3 className={`text-lg font-semibold ${
-                              step.completed ? 'text-gray-900' : 'text-gray-500'
-                            }`}>
-                              {step.title}
-                            </h3>
-                            {step.date && (
-                              <span className="text-sm text-gray-500">
-                                {formatDate(step.date)}
-                              </span>
-                            )}
-                          </div>
-                          <p className={`text-sm mt-1 ${
-                            step.completed ? 'text-gray-600' : 'text-gray-400'
-                          }`}>
-                            {step.description}
-                          </p>
-
-                          {/* Show current status indicator */}
-                          {step.completed && index === timeline.findIndex((s: any) => s.completed) && (
-                            <div className="mt-2">
-                              <Badge className="bg-blue-100 text-blue-800">
-                                Status Atual
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Data do Pedido</p>
+                    <p className="font-medium flex items-center">
+                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  {order.deadline && (
+                    <div>
+                      <p className="text-sm text-gray-600">Prazo de Entrega</p>
+                      <p className="font-medium flex items-center">
+                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                        {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  )}
+                  {order.vendorName && (
+                    <div>
+                      <p className="text-sm text-gray-600">Vendedor</p>
+                      <p className="font-medium">{order.vendorName}</p>
+                    </div>
+                  )}
+                  {order.producerName && (
+                    <div>
+                      <p className="text-sm text-gray-600">Produtor</p>
+                      <p className="font-medium">{order.producerName}</p>
+                    </div>
+                  )}
                 </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Valor Total</p>
+                    <p className="font-bold text-2xl text-green-600">
+                      R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Valor Pago</p>
+                    <p className="font-semibold text-lg text-blue-600">
+                      R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Saldo Restante</p>
+                    <p className="font-semibold text-lg text-orange-600">
+                      R$ {(parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {order.description && (
+                <div className="mt-6 pt-6 border-t">
+                  <p className="text-sm text-gray-600 mb-2">Descrição do Pedido</p>
+                  <p className="text-gray-900 bg-gray-50 p-4 rounded-lg">{order.description}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Acompanhamento do Pedido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-8">
+                {timeline.map((step: any, index: number) => (
+                  <div key={step.id} className="flex items-start">
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                      step.completed ? 'gradient-bg text-white' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {step.icon === 'check-circle' && <CheckCircle className="h-5 w-5" />}
+                      {step.icon === 'clock' && <Clock className="h-5 w-5" />}
+                      {step.icon === 'package' && <Package className="h-5 w-5" />}
+                      {step.icon === 'truck' && <Truck className="h-5 w-5" />}
+                      {step.icon === 'file-plus' && <FileText className="h-5 w-5" />}
+                      {step.icon === 'settings' && <Package className="h-5 w-5" />}
+                      {step.icon === 'check-circle-2' && <CheckCircle className="h-5 w-5" />}
+                    </div>
+                    <div className="flex-1 pb-8 border-l-2 border-gray-200 pl-6 ml-5 relative">
+                      <div className="absolute -left-2 top-0 w-4 h-4 bg-white border-2 border-gray-300 rounded-full"></div>
+                      <h4 className={`font-bold text-lg mb-2 ${step.completed ? 'text-gray-900' : 'text-gray-500'}`}>
+                        {step.title}
+                      </h4>
+                      <p className={`text-sm mb-3 ${step.completed ? 'text-gray-700' : 'text-gray-400'}`}>
+                        {step.description}
+                      </p>
+                      {step.date && (
+                        <div className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full inline-flex">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          {new Date(step.date).toLocaleDateString('pt-BR', { 
+                            weekday: 'long',
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Order Info Sidebar */}
-        <div className="space-y-6">
-          <Card>
+        {/* Sidebar Information */}
+        <div>
+          {/* Financial Information */}
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Informações do Pedido</CardTitle>
+              <CardTitle className="flex items-center">
+                <CreditCard className="h-5 w-5 mr-2" />
+                Resumo Financeiro
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-2">Produto</h4>
-                <p className="text-gray-700">{order.product}</p>
-                {order.description && (
-                  <p className="text-sm text-gray-600 mt-1">{order.description}</p>
-                )}
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-gray-900 mb-2">Valor Total</h4>
-                <p className="text-2xl font-bold text-green-600">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Valor Total:</span>
+                <span className="font-bold text-xl text-green-600">
                   R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-                {parseFloat(order.paidValue || '0') > 0 && (
-                  <p className="text-sm text-gray-600">
-                    Pago: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                )}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Valor Pago:</span>
+                <span className="font-semibold text-blue-600">
+                  R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-4 border-t">
+                <span className="text-gray-600 font-medium">Saldo:</span>
+                <span className="font-bold text-xl text-orange-600">
+                  R$ {(parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
 
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-gray-900 mb-2">Prazo</h4>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-700">
-                    {order.deadline 
-                      ? new Date(order.deadline).toLocaleDateString('pt-BR')
-                      : 'A definir'
-                    }
-                  </span>
-                </div>
-              </div>
-
-              {order.productionOrder && (
-                <div className="border-t pt-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Produção</h4>
-                  <div className="space-y-2">
-                    {order.productionOrder.acceptedAt && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-gray-600">
-                          Aceito em: {formatDate(order.productionOrder.acceptedAt)}
-                        </span>
-                      </div>
-                    )}
-                    {order.productionOrder.notes && (
-                      <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-700">{order.productionOrder.notes}</p>
-                      </div>
-                    )}
+              {parseFloat(order.paidValue || '0') > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center text-sm text-green-800">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <span>Pagamento parcial realizado</span>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Quick Actions */}
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Contato</CardTitle>
+              <CardTitle className="flex items-center">
+                <Phone className="h-5 w-5 mr-2" />
+                Ações Rápidas
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Dúvidas sobre seu pedido? Entre em contato:
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">(11) 99999-9999</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">suporte@empresa.com</span>
-                </div>
-              </div>
-              <Button className="w-full gradient-bg text-white mt-4">
+              <Button variant="outline" size="sm" className="w-full">
                 <Phone className="h-4 w-4 mr-2" />
-                Entrar em Contato
+                Ligar para Vendedor
+              </Button>
+              <Button variant="outline" size="sm" className="w-full">
+                <Mail className="h-4 w-4 mr-2" />
+                Enviar Email
+              </Button>
+              <Button variant="outline" size="sm" className="w-full">
+                <Package className="h-4 w-4 mr-2" />
+                Rastrear Entrega
               </Button>
             </CardContent>
           </Card>
+
+          {/* Additional Information */}
+          {(order.vendorName || order.producerName) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <User className="h-5 w-5 mr-2" />
+                  Equipe Responsável
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.vendorName && (
+                  <div>
+                    <p className="text-sm text-gray-600">Vendedor Responsável</p>
+                    <p className="font-medium text-gray-900">{order.vendorName}</p>
+                  </div>
+                )}
+                {order.producerName && (
+                  <div>
+                    <p className="text-sm text-gray-600">Produtor</p>
+                    <p className="font-medium text-gray-900">{order.producerName}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

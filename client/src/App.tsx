@@ -26,6 +26,7 @@ import VendorBudgets from "@/pages/vendor/budgets";
 // Client pages
 import ClientOrders from "@/pages/client/orders";
 import ClientProfile from "@/pages/client/profile";
+import ClientDashboard from "@/pages/dashboards/client-dashboard";
 
 // Producer pages
 import ProducerOrders from "@/pages/producer/orders";
@@ -138,6 +139,14 @@ function App() {
           </Route>
 
           {/* Client Routes - Accessible by client users and admin */}
+          <Route path="/client/dashboard">
+            <ProtectedRoute>
+              <MainLayout>
+                <ClientDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/client/orders">
             <ProtectedRoute>
               <MainLayout>

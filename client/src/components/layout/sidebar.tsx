@@ -56,7 +56,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const menuItems = [
     { id: "admin", label: "Admin Geral", icon: LayoutDashboard },
     { id: "vendor", label: "Vendedor", icon: ShoppingCart },
-    { id: "client", label: "Cliente", icon: Users },
+    { id: "client", label: "Painel de Clientes", icon: Users },
     { id: "producer", label: "Produtor Externo", icon: Factory },
     { id: "finance", label: "Financeiro", icon: TrendingUp },
   ];
@@ -237,6 +237,18 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
         <nav className="mt-8">
           <div className="px-6 mb-4">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Dashboard
+            </p>
+          </div>
+          <SidebarItem 
+            icon={BarChart3} 
+            label="Dashboard" 
+            href="/client/dashboard"
+            isActive={location === "/client/dashboard"}
+          />
+
+          <div className="px-6 mb-4 mt-6">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
               Pedidos
             </p>
           </div>
@@ -245,12 +257,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             label="Meus Pedidos" 
             href="/client/orders"
             isActive={location === "/client/orders"}
-          />
-          <SidebarItem 
-            icon={ClipboardList} 
-            label="Status dos Pedidos" 
-            href="/client/orders"
-            isActive={location.includes("/client/order/") && location.includes("/timeline")}
           />
 
           <div className="px-6 mb-4 mt-6">
