@@ -24,6 +24,8 @@ export default function VendorOrders() {
   const [selectedProducer, setSelectedProducer] = useState<string>("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
   // Order form state - isolated for vendor
