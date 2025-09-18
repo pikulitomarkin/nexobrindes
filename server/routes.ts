@@ -293,8 +293,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
           }
 
+          // Get payments for this order to calculate correct paid value
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const totalPaid = payments
+            .filter(payment => payment.status === 'confirmed')
+            .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+
           return {
             ...order,
+            paidValue: totalPaid.toFixed(2), // Update with actual paid amount
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
@@ -768,6 +775,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating client password:", error);
       res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
+  // Create test payment for order
+  app.post("/api/orders/:id/create-test-payment", async (req, res) => {
+    try {
+      const { amount } = req.body;
+      const orderId = req.params.id;
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Create a confirmed payment
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: amount || "567.00", // Default test amount
+        method: "pix",
+        status: "confirmed",
+        transactionId: `TEST-${Date.now()}`,
+        paidAt: new Date()
+      });
+
+      res.json({ success: true, payment });
+    } catch (error) {
+      console.error("Error creating test payment:", error);
+      res.status(500).json({ error: "Failed to create test payment" });
     }
   });
 
@@ -2170,9 +2205,16 @@ Para mais detalhes, entre em contato conosco!`;
         productionOrder = productionOrders[0] || null;
       }
 
-      // Create enriched order with all information
+      // Get payments for this order to calculate correct paid value
+      const payments = await storage.getPaymentsByOrder(order.id);
+      const totalPaid = payments
+        .filter(payment => payment.status === 'confirmed')
+        .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+
+      // Create enriched order with all information including updated payment values
       const enrichedOrder = {
         ...order,
+        paidValue: totalPaid.toFixed(2), // Update with actual paid amount
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null,

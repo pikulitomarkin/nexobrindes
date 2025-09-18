@@ -562,6 +562,25 @@ export class MemStorage implements IStorage {
     };
     this.commissions.set(commission.id, commission);
 
+    // Create additional payment for the new order if it exists
+    const recentOrder = Array.from(this.orders.values()).find(o => o.orderNumber?.includes("PED-"));
+    if (recentOrder) {
+      const testPayment: Payment = {
+        id: "payment-test-1",
+        orderId: recentOrder.id,
+        amount: "567.00",
+        method: "pix",
+        status: "confirmed",
+        transactionId: "PIX-TEST-001",
+        paidAt: new Date(),
+        createdAt: new Date()
+      };
+      this.payments.set(testPayment.id, testPayment);
+      
+      // Update the order's paid value
+      this.updateOrderPaidValue(recentOrder.id);
+    }
+
     // Initialize mock budgets
     mockBudgets = [
       {
@@ -974,11 +993,26 @@ export class MemStorage implements IStorage {
       createdAt: new Date()
     };
     this.payments.set(id, payment);
+    
+    // Se o pagamento está confirmado, atualizar o valor pago no pedido
+    if (payment.status === 'confirmed') {
+      await this.updateOrderPaidValue(payment.orderId);
+    }
+    
     return payment;
   }
 
   async getPaymentsByOrder(orderId: string): Promise<Payment[]> {
     return Array.from(this.payments.values()).filter(payment => payment.orderId === orderId);
+  }
+
+  async updateOrderPaidValue(orderId: string): Promise<void> {
+    const payments = await this.getPaymentsByOrder(orderId);
+    const totalPaid = payments
+      .filter(payment => payment.status === 'confirmed')
+      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+    
+    await this.updateOrder(orderId, { paidValue: totalPaid.toFixed(2) });
   }
 
   // Commission methods
