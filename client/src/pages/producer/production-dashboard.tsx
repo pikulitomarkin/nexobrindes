@@ -16,6 +16,7 @@ export default function ProductionDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
   const [updateNotes, setUpdateNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const { toast } = useToast();
@@ -108,9 +109,42 @@ export default function ProductionDashboard() {
   };
 
   const filteredOrders = productionOrders?.filter((order: any) => {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "overdue") return isOverdue(order.deadline);
-    return order.status === statusFilter;
+    // Status filter
+    let statusMatch = true;
+    if (statusFilter !== "all") {
+      if (statusFilter === "overdue") {
+        statusMatch = isOverdue(order.deadline);
+      } else {
+        statusMatch = order.status === statusFilter;
+      }
+    }
+
+    // Period filter
+    let periodMatch = true;
+    if (periodFilter !== "all" && order.createdAt) {
+      const orderDate = new Date(order.createdAt);
+      const today = new Date();
+      
+      switch (periodFilter) {
+        case "today":
+          periodMatch = orderDate.toDateString() === today.toDateString();
+          break;
+        case "week":
+          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          periodMatch = orderDate >= weekAgo;
+          break;
+        case "month":
+          periodMatch = orderDate.getMonth() === today.getMonth() && orderDate.getFullYear() === today.getFullYear();
+          break;
+        case "quarter":
+          const currentQuarter = Math.floor(today.getMonth() / 3);
+          const orderQuarter = Math.floor(orderDate.getMonth() / 3);
+          periodMatch = orderQuarter === currentQuarter && orderDate.getFullYear() === today.getFullYear();
+          break;
+      }
+    }
+
+    return statusMatch && periodMatch;
   });
 
   if (isLoading) {
@@ -204,43 +238,87 @@ export default function ProductionDashboard() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant={statusFilter === "all" ? "default" : "outline"} 
-            size="sm"
-            onClick={() => setStatusFilter("all")}
-          >
-            Todos
-          </Button>
-          <Button 
-            variant={statusFilter === "pending" ? "default" : "outline"} 
-            size="sm"
-            onClick={() => setStatusFilter("pending")}
-          >
-            Pendentes
-          </Button>
-          <Button 
-            variant={statusFilter === "production" ? "default" : "outline"} 
-            size="sm"
-            onClick={() => setStatusFilter("production")}
-          >
-            Em Produção
-          </Button>
-          <Button 
-            variant={statusFilter === "ready" ? "default" : "outline"} 
-            size="sm"
-            onClick={() => setStatusFilter("ready")}
-          >
-            Prontos
-          </Button>
-          <Button 
-            variant={statusFilter === "overdue" ? "destructive" : "outline"} 
-            size="sm"
-            onClick={() => setStatusFilter("overdue")}
-          >
-            Em Atraso
-          </Button>
+      <div className="mb-6 space-y-4">
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Filtrar por Status:</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant={statusFilter === "all" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setStatusFilter("all")}
+            >
+              Todos
+            </Button>
+            <Button 
+              variant={statusFilter === "pending" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setStatusFilter("pending")}
+            >
+              Pendentes
+            </Button>
+            <Button 
+              variant={statusFilter === "production" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setStatusFilter("production")}
+            >
+              Em Produção
+            </Button>
+            <Button 
+              variant={statusFilter === "ready" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setStatusFilter("ready")}
+            >
+              Prontos
+            </Button>
+            <Button 
+              variant={statusFilter === "overdue" ? "destructive" : "outline"} 
+              size="sm"
+              onClick={() => setStatusFilter("overdue")}
+            >
+              Em Atraso
+            </Button>
+          </div>
+        </div>
+        
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Filtrar por Período:</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant={periodFilter === "all" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setPeriodFilter("all")}
+            >
+              Todos
+            </Button>
+            <Button 
+              variant={periodFilter === "today" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setPeriodFilter("today")}
+            >
+              Hoje
+            </Button>
+            <Button 
+              variant={periodFilter === "week" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setPeriodFilter("week")}
+            >
+              Esta Semana
+            </Button>
+            <Button 
+              variant={periodFilter === "month" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setPeriodFilter("month")}
+            >
+              Este Mês
+            </Button>
+            <Button 
+              variant={periodFilter === "quarter" ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setPeriodFilter("quarter")}
+            >
+              Este Trimestre
+            </Button>
+          </div>
         </div>
       </div>
 

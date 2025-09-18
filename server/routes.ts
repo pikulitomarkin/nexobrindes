@@ -223,17 +223,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       console.log(`Fetching orders for client: ${clientId}`);
       
-      // First, try to find orders by user ID (for backward compatibility)
-      let orders = await storage.getOrdersByClient(clientId);
+      // Try multiple approaches to find orders for this client
+      let orders = [];
       
-      // If no orders found by user ID, try to find client record and get orders by client record ID
-      if (orders.length === 0) {
-        const clientRecord = await storage.getClientByUserId(clientId);
-        if (clientRecord) {
-          console.log(`Found client record: ${clientRecord.id}`);
-          orders = await storage.getOrdersByClient(clientRecord.id);
-        }
+      // 1. Try to find orders by user ID directly
+      const ordersByUserId = await storage.getOrdersByClient(clientId);
+      orders = [...ordersByUserId];
+      
+      // 2. Try to find client record and get orders by client record ID
+      const clientRecord = await storage.getClientByUserId(clientId);
+      if (clientRecord) {
+        console.log(`Found client record: ${clientRecord.id}`);
+        const ordersByClientId = await storage.getOrdersByClient(clientRecord.id);
+        
+        // Merge orders and remove duplicates
+        const existingOrderIds = new Set(orders.map(o => o.id));
+        const newOrders = ordersByClientId.filter(o => !existingOrderIds.has(o.id));
+        orders = [...orders, ...newOrders];
       }
+      
+      // 3. Also check if there are orders where the user is referenced in different ways
+      const allOrders = await storage.getOrders();
+      const userMatchedOrders = allOrders.filter(order => 
+        order.clientId === clientId || 
+        (clientRecord && order.clientId === clientRecord.id)
+      );
+      
+      // Merge with existing and remove duplicates
+      const existingIds = new Set(orders.map(o => o.id));
+      const additionalOrders = userMatchedOrders.filter(o => !existingIds.has(o.id));
+      orders = [...orders, ...additionalOrders];
       
       console.log(`Found ${orders.length} orders for client ${clientId}`);
 
@@ -410,18 +429,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate });
 
-      // Create vendor with all data in one call to avoid duplicates
-      const vendor = await storage.createVendor({
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(userCode);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      // Create user first
+      const user = await storage.createUser({
         username: userCode,
         password: password,
+        role: "vendor",
         name,
         email: email || null,
         phone: phone || null,
         address: address || null,
+        isActive: true
+      });
+
+      // Create vendor record
+      const vendor = await storage.createVendor({
+        userId: user.id,
         commissionRate: commissionRate || '10.00'
       });
 
-      res.json({ success: true, user: { ...vendor, userCode: userCode } });
+      res.json({ 
+        success: true, 
+        user: { 
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          userCode: userCode,
+          commissionRate: vendor.commissionRate,
+          isActive: true
+        }
+      });
     } catch (error) {
       console.error('Error creating vendor:', error);
       res.status(500).json({ error: "Failed to create vendor" });

@@ -396,7 +396,7 @@ export default function VendorBudgets() {
       if (!response.ok) throw new Error("Erro ao converter para pedido");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newOrder) => {
       // Invalidate multiple queries to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
