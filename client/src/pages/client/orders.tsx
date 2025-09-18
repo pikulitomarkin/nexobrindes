@@ -5,9 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 
 export default function ClientOrders() {
-  const clientId = "client-1";
+  // Get the current user from localStorage or context
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  const clientId = currentUser.id;
+  
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders/client", clientId],
+    enabled: !!clientId,
   });
 
   const getTimelineSteps = (status: string) => {

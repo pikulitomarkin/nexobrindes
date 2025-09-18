@@ -250,13 +250,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
           const order = await storage.getOrder(po.orderId);
-          const clientUser = order ? await storage.getUser(order.clientId) : null;
-          const clientDetails = order ? await storage.getClient(order.clientId) : null;
+          if (!order) {
+            return {
+              ...po,
+              product: 'Unknown',
+              orderNumber: 'Unknown',
+              clientName: 'Unknown',
+              clientAddress: null,
+              clientPhone: null
+            };
+          }
+
+          // Get client user first
+          const clientUser = await storage.getUser(order.clientId);
+          // Then get client details
+          const clientDetails = await storage.getClient(order.clientId);
+
+          // Use client details name if available, otherwise user name
+          let clientName = 'Unknown';
+          if (clientDetails?.name) {
+            clientName = clientDetails.name;
+          } else if (clientUser?.name) {
+            clientName = clientUser.name;
+          }
+
           return {
             ...po,
-            product: order?.product || 'Unknown',
-            orderNumber: order?.orderNumber || 'Unknown',
-            clientName: clientUser?.name || 'Unknown',
+            product: order.product || 'Unknown',
+            orderNumber: order.orderNumber || 'Unknown',
+            clientName: clientName,
             clientAddress: clientDetails?.address || null,
             clientPhone: clientDetails?.phone || clientUser?.phone || null
           };
@@ -265,6 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(enrichedOrders);
     } catch (error) {
+      console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
     }
   });
@@ -565,6 +588,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
   });
 
+  // Clear test data endpoint
+  app.delete("/api/orders/test-data", async (req, res) => {
+    try {
+      // Get all orders
+      const orders = await storage.getOrders();
+      
+      // Delete test orders (you can adjust the criteria)
+      const testOrders = orders.filter(order => 
+        order.orderNumber?.includes('TEST') || 
+        order.product?.toLowerCase().includes('test') ||
+        order.description?.toLowerCase().includes('test')
+      );
+
+      for (const order of testOrders) {
+        // Delete related production orders first
+        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+        for (const po of productionOrders) {
+          await storage.deleteProductionOrder(po.id);
+        }
+        
+        // Delete the order
+        await storage.deleteOrder(order.id);
+      }
+
+      res.json({ 
+        success: true, 
+        deletedCount: testOrders.length,
+        message: `${testOrders.length} pedidos de teste foram removidos`
+      });
+    } catch (error) {
+      console.error("Error clearing test orders:", error);
+      res.status(500).json({ error: "Failed to clear test orders" });
+    }
+  });
+
   // Additional product routes
   app.get("/api/products/:id", async (req, res) => {
     try {
@@ -860,8 +918,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.json(order);
+      // Return enriched order data
+      const client = await storage.getUser(order.clientId);
+      const vendor = await storage.getUser(order.vendorId);
+      const producer = producerId ? await storage.getUser(producerId) : null;
+
+      const enrichedOrder = {
+        ...order,
+        clientName: client?.name || 'Unknown',
+        vendorName: vendor?.name || 'Unknown',
+        producerName: producer?.name || null
+      };
+
+      res.json(enrichedOrder);
     } catch (error) {
+      console.error("Error converting budget to order:", error);
       res.status(500).json({ error: "Failed to convert budget to order" });
     }
   });
@@ -1427,7 +1498,29 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();
-      res.json(clients);
+      
+      // Enrich clients with userCode and order statistics
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const user = await storage.getUser(client.userId);
+          const orders = await storage.getOrdersByClient(client.userId || client.id);
+          
+          const ordersCount = orders.length;
+          const totalSpent = orders.reduce((sum, order) => 
+            sum + parseFloat(order.totalValue || '0'), 0
+          );
+
+          return {
+            ...client,
+            userCode: user?.username || client.userCode,
+            username: user?.username,
+            ordersCount,
+            totalSpent
+          };
+        })
+      );
+
+      res.json(enrichedClients);
     } catch (error) {
       console.log(error);
       res.status(500).json({ error: "Failed to fetch clients" });

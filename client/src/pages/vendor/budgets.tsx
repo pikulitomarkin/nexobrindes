@@ -397,7 +397,14 @@ export default function VendorBudgets() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate multiple queries to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
+
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
       setConvertClientId("");
