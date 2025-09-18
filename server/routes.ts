@@ -298,29 +298,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
           const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
-          // Calculate remaining balance
+          // Get budget information if order was converted from budget
+          let budgetDownPayment = 0;
+          let originalBudgetInfo = null;
+
+          if (order.budgetId) {
+            try {
+              const budget = await storage.getBudget(order.budgetId);
+              const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+
+              if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+                budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment);
+                originalBudgetInfo = {
+                  downPayment: budgetDownPayment,
+                  remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                  installments: budgetPaymentInfo.installments || 1
+                };
+              }
+            } catch (error) {
+              console.log("Error fetching budget info for order:", order.id, error);
+            }
+          }
+
+          // Use budget down payment if available, otherwise use calculated payments
+          const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
           const totalValue = parseFloat(order.totalValue);
-          const remainingBalance = Math.max(0, totalValue - totalPaid);
+          const remainingBalance = Math.max(0, totalValue - actualPaidValue);
 
-          // Get budget payment info if available
-          const budgetPaymentInfo = order.budgetId ? await storage.getBudgetPaymentInfo(order.budgetId) : null;
-          const downPayment = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.downPayment) : 0;
-          const calculatedRemainingBalance = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.remainingAmount) : remainingBalance;
-
-          console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${totalPaid}, Remaining=${remainingBalance}, Payments:`, confirmedPayments.map(p => ({ amount: p.amount, method: p.method, status: p.status })));
+          console.log(`Order ${order.orderNumber}: Total=${totalValue}, BudgetDownPayment=${budgetDownPayment}, Paid=${totalPaid}, ActualPaid=${actualPaidValue}, Remaining=${remainingBalance}`);
 
           return {
             ...order,
-            clientName: client?.name || 'Unknown',
+            paidValue: actualPaidValue.toFixed(2), // Use budget down payment or payments
+            remainingValue: remainingBalance.toFixed(2), // Add remaining balance
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
             trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-            productionOrder,
-            paidValue: totalPaid.toFixed(2),
-            downPayment: downPayment.toFixed(2),
-            remainingBalance: calculatedRemainingBalance.toFixed(2),
-            budgetPaymentInfo
+            estimatedDelivery: productionOrder?.deliveryDelivery || null,
+            payments: payments.filter(p => p.status === 'confirmed'), // Include payment details
+            budgetInfo: originalBudgetInfo // Include original budget payment info
           };
         })
       );
@@ -2224,28 +2241,45 @@ Para mais detalhes, entre em contato conosco!`;
       const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
       const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
-      // Calculate remaining balance
-      const totalValue = parseFloat(order.totalValue);
-      const remainingBalance = Math.max(0, totalValue - totalPaid);
+      // Get budget information if order was converted from budget
+      let budgetDownPayment = 0;
+      let originalBudgetInfo = null;
 
-      // Get budget payment info if available
-      const budgetPaymentInfo = order.budgetId ? await storage.getBudgetPaymentInfo(order.budgetId) : null;
-      const downPayment = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.downPayment) : 0;
-      const calculatedRemainingBalance = budgetPaymentInfo ? parseFloat(budgetPaymentInfo.remainingAmount) : remainingBalance;
+      if (order.budgetId) {
+        try {
+          const budget = await storage.getBudget(order.budgetId);
+          const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+
+          if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+            budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment);
+            originalBudgetInfo = {
+              downPayment: budgetDownPayment,
+              remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+              installments: budgetPaymentInfo.installments || 1
+            };
+          }
+        } catch (error) {
+          console.log("Error fetching budget info for timeline:", order.id, error);
+        }
+      }
+
+      // Use budget down payment if available, otherwise use calculated payments
+      const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
+      const totalValue = parseFloat(order.totalValue);
+      const remainingBalance = Math.max(0, totalValue - actualPaidValue);
 
       // Create enriched order with all information including updated payment values
       const enrichedOrder = {
         ...order,
+        paidValue: actualPaidValue.toFixed(2), // Use budget down payment or payments
+        remainingValue: remainingBalance.toFixed(2), // Add remaining balance
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
         producerName: producer?.name || null,
         trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
         productionOrder,
         payments: confirmedPayments, // Include only confirmed payments
-        paidValue: totalPaid.toFixed(2),
-        downPayment: downPayment.toFixed(2),
-        remainingBalance: calculatedRemainingBalance.toFixed(2),
-        budgetPaymentInfo
+        budgetInfo: originalBudgetInfo // Include original budget payment info
       };
 
       const timeline = [

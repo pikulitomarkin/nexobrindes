@@ -233,22 +233,31 @@ export default function ClientOrders() {
                   <div className="flex items-center gap-2 mb-2">
                     <CreditCard className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-800">
-                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
-                        ? 'Pagamento completo realizado'
-                        : 'Entrada paga'}: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
+                        ? 'Pagamento completo realizado' 
+                        : (order.budgetInfo ? 'Entrada paga conforme orçamento' : 'Entrada paga')}: 
+                      R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  {order.payments && order.payments.length > 0 && (
-                    <div className="text-xs text-green-700">
-                      <strong>Histórico:</strong>
-                      {order.payments.map((payment: any, index: number) => (
+                  <div className="text-xs text-green-700">
+                    <strong>Detalhes:</strong>
+                    {order.budgetInfo && order.budgetInfo.downPayment > 0 ? (
+                      <div className="ml-2">
+                        <div>• Entrada do orçamento paga</div>
+                        {order.budgetInfo.installments > 1 && (
+                          <div>• Restante em {order.budgetInfo.installments - 1}x</div>
+                        )}
+                        <div>• Saldo: R$ {(parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      </div>
+                    ) : (
+                      order.payments && order.payments.length > 0 && order.payments.map((payment: any, index: number) => (
                         <div key={payment.id || index} className="ml-2 flex justify-between">
                           <span>{payment.method?.toUpperCase()} - {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 'Data não informada'}</span>
                           <span className="font-medium">R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>

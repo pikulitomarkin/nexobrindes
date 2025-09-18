@@ -387,13 +387,25 @@ export default function ClientOrderTimeline() {
                     <span className="font-medium">
                       {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
                         ? 'Pagamento completo realizado'
-                        : 'Entrada paga - Saldo pendente'}
+                        : (order.budgetInfo ? 'Entrada paga conforme orçamento' : 'Entrada paga - Saldo pendente')}
                     </span>
                   </div>
-                  {order.payments && order.payments.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="text-xs font-medium text-green-800 mb-1">Pagamentos confirmados:</div>
-                      {order.payments.map((payment: any, index: number) => (
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-green-800 mb-1">Detalhes do pagamento:</div>
+                    {order.budgetInfo && order.budgetInfo.downPayment > 0 ? (
+                      <div className="space-y-1">
+                        <div className="text-xs text-green-700 flex justify-between bg-white p-1 rounded">
+                          <span>Entrada Orçamento - {new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
+                          <span className="font-medium">R$ {parseFloat(order.budgetInfo.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {order.budgetInfo.installments > 1 && (
+                          <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded">
+                            Restante em {order.budgetInfo.installments - 1} parcelas
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      order.payments && order.payments.length > 0 && order.payments.map((payment: any, index: number) => (
                         <div key={payment.id || index} className="text-xs text-green-700 flex justify-between bg-white p-1 rounded">
                           <span>
                             {payment.method?.toUpperCase()} - {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 'Data não informada'}
@@ -402,12 +414,12 @@ export default function ClientOrderTimeline() {
                             R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
-                      ))}
-                      <div className="text-xs text-green-800 font-medium pt-1 border-t border-green-200">
-                        Total pago: R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </div>
+                      ))
+                    )}
+                    <div className="text-xs text-green-800 font-medium pt-1 border-t border-green-200">
+                      Total pago: R$ {parseFloat(order.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </CardContent>
