@@ -79,6 +79,7 @@ export default function AdminUsers() {
   const [partnerUserCode, setPartnerUserCode] = useState("");
   const [producerUserCode, setProducerUserCode] = useState("");
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
 
   // Detectar tab na URL
   useEffect(() => {
@@ -1066,7 +1067,7 @@ export default function AdminUsers() {
                           <div className="flex items-center justify-between">
                             <div>
                               <FormLabel className="text-blue-700">Código de Acesso do Produtor</FormLabel>
-                              <div className="flex items-center space-x-2 mt-1">
+                              <div className="flex items-center mt-1">
                                 <User className="h-4 w-4 text-blue-600" />
                                 <span className="font-mono font-bold text-blue-800">{producerUserCode}</span>
                               </div>
@@ -1204,12 +1205,15 @@ export default function AdminUsers() {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900">{producer.name}</h3>
-                          <div className="flex items-center mt-1">
-                            <User className="h-3 w-3 text-blue-600 mr-1" />
-                            <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                              {producer.username}
-                            </span>
+                          <div className="flex items-center mt-2">
+                            <User className="h-4 w-4 text-blue-600 mr-2" />
+                            <div className="bg-blue-100 border border-blue-300 px-3 py-1.5 rounded-lg">
+                              <span className="text-sm font-mono font-bold text-blue-800">
+                                {producer.username}
+                              </span>
+                            </div>
                           </div>
+                          <p className="text-xs text-gray-600 mt-1">Código de acesso para login</p>
                         </div>
                         <div className="flex space-x-2">
                           <Button variant="ghost" size="sm" title="Ver Detalhes">
