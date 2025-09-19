@@ -6,8 +6,11 @@ import { Eye, RefreshCw, Package, Truck, Clock, CheckCircle, MapPin } from "luci
 import { useNavigate } from "react-router-dom";
 
 export default function ProducerPanel() {
-  const producerId = "producer-1";
   const navigate = useNavigate();
+  
+  // Get producer ID from localStorage (set during login)
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const producerId = user.id;
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/producer", producerId, "stats"],

@@ -438,18 +438,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/producers", async (req, res) => {
     try {
-      const { name, email, phone, specialty, address, password } = req.body;
+      const { name, email, phone, specialty, address, password, username } = req.body;
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username || email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
 
       // Create user with role producer including specialty and address
       const user = await storage.createUser({
-        username: email,
+        username: username || email,
         password: password || "123456",
         role: "producer",
         name,
         email,
         phone,
         specialty,
-        address
+        address,
+        isActive: true
       });
 
       res.json({ success: true, user });

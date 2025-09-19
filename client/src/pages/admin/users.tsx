@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Users, ShoppingCart, Handshake, Factory, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { Plus, Users, ShoppingCart, Handshake, Factory, Edit, Trash2, Eye, EyeOff, RefreshCw, User, Mail, Phone, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -46,7 +45,7 @@ const vendorFormSchema = z.object({
 
 const partnerFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  email: z.string().email("Email inválido"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
   username: z.string().min(3, "Username deve ter pelo menos 3 caracteres"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   phone: z.string().optional(),
@@ -55,8 +54,7 @@ const partnerFormSchema = z.object({
 
 const producerFormSchema = z.object({
   name: z.string().min(2, "Nome/Empresa deve ter pelo menos 2 caracteres"),
-  email: z.string().email("Email inválido"),
-  username: z.string().min(3, "Username deve ter pelo menos 3 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   phone: z.string().min(10, "Telefone inválido"),
   specialty: z.string().min(2, "Especialidade é obrigatória"),
@@ -73,7 +71,10 @@ export default function AdminUsers() {
   const [isVendorDialogOpen, setIsVendorDialogOpen] = useState(false);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
   const [isProducerDialogOpen, setIsProducerDialogOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [clientUserCode, setClientUserCode] = useState("");
+  const [vendorUserCode, setVendorUserCode] = useState("");
+  const [partnerUserCode, setPartnerUserCode] = useState("");
+  const [producerUserCode, setProducerUserCode] = useState("");
   const { toast } = useToast();
 
   // Get all users
@@ -136,7 +137,6 @@ export default function AdminUsers() {
     defaultValues: {
       name: "",
       email: "",
-      username: "",
       password: "",
       phone: "",
       specialty: "",
@@ -157,9 +157,9 @@ export default function AdminUsers() {
         }),
       });
       if (!userResponse.ok) throw new Error("Erro ao criar usuário cliente");
-      
+
       const user = await userResponse.json();
-      
+
       // Then create client profile
       const clientResponse = await fetch("/api/clients", {
         method: "POST",
@@ -175,7 +175,7 @@ export default function AdminUsers() {
           vendorId: data.vendorId,
         }),
       });
-      
+
       if (!clientResponse.ok) throw new Error("Erro ao criar perfil do cliente");
       return user;
     },
@@ -215,32 +215,39 @@ export default function AdminUsers() {
 
   const createPartnerMutation = useMutation({
     mutationFn: async (data: PartnerFormValues) => {
+      const partnerData = {
+        ...data,
+        username: partnerUserCode,
+      };
       const response = await fetch("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(partnerData),
       });
-      if (!response.ok) throw new Error("Erro ao criar sócio");
+      if (!response.ok) throw new Error("Erro ao criar parceiro");
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
       setIsPartnerDialogOpen(false);
       partnerForm.reset();
       toast({
         title: "Sucesso!",
-        description: "Sócio criado com sucesso",
+        description: `Parceiro criado com sucesso! Código de acesso: ${partnerUserCode}`,
       });
     },
   });
 
   const createProducerMutation = useMutation({
     mutationFn: async (data: ProducerFormValues) => {
+      const producerData = {
+        ...data,
+        username: producerUserCode,
+      };
       const response = await fetch("/api/producers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(producerData),
       });
       if (!response.ok) throw new Error("Erro ao criar produtor");
       return response.json();
@@ -252,10 +259,77 @@ export default function AdminUsers() {
       producerForm.reset();
       toast({
         title: "Sucesso!",
-        description: "Produtor criado com sucesso",
+        description: `Produtor criado com sucesso! Código de acesso: ${producerUserCode}`,
       });
     },
   });
+
+  // Code generation functions
+  const generateClientUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `CLI${timestamp}${randomStr}`;
+  };
+
+  const generateVendorUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `VEN${timestamp}${randomStr}`;
+  };
+
+  const generatePartnerUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `PAR${timestamp}${randomStr}`;
+  };
+
+  const generateProducerUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `PRO${timestamp}${randomStr}`;
+  };
+
+  // Effects to generate codes when dialogs open
+  useEffect(() => {
+    if (isClientDialogOpen) {
+      setClientUserCode(generateClientUserCode());
+    }
+  }, [isClientDialogOpen]);
+
+  useEffect(() => {
+    if (isVendorDialogOpen) {
+      setVendorUserCode(generateVendorUserCode());
+    }
+  }, [isVendorDialogOpen]);
+
+  useEffect(() => {
+    if (isPartnerDialogOpen) {
+      setPartnerUserCode(generatePartnerUserCode());
+    }
+  }, [isPartnerDialogOpen]);
+
+  useEffect(() => {
+    if (isProducerDialogOpen) {
+      setProducerUserCode(generateProducerUserCode());
+    }
+  }, [isProducerDialogOpen]);
+
+  // Submit handlers
+  const onClientSubmit = (data: ClientFormValues) => {
+    createClientMutation.mutate(data);
+  };
+
+  const onVendorSubmit = (data: VendorFormValues) => {
+    createVendorMutation.mutate(data);
+  };
+
+  const onPartnerSubmit = (data: PartnerFormValues) => {
+    createPartnerMutation.mutate(data);
+  };
+
+  const onProducerSubmit = (data: ProducerFormValues) => {
+    createProducerMutation.mutate(data);
+  };
 
   // Filter users by role
   const clients = users?.filter((u: any) => u.role === 'client') || [];
@@ -278,7 +352,7 @@ export default function AdminUsers() {
     const labels = {
       admin: 'Administrador',
       vendor: 'Vendedor',
-      client: 'Cliente', 
+      client: 'Cliente',
       producer: 'Produtor',
       partner: 'Sócio',
       finance: 'Financeiro'
@@ -307,11 +381,27 @@ export default function AdminUsers() {
       </div>
 
       <Tabs defaultValue="clients" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="clients">Clientes ({clients.length})</TabsTrigger>
-          <TabsTrigger value="vendors">Vendedores ({vendorUsers.length})</TabsTrigger>
-          <TabsTrigger value="partners">Sócios ({partners.length})</TabsTrigger>
-          <TabsTrigger value="producers">Produtores ({producers.length})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="clients" className="flex items-center">
+            <Users className="h-4 w-4 mr-2" />
+            Clientes ({clients.length})
+          </TabsTrigger>
+          <TabsTrigger value="vendors" className="flex items-center">
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Vendedores ({vendorUsers.length})
+          </TabsTrigger>
+          <TabsTrigger value="partners" className="flex items-center">
+            <Handshake className="h-4 w-4 mr-2" />
+            Sócios ({partners.length})
+          </TabsTrigger>
+          <TabsTrigger value="producers" className="flex items-center">
+            <Factory className="h-4 w-4 mr-2" />
+            Produtores ({producers.length})
+          </TabsTrigger>
+          <TabsTrigger value="overview" className="flex items-center">
+            <Eye className="h-4 w-4 mr-2" />
+            Visão Geral
+          </TabsTrigger>
         </TabsList>
 
         {/* Clientes */}
@@ -338,7 +428,7 @@ export default function AdminUsers() {
                       </DialogDescription>
                     </DialogHeader>
                     <Form {...clientForm}>
-                      <form onSubmit={clientForm.handleSubmit((data) => createClientMutation.mutate(data))} className="space-y-4">
+                      <form onSubmit={clientForm.handleSubmit(onClientSubmit)} className="space-y-4">
                         <FormField
                           control={clientForm.control}
                           name="name"
@@ -352,7 +442,7 @@ export default function AdminUsers() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={clientForm.control}
@@ -390,10 +480,10 @@ export default function AdminUsers() {
                               <FormLabel>Senha *</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input 
-                                    type={showPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    {...field}
                                   />
                                   <Button
                                     type="button"
@@ -461,10 +551,10 @@ export default function AdminUsers() {
                             <FormItem>
                               <FormLabel>Endereço</FormLabel>
                               <FormControl>
-                                <Textarea 
+                                <Textarea
                                   placeholder="Rua das Flores, 123, Centro, São Paulo, SP"
                                   rows={3}
-                                  {...field} 
+                                  {...field}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -583,7 +673,7 @@ export default function AdminUsers() {
                       </DialogDescription>
                     </DialogHeader>
                     <Form {...vendorForm}>
-                      <form onSubmit={vendorForm.handleSubmit((data) => createVendorMutation.mutate(data))} className="space-y-4">
+                      <form onSubmit={vendorForm.handleSubmit(onVendorSubmit)} className="space-y-4">
                         <FormField
                           control={vendorForm.control}
                           name="name"
@@ -597,7 +687,7 @@ export default function AdminUsers() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={vendorForm.control}
@@ -635,10 +725,10 @@ export default function AdminUsers() {
                               <FormLabel>Senha *</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input 
-                                    type={showPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    {...field}
                                   />
                                   <Button
                                     type="button"
@@ -771,7 +861,7 @@ export default function AdminUsers() {
                       </DialogDescription>
                     </DialogHeader>
                     <Form {...partnerForm}>
-                      <form onSubmit={partnerForm.handleSubmit((data) => createPartnerMutation.mutate(data))} className="space-y-4">
+                      <form onSubmit={partnerForm.handleSubmit(onPartnerSubmit)} className="space-y-4">
                         <FormField
                           control={partnerForm.control}
                           name="name"
@@ -785,7 +875,7 @@ export default function AdminUsers() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={partnerForm.control}
@@ -823,10 +913,10 @@ export default function AdminUsers() {
                               <FormLabel>Senha *</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input 
-                                    type={showPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    {...field}
                                   />
                                   <Button
                                     type="button"
@@ -951,15 +1041,37 @@ export default function AdminUsers() {
                       Novo Produtor
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Cadastrar Novo Produtor</DialogTitle>
                       <DialogDescription>
-                        Preencha os dados do produtor para criar uma nova conta
+                        Preencha os dados completos do produtor
                       </DialogDescription>
                     </DialogHeader>
                     <Form {...producerForm}>
-                      <form onSubmit={producerForm.handleSubmit((data) => createProducerMutation.mutate(data))} className="space-y-4">
+                      <form onSubmit={producerForm.handleSubmit(onProducerSubmit)} className="space-y-4">
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <FormLabel className="text-blue-700">Código de Acesso do Produtor</FormLabel>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <User className="h-4 w-4 text-blue-600" />
+                                <span className="font-mono font-bold text-blue-800">{producerUserCode}</span>
+                              </div>
+                              <p className="text-xs text-blue-600 mt-1">Este código será usado para login no sistema</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setProducerUserCode(generateProducerUserCode())}
+                              className="border-blue-300 text-blue-600 hover:bg-blue-100"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
                         <FormField
                           control={producerForm.control}
                           name="name"
@@ -973,14 +1085,29 @@ export default function AdminUsers() {
                             </FormItem>
                           )}
                         />
-                        
+
+                        <FormField
+                          control={producerForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Senha de Acesso *</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="Digite uma senha" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              <p className="text-xs text-gray-600">Senha que o produtor usará para acessar o sistema</p>
+                            </FormItem>
+                          )}
+                        />
+
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={producerForm.control}
                             name="email"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Email *</FormLabel>
+                                <FormLabel>Email</FormLabel>
                                 <FormControl>
                                   <Input type="email" placeholder="contato@marcenariasantos.com" {...field} />
                                 </FormControl>
@@ -988,51 +1115,6 @@ export default function AdminUsers() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={producerForm.control}
-                            name="username"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Username *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="marcenaria.santos" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <FormField
-                          control={producerForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Senha *</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input 
-                                    type={showPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                  >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                  </Button>
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={producerForm.control}
                             name="phone"
@@ -1046,32 +1128,33 @@ export default function AdminUsers() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={producerForm.control}
-                            name="specialty"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Especialidade *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Móveis sob medida" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
                         </div>
+
+                        <FormField
+                          control={producerForm.control}
+                          name="specialty"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>O que produz (Especialidade) *</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Móveis sob medida, Cadeiras, Mesas..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <FormField
                           control={producerForm.control}
                           name="address"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Endereço *</FormLabel>
+                              <FormLabel>Endereço Completo *</FormLabel>
                               <FormControl>
-                                <Textarea 
+                                <Textarea
                                   placeholder="Rua Industrial, 456, Distrito Industrial, São Paulo, SP"
                                   rows={3}
-                                  {...field} 
+                                  {...field}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -1102,45 +1185,130 @@ export default function AdminUsers() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidade</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {producers.map((producer: any) => (
-                      <tr key={producer.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{producer.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{producer.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{producer.username}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{producer.specialty}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`status-badge ${producer.isActive ? 'status-confirmed' : 'status-cancelled'}`}>
-                            {producer.isActive ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Button variant="ghost" size="sm" className="mr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {producers?.map((producer: any) => (
+                  <Card key={producer.id} className="card-hover">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{producer.name}</h3>
+                          <div className="flex items-center mt-1">
+                            <User className="h-3 w-3 text-blue-600 mr-1" />
+                            <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              {producer.username}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="ghost" size="sm" title="Ver Detalhes">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" title="Editar">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {producer.email && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">{producer.email}</span>
+                          </div>
+                        )}
+                        {producer.phone && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span>{producer.phone}</span>
+                          </div>
+                        )}
+                        {producer.specialty && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Factory className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span>{producer.specialty}</span>
+                          </div>
+                        )}
+                        {producer.address && (
+                          <div className="flex items-start text-sm text-gray-600">
+                            <MapPin className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                            <span className="line-clamp-2">{producer.address}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Status:</span>
+                          <span className={`font-medium ${producer.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                            {producer.isActive ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
+
+              {producers?.length === 0 && (
+                <div className="text-center py-12">
+                  <Factory className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum produtor cadastrado</h3>
+                  <p className="text-gray-500 mb-4">Cadastre produtores para expandir sua rede de produção</p>
+                  <Button onClick={() => setIsProducerDialogOpen(true)} className="gradient-bg text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Cadastrar Primeiro Produtor
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Visão Geral */}
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="card-hover">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Clientes</h3>
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+                <p className="text-3xl font-bold gradient-text">{clients.length}</p>
+                <p className="text-sm text-gray-600 mt-2">Total de clientes cadastrados</p>
+              </CardContent>
+            </Card>
+
+            <Card className="card-hover">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Vendedores</h3>
+                  <ShoppingCart className="h-6 w-6 text-green-600" />
+                </div>
+                <p className="text-3xl font-bold gradient-text">{vendorUsers.length}</p>
+                <p className="text-sm text-gray-600 mt-2">Vendedores ativos no sistema</p>
+              </CardContent>
+            </Card>
+
+            <Card className="card-hover">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Parceiros</h3>
+                  <Handshake className="h-6 w-6 text-purple-600" />
+                </div>
+                <p className="text-3xl font-bold gradient-text">{partners.length}</p>
+                <p className="text-sm text-gray-600 mt-2">Parceiros de negócio</p>
+              </CardContent>
+            </Card>
+
+            <Card className="card-hover">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Produtores</h3>
+                  <Factory className="h-6 w-6 text-orange-600" />
+                </div>
+                <p className="text-3xl font-bold gradient-text">{producers.length}</p>
+                <p className="text-sm text-gray-600 mt-2">Rede de produção terceirizada</p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
