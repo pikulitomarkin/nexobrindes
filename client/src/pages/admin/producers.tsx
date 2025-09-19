@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Factory, MapPin, Phone } from "lucide-react";
+import { Plus, Factory, MapPin, Phone, User, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -19,17 +19,26 @@ const producerFormSchema = z.object({
   specialty: z.string().min(2, "Especialidade é obrigatória"),
   address: z.string().min(5, "Endereço é obrigatório"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  confirmPassword: z.string().min(6, "Confirmação de senha é obrigatória"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Senhas não coincidem",
-  path: ["confirmPassword"],
 });
 
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
 
 export default function AdminProducers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [userCode, setUserCode] = useState("");
   const { toast } = useToast();
+
+  const generateUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `PRO${timestamp}${randomStr}`;
+  };
+
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      setUserCode(generateUserCode());
+    }
+  }, [isCreateDialogOpen]);
 
   const { data: producers, isLoading } = useQuery({
     queryKey: ["/api/producers"],
@@ -50,16 +59,19 @@ export default function AdminProducers() {
       specialty: "",
       address: "",
       password: "",
-      confirmPassword: "",
     },
   });
 
   const createProducerMutation = useMutation({
     mutationFn: async (data: ProducerFormValues) => {
+      const producerData = {
+        ...data,
+        userCode: userCode
+      };
       const response = await fetch("/api/producers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(producerData),
       });
       if (!response.ok) throw new Error("Erro ao criar produtor");
       return response.json();
@@ -70,7 +82,7 @@ export default function AdminProducers() {
       form.reset();
       toast({
         title: "Sucesso!",
-        description: "Produtor criado com sucesso",
+        description: `Produtor criado com sucesso! Código de acesso: ${userCode}`,
       });
     },
   });
@@ -113,16 +125,53 @@ export default function AdminProducers() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <FormLabel className="text-blue-700">Código de Acesso do Produtor</FormLabel>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <User className="h-4 w-4 text-blue-600" />
+                        <span className="font-mono font-bold text-blue-800">{userCode}</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">Este código será usado para login no sistema</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUserCode(generateUserCode())}
+                      className="border-blue-300 text-blue-600 hover:bg-blue-100"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome/Empresa</FormLabel>
+                      <FormLabel>Nome/Empresa *</FormLabel>
                       <FormControl>
                         <Input placeholder="Marcenaria Santos" {...field} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha de Acesso *</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Digite uma senha" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-gray-600">Senha que o produtor usará para acessar o sistema</p>
                     </FormItem>
                   )}
                 />
@@ -173,32 +222,6 @@ export default function AdminProducers() {
                       <FormLabel>Endereço</FormLabel>
                       <FormControl>
                         <Input placeholder="Rua Industrial, 456" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Senha</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirmar Senha</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
