@@ -29,8 +29,8 @@ export default function AdminProducers() {
   const { toast } = useToast();
 
   const generateUserCode = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const timestamp = Date.now().toString().slice(-8);
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `PRO${timestamp}${randomStr}`;
   };
 
