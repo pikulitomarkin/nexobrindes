@@ -293,13 +293,16 @@ export default function AdminProducers() {
                 </div>
               </div>
 
-              <div className="flex justify-between mt-4">
-                <Button variant="outline" size="sm" className="flex-1 mr-2">
-                  Ver Detalhes
-                </Button>
-                <Button className="gradient-bg text-white flex-1">
-                  Enviar Ordem
-                </Button>
+              <div className="bg-gray-50 p-3 rounded-lg mt-4 border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
+                    <p className="font-mono font-bold text-gray-900">{producer.userCode || producer.username}</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Ver Detalhes
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
