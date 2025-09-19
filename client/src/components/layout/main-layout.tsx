@@ -57,6 +57,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
         ];
+      case "partner":
+        return [
+          { href: "/", icon: Home, label: "Dashboard" },
+          { href: "/partner/products", icon: Package, label: "Produtos" },
+          { href: "/partner/producers", icon: Factory, label: "Produtores" },
+          { href: "/partner/clients", icon: Users, label: "Clientes" },
+          { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
+          { href: "/partner/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+        ];
       case "vendor":
         return [
           { href: "/", icon: Home, label: "Dashboard" },

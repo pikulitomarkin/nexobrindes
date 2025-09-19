@@ -351,8 +351,8 @@ export class MemStorage implements IStorage {
     // Partner user
     const partnerUser = {
       id: "partner-1",
-      username: "socio1",
-      password: "123456",
+      username: "partner1",
+      password: "partner123",
       name: "João Sócio",
       email: "joao.socio@erp.com",
       phone: null,

@@ -17,6 +17,13 @@ import AdminCommissionManagement from './pages/admin/commission-management';
 import AdminProducts from "@/pages/admin/products";
 import AdminProducers from "@/pages/admin/producers";
 
+// Partner pages - Same functionality as admin but with separate commissions
+import PartnerClients from "@/pages/partner/clients";
+import PartnerVendors from "@/pages/partner/vendors";
+import PartnerCommissionManagement from "@/pages/partner/commission-management";
+import PartnerProducts from "@/pages/partner/products";
+import PartnerProducers from "@/pages/partner/producers";
+
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
 import VendorClients from "@/pages/vendor/clients";
@@ -102,6 +109,47 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminProducers />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          {/* Partner Routes - Same as admin but with separate commissions */}
+          <Route path="/partner/clients">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerClients />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/vendors">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerVendors />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/commission-management">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerCommissionManagement />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/products">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerProducts />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/producers">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerProducers />
               </MainLayout>
             </ProtectedRoute>
           </Route>

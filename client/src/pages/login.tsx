@@ -59,7 +59,7 @@ export default function Login() {
               window.location.href = "/finance/payments";
               break;
             case "partner":
-              window.location.href = "/partner/dashboard";
+              window.location.href = "/partner/clients";
               break;
             default:
               window.location.href = "/dashboard";
@@ -89,7 +89,7 @@ export default function Login() {
     { username: "vendedor1", password: "123456", role: "Vendedor", icon: Users, color: "text-blue-600" },
     { username: "cliente1", password: "123456", role: "Cliente", icon: User, color: "text-green-600" },
     { username: "produtor1", password: "123456", role: "Produtor", icon: Factory, color: "text-purple-600" },
-    { username: "socio1", password: "123456", role: "Sócio", icon: DollarSign, color: "text-yellow-600" },
+    { username: "partner1", password: "partner123", role: "Sócio", icon: DollarSign, color: "text-yellow-600" },
   ];
 
   const quickLogin = (user: any) => {
@@ -180,7 +180,7 @@ export default function Login() {
             </div>
 
             <div className="text-center text-xs text-gray-500">
-              <p>Todos os usuários de teste usam a senha: <strong>123456</strong></p>
+              <p>Clique em qualquer usuário para preencher automaticamente</p>
             </div>
           </CardContent>
         </Card>
