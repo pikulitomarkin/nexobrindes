@@ -98,6 +98,14 @@ function App() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/admin/producers">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminProducers />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           {/* Vendor Routes - Accessible by vendor users and admin */}
           <Route path="/vendor/products">
             <ProtectedRoute>
