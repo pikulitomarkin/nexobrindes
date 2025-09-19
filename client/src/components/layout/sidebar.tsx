@@ -111,7 +111,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href="/admin/users">
+                    <Link href="/admin/users?tab=producers">
                       <Factory className="h-4 w-4" />
                       <span>Produtores</span>
                     </Link>

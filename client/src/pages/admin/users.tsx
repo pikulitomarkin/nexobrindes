@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,8 @@ type PartnerFormValues = z.infer<typeof partnerFormSchema>;
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
 
 export default function AdminUsers() {
+  const [location] = useLocation();
+  const [activeTab, setActiveTab] = useState("clients");
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isVendorDialogOpen, setIsVendorDialogOpen] = useState(false);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
@@ -76,6 +79,15 @@ export default function AdminUsers() {
   const [partnerUserCode, setPartnerUserCode] = useState("");
   const [producerUserCode, setProducerUserCode] = useState("");
   const { toast } = useToast();
+
+  // Detectar tab na URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location]);
 
   // Get all users
   const { data: users, isLoading } = useQuery({
@@ -380,7 +392,7 @@ export default function AdminUsers() {
         <p className="text-gray-600">Cadastre e gerencie todos os usuários do sistema</p>
       </div>
 
-      <Tabs defaultValue="clients" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="clients" className="flex items-center">
             <Users className="h-4 w-4 mr-2" />
