@@ -1,9 +1,9 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, Eye, Edit } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
@@ -17,14 +17,25 @@ export default function Dashboard() {
     queryKey: ["/api/orders"],
   });
 
+  const { data: commissions } = useQuery({
+    queryKey: [`/api/commissions/partner/${user.id}`],
+    enabled: user.role === 'partner',
+  });
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
+
   const getStatusBadge = (status: string) => {
     const statusClasses = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800",
-      production: "bg-purple-100 text-purple-800",
-      shipped: "bg-indigo-100 text-indigo-800",
-      delivered: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
+      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+      confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+      production: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+      shipped: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
+      delivered: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     };
 
     const statusLabels = {
@@ -37,153 +48,291 @@ export default function Dashboard() {
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusClasses[status as keyof typeof statusClasses]}`}>
-        {statusLabels[status as keyof typeof statusLabels]}
-      </span>
+      <Badge className={statusClasses[status as keyof typeof statusClasses] || "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"}>
+        {statusLabels[status as keyof typeof statusLabels] || status}
+      </Badge>
     );
   };
 
-  // Show simplified admin dashboard
-  if (user.role === "admin") {
+  // Calculate commission data for partners
+  const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
+  const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
+  const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
+
+  const getQuickActions = () => {
+    if (user.role === "admin") {
+      return [
+        { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
+        { href: "/admin/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
+        { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+        { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
+        { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
+        { href: "/admin/products", icon: Package, label: "Produtos", color: "text-emerald-600" },
+      ];
+    } else if (user.role === "partner") {
+      return [
+        { href: "/partner/products", icon: Package, label: "Produtos", color: "text-blue-600" },
+        { href: "/partner/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
+        { href: "/partner/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+        { href: "/partner/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
+        { href: "/partner/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
+      ];
+    }
+    return [];
+  };
+
+  const quickActions = getQuickActions();
+
+  // Show comprehensive dashboard for admin and partner
+  if (user.role === "admin" || user.role === "partner") {
     return (
-      <div className="p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Administrativo</h1>
-          <p className="text-gray-600">Bem-vindo, {user.name}</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total de Pedidos</p>
-                  <p className="text-3xl font-bold text-blue-600">{orders?.length || 0}</p>
-                </div>
-                <ShoppingCart className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Em Produção</p>
-                  <p className="text-3xl font-bold text-purple-600">{stats?.inProduction || 0}</p>
-                </div>
-                <Factory className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Vendedores</p>
-                  <p className="text-3xl font-bold text-green-600">{stats?.totalVendors || 0}</p>
-                </div>
-                <Users className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Clientes</p>
-                  <p className="text-3xl font-bold text-orange-600">{stats?.totalClients || 0}</p>
-                </div>
-                <Users className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Orders List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Pedidos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Número
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cliente
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vendedor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Produto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orders?.slice(0, 10).map((order: any) => (
-                    <tr key={order.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {order.orderNumber}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.clientName}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.vendorName}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.product}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(order.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-800 shadow-sm border-b px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {user.role === "admin" ? "Painel Administrativo" : "Painel do Sócio"}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">Bem-vindo, {user.name}</p>
             </div>
-            
-            {(!orders || orders.length === 0) && (
-              <div className="text-center py-8">
-                <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-500">Nenhum pedido encontrado</p>
-              </div>
+            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {/* Main Business Stats Cards - All 5 required metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <Card data-testid="card-total-orders">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Pedidos</p>
+                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats?.totalOrders || 0}</p>
+                  </div>
+                  <ShoppingCart className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-orders-production">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Em Produção</p>
+                    <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats?.inProduction || 0}</p>
+                  </div>
+                  <Factory className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-clients">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Clientes</p>
+                    <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats?.totalClients || 0}</p>
+                  </div>
+                  <Users className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-vendors">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendedores</p>
+                    <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats?.totalVendors || 0}</p>
+                  </div>
+                  <Users className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-producers">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Produtores</p>
+                    <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats?.totalProducers || 0}</p>
+                  </div>
+                  <Factory className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Financial Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <Card data-testid="card-orders-today">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pedidos Hoje</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats?.ordersToday || 0}</p>
+                  </div>
+                  <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-monthly-revenue">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Receita Mensal</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    </p>
+                  </div>
+                  <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-pending-payments">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pagamentos Pendentes</p>
+                    <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                      R$ {stats?.pendingPayments?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {user.role === "partner" && (
+              <Card data-testid="card-partner-commissions">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                        R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Recent Orders & Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <Card data-testid="card-recent-orders">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Últimos Pedidos</CardTitle>
+                <Link href={user.role === "admin" ? "/admin/orders" : "/"}>
+                  <Button variant="outline" size="sm" data-testid="button-view-all-orders">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Ver Todos
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {!orders || orders.length === 0 ? (
+                    <div className="text-center py-8">
+                      <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400">Nenhum pedido encontrado</p>
+                    </div>
+                  ) : (
+                    orders.slice(0, 5).map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">#{order.orderNumber}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">{order.clientName}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">Vendedor: {order.vendorName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm">R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          {getStatusBadge(order.status)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-quick-actions">
+              <CardHeader>
+                <CardTitle>Ações Rápidas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <Link key={action.href} href={action.href}>
+                        <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" data-testid={`link-${action.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                          <Icon className={`h-5 w-5 ${action.color} mr-3`} />
+                          <span className="font-medium text-sm">{action.label}</span>
+                          <ArrowUpRight className="h-4 w-4 ml-auto text-gray-400" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Partner Commission History (only for partners) */}
+          {user.role === "partner" && commissions && commissions.length > 0 && (
+            <Card data-testid="card-commission-history">
+              <CardHeader>
+                <CardTitle>Histórico de Comissões Recentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {commissions.slice(0, 5).map((commission: any) => (
+                    <div key={commission.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <div>
+                        <p className="font-semibold text-sm">Pedido #{commission.orderId?.slice(-6) || 'N/A'}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-sm text-green-600 dark:text-green-400">
+                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <Badge className={`${
+                          commission.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 
+                          commission.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' : 
+                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                        }`}>
+                          {commission.status === 'paid' ? 'Paga' : 
+                           commission.status === 'pending' ? 'Pendente' : 'Outro'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     );
   }
 
-  // For other roles, keep existing dashboards
+  // For other roles, show simple dashboard
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Bem-vindo, {user.name}</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400">Bem-vindo, {user.name}</p>
       </div>
 
       {/* Stats Cards based on role */}
@@ -192,10 +341,10 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pedidos</p>
-                <p className="text-3xl font-bold text-blue-600">{orders?.length || 0}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pedidos</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{orders?.length || 0}</p>
               </div>
-              <ShoppingCart className="h-8 w-8 text-blue-600" />
+              <ShoppingCart className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
           </CardContent>
         </Card>
