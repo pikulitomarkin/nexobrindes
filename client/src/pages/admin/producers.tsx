@@ -297,7 +297,7 @@ export default function AdminProducers() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
-                    <p className="font-mono font-bold text-gray-900">{producer.userCode || producer.username}</p>
+                    <p className="font-mono font-bold text-gray-900">{producer.userCode}</p>
                   </div>
                   <Button variant="outline" size="sm">
                     Ver Detalhes
