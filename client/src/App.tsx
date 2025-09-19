@@ -155,6 +155,14 @@ function App() {
           </Route>
 
           {/* Vendor Routes - Accessible by vendor users and admin */}
+          <Route path="/vendor/dashboard">
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/vendor/products">
             <ProtectedRoute>
               <MainLayout>
