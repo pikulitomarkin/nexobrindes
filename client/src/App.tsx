@@ -15,6 +15,7 @@ import AdminClients from "./pages/admin/clients";
 import AdminVendors from "./pages/admin/vendors";
 import AdminCommissionManagement from './pages/admin/commission-management';
 import AdminProducts from "@/pages/admin/products";
+import AdminProducers from "@/pages/admin/producers";
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
@@ -93,6 +94,14 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminProducts />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/producers">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminProducers />
               </MainLayout>
             </ProtectedRoute>
           </Route>

@@ -52,6 +52,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         return [
           { href: "/", icon: Home, label: "Dashboard" },
           { href: "/admin/products", icon: Package, label: "Produtos" },
+          { href: "/admin/producers", icon: Factory, label: "Produtores" },
           { href: "/admin/clients", icon: Users, label: "Clientes" },
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
