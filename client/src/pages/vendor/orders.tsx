@@ -88,7 +88,14 @@ export default function VendorOrders() {
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
       itemCustomizationValue: 0,
-      itemCustomizationDescription: ""
+      itemCustomizationDescription: "",
+      productWidth: "",
+      productHeight: "",
+      productDepth: "",
+      hasItemDiscount: false,
+      itemDiscountType: "percentage",
+      itemDiscountPercentage: 0,
+      itemDiscountValue: 0
     };
     setVendorOrderForm(prev => ({
       ...prev,
@@ -125,16 +132,26 @@ export default function VendorOrders() {
 
   const calculateOrderTotal = () => {
     return vendorOrderForm.items.reduce((total, item) => {
-      const basePrice = item.unitPrice * item.quantity;
-      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-      return total + basePrice + customizationValue;
+      return total + calculateItemTotal(item);
     }, 0);
   };
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
     const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-    return basePrice + customizationValue;
+    let subtotal = basePrice + customizationValue;
+    
+    // Aplicar desconto do item
+    if (item.hasItemDiscount) {
+      if (item.itemDiscountType === 'percentage') {
+        const discountAmount = (basePrice * (item.itemDiscountPercentage || 0)) / 100;
+        subtotal = subtotal - discountAmount;
+      } else if (item.itemDiscountType === 'value') {
+        subtotal = subtotal - (item.itemDiscountValue || 0);
+      }
+    }
+    
+    return Math.max(0, subtotal);
   };
 
   const resetOrderForm = () => {
@@ -463,6 +480,46 @@ export default function VendorOrders() {
                           </div>
                         </div>
 
+                        {/* Product Size Fields */}
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <Label htmlFor={`width-${index}`}>Largura (cm)</Label>
+                            <Input
+                              id={`width-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productWidth || ""}
+                              onChange={(e) => updateOrderItem(index, 'productWidth', e.target.value)}
+                              placeholder="Ex: 150.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`height-${index}`}>Altura (cm)</Label>
+                            <Input
+                              id={`height-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productHeight || ""}
+                              onChange={(e) => updateOrderItem(index, 'productHeight', e.target.value)}
+                              placeholder="Ex: 80.0"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`depth-${index}`}>Profundidade (cm)</Label>
+                            <Input
+                              id={`depth-${index}`}
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={item.productDepth || ""}
+                              onChange={(e) => updateOrderItem(index, 'productDepth', e.target.value)}
+                              placeholder="Ex: 60.0"
+                            />
+                          </div>
+                        </div>
+
                         <div className="flex items-center space-x-2 mb-3">
                           <Switch
                             id={`item-customization-${index}`}
@@ -497,6 +554,81 @@ export default function VendorOrders() {
                                 onChange={(e) => updateOrderItem(index, 'itemCustomizationDescription', e.target.value)}
                                 placeholder="Ex: Gravação, cor especial..."
                               />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`item-discount-${index}`}
+                            checked={item.hasItemDiscount}
+                            onCheckedChange={(checked) => updateOrderItem(index, 'hasItemDiscount', checked)}
+                          />
+                          <Label htmlFor={`item-discount-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Desconto no Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemDiscount && (
+                          <div className="bg-orange-50 p-3 rounded mb-3 space-y-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <Label htmlFor={`item-discount-type-${index}`}>Tipo de Desconto</Label>
+                                <Select value={item.itemDiscountType || 'percentage'} onValueChange={(value) => updateOrderItem(index, 'itemDiscountType', value)}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                                    <SelectItem value="value">Valor Fixo (R$)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {item.itemDiscountType === 'percentage' ? (
+                                <div>
+                                  <Label htmlFor={`item-discount-percentage-${index}`}>Desconto (%)</Label>
+                                  <Input
+                                    id={`item-discount-percentage-${index}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={item.itemDiscountPercentage || 0}
+                                    onChange={(e) => updateOrderItem(index, 'itemDiscountPercentage', parseFloat(e.target.value) || 0)}
+                                    placeholder="Ex: 10.50"
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  <Label htmlFor={`item-discount-value-${index}`}>Desconto (R$)</Label>
+                                  <Input
+                                    id={`item-discount-value-${index}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={item.itemDiscountValue || 0}
+                                    onChange={(e) => updateOrderItem(index, 'itemDiscountValue', parseFloat(e.target.value) || 0)}
+                                    placeholder="Ex: 50.00"
+                                  />
+                                </div>
+                              )}
+                              <div>
+                                <Label>Valor do Desconto</Label>
+                                <p className="text-lg font-semibold text-orange-600 mt-2">
+                                  R$ {(() => {
+                                    const basePrice = item.unitPrice * item.quantity;
+                                    if (item.hasItemDiscount) {
+                                      if (item.itemDiscountType === 'percentage') {
+                                        return ((basePrice * (item.itemDiscountPercentage || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                      } else {
+                                        return (item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                      }
+                                    }
+                                    return '0,00';
+                                  })()}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         )}

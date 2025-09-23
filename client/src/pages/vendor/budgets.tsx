@@ -181,7 +181,11 @@ export default function VendorBudgets() {
       customizationPhoto: "",
       productWidth: "",
       productHeight: "",
-      productDepth: ""
+      productDepth: "",
+      hasItemDiscount: false,
+      itemDiscountType: "percentage",
+      itemDiscountPercentage: 0,
+      itemDiscountValue: 0
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -218,12 +222,10 @@ export default function VendorBudgets() {
 
   const calculateBudgetTotal = () => {
     const subtotal = vendorBudgetForm.items.reduce((total, item) => {
-      const basePrice = item.unitPrice * item.quantity;
-      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
-      return total + basePrice + customizationValue;
+      return total + calculateItemTotal(item);
     }, 0);
 
-    // Apply discount
+    // Apply general discount
     if (vendorBudgetForm.hasDiscount) {
       if (vendorBudgetForm.discountType === 'percentage') {
         const discountAmount = (subtotal * vendorBudgetForm.discountPercentage) / 100;
@@ -239,7 +241,19 @@ export default function VendorBudgets() {
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
     const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
-    return basePrice + customizationValue;
+    let subtotal = basePrice + customizationValue;
+    
+    // Aplicar desconto do item
+    if (item.hasItemDiscount) {
+      if (item.itemDiscountType === 'percentage') {
+        const discountAmount = (basePrice * (item.itemDiscountPercentage || 0)) / 100;
+        subtotal = subtotal - discountAmount;
+      } else if (item.itemDiscountType === 'value') {
+        subtotal = subtotal - (item.itemDiscountValue || 0);
+      }
+    }
+    
+    return Math.max(0, subtotal);
   };
 
   // Calculate the total including shipping cost
@@ -907,6 +921,81 @@ export default function VendorBudgets() {
                                     </Button>
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`item-discount-${index}`}
+                            checked={item.hasItemDiscount}
+                            onCheckedChange={(checked) => updateBudgetItem(index, 'hasItemDiscount', checked)}
+                          />
+                          <Label htmlFor={`item-discount-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Desconto no Item
+                          </Label>
+                        </div>
+
+                        {item.hasItemDiscount && (
+                          <div className="bg-orange-50 p-3 rounded mb-3 space-y-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <Label htmlFor={`item-discount-type-${index}`}>Tipo de Desconto</Label>
+                                <Select value={item.itemDiscountType || 'percentage'} onValueChange={(value) => updateBudgetItem(index, 'itemDiscountType', value)}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                                    <SelectItem value="value">Valor Fixo (R$)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {item.itemDiscountType === 'percentage' ? (
+                                <div>
+                                  <Label htmlFor={`item-discount-percentage-${index}`}>Desconto (%)</Label>
+                                  <Input
+                                    id={`item-discount-percentage-${index}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={item.itemDiscountPercentage || 0}
+                                    onChange={(e) => updateBudgetItem(index, 'itemDiscountPercentage', parseFloat(e.target.value) || 0)}
+                                    placeholder="Ex: 10.50"
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  <Label htmlFor={`item-discount-value-${index}`}>Desconto (R$)</Label>
+                                  <Input
+                                    id={`item-discount-value-${index}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={item.itemDiscountValue || 0}
+                                    onChange={(e) => updateBudgetItem(index, 'itemDiscountValue', parseFloat(e.target.value) || 0)}
+                                    placeholder="Ex: 50.00"
+                                  />
+                                </div>
+                              )}
+                              <div>
+                                <Label>Valor do Desconto</Label>
+                                <p className="text-lg font-semibold text-orange-600 mt-2">
+                                  R$ {(() => {
+                                    const basePrice = item.unitPrice * item.quantity;
+                                    if (item.hasItemDiscount) {
+                                      if (item.itemDiscountType === 'percentage') {
+                                        return ((basePrice * (item.itemDiscountPercentage || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                      } else {
+                                        return (item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                      }
+                                    }
+                                    return '0,00';
+                                  })()}
+                                </p>
                               </div>
                             </div>
                           </div>
