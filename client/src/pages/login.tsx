@@ -105,7 +105,7 @@ export default function Login() {
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-teal-500 rounded-full flex items-center justify-center mb-4">
               <LogIn className="h-8 w-8 text-white" />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">ERP System</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900">Nexo Brindes</CardTitle>
             <p className="text-gray-600">Acesse seu painel personalizado</p>
           </CardHeader>
           <CardContent className="space-y-6">

@@ -67,7 +67,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   return (
     <div className="w-64 gradient-bg text-white shadow-xl">
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-2">ERP Sistema</h1>
+        <h1 className="text-2xl font-bold mb-2">Nexo Brindes</h1>
         <p className="text-blue-100 text-sm">Vendas & Produção</p>
       </div>
 

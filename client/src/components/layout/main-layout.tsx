@@ -128,7 +128,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/20">
-            <h1 className="text-2xl font-bold text-white">ERP System</h1>
+            <h1 className="text-2xl font-bold text-white">Nexo Brindes</h1>
             <Button
               variant="ghost"
               size="sm"
