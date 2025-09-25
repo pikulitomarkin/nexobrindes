@@ -766,6 +766,129 @@ export class MemStorage implements IStorage {
       }
     ];
     mockProducts.forEach(product => this.products.set(product.id, product));
+
+    // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
+    this.initializeFinancialIntegration();
+  }
+
+  private initializeFinancialIntegration() {
+    // Create AccountsReceivable entries for all existing orders
+    const allOrders = Array.from(this.orders.values());
+    
+    allOrders.forEach(order => {
+      // Create receivable entry for each order
+      const totalValue = parseFloat(order.totalValue);
+      const paidValue = parseFloat(order.paidValue);
+      const remainingAmount = totalValue - paidValue;
+      
+      let status: 'pending' | 'partial' | 'paid' = 'pending';
+      if (paidValue >= totalValue) {
+        status = 'paid';
+      } else if (paidValue > 0) {
+        status = 'partial';
+      }
+
+      const receivable: AccountsReceivable = {
+        id: `ar-${order.id}`,
+        orderId: order.id,
+        clientId: order.clientId,
+        vendorId: order.vendorId,
+        description: `Venda: ${order.product}`,
+        amount: order.totalValue,
+        receivedAmount: order.paidValue,
+        dueDate: order.deadline,
+        status: status,
+        type: 'sale',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      this.accountsReceivable.set(receivable.id, receivable);
+
+      // If there are payments for this order, create payment allocations
+      const orderPayments = Array.from(this.payments.values()).filter(p => p.orderId === order.id);
+      orderPayments.forEach(payment => {
+        if (payment.status === 'confirmed') {
+          const allocation: PaymentAllocation = {
+            id: `allocation-${payment.id}-${receivable.id}`,
+            paymentId: payment.id,
+            receivableId: receivable.id,
+            amount: payment.amount,
+            allocatedAt: payment.paidAt || payment.createdAt
+          };
+          this.paymentAllocations.set(allocation.id, allocation);
+        }
+      });
+    });
+
+    // Create Commission Payouts based on existing commissions
+    const allCommissions = Array.from(this.commissions.values());
+    
+    // Group commissions by vendor to create payout batches
+    const commissionsByVendor = new Map<string, Commission[]>();
+    allCommissions.forEach(commission => {
+      if (!commissionsByVendor.has(commission.vendorId)) {
+        commissionsByVendor.set(commission.vendorId, []);
+      }
+      commissionsByVendor.get(commission.vendorId)!.push(commission);
+    });
+
+    // Create commission payouts for each vendor
+    commissionsByVendor.forEach((commissions, vendorId) => {
+      const totalAmount = commissions.reduce((sum, comm) => sum + parseFloat(comm.amount), 0);
+      
+      if (totalAmount > 0) {
+        const payout: CommissionPayout = {
+          id: `payout-vendor-${vendorId}`,
+          userId: vendorId,
+          type: 'vendor',
+          description: `Comissões acumuladas - ${commissions.length} pedidos`,
+          totalAmount: totalAmount.toFixed(2),
+          commissionIds: commissions.map(c => c.id),
+          status: commissions.every(c => c.status === 'paid') ? 'paid' : 'pending',
+          paidAt: commissions.every(c => c.status === 'paid') ? new Date() : null,
+          createdAt: new Date()
+        };
+        
+        this.commissionPayouts.set(payout.id, payout);
+      }
+    });
+
+    // Create sample expense notes
+    const sampleExpenses: ExpenseNote[] = [
+      {
+        id: "expense-1",
+        vendorId: "vendor-1",
+        orderId: "order-1",
+        description: "Material para Mesa de Jantar - Madeira Premium",
+        amount: "850.00",
+        category: "material",
+        attachmentUrl: null,
+        status: "approved",
+        approvedBy: "admin-1",
+        approvedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "expense-2", 
+        vendorId: "vendor-1",
+        orderId: null,
+        description: "Transporte - Entrega de produtos",
+        amount: "120.00",
+        category: "transport",
+        attachmentUrl: null,
+        status: "pending",
+        approvedBy: null,
+        approvedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    sampleExpenses.forEach(expense => {
+      this.mockData.expenses.push(expense);
+    });
   }
 
   // User methods
@@ -892,7 +1015,7 @@ export class MemStorage implements IStorage {
       producerId: insertOrder.producerId || null,
       budgetId: insertOrder.budgetId || null,
       description: insertOrder.description || null,
-      paidValue: insertOrder.paidValue || null,
+      paidValue: insertOrder.paidValue || "0.00",
       deadline: insertOrder.deadline || null,
       trackingCode: insertOrder.trackingCode || null,
       status: insertOrder.status || 'pending',
@@ -900,7 +1023,40 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.orders.set(id, order);
+
+    // Automatically create AccountsReceivable entry for this new order
+    await this.createAccountsReceivableForOrder(order);
+    
     return order;
+  }
+
+  private async createAccountsReceivableForOrder(order: Order): Promise<void> {
+    const paidValue = parseFloat(order.paidValue || "0");
+    const totalValue = parseFloat(order.totalValue);
+    
+    let status: 'pending' | 'partial' | 'paid' = 'pending';
+    if (paidValue >= totalValue) {
+      status = 'paid';
+    } else if (paidValue > 0) {
+      status = 'partial';
+    }
+
+    const receivable: AccountsReceivable = {
+      id: `ar-${order.id}`,
+      orderId: order.id,
+      clientId: order.clientId,
+      vendorId: order.vendorId,
+      description: `Venda: ${order.product}`,
+      amount: order.totalValue,
+      receivedAmount: order.paidValue || "0.00",
+      dueDate: order.deadline,
+      status: status,
+      type: 'sale',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.accountsReceivable.set(receivable.id, receivable);
   }
 
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
@@ -1102,6 +1258,26 @@ export class MemStorage implements IStorage {
       .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
     await this.updateOrder(orderId, { paidValue: totalPaid.toFixed(2) });
+
+    // Update corresponding AccountsReceivable entry
+    const receivableId = `ar-${orderId}`;
+    const receivable = this.accountsReceivable.get(receivableId);
+    
+    if (receivable) {
+      const totalValue = parseFloat(receivable.amount);
+      let status: 'pending' | 'partial' | 'paid' = 'pending';
+      
+      if (totalPaid >= totalValue) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        status = 'partial';
+      }
+
+      await this.updateAccountsReceivable(receivableId, {
+        receivedAmount: totalPaid.toFixed(2),
+        status: status
+      });
+    }
   }
 
   // Commission methods
