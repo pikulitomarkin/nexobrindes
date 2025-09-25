@@ -44,6 +44,7 @@ import ProducerProfileSettings from "./pages/producer/profile-settings";
 import ClientOrderTimeline from "./pages/client/order-timeline";
 
 // Finance pages
+import FinanceIndex from "@/pages/finance/index";
 import FinancePayments from "@/pages/finance/payments";
 import FinanceReconciliation from "@/pages/finance/reconciliation";
 import FinanceReceivables from "@/pages/finance/receivables";
@@ -274,6 +275,14 @@ function App() {
           </Route>
 
           {/* Finance Routes - Accessible by admin and finance roles */}
+          <Route path="/finance">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
+              <MainLayout>
+                <FinanceIndex />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/finance/payments">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
               <MainLayout>
