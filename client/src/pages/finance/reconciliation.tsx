@@ -359,7 +359,7 @@ export default function FinanceReconciliation() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {bankTransactions?.slice(0, 5).map((transaction: any, index: number) => (
+              {(bankTransactions || [])?.slice(0, 5).map((transaction: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
@@ -466,7 +466,7 @@ export default function FinanceReconciliation() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {bankTransactions?.slice(0, 10).map((transaction: any) => (
+                {(bankTransactions || [])?.slice(0, 10).map((transaction: any) => (
                   <tr key={transaction.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}

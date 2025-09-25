@@ -105,7 +105,7 @@ export default function FinanceExpenses() {
     return iconMap[category as keyof typeof iconMap] || iconMap.other;
   };
 
-  const filteredExpenses = expenses?.filter((expense: any) => {
+  const filteredExpenses = (expenses || [])?.filter((expense: any) => {
     const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
     const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
     const matchesSearch = searchTerm === "" || 
@@ -124,10 +124,10 @@ export default function FinanceExpenses() {
     }
   };
 
-  const totalExpenses = expenses?.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0) || 0;
-  const approvedExpenses = expenses?.filter((e: any) => e.status === 'approved').length || 0;
-  const pendingExpenses = expenses?.filter((e: any) => e.status === 'recorded').length || 0;
-  const thisMonthExpenses = expenses?.filter((e: any) => {
+  const totalExpenses = (expenses || [])?.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0) || 0;
+  const approvedExpenses = (expenses || [])?.filter((e: any) => e.status === 'approved').length || 0;
+  const pendingExpenses = (expenses || [])?.filter((e: any) => e.status === 'recorded').length || 0;
+  const thisMonthExpenses = (expenses || [])?.filter((e: any) => {
     const expenseDate = new Date(e.date);
     const now = new Date();
     return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
@@ -237,7 +237,7 @@ export default function FinanceExpenses() {
                       <SelectValue placeholder="Selecione o fornecedor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {vendors?.map((vendor: any) => (
+                      {(vendors || [])?.map((vendor: any) => (
                         <SelectItem key={vendor.id} value={vendor.id}>
                           {vendor.name}
                         </SelectItem>
@@ -256,7 +256,7 @@ export default function FinanceExpenses() {
                       <SelectValue placeholder="Selecione o pedido" />
                     </SelectTrigger>
                     <SelectContent>
-                      {orders?.map((order: any) => (
+                      {(orders || [])?.map((order: any) => (
                         <SelectItem key={order.id} value={order.id}>
                           {order.orderNumber}
                         </SelectItem>
