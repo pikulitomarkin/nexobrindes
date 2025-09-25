@@ -49,6 +49,7 @@ import FinanceReconciliation from "@/pages/finance/reconciliation";
 import FinanceReceivables from "@/pages/finance/receivables";
 import FinanceExpenses from "@/pages/finance/expenses";
 import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
+import FinancePayables from "@/pages/finance/payables";
 
 function App() {
   return (
@@ -273,45 +274,41 @@ function App() {
           </Route>
 
           {/* Finance Routes - Accessible by admin and finance roles */}
-          <Route path="/finance/payments">
+          <Route path="/finance/payments" element={
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinancePayments />
-              </MainLayout>
+              <FinancePayments />
             </ProtectedRoute>
-          </Route>
+          } />
 
-          <Route path="/finance/reconciliation">
+          <Route path="/finance/reconciliation" element={
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceReconciliation />
-              </MainLayout>
+              <FinanceReconciliation />
             </ProtectedRoute>
-          </Route>
+          } />
 
-          <Route path="/finance/receivables">
+          <Route path="/finance/receivables" element={
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceReceivables />
-              </MainLayout>
+              <FinanceReceivables />
             </ProtectedRoute>
-          </Route>
+          } />
 
-          <Route path="/finance/expenses">
+          <Route path="/finance/payables" element={
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceExpenses />
-              </MainLayout>
+              <FinancePayables />
             </ProtectedRoute>
-          </Route>
+          } />
 
-          <Route path="/finance/commission-payouts">
+          <Route path="/finance/expenses" element={
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceCommissionPayouts />
-              </MainLayout>
+              <FinanceExpenses />
             </ProtectedRoute>
-          </Route>
+          } />
+
+          <Route path="/finance/commission-payouts" element={
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
+              <FinanceCommissionPayouts />
+            </ProtectedRoute>
+          } />
 
           <Route component={NotFound} />
         </Switch>

@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut, Target, Award, Clock, Star, Briefcase } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut, Target, Award, Clock, Star, Briefcase, Receipt } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  
+
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -83,13 +83,15 @@ export default function Dashboard() {
         { href: "/partner/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
       ];
     } else if (user.role === "finance") {
-      return [
+      const financeLinks = [
         { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber", color: "text-blue-600" },
-        { href: "/finance/expenses", icon: TrendingDown, label: "Notas de Despesas", color: "text-red-600" },
+        { href: "/finance/payables", icon: TrendingDown, label: "Contas a Pagar", color: "text-red-600" },
+        { href: "/finance/expenses", icon: Receipt, label: "Notas de Despesas", color: "text-orange-600" },
         { href: "/finance/commission-payouts", icon: TrendingUp, label: "Pagamentos de Comissão", color: "text-green-600" },
-        { href: "/finance/reconciliation", icon: BarChart3, label: "Conciliação Bancária", color: "text-purple-600" },
-        { href: "/finance/payments", icon: Package, label: "Pagamentos", color: "text-orange-600" },
+        { href: "/finance/payments", icon: Package, label: "Pagamentos", color: "text-purple-600" },
+        { href: "/finance/reconciliation", icon: BarChart3, label: "Conciliação Bancária", color: "text-indigo-600" },
       ];
+      return financeLinks;
     }
     return [];
   };
@@ -347,7 +349,7 @@ export default function Dashboard() {
     // Filter orders for this vendor
     const vendorOrders = orders?.filter((order: any) => order.vendorId === user.id) || [];
     const pendingOrders = vendorOrders.filter((order: any) => order.status === 'pending' || order.status === 'confirmed');
-    
+
     // Calculate vendor-specific stats
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
@@ -355,7 +357,7 @@ export default function Dashboard() {
       const orderDate = new Date(order.createdAt);
       return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
     });
-    
+
     const monthlyRevenue = monthlyOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalValue || 0), 0);
     const totalCommissions = vendorCommissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
     const pendingCommissions = vendorCommissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
@@ -555,7 +557,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3">
                   {vendorCommissions.slice(0, 3).map((commission: any) => (
                     <div key={commission.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-emerald-50 dark:hover:bg-gray-800 transition-colors">

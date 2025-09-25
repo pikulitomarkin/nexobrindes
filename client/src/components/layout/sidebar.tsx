@@ -309,6 +309,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             isActive={location === "/finance/receivables"}
           />
           <SidebarItem 
+            icon={TrendingDown} 
+            label="Contas a Pagar" 
+            href="/finance/payables"
+            isActive={location === "/finance/payables"}
+          />
+          <SidebarItem 
             icon={Receipt} 
             label="Notas de Despesas" 
             href="/finance/expenses"
