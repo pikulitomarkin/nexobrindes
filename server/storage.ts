@@ -30,7 +30,20 @@ import {
   type ShippingMethod,
   type InsertShippingMethod,
   type BudgetPaymentInfo,
-  type InsertBudgetPaymentInfo
+  type InsertBudgetPaymentInfo,
+  // Financial module types
+  type AccountsReceivable,
+  type InsertAccountsReceivable,
+  type PaymentAllocation,
+  type InsertPaymentAllocation,
+  type BankImport,
+  type InsertBankImport,
+  type BankTransaction,
+  type InsertBankTransaction,
+  type ExpenseNote,
+  type InsertExpenseNote,
+  type CommissionPayout,
+  type InsertCommissionPayout
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -159,6 +172,43 @@ export interface IStorage {
   getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined>;
   createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo>;
   updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo>;
+
+  // Financial module - Accounts Receivable
+  getAccountsReceivable(): Promise<AccountsReceivable[]>;
+  getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]>;
+  getAccountsReceivableByClient(clientId: string): Promise<AccountsReceivable[]>;
+  getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]>;
+  createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable>;
+  updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined>;
+  
+  // Financial module - Payment Allocations
+  getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]>;
+  getPaymentAllocationsByReceivable(receivableId: string): Promise<PaymentAllocation[]>;
+  createPaymentAllocation(data: InsertPaymentAllocation): Promise<PaymentAllocation>;
+  allocatePaymentToReceivable(paymentId: string, receivableId: string, amount: string): Promise<PaymentAllocation>;
+
+  // Financial module - Bank Imports & Transactions
+  getBankImports(): Promise<BankImport[]>;
+  getBankImport(id: string): Promise<BankImport | undefined>;
+  createBankImport(data: InsertBankImport): Promise<BankImport>;
+  getBankTransactionsByImport(importId: string): Promise<BankTransaction[]>;
+  getBankTransactions(): Promise<BankTransaction[]>;
+  createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction>;
+  updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined>;
+  matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined>;
+
+  // Financial module - Expense Notes
+  getExpenseNotes(): Promise<ExpenseNote[]>;
+  getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]>;
+  getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]>;
+  createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote>;
+  updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined>;
+  
+  // Financial module - Commission Payouts
+  getCommissionPayouts(): Promise<CommissionPayout[]>;
+  getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]>;
+  createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout>;
+  updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -250,6 +300,14 @@ export class MemStorage implements IStorage {
   // Budget Payment Info
   private budgetPaymentInfo: BudgetPaymentInfo[] = [];
 
+  // Financial module storage
+  private accountsReceivable: Map<string, AccountsReceivable>;
+  private paymentAllocations: Map<string, PaymentAllocation>;
+  private bankImports: Map<string, BankImport>;
+  private bankTransactions: Map<string, BankTransaction>;
+  private expenseNotes: Map<string, ExpenseNote>;
+  private commissionPayouts: Map<string, CommissionPayout>;
+
   constructor() {
     this.users = new Map();
     this.clients = new Map();
@@ -263,6 +321,14 @@ export class MemStorage implements IStorage {
     this.budgets = new Map();
     this.budgetItems = []; // Initialize as empty array
     this.budgetPhotos = []; // Initialize as empty array
+
+    // Initialize financial module Maps
+    this.accountsReceivable = new Map();
+    this.paymentAllocations = new Map();
+    this.bankImports = new Map();
+    this.bankTransactions = new Map();
+    this.expenseNotes = new Map();
+    this.commissionPayouts = new Map();
 
     // Initialize commission settings
     this.commissionSettings = {
@@ -1709,6 +1775,218 @@ export class MemStorage implements IStorage {
       default:
         return [];
     }
+  }
+
+  // Financial module methods - Accounts Receivable
+  async getAccountsReceivable(): Promise<AccountsReceivable[]> {
+    return Array.from(this.accountsReceivable.values());
+  }
+
+  async getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]> {
+    return Array.from(this.accountsReceivable.values()).filter(ar => ar.orderId === orderId);
+  }
+
+  async getAccountsReceivableByClient(clientId: string): Promise<AccountsReceivable[]> {
+    return Array.from(this.accountsReceivable.values()).filter(ar => ar.clientId === clientId);
+  }
+
+  async getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]> {
+    return Array.from(this.accountsReceivable.values()).filter(ar => ar.vendorId === vendorId);
+  }
+
+  async createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable> {
+    const newAR: AccountsReceivable = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.accountsReceivable.set(newAR.id, newAR);
+    return newAR;
+  }
+
+  async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
+    const existing = this.accountsReceivable.get(id);
+    if (!existing) return undefined;
+    
+    const updated: AccountsReceivable = {
+      ...existing,
+      ...data,
+      updatedAt: new Date()
+    };
+    this.accountsReceivable.set(id, updated);
+    return updated;
+  }
+
+  // Financial module methods - Payment Allocations
+  async getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]> {
+    return Array.from(this.paymentAllocations.values()).filter(pa => pa.paymentId === paymentId);
+  }
+
+  async getPaymentAllocationsByReceivable(receivableId: string): Promise<PaymentAllocation[]> {
+    return Array.from(this.paymentAllocations.values()).filter(pa => pa.receivableId === receivableId);
+  }
+
+  async createPaymentAllocation(data: InsertPaymentAllocation): Promise<PaymentAllocation> {
+    const newPA: PaymentAllocation = {
+      id: randomUUID(),
+      ...data,
+      allocatedAt: new Date()
+    };
+    this.paymentAllocations.set(newPA.id, newPA);
+    return newPA;
+  }
+
+  async allocatePaymentToReceivable(paymentId: string, receivableId: string, amount: string): Promise<PaymentAllocation> {
+    const allocation = await this.createPaymentAllocation({
+      paymentId,
+      receivableId,
+      amount
+    });
+
+    // Update receivable amount
+    const receivable = this.accountsReceivable.get(receivableId);
+    if (receivable) {
+      const currentReceived = parseFloat(receivable.receivedAmount);
+      const allocationAmount = parseFloat(amount);
+      const newReceived = currentReceived + allocationAmount;
+      
+      let status = receivable.status;
+      if (newReceived >= parseFloat(receivable.amount)) {
+        status = 'paid';
+      } else if (newReceived > 0) {
+        status = 'partial';
+      }
+
+      await this.updateAccountsReceivable(receivableId, {
+        receivedAmount: newReceived.toFixed(2),
+        status
+      });
+    }
+
+    return allocation;
+  }
+
+  // Financial module methods - Bank Imports & Transactions
+  async getBankImports(): Promise<BankImport[]> {
+    return Array.from(this.bankImports.values());
+  }
+
+  async getBankImport(id: string): Promise<BankImport | undefined> {
+    return this.bankImports.get(id);
+  }
+
+  async createBankImport(data: InsertBankImport): Promise<BankImport> {
+    const newBI: BankImport = {
+      id: randomUUID(),
+      ...data,
+      uploadedAt: new Date()
+    };
+    this.bankImports.set(newBI.id, newBI);
+    return newBI;
+  }
+
+  async getBankTransactionsByImport(importId: string): Promise<BankTransaction[]> {
+    return Array.from(this.bankTransactions.values()).filter(bt => bt.importId === importId);
+  }
+
+  async getBankTransactions(): Promise<BankTransaction[]> {
+    return Array.from(this.bankTransactions.values());
+  }
+
+  async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
+    const newBT: BankTransaction = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date()
+    };
+    this.bankTransactions.set(newBT.id, newBT);
+    return newBT;
+  }
+
+  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined> {
+    const existing = this.bankTransactions.get(id);
+    if (!existing) return undefined;
+    
+    const updated: BankTransaction = {
+      ...existing,
+      ...data
+    };
+    this.bankTransactions.set(id, updated);
+    return updated;
+  }
+
+  async matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined> {
+    return await this.updateBankTransaction(transactionId, {
+      status: 'matched',
+      matchedReceivableId: receivableId
+    });
+  }
+
+  // Financial module methods - Expense Notes
+  async getExpenseNotes(): Promise<ExpenseNote[]> {
+    return Array.from(this.expenseNotes.values());
+  }
+
+  async getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]> {
+    return Array.from(this.expenseNotes.values()).filter(en => en.vendorId === vendorId);
+  }
+
+  async getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]> {
+    return Array.from(this.expenseNotes.values()).filter(en => en.orderId === orderId);
+  }
+
+  async createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote> {
+    const newEN: ExpenseNote = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date()
+    };
+    this.expenseNotes.set(newEN.id, newEN);
+    return newEN;
+  }
+
+  async updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined> {
+    const existing = this.expenseNotes.get(id);
+    if (!existing) return undefined;
+    
+    const updated: ExpenseNote = {
+      ...existing,
+      ...data
+    };
+    this.expenseNotes.set(id, updated);
+    return updated;
+  }
+
+  // Financial module methods - Commission Payouts
+  async getCommissionPayouts(): Promise<CommissionPayout[]> {
+    return Array.from(this.commissionPayouts.values());
+  }
+
+  async getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]> {
+    return Array.from(this.commissionPayouts.values()).filter(cp => cp.userId === userId && cp.type === type);
+  }
+
+  async createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout> {
+    const newCP: CommissionPayout = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date()
+    };
+    this.commissionPayouts.set(newCP.id, newCP);
+    return newCP;
+  }
+
+  async updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined> {
+    const existing = this.commissionPayouts.get(id);
+    if (!existing) return undefined;
+    
+    const updated: CommissionPayout = {
+      ...existing,
+      ...data
+    };
+    this.commissionPayouts.set(id, updated);
+    return updated;
   }
 }
 
