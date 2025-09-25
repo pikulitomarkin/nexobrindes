@@ -56,7 +56,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/clients", icon: Users, label: "Clientes" },
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
-          { href: "/finance/receivables", icon: CreditCard, label: "Módulo Financeiro" },
+          { href: "/finance/receivables", icon: DollarSign, label: "Módulo Financeiro" },
         ];
       case "partner":
         return [

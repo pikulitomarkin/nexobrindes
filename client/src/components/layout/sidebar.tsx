@@ -59,7 +59,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     { id: "vendor", label: "Vendedor", icon: ShoppingCart },
     { id: "client", label: "Painel de Clientes", icon: Users },
     { id: "producer", label: "Produtor Externo", icon: Factory },
-    { id: "finance", label: "Financeiro", icon: TrendingUp },
+    { id: "finance", label: "Módulo Financeiro", icon: DollarSign },
   ];
 
   // Assuming userRole is available, for example, from context or props
@@ -300,7 +300,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
         <nav className="mt-8">
           <div className="px-6 mb-4">
             <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Módulo Financeiro
+              Controle Financeiro
             </p>
           </div>
           <SidebarItem 
@@ -335,7 +335,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
           />
           <SidebarItem 
             icon={CreditCard} 
-            label="Pagamentos" 
+            label="Histórico de Pagamentos" 
             href="/finance/payments"
             isActive={location === "/finance/payments"}
           />
