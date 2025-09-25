@@ -2607,6 +2607,219 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // ===== FINANCIAL MODULE ROUTES =====
+  
+  // Accounts Receivable routes
+  app.get("/api/finance/receivables", async (req, res) => {
+    try {
+      const receivables = await storage.getAccountsReceivable();
+      res.json(receivables);
+    } catch (error) {
+      console.error("Failed to fetch receivables:", error);
+      res.status(500).json({ error: "Failed to fetch receivables" });
+    }
+  });
+
+  app.get("/api/finance/receivables/by-order/:orderId", async (req, res) => {
+    try {
+      const receivables = await storage.getAccountsReceivableByOrder(req.params.orderId);
+      res.json(receivables);
+    } catch (error) {
+      console.error("Failed to fetch receivables by order:", error);
+      res.status(500).json({ error: "Failed to fetch receivables by order" });
+    }
+  });
+
+  app.post("/api/finance/receivables", async (req, res) => {
+    try {
+      const receivable = await storage.createAccountsReceivable(req.body);
+      res.json(receivable);
+    } catch (error) {
+      console.error("Failed to create receivable:", error);
+      res.status(500).json({ error: "Failed to create receivable" });
+    }
+  });
+
+  app.patch("/api/finance/receivables/:id", async (req, res) => {
+    try {
+      const receivable = await storage.updateAccountsReceivable(req.params.id, req.body);
+      if (!receivable) {
+        return res.status(404).json({ error: "Receivable not found" });
+      }
+      res.json(receivable);
+    } catch (error) {
+      console.error("Failed to update receivable:", error);
+      res.status(500).json({ error: "Failed to update receivable" });
+    }
+  });
+
+  // Payment allocation routes
+  app.post("/api/finance/receivables/:id/allocate-payment", async (req, res) => {
+    try {
+      const { paymentId, amount } = req.body;
+      const allocation = await storage.allocatePaymentToReceivable(paymentId, req.params.id, amount);
+      res.json(allocation);
+    } catch (error) {
+      console.error("Failed to allocate payment:", error);
+      res.status(500).json({ error: "Failed to allocate payment" });
+    }
+  });
+
+  // Expense Notes routes
+  app.get("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenseNotes();
+      res.json(expenses);
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.post("/api/finance/expenses", async (req, res) => {
+    try {
+      const expense = await storage.createExpenseNote(req.body);
+      res.json(expense);
+    } catch (error) {
+      console.error("Failed to create expense:", error);
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.patch("/api/finance/expenses/:id", async (req, res) => {
+    try {
+      const expense = await storage.updateExpenseNote(req.params.id, req.body);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Failed to update expense:", error);
+      res.status(500).json({ error: "Failed to update expense" });
+    }
+  });
+
+  // Commission Payouts routes
+  app.get("/api/finance/commission-payouts", async (req, res) => {
+    try {
+      const payouts = await storage.getCommissionPayouts();
+      res.json(payouts);
+    } catch (error) {
+      console.error("Failed to fetch commission payouts:", error);
+      res.status(500).json({ error: "Failed to fetch commission payouts" });
+    }
+  });
+
+  app.get("/api/finance/commission-payouts/user/:userId/:type", async (req, res) => {
+    try {
+      const { userId, type } = req.params;
+      const payouts = await storage.getCommissionPayoutsByUser(userId, type as 'vendor' | 'partner');
+      res.json(payouts);
+    } catch (error) {
+      console.error("Failed to fetch user commission payouts:", error);
+      res.status(500).json({ error: "Failed to fetch user commission payouts" });
+    }
+  });
+
+  app.post("/api/finance/commission-payouts", async (req, res) => {
+    try {
+      const payout = await storage.createCommissionPayout(req.body);
+      res.json(payout);
+    } catch (error) {
+      console.error("Failed to create commission payout:", error);
+      res.status(500).json({ error: "Failed to create commission payout" });
+    }
+  });
+
+  app.patch("/api/finance/commission-payouts/:id", async (req, res) => {
+    try {
+      const payout = await storage.updateCommissionPayout(req.params.id, req.body);
+      if (!payout) {
+        return res.status(404).json({ error: "Commission payout not found" });
+      }
+      res.json(payout);
+    } catch (error) {
+      console.error("Failed to update commission payout:", error);
+      res.status(500).json({ error: "Failed to update commission payout" });
+    }
+  });
+
+  // Bank Imports & Transactions routes
+  app.get("/api/finance/bank-imports", async (req, res) => {
+    try {
+      const imports = await storage.getBankImports();
+      res.json(imports);
+    } catch (error) {
+      console.error("Failed to fetch bank imports:", error);
+      res.status(500).json({ error: "Failed to fetch bank imports" });
+    }
+  });
+
+  app.post("/api/finance/bank-imports", async (req, res) => {
+    try {
+      const bankImport = await storage.createBankImport(req.body);
+      res.json(bankImport);
+    } catch (error) {
+      console.error("Failed to create bank import:", error);
+      res.status(500).json({ error: "Failed to create bank import" });
+    }
+  });
+
+  app.get("/api/finance/bank-imports/:id/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getBankTransactionsByImport(req.params.id);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to fetch bank transactions:", error);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  app.get("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getBankTransactions();
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to fetch bank transactions:", error);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  app.post("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      const transaction = await storage.createBankTransaction(req.body);
+      res.json(transaction);
+    } catch (error) {
+      console.error("Failed to create bank transaction:", error);
+      res.status(500).json({ error: "Failed to create bank transaction" });
+    }
+  });
+
+  app.patch("/api/finance/bank-transactions/:id/match", async (req, res) => {
+    try {
+      const { receivableId } = req.body;
+      const transaction = await storage.matchTransactionToReceivable(req.params.id, receivableId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      console.error("Failed to match transaction:", error);
+      res.status(500).json({ error: "Failed to match transaction" });
+    }
+  });
+
+  // OFX Upload route (placeholder for file upload functionality)
+  app.post("/api/finance/ofx/upload", async (req, res) => {
+    try {
+      // TODO: Implement OFX file parsing
+      res.json({ message: "OFX upload endpoint - to be implemented" });
+    } catch (error) {
+      console.error("Failed to process OFX upload:", error);
+      res.status(500).json({ error: "Failed to process OFX upload" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
