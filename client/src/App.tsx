@@ -274,41 +274,53 @@ function App() {
           </Route>
 
           {/* Finance Routes - Accessible by admin and finance roles */}
-          <Route path="/finance/payments" element={
+          <Route path="/finance/payments">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinancePayments />
+              <MainLayout>
+                <FinancePayments />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
-          <Route path="/finance/reconciliation" element={
+          <Route path="/finance/reconciliation">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinanceReconciliation />
+              <MainLayout>
+                <FinanceReconciliation />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
-          <Route path="/finance/receivables" element={
+          <Route path="/finance/receivables">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinanceReceivables />
+              <MainLayout>
+                <FinanceReceivables />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
-          <Route path="/finance/payables" element={
+          <Route path="/finance/payables">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinancePayables />
+              <MainLayout>
+                <FinancePayables />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
-          <Route path="/finance/expenses" element={
+          <Route path="/finance/expenses">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinanceExpenses />
+              <MainLayout>
+                <FinanceExpenses />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
-          <Route path="/finance/commission-payouts" element={
+          <Route path="/finance/commission-payouts">
             <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <FinanceCommissionPayouts />
+              <MainLayout>
+                <FinanceCommissionPayouts />
+              </MainLayout>
             </ProtectedRoute>
-          } />
+          </Route>
 
           <Route component={NotFound} />
         </Switch>

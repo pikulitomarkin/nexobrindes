@@ -4,6 +4,7 @@ import {
   User, 
   Factory, 
   TrendingUp,
+  TrendingDown,
   Package,
   LayoutDashboard,
   ShoppingCart,

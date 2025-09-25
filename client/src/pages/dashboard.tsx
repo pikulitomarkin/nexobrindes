@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut, Target, Award, Clock, Star, Briefcase, Receipt } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, TrendingDown, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut, Target, Award, Clock, Star, Briefcase, Receipt } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
