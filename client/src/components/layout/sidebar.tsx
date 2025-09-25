@@ -161,7 +161,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                   <SidebarMenuButton asChild>
                     <Link href="/admin/finance">
                       <DollarSign className="h-4 w-4" />
-                      <span>Financeiro</span>
+                      <span>Visão Financeira</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -291,6 +291,46 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             label="Ordens" 
             href="/producer/orders"
             isActive={location === "/producer/orders"}
+          />
+        </nav>
+      )}
+
+      {activePanel === "finance" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Módulo Financeiro
+            </p>
+          </div>
+          <SidebarItem 
+            icon={DollarSign} 
+            label="Contas a Receber" 
+            href="/finance/receivables"
+            isActive={location === "/finance/receivables"}
+          />
+          <SidebarItem 
+            icon={Receipt} 
+            label="Notas de Despesas" 
+            href="/finance/expenses"
+            isActive={location === "/finance/expenses"}
+          />
+          <SidebarItem 
+            icon={TrendingUp} 
+            label="Pagamentos de Comissão" 
+            href="/finance/commission-payouts"
+            isActive={location === "/finance/commission-payouts"}
+          />
+          <SidebarItem 
+            icon={Calculator} 
+            label="Conciliação Bancária" 
+            href="/finance/reconciliation"
+            isActive={location === "/finance/reconciliation"}
+          />
+          <SidebarItem 
+            icon={CreditCard} 
+            label="Pagamentos" 
+            href="/finance/payments"
+            isActive={location === "/finance/payments"}
           />
         </nav>
       )}

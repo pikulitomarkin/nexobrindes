@@ -56,6 +56,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/clients", icon: Users, label: "Clientes" },
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+          { href: "/finance/receivables", icon: CreditCard, label: "Módulo Financeiro" },
         ];
       case "partner":
         return [
@@ -90,8 +91,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "finance":
         return [
           { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/finance/payments", icon: CreditCard, label: "Pagamentos" },
-          { href: "/finance/reconciliation", icon: FileText, label: "Conciliação" },
+          { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber" },
+          { href: "/finance/expenses", icon: FileText, label: "Notas de Despesas" },
+          { href: "/finance/commission-payouts", icon: Users, label: "Pagamentos de Comissão" },
+          { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
+          { href: "/finance/payments", icon: Package, label: "Pagamentos" },
         ];
       default:
         return [];
