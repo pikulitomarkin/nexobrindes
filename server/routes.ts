@@ -2809,16 +2809,142 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // OFX Upload route (placeholder for file upload functionality)
-  app.post("/api/finance/ofx/upload", async (req, res) => {
+  // OFX Import route with file processing
+  app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
     try {
-      // TODO: Implement OFX file parsing
-      res.json({ message: "OFX upload endpoint - to be implemented" });
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const { mimetype, size, buffer, originalname } = req.file;
+      
+      // Validate file type
+      if (!originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: "Apenas arquivos OFX são permitidos" });
+      }
+
+      if (size > 10 * 1024 * 1024) { // 10MB limit
+        return res.status(400).json({ error: "Arquivo muito grande. Limite de 10MB." });
+      }
+
+      // Parse OFX content (simplified parsing)
+      const ofxContent = buffer.toString('utf-8');
+      
+      // Create bank import record
+      const bankImport = await storage.createBankImport({
+        fileName: originalname,
+        fileSize: size,
+        status: 'processing',
+        importedAt: new Date(),
+        transactionCount: 0
+      });
+
+      // Extract transactions from OFX (simplified extraction)
+      const transactions = extractOFXTransactions(ofxContent);
+      let importedCount = 0;
+
+      // Process each transaction
+      for (const transaction of transactions) {
+        try {
+          await storage.createBankTransaction({
+            importId: bankImport.id,
+            transactionId: transaction.id,
+            date: transaction.date,
+            amount: transaction.amount,
+            description: transaction.description,
+            type: transaction.type,
+            isMatched: false
+          });
+          importedCount++;
+        } catch (error) {
+          console.error(`Error importing transaction ${transaction.id}:`, error);
+        }
+      }
+
+      // Update import record
+      await storage.updateBankImport(bankImport.id, {
+        status: 'completed',
+        transactionCount: importedCount
+      });
+
+      res.json({
+        success: true,
+        importId: bankImport.id,
+        transactionsImported: importedCount,
+        message: `${importedCount} transações importadas com sucesso`
+      });
+
     } catch (error) {
-      console.error("Failed to process OFX upload:", error);
-      res.status(500).json({ error: "Failed to process OFX upload" });
+      console.error("OFX import error:", error);
+      res.status(500).json({ 
+        error: "Erro ao processar arquivo OFX",
+        details: (error as Error).message 
+      });
     }
   });
+
+  // Get reconciliation data
+  app.get("/api/finance/reconciliation", async (req, res) => {
+    try {
+      const transactions = await storage.getBankTransactions();
+      const expenses = await storage.getExpenseNotes();
+      
+      const reconciled = transactions.filter(t => t.isMatched).length;
+      const pending = transactions.filter(t => !t.isMatched).length;
+      const totalValue = transactions
+        .filter(t => parseFloat(t.amount) > 0)
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+      res.json({
+        reconciled,
+        pending,
+        totalValue,
+        totalTransactions: transactions.length,
+        totalExpenses: expenses.length
+      });
+    } catch (error) {
+      console.error("Failed to fetch reconciliation data:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation data" });
+    }
+  });
+
+  // Helper function to extract transactions from OFX content
+  function extractOFXTransactions(ofxContent: string) {
+    const transactions = [];
+    
+    // Simple regex-based OFX parsing (in production, use a proper OFX parser)
+    const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
+    const matches = ofxContent.match(transactionRegex);
+    
+    if (matches) {
+      matches.forEach((match, index) => {
+        const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
+        const dtPosted = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
+        const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
+        const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${index}`;
+        const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
+        
+        // Parse date (format: YYYYMMDDHHMMSS)
+        let transactionDate = new Date();
+        if (dtPosted && dtPosted.length >= 8) {
+          const year = parseInt(dtPosted.substring(0, 4));
+          const month = parseInt(dtPosted.substring(4, 6)) - 1; // Month is 0-based
+          const day = parseInt(dtPosted.substring(6, 8));
+          transactionDate = new Date(year, month, day);
+        }
+        
+        transactions.push({
+          id: fitId,
+          date: transactionDate,
+          amount: trnAmt,
+          description: memo,
+          type: trnType === 'CREDIT' ? 'credit' : 'debit'
+        });
+      });
+    }
+    
+    return transactions;
+  }
 
   const httpServer = createServer(app);
   return httpServer;

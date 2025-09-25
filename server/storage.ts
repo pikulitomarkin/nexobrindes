@@ -180,7 +180,7 @@ export interface IStorage {
   getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]>;
   createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable>;
   updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined>;
-  
+
   // Financial module - Payment Allocations
   getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]>;
   getPaymentAllocationsByReceivable(receivableId: string): Promise<PaymentAllocation[]>;
@@ -203,7 +203,7 @@ export interface IStorage {
   getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]>;
   createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote>;
   updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined>;
-  
+
   // Financial module - Commission Payouts
   getCommissionPayouts(): Promise<CommissionPayout[]>;
   getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]>;
@@ -225,6 +225,20 @@ export class MemStorage implements IStorage {
   private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
   private commissionSettings: CommissionSettings;
+
+  // Financial module storage
+  private accountsReceivable: Map<string, AccountsReceivable>;
+  private paymentAllocations: Map<string, PaymentAllocation>;
+  private bankImports: Map<string, BankImport>;
+  private bankTransactions: Map<string, BankTransaction>;
+  private expenseNotes: Map<string, ExpenseNote>;
+  private commissionPayouts: Map<string, CommissionPayout>;
+
+  private mockData = {
+    bankImports: [] as BankImport[],
+    bankTransactions: [] as BankTransaction[],
+    expenses: [] as ExpenseNote[]
+  };
 
   // Payment Methods
   private paymentMethods: PaymentMethod[] = [
@@ -299,14 +313,6 @@ export class MemStorage implements IStorage {
 
   // Budget Payment Info
   private budgetPaymentInfo: BudgetPaymentInfo[] = [];
-
-  // Financial module storage
-  private accountsReceivable: Map<string, AccountsReceivable>;
-  private paymentAllocations: Map<string, PaymentAllocation>;
-  private bankImports: Map<string, BankImport>;
-  private bankTransactions: Map<string, BankTransaction>;
-  private expenseNotes: Map<string, ExpenseNote>;
-  private commissionPayouts: Map<string, CommissionPayout>;
 
   constructor() {
     this.users = new Map();
@@ -1808,7 +1814,7 @@ export class MemStorage implements IStorage {
   async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
     const existing = this.accountsReceivable.get(id);
     if (!existing) return undefined;
-    
+
     const updated: AccountsReceivable = {
       ...existing,
       ...data,
@@ -1850,7 +1856,7 @@ export class MemStorage implements IStorage {
       const currentReceived = parseFloat(receivable.receivedAmount);
       const allocationAmount = parseFloat(amount);
       const newReceived = currentReceived + allocationAmount;
-      
+
       let status = receivable.status;
       if (newReceived >= parseFloat(receivable.amount)) {
         status = 'paid';
@@ -1869,92 +1875,109 @@ export class MemStorage implements IStorage {
 
   // Financial module methods - Bank Imports & Transactions
   async getBankImports(): Promise<BankImport[]> {
-    return Array.from(this.bankImports.values());
+    return this.mockData.bankImports || [];
   }
 
   async getBankImport(id: string): Promise<BankImport | undefined> {
-    return this.bankImports.get(id);
+    return this.mockData.bankImports.find(imp => imp.id === id);
   }
 
   async createBankImport(data: InsertBankImport): Promise<BankImport> {
-    const newBI: BankImport = {
-      id: randomUUID(),
+    const id = `import-${Date.now()}`;
+    const bankImport: BankImport = {
+      id,
       ...data,
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
+      updatedAt: new Date()
     };
-    this.bankImports.set(newBI.id, newBI);
-    return newBI;
+    this.mockData.bankImports.push(bankImport);
+    return bankImport;
   }
 
   async getBankTransactionsByImport(importId: string): Promise<BankTransaction[]> {
-    return Array.from(this.bankTransactions.values()).filter(bt => bt.importId === importId);
+    return this.mockData.bankTransactions.filter(txn => txn.importId === importId) || [];
   }
 
   async getBankTransactions(): Promise<BankTransaction[]> {
-    return Array.from(this.bankTransactions.values());
+    return this.mockData.bankTransactions || [];
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
-    const newBT: BankTransaction = {
-      id: randomUUID(),
+    const id = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const transaction: BankTransaction = {
+      id,
       ...data,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.bankTransactions.set(newBT.id, newBT);
-    return newBT;
+    this.mockData.bankTransactions.push(transaction);
+    return transaction;
   }
 
   async updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined> {
-    const existing = this.bankTransactions.get(id);
+    const existing = this.mockData.bankTransactions.find(txn => txn.id === id);
     if (!existing) return undefined;
-    
+
     const updated: BankTransaction = {
       ...existing,
-      ...data
+      ...data,
+      updatedAt: new Date()
     };
-    this.bankTransactions.set(id, updated);
+
+    const index = this.mockData.bankTransactions.findIndex(txn => txn.id === id);
+    if (index !== -1) {
+      this.mockData.bankTransactions[index] = updated;
+    }
     return updated;
   }
 
   async matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined> {
     return await this.updateBankTransaction(transactionId, {
       status: 'matched',
-      matchedReceivableId: receivableId
+      matchedReceivableId: receivableId,
+      matchedAt: new Date()
     });
   }
 
   // Financial module methods - Expense Notes
   async getExpenseNotes(): Promise<ExpenseNote[]> {
-    return Array.from(this.expenseNotes.values());
+    return this.mockData.expenses || [];
   }
 
   async getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]> {
-    return Array.from(this.expenseNotes.values()).filter(en => en.vendorId === vendorId);
+    return (this.mockData.expenses || []).filter(en => en.vendorId === vendorId);
   }
 
   async getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]> {
-    return Array.from(this.expenseNotes.values()).filter(en => en.orderId === orderId);
+    return (this.mockData.expenses || []).filter(en => en.orderId === orderId);
   }
 
   async createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote> {
-    const newEN: ExpenseNote = {
-      id: randomUUID(),
+    const id = `expense-${Date.now()}`;
+    const expense: ExpenseNote = {
+      id,
       ...data,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.expenseNotes.set(newEN.id, newEN);
-    return newEN;
+    this.mockData.expenses.push(expense);
+    return expense;
   }
 
   async updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined> {
-    const existing = this.expenseNotes.get(id);
+    const existing = this.mockData.expenses.find(exp => exp.id === id);
     if (!existing) return undefined;
-    
+
     const updated: ExpenseNote = {
       ...existing,
-      ...data
+      ...data,
+      updatedAt: new Date()
     };
-    this.expenseNotes.set(id, updated);
+
+    const index = this.mockData.expenses.findIndex(exp => exp.id === id);
+    if (index !== -1) {
+      this.mockData.expenses[index] = updated;
+    }
     return updated;
   }
 
@@ -1980,7 +2003,7 @@ export class MemStorage implements IStorage {
   async updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined> {
     const existing = this.commissionPayouts.get(id);
     if (!existing) return undefined;
-    
+
     const updated: CommissionPayout = {
       ...existing,
       ...data
