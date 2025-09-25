@@ -249,6 +249,82 @@ export const budgetPaymentInfo = pgTable("budget_payment_info", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Financial module tables
+export const accountsReceivable = pgTable("accounts_receivable", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  receivedAmount: decimal("received_amount", { precision: 10, scale: 2 }).default('0.00'),
+  status: text("status").notNull().default('open'), // 'open', 'partial', 'paid', 'overdue', 'cancelled'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const paymentAllocations = pgTable("payment_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentId: varchar("payment_id").references(() => payments.id).notNull(),
+  receivableId: varchar("receivable_id").references(() => accountsReceivable.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  allocatedAt: timestamp("allocated_at").defaultNow(),
+});
+
+export const bankImports = pgTable("bank_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  status: text("status").notNull().default('parsed'), // 'parsed', 'reconciled', 'error'
+  summary: text("summary"), // JSON string with import summary
+  errorMessage: text("error_message"),
+});
+
+export const bankTransactions = pgTable("bank_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  importId: varchar("import_id").references(() => bankImports.id).notNull(),
+  date: timestamp("date").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description").notNull(),
+  bankRef: text("bank_ref"), // Reference from bank
+  status: text("status").notNull().default('unmatched'), // 'unmatched', 'matched'
+  matchedReceivableId: varchar("matched_receivable_id").references(() => accountsReceivable.id),
+  matchedPaymentId: varchar("matched_payment_id").references(() => payments.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const expenseNotes = pgTable("expense_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: timestamp("date").notNull(),
+  category: text("category").notNull(), // 'operational', 'marketing', 'travel', 'equipment', 'other'
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  vendorId: varchar("vendor_id").references(() => users.id), // Optional - expense related to vendor
+  orderId: varchar("order_id").references(() => orders.id), // Optional - expense related to order
+  attachmentUrl: text("attachment_url"), // Receipt/invoice attachment
+  status: text("status").notNull().default('recorded'), // 'recorded', 'approved', 'reimbursed'
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const commissionPayouts = pgTable("commission_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // 'vendor', 'partner'
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'paid'
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -266,6 +342,14 @@ export const insertBudgetPhotoSchema = createInsertSchema(budgetPhotos).omit({ i
 export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertShippingMethodSchema = createInsertSchema(shippingMethods).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetPaymentInfoSchema = createInsertSchema(budgetPaymentInfo).omit({ id: true, createdAt: true });
+
+// Financial module insert schemas
+export const insertAccountsReceivableSchema = createInsertSchema(accountsReceivable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPaymentAllocationSchema = createInsertSchema(paymentAllocations).omit({ id: true, allocatedAt: true });
+export const insertBankImportSchema = createInsertSchema(bankImports).omit({ id: true, uploadedAt: true });
+export const insertBankTransactionSchema = createInsertSchema(bankTransactions).omit({ id: true, createdAt: true });
+export const insertExpenseNoteSchema = createInsertSchema(expenseNotes).omit({ id: true, createdAt: true });
+export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -300,3 +384,17 @@ export type ShippingMethod = typeof shippingMethods.$inferSelect;
 export type InsertShippingMethod = z.infer<typeof insertShippingMethodSchema>;
 export type BudgetPaymentInfo = typeof budgetPaymentInfo.$inferSelect;
 export type InsertBudgetPaymentInfo = z.infer<typeof insertBudgetPaymentInfoSchema>;
+
+// Financial module types
+export type AccountsReceivable = typeof accountsReceivable.$inferSelect;
+export type InsertAccountsReceivable = z.infer<typeof insertAccountsReceivableSchema>;
+export type PaymentAllocation = typeof paymentAllocations.$inferSelect;
+export type InsertPaymentAllocation = z.infer<typeof insertPaymentAllocationSchema>;
+export type BankImport = typeof bankImports.$inferSelect;
+export type InsertBankImport = z.infer<typeof insertBankImportSchema>;
+export type BankTransaction = typeof bankTransactions.$inferSelect;
+export type InsertBankTransaction = z.infer<typeof insertBankTransactionSchema>;
+export type ExpenseNote = typeof expenseNotes.$inferSelect;
+export type InsertExpenseNote = z.infer<typeof insertExpenseNoteSchema>;
+export type CommissionPayout = typeof commissionPayouts.$inferSelect;
+export type InsertCommissionPayout = z.infer<typeof insertCommissionPayoutSchema>;
