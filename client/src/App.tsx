@@ -46,6 +46,9 @@ import ClientOrderTimeline from "./pages/client/order-timeline";
 // Finance pages
 import FinancePayments from "@/pages/finance/payments";
 import FinanceReconciliation from "@/pages/finance/reconciliation";
+import FinanceReceivables from "@/pages/finance/receivables";
+import FinanceExpenses from "@/pages/finance/expenses";
+import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
 
 function App() {
   return (
@@ -269,9 +272,9 @@ function App() {
             </ProtectedRoute>
           </Route>
 
-          {/* Finance Routes */}
+          {/* Finance Routes - Accessible by admin and finance roles */}
           <Route path="/finance/payments">
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
               <MainLayout>
                 <FinancePayments />
               </MainLayout>
@@ -279,9 +282,33 @@ function App() {
           </Route>
 
           <Route path="/finance/reconciliation">
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
               <MainLayout>
                 <FinanceReconciliation />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/finance/receivables">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
+              <MainLayout>
+                <FinanceReceivables />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/finance/expenses">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
+              <MainLayout>
+                <FinanceExpenses />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/finance/commission-payouts">
+            <ProtectedRoute requiredRoles={["admin", "finance"]}>
+              <MainLayout>
+                <FinanceCommissionPayouts />
               </MainLayout>
             </ProtectedRoute>
           </Route>

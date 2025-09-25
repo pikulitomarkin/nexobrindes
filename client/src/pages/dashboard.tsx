@@ -82,14 +82,22 @@ export default function Dashboard() {
         { href: "/partner/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
         { href: "/partner/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
       ];
+    } else if (user.role === "finance") {
+      return [
+        { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber", color: "text-blue-600" },
+        { href: "/finance/expenses", icon: TrendingDown, label: "Notas de Despesas", color: "text-red-600" },
+        { href: "/finance/commission-payouts", icon: TrendingUp, label: "Pagamentos de Comissão", color: "text-green-600" },
+        { href: "/finance/reconciliation", icon: BarChart3, label: "Conciliação Bancária", color: "text-purple-600" },
+        { href: "/finance/payments", icon: Package, label: "Pagamentos", color: "text-orange-600" },
+      ];
     }
     return [];
   };
 
   const quickActions = getQuickActions();
 
-  // Show comprehensive dashboard for admin and partner
-  if (user.role === "admin" || user.role === "partner") {
+  // Show comprehensive dashboard for admin, partner, and finance
+  if (user.role === "admin" || user.role === "partner" || user.role === "finance") {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Header */}
@@ -97,7 +105,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {user.role === "admin" ? "Nexo Brindes - Painel Administrativo" : "Nexo Brindes - Painel do Sócio"}
+                {user.role === "admin" ? "Nexo Brindes - Painel Administrativo" : 
+                 user.role === "partner" ? "Nexo Brindes - Painel do Sócio" :
+                 user.role === "finance" ? "Nexo Brindes - Painel Financeiro" : "Nexo Brindes"}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">Bem-vindo, {user.name}</p>
             </div>

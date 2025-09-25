@@ -4,9 +4,10 @@ import { useLocation } from "wouter";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: string;
+  requiredRoles?: string[];
 }
 
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole, requiredRoles }: ProtectedRouteProps) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [, setLocation] = useLocation();
@@ -45,8 +46,13 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         // Update stored user data
         localStorage.setItem("user", JSON.stringify(data.user));
         
-        // Check if user role matches required role (but allow admin access to everything)
-        if (requiredRole && data.user.role !== requiredRole && data.user.role !== "admin") {
+        // Check if user role matches required role(s) (but allow admin access to everything)
+        const hasAccess = data.user.role === "admin" || 
+          (!requiredRole && !requiredRoles) ||
+          (requiredRole && data.user.role === requiredRole) ||
+          (requiredRoles && requiredRoles.includes(data.user.role));
+        
+        if ((requiredRole || requiredRoles) && !hasAccess) {
           // Redirect to appropriate main dashboard
           switch (data.user.role) {
             case "vendor":
@@ -60,6 +66,9 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
               break;
             case "partner":
               setLocation("/");
+              break;
+            case "finance":
+              setLocation("/finance/receivables");
               break;
             default:
               setLocation("/login");
@@ -79,7 +88,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     };
 
     checkAuth();
-  }, [requiredRole, setLocation]);
+  }, [requiredRole, requiredRoles, setLocation]);
 
   if (loading) {
     return (
