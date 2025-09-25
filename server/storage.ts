@@ -2070,6 +2070,23 @@ export class MemStorage implements IStorage {
     return bankImport;
   }
 
+  async updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined> {
+    const existing = this.mockData.bankImports.find(imp => imp.id === id);
+    if (!existing) return undefined;
+
+    const updated: BankImport = {
+      ...existing,
+      ...data,
+      updatedAt: new Date()
+    };
+
+    const index = this.mockData.bankImports.findIndex(imp => imp.id === id);
+    if (index !== -1) {
+      this.mockData.bankImports[index] = updated;
+    }
+    return updated;
+  }
+
   async getBankTransactionsByImport(importId: string): Promise<BankTransaction[]> {
     return this.mockData.bankTransactions.filter(txn => txn.importId === importId) || [];
   }
