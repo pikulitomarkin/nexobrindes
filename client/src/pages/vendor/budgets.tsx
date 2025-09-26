@@ -161,7 +161,7 @@ export default function VendorBudgets() {
   const calculateShippingCost = () => {
     // If pickup, no shipping cost
     if (vendorBudgetForm.deliveryType === "pickup") return 0;
-    
+
     if (!selectedShippingMethod) return 0;
 
     const subtotal = calculateBudgetTotal();
@@ -213,7 +213,10 @@ export default function VendorBudgets() {
         item.totalPrice = item.unitPrice * quantity;
       } else if (field === 'itemCustomizationValue') {
         item[field] = parseFloat(value) || 0;
-      } else {
+      } else if (field === 'customizationQuantity') {
+        item[field] = parseInt(value) || 0;
+      }
+       else {
         item[field] = value;
       }
 
@@ -251,7 +254,7 @@ export default function VendorBudgets() {
     const basePrice = item.unitPrice * item.quantity;
     const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) * item.quantity : 0;
     let subtotal = basePrice + customizationValue;
-    
+
     // Aplicar desconto do item
     if (item.hasItemDiscount) {
       if (item.itemDiscountType === 'percentage') {
@@ -261,7 +264,7 @@ export default function VendorBudgets() {
         subtotal = subtotal - (item.itemDiscountValue || 0);
       }
     }
-    
+
     return Math.max(0, subtotal);
   };
 
@@ -435,7 +438,7 @@ export default function VendorBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer"] });
-      
+
       // Invalidate specific client orders
       if (convertClientId) {
         queryClient.invalidateQueries({ queryKey: ["/api/orders/client", convertClientId] });
@@ -518,7 +521,8 @@ export default function VendorBudgets() {
         customizationPhoto: item.customizationPhoto || "",
         productWidth: item.productWidth || "",
         productHeight: item.productHeight || "",
-        productDepth: item.productDepth || ""
+        productDepth: item.productDepth || "",
+        customizationQuantity: item.customizationQuantity || 0
       })),
       paymentMethodId: budget.paymentMethodId || "",
       shippingMethodId: budget.shippingMethodId || "",
@@ -874,36 +878,16 @@ export default function VendorBudgets() {
                                   updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
                                 } else {
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
-                                  // Não limpar os valores manuais quando "Sem personalização" for selecionado
-                                  // updateBudgetItem(index, 'itemCustomizationValue', 0);
-                                  // updateBudgetItem(index, 'itemCustomizationDescription', '');
                                 }
                               }}
+                              customizationQuantity={item.customizationQuantity || 0}
+                              onCustomizationQuantityChange={(quantity) => updateBudgetItem(index, 'customizationQuantity', quantity)}
+                              customizationValue={item.itemCustomizationValue || 0}
+                              onCustomizationValueChange={(value) => updateBudgetItem(index, 'itemCustomizationValue', value)}
+                              customizationDescription={item.itemCustomizationDescription || ''}
+                              onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
                             />
-                            
-                            {/* Campos manuais sempre visíveis quando personalização está ativa */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label>Valor da Personalização (R$)</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={item.itemCustomizationValue || 0}
-                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', parseFloat(e.target.value) || 0)}
-                                  placeholder="0,00"
-                                />
-                              </div>
-                              <div>
-                                <Label>Descrição da Personalização</Label>
-                                <Input
-                                  value={item.itemCustomizationDescription || ''}
-                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
-                                  placeholder="Ex: Gravação, bordado, cor especial..."
-                                />
-                              </div>
-                            </div>
-                            
+
                             <div>
                               <Label>Observações Adicionais (Opcional)</Label>
                               <Input
