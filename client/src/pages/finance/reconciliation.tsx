@@ -221,6 +221,15 @@ export default function FinanceReconciliation() {
     );
   };
 
+  const getAllUnmatchedTransactions = () => {
+    if (!bankTransactions) return [];
+    
+    return bankTransactions.filter((transaction: any) => 
+      transaction.status === 'unmatched' &&
+      parseFloat(transaction.amount) > 0 // Apenas entradas (valores positivos)
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -482,7 +491,12 @@ export default function FinanceReconciliation() {
                         </p>
                         {parseFloat(order.paidValue || '0') > 0 && (
                           <p className="text-xs text-green-600">
-                            Pago: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            Entrada: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
+                        {parseFloat(order.paidValue || '0') === 0 && (
+                          <p className="text-xs text-orange-600">
+                            Aguardando entrada
                           </p>
                         )}
                       </div>
@@ -492,24 +506,29 @@ export default function FinanceReconciliation() {
                       <div className="text-sm text-gray-600">
                         {parseFloat(order.paidValue || '0') > 0 ? (
                           <span className="text-green-600">
-                            {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago
+                            {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago (entrada confirmada)
                           </span>
                         ) : (
-                          <span className="text-yellow-600">Aguardando primeiro pagamento</span>
+                          <span className="text-yellow-600">Aguardando entrada</span>
                         )}
                       </div>
                       
                       <div className="flex items-center gap-2">
                         {compatibleTransactions.length > 0 && (
                           <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                            {compatibleTransactions.length} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
+                            {compatibleTransactions.length} transação{compatibleTransactions.length !== 1 ? 'ões' : ''} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
+                          </Badge>
+                        )}
+                        {getAllUnmatchedTransactions().length > 0 && compatibleTransactions.length === 0 && (
+                          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
+                            {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
                           </Badge>
                         )}
                         <Button
                           size="sm"
                           onClick={() => openAssociationDialog(order)}
                           className="gradient-bg text-white hover:opacity-90"
-                          disabled={unreconciled.length === 0}
+                          disabled={getAllUnmatchedTransactions().length === 0}
                         >
                           <Link className="h-3 w-3 mr-1" />
                           Confirmar Pagamento
@@ -637,6 +656,20 @@ export default function FinanceReconciliation() {
                     <div className="col-span-2">
                       <span className="text-green-700 font-medium">Descrição:</span> {selectedTransaction.description}
                     </div>
+                    {selectedOrder && (
+                      <div className="col-span-2 mt-2 p-2 bg-white rounded border">
+                        <span className="text-green-700 font-medium">Correspondência:</span>
+                        <div className="text-xs mt-1">
+                          <span className="text-gray-600">Saldo devedor: </span>
+                          <span className="font-medium">R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <br />
+                          <span className="text-gray-600">Diferença: </span>
+                          <span className={`font-medium ${Math.abs(parseFloat(selectedTransaction.amount) - (parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0'))) < 1 ? 'text-green-600' : 'text-orange-600'}`}>
+                            R$ {Math.abs(parseFloat(selectedTransaction.amount) - (parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0'))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -686,12 +719,12 @@ export default function FinanceReconciliation() {
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                   <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
-                    {unreconciled.length}
+                    {getAllUnmatchedTransactions().length}
                   </span>
                   Todas as Transações Não Conciliadas
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
-                  {unreconciled.map((transaction: any) => (
+                  {getAllUnmatchedTransactions().map((transaction: any) => (
                     <div
                       key={transaction.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
