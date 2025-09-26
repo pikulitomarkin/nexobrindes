@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { useLocation } from "wouter";
+import React from "react";
 
 // Assuming Link and SidebarMenu related components are imported from a UI library
 // For demonstration, let's assume they are available or mock them if necessary.
@@ -44,16 +45,25 @@ interface SidebarProps {
   onPanelChange: (panel: string) => void;
 }
 
-// SidebarItem component
-const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
-  <a
-    href={href}
-    className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
-  >
-    <Icon className="mr-3 h-5 w-5" />
-    <span>{label}</span>
-  </a>
-);
+// SidebarItem component  
+const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => {
+  const [, navigate] = useLocation();
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(href);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
+    >
+      <Icon className="mr-3 h-5 w-5" />
+      <span>{label}</span>
+    </button>
+  );
+};
 
 export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const [location] = useLocation();
