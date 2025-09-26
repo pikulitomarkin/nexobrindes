@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Route } from "wouter";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,27 @@ import {
   Archive,
   Package
 } from "lucide-react";
+import AdminProducts from "../../pages/admin/products";
+import AdminOrders from "../../pages/admin/orders";
+import AdminBudgets from "../../pages/admin/budgets";
+import AdminSettings from "../../pages/admin/settings";
+import AdminUsers from "../../pages/admin/users";
+import AdminClients from "../../pages/admin/clients";
+import AdminVendors from "../../pages/admin/vendors";
+import AdminProducers from "../../pages/admin/producers";
+import AdminCommissionManagement from "../../pages/admin/commission-management";
+import AdminCustomizations from "../../pages/admin/customizations";
+import AdminDashboard from "../../pages/dashboards/admin-dashboard";
+
+const NotFound = () => (
+  <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+    <h1 className="text-4xl font-bold text-gray-800 mb-4">404</h1>
+    <p className="text-lg text-gray-600 mb-8">Página não encontrada.</p>
+    <Link href="/admin">
+      <Button>Voltar para o Painel</Button>
+    </Link>
+  </div>
+);
 
 export default function AdminPanel() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -179,10 +201,16 @@ export default function AdminPanel() {
                 Pedidos ({stats?.totalOrders || 0})
               </Button>
             </Link>
+            <Link href="/admin/customizations">
+              <Button variant="outline" className="w-full justify-start">
+                <Factory className="h-4 w-4 mr-2" />
+                Personalizações
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
-        
+
       </div>
 
       {/* Recent Orders Table */}
@@ -259,6 +287,18 @@ export default function AdminPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <Route path="/admin/dashboard" component={AdminDashboard} />
+      <Route path="/admin/products" component={AdminProducts} />
+      <Route path="/admin/orders" component={AdminOrders} />
+      <Route path="/admin/budgets" component={AdminBudgets} />
+      <Route path="/admin/clients" component={AdminClients} />
+      <Route path="/admin/vendors" component={AdminVendors} />
+      <Route path="/admin/producers" component={AdminProducers} />
+      <Route path="/admin/commission-management" component={AdminCommissionManagement} />
+      <Route path="/admin/customizations" component={AdminCustomizations} />
+      <Route path="/admin/settings" component={AdminSettings} />
+      <Route component={NotFound} />
     </div>
   );
 }

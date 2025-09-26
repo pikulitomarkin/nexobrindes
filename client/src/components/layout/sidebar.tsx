@@ -102,7 +102,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       </nav>
 
       {/* Admin Panel Specific Links */}
-      {user?.role === 'admin' && (
+      {activePanel === "admin" && (
             <>
               <SidebarItem 
                 icon={LayoutDashboard} 
