@@ -1,4 +1,3 @@
-replit_final_file>
 import {
   type User,
   type InsertUser,
