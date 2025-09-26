@@ -48,7 +48,7 @@ interface SidebarProps {
 // SidebarItem component  
 const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => {
   const [, navigate] = useLocation();
-  
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(href);
@@ -138,6 +138,18 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/customizations'}
               />
               <SidebarItem 
+                icon={Calculator} 
+                label="Orçamentos" 
+                href="/admin/budgets" 
+                isActive={pathname === '/admin/budgets'}
+              />
+              <SidebarItem 
+                icon={ShoppingCart} 
+                label="Pedidos" 
+                href="/admin/orders" 
+                isActive={pathname === '/admin/orders'}
+              />
+              <SidebarItem 
                 icon={Hammer} 
                 label="Produtores" 
                 href="/admin/producers" 
@@ -156,6 +168,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/vendors'}
               />
               <SidebarItem 
+                icon={Users} 
+                label="Usuários" 
+                href="/admin/users" 
+                isActive={pathname === '/admin/users'}
+              />
+              <SidebarItem 
                 icon={Percent} 
                 label="Gestão de Comissões" 
                 href="/admin/commission-management" 
@@ -166,30 +184,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 label="Módulo Financeiro" 
                 href="/finance" 
                 isActive={pathname === '/finance'}
-              />
-              
-              <div className="px-6 mb-4 mt-6">
-                <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-                  Gestão
-                </p>
-              </div>
-              <SidebarItem 
-                icon={Calculator} 
-                label="Orçamentos" 
-                href="/admin/budgets" 
-                isActive={pathname === '/admin/budgets'}
-              />
-              <SidebarItem 
-                icon={ShoppingCart} 
-                label="Pedidos" 
-                href="/admin/orders" 
-                isActive={pathname === '/admin/orders'}
-              />
-              <SidebarItem 
-                icon={Users} 
-                label="Usuários" 
-                href="/admin/users" 
-                isActive={pathname === '/admin/users'}
               />
               <SidebarItem 
                 icon={Settings} 
