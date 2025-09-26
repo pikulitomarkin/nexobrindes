@@ -13,6 +13,7 @@ import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, P
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
+import { CustomizationSelector } from "@/components/customization-selector";
 
 export default function VendorBudgets() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -176,8 +177,10 @@ export default function VendorBudgets() {
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
+      selectedCustomizationId: "",
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
+      additionalCustomizationNotes: "",
       customizationPhoto: "",
       productWidth: "",
       productHeight: "",
@@ -854,29 +857,42 @@ export default function VendorBudgets() {
 
                         {item.hasItemCustomization && (
                           <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
-                                <Input
-                                  id={`item-customization-value-${index}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={item.itemCustomizationValue}
-                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', e.target.value)}
-                                  placeholder="0,00"
-                                />
+                            <CustomizationSelector 
+                              productCategory={products.find(p => p.id === item.productId)?.category}
+                              quantity={item.quantity}
+                              selectedCustomization={item.selectedCustomizationId}
+                              onCustomizationChange={(customization) => {
+                                if (customization) {
+                                  updateBudgetItem(index, 'selectedCustomizationId', customization.id);
+                                  updateBudgetItem(index, 'itemCustomizationValue', customization.price);
+                                  updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
+                                } else {
+                                  updateBudgetItem(index, 'selectedCustomizationId', '');
+                                  updateBudgetItem(index, 'itemCustomizationValue', 0);
+                                  updateBudgetItem(index, 'itemCustomizationDescription', '');
+                                }
+                              }}
+                            />
+                            
+                            {item.selectedCustomizationId && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label>Valor da Personalização</Label>
+                                  <Input
+                                    value={`R$ ${parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    disabled
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Descrição Adicional (Opcional)</Label>
+                                  <Input
+                                    value={item.additionalCustomizationNotes || ''}
+                                    onChange={(e) => updateBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
+                                    placeholder="Observações extras..."
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
-                                <Input
-                                  id={`item-customization-description-${index}`}
-                                  value={item.itemCustomizationDescription}
-                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
-                                  placeholder="Ex: Gravação, cor especial..."
-                                />
-                              </div>
-                            </div>
+                            )
 
                             {/* Image Upload for Product Customization */}
                             <div>

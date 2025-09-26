@@ -1,3 +1,4 @@
+replit_final_file>
 import { 
   BarChart3, 
   Bus, 
@@ -18,6 +19,9 @@ import {
   Receipt,
   Calculator,
   Percent,
+  Store,
+  Hammer,
+  Palette,
 } from "lucide-react";
 
 import { useLocation } from "wouter";
@@ -64,6 +68,8 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
 
   // Assuming userRole is available, for example, from context or props
   const userRole = "admin"; // Placeholder for actual user role
+  const user = { role: userRole }; // Mocking user object for role check
+  const pathname = location; // Mocking pathname for active link highlighting
 
   return (
     <div className="w-64 gradient-bg text-white shadow-xl">
@@ -97,95 +103,82 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       </nav>
 
       {/* Admin Panel Specific Links */}
-      {userRole === 'admin' && (
-          <>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/products">
-                      <Package className="h-4 w-4" />
-                      <span>Produtos</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/users?tab=producers">
-                      <Factory className="h-4 w-4" />
-                      <span>Produtores</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/orders">
-                      <ShoppingCart className="h-4 w-4" />
-                      <span>Pedidos</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/budgets">
-                      <FileText className="h-4 w-4" />
-                      <span>Orçamentos</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/users">
-                      <Users className="h-4 w-4" />
-                      <span>Usuários</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/clients">
-                      <Users className="h-4 w-4" />
-                      <span>Clientes</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/vendors">
-                      <ShoppingCart className="h-4 w-4" />
-                      <span>Vendedores</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/finance">
-                      <DollarSign className="h-4 w-4" />
-                      <span>Visão Financeira</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/commission-management">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Comissões</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/admin/settings">
-                      <Settings className="h-4 w-4" />
-                      <span>Configurações</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </>
-        )}
+      {user?.role === 'admin' && (
+            <>
+              <SidebarItem 
+                icon={LayoutDashboard} 
+                label="Dashboard" 
+                href="/admin-dashboard" 
+                isActive={pathname === '/admin-dashboard'}
+              />
+              <SidebarItem 
+                icon={Users} 
+                label="Usuários" 
+                href="/admin/users" 
+                isActive={pathname === '/admin/users'}
+              />
+              <SidebarItem 
+                icon={Store} 
+                label="Vendedores" 
+                href="/admin/vendors" 
+                isActive={pathname === '/admin/vendors'}
+              />
+              <SidebarItem 
+                icon={UserCheck} 
+                label="Clientes" 
+                href="/admin/clients" 
+                isActive={pathname === '/admin/clients'}
+              />
+              <SidebarItem 
+                icon={Hammer} 
+                label="Produtores" 
+                href="/admin/producers" 
+                isActive={pathname === '/admin/producers'}
+              />
+              <SidebarItem 
+                icon={Package} 
+                label="Produtos" 
+                href="/admin/products" 
+                isActive={pathname === '/admin/products'}
+              />
+              <SidebarItem 
+                icon={Palette} 
+                label="Personalizações" 
+                href="/admin/customizations" 
+                isActive={pathname === '/admin/customizations'}
+              />
+              <SidebarItem 
+                icon={Calculator} 
+                label="Orçamentos" 
+                href="/admin/budgets" 
+                isActive={pathname === '/admin/budgets'}
+              />
+              <SidebarItem 
+                icon={ShoppingCart} 
+                label="Pedidos" 
+                href="/admin/orders" 
+                isActive={pathname === '/admin/orders'}
+              />
+              <SidebarItem 
+                icon={Percent} 
+                label="Comissões" 
+                href="/admin/commission-management" 
+                isActive={pathname === '/admin/commission-management'}
+              />
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Financeiro" 
+                href="/finance" 
+                isActive={pathname === '/finance'}
+              />
+              <SidebarItem 
+                icon={Settings} 
+                label="Configurações" 
+                href="/admin/settings" 
+                isActive={pathname === '/admin/settings'}
+              />
+            </>
+          )}
 
       {/* Vendor Panel Specific Links */}
       {activePanel === "vendor" && (
@@ -344,3 +337,4 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     </div>
   );
 }
+</replit_final_file>

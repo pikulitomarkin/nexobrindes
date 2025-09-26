@@ -2608,7 +2608,7 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // ===== FINANCIAL MODULE ROUTES =====
-  
+
   // Accounts Receivable routes
   app.get("/api/finance/receivables", async (req, res) => {
     try {
@@ -2692,7 +2692,7 @@ Para mais detalhes, entre em contato conosco!`;
       const orders = await storage.getOrders();
       const clients = await storage.getClients();
       const users = await storage.getUsers();
-      
+
       const pendingOrders = await Promise.all(
         orders
           .filter(order => {
@@ -2713,21 +2713,21 @@ Para mais detalhes, entre em contato conosco!`;
                 clientName = clientUser.name;
               }
             }
-            
+
             const vendor = users.find(v => v.id === order.vendorId);
             const producer = order.producerId ? users.find(p => p.id === order.producerId) : null;
-            
+
             // Get payment history for this order
             const payments = await storage.getPaymentsByOrder(order.id);
             const confirmedPayments = payments.filter(p => p.status === 'confirmed');
-            
+
             // Get budget information if order was converted from budget
             let budgetInfo = null;
             if (order.budgetId) {
               try {
                 const budget = await storage.getBudget(order.budgetId);
                 const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
-                
+
                 if (budgetPaymentInfo) {
                   budgetInfo = {
                     downPayment: parseFloat(budgetPaymentInfo.downPayment || '0'),
@@ -2741,11 +2741,11 @@ Para mais detalhes, entre em contato conosco!`;
                 console.log("Error fetching budget info for pending order:", order.id, error);
               }
             }
-            
+
             const totalValue = parseFloat(order.totalValue);
             const paidValue = parseFloat(order.paidValue || '0');
             const remainingBalance = totalValue - paidValue;
-            
+
             return {
               ...order,
               clientName,
@@ -2765,21 +2765,21 @@ Para mais detalhes, entre em contato conosco!`;
             };
           })
       );
-      
+
       // Sort by creation date (newest first) and then by remaining balance (highest first)
       const sortedOrders = pendingOrders.sort((a, b) => {
         const dateA = new Date(a.createdAt).getTime();
         const dateB = new Date(b.createdAt).getTime();
         const balanceA = parseFloat(a.remainingBalance);
         const balanceB = parseFloat(b.remainingBalance);
-        
+
         // First by date (newest first), then by balance (highest first)
         if (dateB !== dateA) {
           return dateB - dateA;
         }
         return balanceB - balanceA;
       });
-      
+
       console.log(`Returning ${sortedOrders.length} pending orders for reconciliation`);
       res.json(sortedOrders);
     } catch (error) {
@@ -2792,7 +2792,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/associate-payment", async (req, res) => {
     try {
       const { transactionId, orderId, amount } = req.body;
-      
+
       console.log("Associating payment:", { transactionId, orderId, amount });
 
       // Validate inputs
@@ -2994,7 +2994,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       const { mimetype, size, buffer, originalname } = req.file;
-      
+
       // Validate file type
       if (!originalname.toLowerCase().endsWith('.ofx')) {
         return res.status(400).json({ error: "Apenas arquivos OFX são permitidos" });
@@ -3006,7 +3006,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Parse OFX content (simplified parsing)
       const ofxContent = buffer.toString('utf-8');
-      
+
       // Create bank import record
       const bankImport = await storage.createBankImport({
         fileName: originalname,
@@ -3065,7 +3065,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const transactions = await storage.getBankTransactions();
       const expenses = await storage.getExpenseNotes();
-      
+
       const reconciled = transactions.filter(t => t.isMatched).length;
       const pending = transactions.filter(t => !t.isMatched).length;
       const totalValue = transactions
@@ -3088,11 +3088,11 @@ Para mais detalhes, entre em contato conosco!`;
   // Helper function to extract transactions from OFX content
   function extractOFXTransactions(ofxContent: string) {
     const transactions = [];
-    
+
     // Simple regex-based OFX parsing (in production, use a proper OFX parser)
     const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
     const matches = ofxContent.match(transactionRegex);
-    
+
     if (matches) {
       matches.forEach((match, index) => {
         const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
@@ -3100,7 +3100,7 @@ Para mais detalhes, entre em contato conosco!`;
         const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
         const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${index}`;
         const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
-        
+
         // Parse date (format: YYYYMMDDHHMMSS)
         let transactionDate = new Date();
         if (dtPosted && dtPosted.length >= 8) {
@@ -3109,7 +3109,7 @@ Para mais detalhes, entre em contato conosco!`;
           const day = parseInt(dtPosted.substring(6, 8));
           transactionDate = new Date(year, month, day);
         }
-        
+
         transactions.push({
           id: fitId,
           date: transactionDate,
@@ -3119,7 +3119,7 @@ Para mais detalhes, entre em contato conosco!`;
         });
       });
     }
-    
+
     return transactions;
   }
 

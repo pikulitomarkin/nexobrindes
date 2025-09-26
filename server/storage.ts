@@ -43,7 +43,10 @@ import {
   type ExpenseNote,
   type InsertExpenseNote,
   type CommissionPayout,
-  type InsertCommissionPayout
+  type InsertCommissionPayout,
+  // Customization Option types
+  type CustomizationOption,
+  type InsertCustomizationOption
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -209,6 +212,13 @@ export interface IStorage {
   getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]>;
   createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout>;
   updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined>;
+
+  // Customization Options
+  createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
+  getCustomizationOptions(): Promise<CustomizationOption[]>;
+  getCustomizationOptionsByCategory(category: string, quantity: number): Promise<CustomizationOption[]>;
+  updateCustomizationOption(id: string, data: Partial<InsertCustomizationOption>): Promise<CustomizationOption | undefined>;
+  deleteCustomizationOption(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -235,9 +245,29 @@ export class MemStorage implements IStorage {
   private commissionPayouts: Map<string, CommissionPayout>;
 
   private mockData = {
+    users: [] as User[],
+    clients: [] as Client[],
+    orders: [] as Order[],
+    productionOrders: [] as ProductionOrder[],
+    payments: [] as Payment[],
+    commissions: [] as Commission[],
+    partners: [] as Partner[],
+    commissionSettings: [] as CommissionSettings[],
+    vendors: [] as Vendor[],
+    products: [] as Product[],
+    budgets: [] as Budget[],
+    budgetItems: [] as BudgetItem[],
+    budgetPhotos: [] as BudgetPhoto[],
+    paymentMethods: [] as PaymentMethod[],
+    shippingMethods: [] as ShippingMethod[],
+    budgetPaymentInfo: [] as BudgetPaymentInfo[],
+    accountsReceivable: [] as AccountsReceivable[],
+    paymentAllocations: [] as PaymentAllocation[],
     bankImports: [] as BankImport[],
     bankTransactions: [] as BankTransaction[],
-    expenses: [] as ExpenseNote[]
+    expenseNotes: [] as ExpenseNote[],
+    commissionPayouts: [] as CommissionPayout[],
+    customizationOptions: [] as CustomizationOption[],
   };
 
   // Payment Methods
@@ -767,6 +797,83 @@ export class MemStorage implements IStorage {
     ];
     mockProducts.forEach(product => this.products.set(product.id, product));
 
+    // Create sample commission settings
+    const defaultCommissionSettings: CommissionSettings = {
+      id: "settings-1",
+      vendorCommissionRate: "10.00",
+      partnerCommissionRate: "15.00",
+      vendorPaymentTiming: "order_completion",
+      partnerPaymentTiming: "order_start",
+      isActive: true,
+      updatedAt: new Date(),
+    };
+    this.mockData.commissionSettings.push(defaultCommissionSettings);
+
+    // Create sample customization options
+    const sampleCustomizations: CustomizationOption[] = [
+      {
+        id: "custom-1",
+        name: "Serigrafia 1 cor",
+        description: "Personalização com serigrafia em uma cor",
+        category: "Mochila",
+        minQuantity: 50,
+        price: "5.00",
+        isActive: true,
+        createdBy: adminUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "custom-2",
+        name: "Serigrafia 1 cor",
+        description: "Personalização com serigrafia em uma cor",
+        category: "Mochila",
+        minQuantity: 100,
+        price: "4.50",
+        isActive: true,
+        createdBy: adminUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "custom-3",
+        name: "Serigrafia 1 cor",
+        description: "Personalização com serigrafia em uma cor",
+        category: "Mochila",
+        minQuantity: 200,
+        price: "3.50",
+        isActive: true,
+        createdBy: adminUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "custom-4",
+        name: "Bordado",
+        description: "Personalização com bordado",
+        category: "Mochila",
+        minQuantity: 25,
+        price: "8.00",
+        isActive: true,
+        createdBy: adminUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "custom-5",
+        name: "Gravação a laser",
+        description: "Personalização com gravação a laser",
+        category: "Copo",
+        minQuantity: 20,
+        price: "12.00",
+        isActive: true,
+        createdBy: adminUser.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    ];
+    this.mockData.customizationOptions.push(...sampleCustomizations);
+
     // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
     this.initializeFinancialIntegration();
   }
@@ -774,13 +881,13 @@ export class MemStorage implements IStorage {
   private initializeFinancialIntegration() {
     // Create AccountsReceivable entries for all existing orders
     const allOrders = Array.from(this.orders.values());
-    
+
     allOrders.forEach(order => {
       // Create receivable entry for each order
       const totalValue = parseFloat(order.totalValue);
       const paidValue = parseFloat(order.paidValue);
       const remainingAmount = totalValue - paidValue;
-      
+
       let status: 'pending' | 'partial' | 'paid' = 'pending';
       if (paidValue >= totalValue) {
         status = 'paid';
@@ -802,7 +909,7 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      
+
       this.accountsReceivable.set(receivable.id, receivable);
 
       // If there are payments for this order, create payment allocations
@@ -823,7 +930,7 @@ export class MemStorage implements IStorage {
 
     // Create Commission Payouts based on existing commissions
     const allCommissions = Array.from(this.commissions.values());
-    
+
     // Group commissions by vendor to create payout batches
     const commissionsByVendor = new Map<string, Commission[]>();
     allCommissions.forEach(commission => {
@@ -836,7 +943,7 @@ export class MemStorage implements IStorage {
     // Create commission payouts for each vendor
     commissionsByVendor.forEach((commissions, vendorId) => {
       const totalAmount = commissions.reduce((sum, comm) => sum + parseFloat(comm.amount), 0);
-      
+
       if (totalAmount > 0) {
         const payout: CommissionPayout = {
           id: `payout-vendor-${vendorId}`,
@@ -849,7 +956,7 @@ export class MemStorage implements IStorage {
           paidAt: commissions.every(c => c.status === 'paid') ? new Date() : null,
           createdAt: new Date()
         };
-        
+
         this.commissionPayouts.set(payout.id, payout);
       }
     });
@@ -1026,14 +1133,14 @@ export class MemStorage implements IStorage {
 
     // Automatically create AccountsReceivable entry for this new order
     await this.createAccountsReceivableForOrder(order);
-    
+
     return order;
   }
 
   private async createAccountsReceivableForOrder(order: Order): Promise<void> {
     const paidValue = parseFloat(order.paidValue || "0");
     const totalValue = parseFloat(order.totalValue);
-    
+
     let status: 'pending' | 'partial' | 'paid' = 'pending';
     if (paidValue >= totalValue) {
       status = 'paid';
@@ -1055,7 +1162,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     this.accountsReceivable.set(receivable.id, receivable);
   }
 
@@ -1262,11 +1369,11 @@ export class MemStorage implements IStorage {
     // Update corresponding AccountsReceivable entry
     const receivableId = `ar-${orderId}`;
     const receivable = this.accountsReceivable.get(receivableId);
-    
+
     if (receivable) {
       const totalValue = parseFloat(receivable.amount);
       let status: 'pending' | 'partial' | 'paid' = 'pending';
-      
+
       if (totalPaid >= totalValue) {
         status = 'paid';
       } else if (totalPaid > 0) {
@@ -2175,34 +2282,62 @@ export class MemStorage implements IStorage {
   }
 
   // Financial module methods - Commission Payouts
-  async getCommissionPayouts(): Promise<CommissionPayout[]> {
-    return Array.from(this.commissionPayouts.values());
-  }
-
-  async getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]> {
-    return Array.from(this.commissionPayouts.values()).filter(cp => cp.userId === userId && cp.type === type);
-  }
-
   async createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout> {
-    const newCP: CommissionPayout = {
+    const newPayout: CommissionPayout = {
       id: randomUUID(),
       ...data,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-    this.commissionPayouts.set(newCP.id, newCP);
-    return newCP;
+    this.mockData.commissionPayouts.push(newPayout);
+    return newPayout;
   }
 
-  async updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined> {
-    const existing = this.commissionPayouts.get(id);
-    if (!existing) return undefined;
+  async getCommissionPayouts(): Promise<CommissionPayout[]> {
+    return this.mockData.commissionPayouts;
+  }
 
-    const updated: CommissionPayout = {
-      ...existing,
-      ...data
+  // Customization Options
+  async createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption> {
+    const newOption: CustomizationOption = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    this.commissionPayouts.set(id, updated);
+    this.mockData.customizationOptions.push(newOption);
+    return newOption;
+  }
+
+  async getCustomizationOptions(): Promise<CustomizationOption[]> {
+    return this.mockData.customizationOptions;
+  }
+
+  async getCustomizationOptionsByCategory(category: string, quantity: number): Promise<CustomizationOption[]> {
+    return this.mockData.customizationOptions.filter(option => 
+      option.category === category && 
+      option.minQuantity <= quantity &&
+      option.isActive
+    );
+  }
+
+  async updateCustomizationOption(id: string, data: Partial<InsertCustomizationOption>): Promise<CustomizationOption | undefined> {
+    const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
+    if (index === -1) return undefined;
+
+    const updated: CustomizationOption = {
+      ...this.mockData.customizationOptions[index],
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.mockData.customizationOptions[index] = updated;
     return updated;
+  }
+
+  async deleteCustomizationOption(id: string): Promise<boolean> {
+    const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
+    if (index === -1) return false;
+    this.mockData.customizationOptions.splice(index, 1);
+    return true;
   }
 }
 

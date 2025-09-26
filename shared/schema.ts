@@ -325,6 +325,19 @@ export const commissionPayouts = pgTable("commission_payouts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const customizationOptions = pgTable("customization_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Ex: "Serigrafia 1 cor"
+  description: text("description"), // Descrição adicional
+  category: text("category").notNull(), // Categoria do produto compatível
+  minQuantity: integer("min_quantity").notNull(), // Quantidade mínima
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(), // Valor da personalização
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -350,6 +363,7 @@ export const insertBankImportSchema = createInsertSchema(bankImports).omit({ id:
 export const insertBankTransactionSchema = createInsertSchema(bankTransactions).omit({ id: true, createdAt: true });
 export const insertExpenseNoteSchema = createInsertSchema(expenseNotes).omit({ id: true, createdAt: true });
 export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({ id: true, createdAt: true });
+export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -398,3 +412,5 @@ export type ExpenseNote = typeof expenseNotes.$inferSelect;
 export type InsertExpenseNote = z.infer<typeof insertExpenseNoteSchema>;
 export type CommissionPayout = typeof commissionPayouts.$inferSelect;
 export type InsertCommissionPayout = z.infer<typeof insertCommissionPayoutSchema>;
+export type CustomizationOption = typeof customizationOptions.$inferSelect;
+export type InsertCustomizationOption = z.infer<typeof insertCustomizationOptionSchema>;
