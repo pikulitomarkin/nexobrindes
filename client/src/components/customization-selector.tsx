@@ -150,16 +150,29 @@ export function CustomizationSelector({
               <Input
                 id="customization-quantity"
                 type="number"
-                min="1"
+                min={selectedCustomizationData.minQuantity}
                 max={quantity}
                 value={customizationQuantity}
-                onChange={(e) => onCustomizationQuantityChange?.(parseInt(e.target.value) || 0)}
-                placeholder={`Máx: ${quantity}`}
-                className="mt-1"
+                onChange={(e) => {
+                  const qty = parseInt(e.target.value) || 0;
+                  onCustomizationQuantityChange?.(qty);
+                  
+                  // Auto-calcular o valor baseado na quantidade mínima
+                  if (qty >= selectedCustomizationData.minQuantity) {
+                    onCustomizationValueChange?.(parseFloat(selectedCustomizationData.price) || 0);
+                  }
+                }}
+                placeholder={`Mín: ${selectedCustomizationData.minQuantity}`}
+                className={`mt-1 ${customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity ? 'border-red-500' : ''}`}
               />
               <p className="text-xs text-gray-500 mt-1">
                 Mín: {selectedCustomizationData.minQuantity} / Máx: {quantity} unidades
               </p>
+              {customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity && (
+                <p className="text-xs text-red-500 mt-1">
+                  ⚠️ Quantidade menor que o mínimo ({selectedCustomizationData.minQuantity})
+                </p>
+              )}
             </div>
 
             <div>
@@ -175,7 +188,11 @@ export function CustomizationSelector({
                 onChange={(e) => onCustomizationValueChange?.(parseFloat(e.target.value) || 0)}
                 placeholder="0,00"
                 className="mt-1"
+                disabled={customizationQuantity < selectedCustomizationData.minQuantity}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Preço base: R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
             </div>
 
             <div>
@@ -192,14 +209,23 @@ export function CustomizationSelector({
             </div>
           </div>
 
-          {customizationQuantity > 0 && customizationValue > 0 && (
+          {customizationQuantity >= selectedCustomizationData.minQuantity && customizationValue > 0 ? (
             <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
               <p className="text-sm text-green-800">
                 <strong>Total da Personalização:</strong> {customizationQuantity} × R$ {customizationValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
                 <strong className="ml-1">R$ {(customizationQuantity * customizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
               </p>
             </div>
-          )}
+          ) : customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity ? (
+            <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
+              <p className="text-sm text-red-800">
+                <strong>❌ Quantidade insuficiente:</strong> Esta personalização requer no mínimo {selectedCustomizationData.minQuantity} unidades.
+                <br />
+                <strong>Valor seria:</strong> {selectedCustomizationData.minQuantity} × R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
+                <strong className="ml-1">R$ {(selectedCustomizationData.minQuantity * parseFloat(selectedCustomizationData.price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+              </p>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
