@@ -17,12 +17,12 @@ export function CustomizationSelector({
   onCustomizationChange 
 }: CustomizationSelectorProps) {
   const { data: customizations = [], isLoading } = useQuery({
-    queryKey: ["/api/customizations", { category: productCategory, quantity }],
+    queryKey: ["/api/settings/customization-options", { category: productCategory, quantity }],
     queryFn: async () => {
       if (!productCategory) return [];
       
-      const response = await fetch(`/api/customizations?category=${encodeURIComponent(productCategory)}&quantity=${quantity}`);
-      if (!response.ok) throw new Error('Failed to fetch customizations');
+      const response = await fetch(`/api/settings/customization-options/category/${encodeURIComponent(productCategory)}?minQuantity=${quantity}`);
+      if (!response.ok) return [];
       return response.json();
     },
     enabled: !!productCategory && quantity > 0,

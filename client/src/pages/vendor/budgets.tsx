@@ -145,7 +145,13 @@ export default function VendorBudgets() {
   });
 
   const products = productsData?.products || [];
-  const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+  const categorySet = new Set<string>();
+  (products || []).forEach((product: any) => {
+    if (product.category && typeof product.category === 'string') {
+      categorySet.add(product.category);
+    }
+  });
+  const categories: string[] = ['all', ...Array.from(categorySet)];
 
   // Helper variables for selected payment and shipping methods
   const selectedPaymentMethod = paymentMethods?.find((pm: any) => pm.id === vendorBudgetForm.paymentMethodId);
@@ -858,7 +864,7 @@ export default function VendorBudgets() {
                         {item.hasItemCustomization && (
                           <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
                             <CustomizationSelector 
-                              productCategory={products.find(p => p.id === item.productId)?.category}
+                              productCategory={products.find((p: any) => p.id === item.productId)?.category}
                               quantity={item.quantity}
                               selectedCustomization={item.selectedCustomizationId}
                               onCustomizationChange={(customization) => {
