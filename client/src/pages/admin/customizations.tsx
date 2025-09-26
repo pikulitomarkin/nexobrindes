@@ -31,6 +31,8 @@ export default function AdminCustomizations() {
     price: "",
     isActive: true,
   });
+  const [newCategory, setNewCategory] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   // Queries
   const customizationsQuery = useQuery({
@@ -126,6 +128,8 @@ export default function AdminCustomizations() {
       price: "",
       isActive: true,
     });
+    setNewCategory("");
+    setIsCreatingCategory(false);
   };
 
   const handleEdit = (customization: any) => {
@@ -243,22 +247,78 @@ export default function AdminCustomizations() {
 
                   <div>
                     <Label htmlFor="category">Categoria do Produto</Label>
-                    <Select 
-                      value={customizationForm.category}
-                      onValueChange={(value) => setCustomizationForm({...customizationForm, category: value})}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category: string) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {!isCreatingCategory ? (
+                      <div className="space-y-2">
+                        <Select 
+                          value={customizationForm.category}
+                          onValueChange={(value) => {
+                            if (value === "create-new") {
+                              setIsCreatingCategory(true);
+                              setCustomizationForm({...customizationForm, category: ""});
+                            } else {
+                              setCustomizationForm({...customizationForm, category: value});
+                            }
+                          }}
+                          required={!isCreatingCategory}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category: string) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="create-new" className="text-blue-600 font-medium">
+                              + Criar nova categoria
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Digite o nome da nova categoria"
+                          value={newCategory}
+                          onChange={(e) => {
+                            setNewCategory(e.target.value);
+                            setCustomizationForm({...customizationForm, category: e.target.value});
+                          }}
+                          required
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsCreatingCategory(false);
+                              setNewCategory("");
+                              setCustomizationForm({...customizationForm, category: ""});
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              if (newCategory.trim()) {
+                                setIsCreatingCategory(false);
+                                toast({ 
+                                  title: "Categoria criada", 
+                                  description: `A categoria "${newCategory}" será criada junto com a personalização.` 
+                                });
+                              }
+                            }}
+                            disabled={!newCategory.trim()}
+                          >
+                            Confirmar categoria
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
