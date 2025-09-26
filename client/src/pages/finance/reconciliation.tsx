@@ -225,7 +225,7 @@ export default function FinanceReconciliation() {
     if (!bankTransactions) return [];
     
     return bankTransactions.filter((transaction: any) => 
-      transaction.status === 'unmatched' &&
+      (transaction.status === 'unmatched' || !transaction.status) &&
       parseFloat(transaction.amount) > 0 // Apenas entradas (valores positivos)
     );
   };
@@ -556,7 +556,7 @@ export default function FinanceReconciliation() {
                           size="sm"
                           onClick={() => openAssociationDialog(order)}
                           className="gradient-bg text-white hover:opacity-90"
-                          disabled={getAllUnmatchedTransactions().length === 0}
+                          disabled={bankTransactions && bankTransactions.length === 0}
                         >
                           <Link className="h-3 w-3 mr-1" />
                           Confirmar Pagamento

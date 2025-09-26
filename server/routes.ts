@@ -2950,7 +2950,12 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/bank-transactions", async (req, res) => {
     try {
       const transactions = await storage.getBankTransactions();
-      res.json(transactions);
+      // Garantir que todas as transações tenham status padrão se não tiver
+      const normalizedTransactions = transactions.map(txn => ({
+        ...txn,
+        status: txn.status || 'unmatched'
+      }));
+      res.json(normalizedTransactions);
     } catch (error) {
       console.error("Failed to fetch bank transactions:", error);
       res.status(500).json({ error: "Failed to fetch bank transactions" });
