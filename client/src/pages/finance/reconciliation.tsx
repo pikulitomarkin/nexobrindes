@@ -472,6 +472,22 @@ export default function FinanceReconciliation() {
                 const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
                 const compatibleTransactions = getCompatibleTransactions(remainingValue);
                 
+                // Get budget down payment info if available
+                let budgetDownPayment = 0;
+                let expectedDownPayment = remainingValue; // Default to remaining value
+                
+                if (order.budgetInfo && order.budgetInfo.downPayment) {
+                  budgetDownPayment = parseFloat(order.budgetInfo.downPayment);
+                  
+                  // If no payment has been made yet, the expected payment is the down payment
+                  if (parseFloat(order.paidValue || '0') === 0) {
+                    expectedDownPayment = budgetDownPayment;
+                  }
+                }
+                
+                // Get transactions that match the expected payment amount
+                const expectedCompatibleTransactions = getCompatibleTransactions(expectedDownPayment);
+                
                 return (
                   <div key={order.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
                     <div className="flex items-center justify-between mb-2">
@@ -491,10 +507,15 @@ export default function FinanceReconciliation() {
                         </p>
                         {parseFloat(order.paidValue || '0') > 0 && (
                           <p className="text-xs text-green-600">
-                            Entrada: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            Pago: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                         )}
-                        {parseFloat(order.paidValue || '0') === 0 && (
+                        {budgetDownPayment > 0 && parseFloat(order.paidValue || '0') === 0 && (
+                          <p className="text-xs text-blue-600 font-medium">
+                            Entrada esperada: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
+                        {budgetDownPayment === 0 && parseFloat(order.paidValue || '0') === 0 && (
                           <p className="text-xs text-orange-600">
                             Aguardando entrada
                           </p>
@@ -506,7 +527,11 @@ export default function FinanceReconciliation() {
                       <div className="text-sm text-gray-600">
                         {parseFloat(order.paidValue || '0') > 0 ? (
                           <span className="text-green-600">
-                            {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago (entrada confirmada)
+                            {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago
+                          </span>
+                        ) : budgetDownPayment > 0 ? (
+                          <span className="text-blue-600">
+                            Entrada orçamento: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({Math.round((budgetDownPayment / parseFloat(order.totalValue)) * 100)}%)
                           </span>
                         ) : (
                           <span className="text-yellow-600">Aguardando entrada</span>
@@ -514,12 +539,15 @@ export default function FinanceReconciliation() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {compatibleTransactions.length > 0 && (
+                        {expectedCompatibleTransactions.length > 0 && (
                           <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                            {compatibleTransactions.length} transação{compatibleTransactions.length !== 1 ? 'ões' : ''} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
+                            {expectedCompatibleTransactions.length} transação{expectedCompatibleTransactions.length !== 1 ? 'ões' : ''} compatível{expectedCompatibleTransactions.length !== 1 ? 'is' : ''}
+                            {budgetDownPayment > 0 && parseFloat(order.paidValue || '0') === 0 && (
+                              <span className="ml-1">(R$ {expectedDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
+                            )}
                           </Badge>
                         )}
-                        {getAllUnmatchedTransactions().length > 0 && compatibleTransactions.length === 0 && (
+                        {getAllUnmatchedTransactions().length > 0 && expectedCompatibleTransactions.length === 0 && (
                           <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
                             {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
                           </Badge>
@@ -634,6 +662,15 @@ export default function FinanceReconciliation() {
                     <span className="text-blue-700 font-medium">Já Pago:</span> 
                     <span className="font-bold"> R$ {parseFloat(selectedOrder.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
+                  {selectedOrder.budgetInfo && selectedOrder.budgetInfo.downPayment > 0 && parseFloat(selectedOrder.paidValue || '0') === 0 && (
+                    <div className="col-span-2 p-2 bg-green-50 rounded border border-green-200">
+                      <span className="text-green-700 font-medium">💰 Entrada Esperada (Orçamento):</span> 
+                      <span className="font-bold text-green-800"> R$ {selectedOrder.budgetInfo.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <div className="text-xs text-green-600 mt-1">
+                        Entrada registrada no orçamento original - procure transações com este valor
+                      </div>
+                    </div>
+                  )}
                   <div className="col-span-2">
                     <span className="text-blue-700 font-medium">Saldo Devedor:</span> 
                     <span className="font-bold text-red-600"> R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
@@ -676,43 +713,90 @@ export default function FinanceReconciliation() {
 
               {/* Compatible Transactions */}
               <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
-                    {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length}
-                  </span>
-                  Transações Compatíveis (valor similar ao saldo devedor)
-                </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
-                  {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).map((transaction: any) => (
-                    <div
-                      key={transaction.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                        selectedTransaction?.id === transaction.id
-                          ? 'border-blue-500 bg-blue-50 shadow-md'
-                          : 'border-gray-200 hover:bg-white hover:shadow-sm'
-                      }`}
-                      onClick={() => setSelectedTransaction(transaction)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                {selectedOrder.budgetInfo && selectedOrder.budgetInfo.downPayment > 0 && parseFloat(selectedOrder.paidValue || '0') === 0 ? (
+                  <>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-6 h-6 bg-green-100 text-green-600 rounded-full text-xs font-bold">
+                        {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).length}
+                      </span>
+                      🎯 Transações Compatíveis com Entrada (R$ {selectedOrder.budgetInfo.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                    </h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-green-50">
+                      {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).map((transaction: any) => (
+                        <div
+                          key={transaction.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                            selectedTransaction?.id === transaction.id
+                              ? 'border-green-500 bg-green-100 shadow-md'
+                              : 'border-green-200 hover:bg-white hover:shadow-sm'
+                          }`}
+                          onClick={() => setSelectedTransaction(transaction)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                              <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                              <div className="text-xs text-green-600 font-medium mt-1">
+                                ✓ Corresponde à entrada esperada
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-green-600">
+                                R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              {transaction.bankRef && (
+                                <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-green-600">
-                            R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                          {transaction.bankRef && (
-                            <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
-                          )}
-                        </div>
-                      </div>
+                      ))}
+                      {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).length === 0 && (
+                        <p className="text-center text-gray-500 py-4">Nenhuma transação com valor da entrada encontrada</p>
+                      )}
                     </div>
-                  ))}
-                  {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length === 0 && (
-                    <p className="text-center text-gray-500 py-4">Nenhuma transação compatível encontrada</p>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
+                        {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length}
+                      </span>
+                      Transações Compatíveis (valor similar ao saldo devedor)
+                    </h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                      {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).map((transaction: any) => (
+                        <div
+                          key={transaction.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                            selectedTransaction?.id === transaction.id
+                              ? 'border-blue-500 bg-blue-50 shadow-md'
+                              : 'border-gray-200 hover:bg-white hover:shadow-sm'
+                          }`}
+                          onClick={() => setSelectedTransaction(transaction)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                              <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-green-600">
+                                R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              {transaction.bankRef && (
+                                <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length === 0 && (
+                        <p className="text-center text-gray-500 py-4">Nenhuma transação compatível encontrada</p>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* All Unreconciled Transactions */}

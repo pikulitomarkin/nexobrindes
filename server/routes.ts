@@ -2721,6 +2721,27 @@ Para mais detalhes, entre em contato conosco!`;
             const payments = await storage.getPaymentsByOrder(order.id);
             const confirmedPayments = payments.filter(p => p.status === 'confirmed');
             
+            // Get budget information if order was converted from budget
+            let budgetInfo = null;
+            if (order.budgetId) {
+              try {
+                const budget = await storage.getBudget(order.budgetId);
+                const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+                
+                if (budgetPaymentInfo) {
+                  budgetInfo = {
+                    downPayment: parseFloat(budgetPaymentInfo.downPayment || '0'),
+                    remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                    installments: budgetPaymentInfo.installments || 1,
+                    paymentMethodId: budgetPaymentInfo.paymentMethodId,
+                    shippingMethodId: budgetPaymentInfo.shippingMethodId
+                  };
+                }
+              } catch (error) {
+                console.log("Error fetching budget info for pending order:", order.id, error);
+              }
+            }
+            
             const totalValue = parseFloat(order.totalValue);
             const paidValue = parseFloat(order.paidValue || '0');
             const remainingBalance = totalValue - paidValue;
@@ -2731,6 +2752,7 @@ Para mais detalhes, entre em contato conosco!`;
               vendorName: vendor?.name || 'Unknown',
               producerName: producer?.name || null,
               remainingBalance: remainingBalance.toFixed(2),
+              budgetInfo,
               paymentHistory: confirmedPayments.map(p => ({
                 id: p.id,
                 amount: p.amount,
