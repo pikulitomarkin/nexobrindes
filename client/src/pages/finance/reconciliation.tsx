@@ -122,25 +122,30 @@ export default function FinanceReconciliation() {
           amount: parseFloat(amount).toFixed(2)
         }),
       });
-      if (!response.ok) throw new Error("Erro ao associar pagamento");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao associar pagamento");
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       setIsAssociationDialogOpen(false);
       setSelectedOrder(null);
       setSelectedTransaction(null);
       toast({
         title: "Sucesso!",
-        description: "Pagamento associado ao pedido com sucesso",
+        description: `Pagamento de R$ ${parseFloat(data.payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado para o pedido ${selectedOrder?.orderNumber}`,
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Não foi possível associar o pagamento",
+        description: error.message || "Não foi possível associar o pagamento",
         variant: "destructive",
       });
     },
@@ -177,13 +182,32 @@ export default function FinanceReconciliation() {
   };
 
   const handleAssociatePayment = () => {
-    if (selectedOrder && selectedTransaction) {
-      associatePaymentMutation.mutate({
-        transactionId: selectedTransaction.id,
-        orderId: selectedOrder.id,
-        amount: selectedTransaction.amount
+    if (!selectedOrder || !selectedTransaction) {
+      toast({
+        title: "Erro",
+        description: "Selecione um pedido e uma transação para confirmar o pagamento",
+        variant: "destructive",
       });
+      return;
     }
+
+    const transactionAmount = parseFloat(selectedTransaction.amount);
+    const remainingBalance = parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0');
+
+    if (transactionAmount > remainingBalance + (remainingBalance * 0.05)) { // 5% de tolerância
+      toast({
+        title: "Atenção",
+        description: `O valor da transação (R$ ${transactionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o saldo devedor (R$ ${remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Deseja continuar?`,
+        variant: "destructive",
+      });
+      // Continua mesmo assim, mas alerta o usuário
+    }
+
+    associatePaymentMutation.mutate({
+      transactionId: selectedTransaction.id,
+      orderId: selectedOrder.id,
+      amount: selectedTransaction.amount
+    });
   };
 
   const getCompatibleTransactions = (orderValue: number) => {
@@ -192,6 +216,7 @@ export default function FinanceReconciliation() {
     const tolerance = 0.05; // 5% de tolerância
     return bankTransactions.filter((transaction: any) => 
       transaction.status === 'unmatched' &&
+      parseFloat(transaction.amount) > 0 && // Apenas entradas (valores positivos)
       Math.abs(parseFloat(transaction.amount) - orderValue) <= (orderValue * tolerance)
     );
   };
@@ -429,7 +454,7 @@ export default function FinanceReconciliation() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Pedidos com Saldo Devedor
+              Pedidos com Saldo Devedor ({pendingOrders?.length || 0})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -439,11 +464,14 @@ export default function FinanceReconciliation() {
                 const compatibleTransactions = getCompatibleTransactions(remainingValue);
                 
                 return (
-                  <div key={order.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={order.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <p className="font-medium text-gray-900">{order.orderNumber}</p>
                         <p className="text-sm text-gray-600">{order.clientName}</p>
+                        <p className="text-xs text-gray-500">
+                          Criado em: {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-red-600">
@@ -452,6 +480,11 @@ export default function FinanceReconciliation() {
                         <p className="text-xs text-gray-500">
                           Total: R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
+                        {parseFloat(order.paidValue || '0') > 0 && (
+                          <p className="text-xs text-green-600">
+                            Pago: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
                       </div>
                     </div>
                     
@@ -459,23 +492,23 @@ export default function FinanceReconciliation() {
                       <div className="text-sm text-gray-600">
                         {parseFloat(order.paidValue || '0') > 0 ? (
                           <span className="text-green-600">
-                            Entrada paga: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago
                           </span>
                         ) : (
-                          <span className="text-yellow-600">Aguardando entrada</span>
+                          <span className="text-yellow-600">Aguardando primeiro pagamento</span>
                         )}
                       </div>
                       
                       <div className="flex items-center gap-2">
                         {compatibleTransactions.length > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            {compatibleTransactions.length} transação(ões) compatível(eis)
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                            {compatibleTransactions.length} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
                           </Badge>
                         )}
                         <Button
                           size="sm"
                           onClick={() => openAssociationDialog(order)}
-                          className="gradient-bg text-white"
+                          className="gradient-bg text-white hover:opacity-90"
                           disabled={unreconciled.length === 0}
                         >
                           <Link className="h-3 w-3 mr-1" />
@@ -491,6 +524,7 @@ export default function FinanceReconciliation() {
                 <div className="text-center py-8 text-gray-500">
                   <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <p>Nenhum pedido com saldo devedor</p>
+                  <p className="text-xs">Todos os pedidos estão pagos integralmente</p>
                 </div>
               )}
             </div>
@@ -549,11 +583,15 @@ export default function FinanceReconciliation() {
 
       {/* Association Dialog */}
       <Dialog open={isAssociationDialogOpen} onOpenChange={setIsAssociationDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Confirmar Pagamento do Pedido</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="h-5 w-5" />
+              Confirmar Pagamento do Pedido
+            </DialogTitle>
             <DialogDescription>
-              Selecione a transação OFX que corresponde ao pagamento deste pedido
+              Selecione a transação bancária que corresponde ao pagamento deste pedido. 
+              O sistema criará automaticamente o registro de pagamento.
             </DialogDescription>
           </DialogHeader>
           
@@ -561,7 +599,7 @@ export default function FinanceReconciliation() {
             <div className="space-y-6">
               {/* Order Info */}
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-900 mb-2">Pedido Selecionado</h4>
+                <h4 className="font-semibold text-blue-900 mb-3">📋 Pedido Selecionado</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-blue-700 font-medium">Número:</span> {selectedOrder.orderNumber}
@@ -570,32 +608,62 @@ export default function FinanceReconciliation() {
                     <span className="text-blue-700 font-medium">Cliente:</span> {selectedOrder.clientName}
                   </div>
                   <div>
-                    <span className="text-blue-700 font-medium">Valor Total:</span> R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <span className="text-blue-700 font-medium">Valor Total:</span> 
+                    <span className="font-bold"> R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div>
-                    <span className="text-blue-700 font-medium">Saldo Devedor:</span> R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <span className="text-blue-700 font-medium">Já Pago:</span> 
+                    <span className="font-bold"> R$ {parseFloat(selectedOrder.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-blue-700 font-medium">Saldo Devedor:</span> 
+                    <span className="font-bold text-red-600"> R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>
 
+              {/* Selected Transaction Preview */}
+              {selectedTransaction && (
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-2">✅ Transação Selecionada</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-green-700 font-medium">Data:</span> {new Date(selectedTransaction.date).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div>
+                      <span className="text-green-700 font-medium">Valor:</span> 
+                      <span className="font-bold"> R$ {parseFloat(selectedTransaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-green-700 font-medium">Descrição:</span> {selectedTransaction.description}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Compatible Transactions */}
               <div>
-                <h4 className="font-semibold mb-3">Transações Compatíveis</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
+                    {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length}
+                  </span>
+                  Transações Compatíveis (valor similar ao saldo devedor)
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
                   {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).map((transaction: any) => (
                     <div
                       key={transaction.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                      className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
                         selectedTransaction?.id === transaction.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:bg-gray-50'
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:bg-white hover:shadow-sm'
                       }`}
                       onClick={() => setSelectedTransaction(transaction)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                          <p className="text-sm text-gray-600">{transaction.description}</p>
+                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-green-600">
@@ -608,27 +676,35 @@ export default function FinanceReconciliation() {
                       </div>
                     </div>
                   ))}
+                  {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length === 0 && (
+                    <p className="text-center text-gray-500 py-4">Nenhuma transação compatível encontrada</p>
+                  )}
                 </div>
               </div>
 
               {/* All Unreconciled Transactions */}
               <div>
-                <h4 className="font-semibold mb-3">Todas as Transações Disponíveis</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
+                    {unreconciled.length}
+                  </span>
+                  Todas as Transações Não Conciliadas
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
                   {unreconciled.map((transaction: any) => (
                     <div
                       key={transaction.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                      className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
                         selectedTransaction?.id === transaction.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:bg-gray-50'
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:bg-white hover:shadow-sm'
                       }`}
                       onClick={() => setSelectedTransaction(transaction)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                          <p className="text-sm text-gray-600">{transaction.description}</p>
+                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-green-600">
@@ -644,7 +720,7 @@ export default function FinanceReconciliation() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end space-x-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsAssociationDialogOpen(false)}>
                   Cancelar
                 </Button>
@@ -653,7 +729,7 @@ export default function FinanceReconciliation() {
                   onClick={handleAssociatePayment}
                   disabled={!selectedTransaction || associatePaymentMutation.isPending}
                 >
-                  {associatePaymentMutation.isPending ? "Associando..." : "Confirmar Pagamento"}
+                  {associatePaymentMutation.isPending ? "Confirmando..." : "Confirmar Pagamento"}
                 </Button>
               </div>
             </div>

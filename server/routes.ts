@@ -2691,28 +2691,75 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const orders = await storage.getOrders();
       const clients = await storage.getClients();
-      const vendors = await storage.getUsers();
+      const users = await storage.getUsers();
       
-      const pendingOrders = orders
-        .filter(order => {
-          const totalValue = parseFloat(order.totalValue);
-          const paidValue = parseFloat(order.paidValue || '0');
-          return paidValue < totalValue; // Has pending balance
-        })
-        .map(order => {
-          const client = clients.find(c => c.id === order.clientId);
-          const vendor = vendors.find(v => v.id === order.vendorId);
-          
-          return {
-            ...order,
-            clientName: client?.name || 'Unknown',
-            vendorName: vendor?.name || 'Unknown',
-            remainingBalance: (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toFixed(2)
-          };
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const pendingOrders = await Promise.all(
+        orders
+          .filter(order => {
+            const totalValue = parseFloat(order.totalValue);
+            const paidValue = parseFloat(order.paidValue || '0');
+            return paidValue < totalValue && order.status !== 'cancelled'; // Has pending balance and not cancelled
+          })
+          .map(async (order) => {
+            // Try to get client by direct ID first
+            let clientName = 'Unknown';
+            const client = clients.find(c => c.id === order.clientId);
+            if (client) {
+              clientName = client.name;
+            } else {
+              // Fallback to user table
+              const clientUser = users.find(u => u.id === order.clientId);
+              if (clientUser) {
+                clientName = clientUser.name;
+              }
+            }
+            
+            const vendor = users.find(v => v.id === order.vendorId);
+            const producer = order.producerId ? users.find(p => p.id === order.producerId) : null;
+            
+            // Get payment history for this order
+            const payments = await storage.getPaymentsByOrder(order.id);
+            const confirmedPayments = payments.filter(p => p.status === 'confirmed');
+            
+            const totalValue = parseFloat(order.totalValue);
+            const paidValue = parseFloat(order.paidValue || '0');
+            const remainingBalance = totalValue - paidValue;
+            
+            return {
+              ...order,
+              clientName,
+              vendorName: vendor?.name || 'Unknown',
+              producerName: producer?.name || null,
+              remainingBalance: remainingBalance.toFixed(2),
+              paymentHistory: confirmedPayments.map(p => ({
+                id: p.id,
+                amount: p.amount,
+                method: p.method,
+                paidAt: p.paidAt,
+                transactionId: p.transactionId
+              })),
+              paymentCount: confirmedPayments.length,
+              paymentPercentage: Math.round((paidValue / totalValue) * 100)
+            };
+          })
+      );
       
-      res.json(pendingOrders);
+      // Sort by creation date (newest first) and then by remaining balance (highest first)
+      const sortedOrders = pendingOrders.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        const balanceA = parseFloat(a.remainingBalance);
+        const balanceB = parseFloat(b.remainingBalance);
+        
+        // First by date (newest first), then by balance (highest first)
+        if (dateB !== dateA) {
+          return dateB - dateA;
+        }
+        return balanceB - balanceA;
+      });
+      
+      console.log(`Returning ${sortedOrders.length} pending orders for reconciliation`);
+      res.json(sortedOrders);
     } catch (error) {
       console.error("Failed to fetch pending orders:", error);
       res.status(500).json({ error: "Failed to fetch pending orders" });
@@ -2724,6 +2771,30 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { transactionId, orderId, amount } = req.body;
       
+      console.log("Associating payment:", { transactionId, orderId, amount });
+
+      // Validate inputs
+      if (!transactionId || !orderId || !amount) {
+        return res.status(400).json({ error: "Dados incompletos para associar pagamento" });
+      }
+
+      // Get order to validate
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Get transaction to validate
+      const bankTransactions = await storage.getBankTransactions();
+      const transaction = bankTransactions.find(t => t.id === transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação bancária não encontrada" });
+      }
+
+      if (transaction.status === 'matched') {
+        return res.status(400).json({ error: "Esta transação já foi conciliada" });
+      }
+
       // Mark transaction as matched
       await storage.updateBankTransaction(transactionId, {
         status: 'matched',
@@ -2731,22 +2802,37 @@ Para mais detalhes, entre em contato conosco!`;
         matchedAt: new Date()
       });
 
-      // Create payment record
+      // Create payment record with proper description
       const payment = await storage.createPayment({
         orderId,
-        amount,
+        amount: parseFloat(amount).toFixed(2),
         method: 'bank_transfer',
         status: 'confirmed',
         transactionId: `BANK-${transactionId}`,
-        paidAt: new Date()
+        paidAt: transaction.date || new Date()
       });
 
-      // Update order paid value will be handled automatically by the payment creation
+      // Get updated order to return current state
+      const updatedOrder = await storage.getOrder(orderId);
 
-      res.json({ success: true, payment });
+      console.log("Payment association successful:", {
+        paymentId: payment.id,
+        amount: payment.amount,
+        orderPaidValue: updatedOrder?.paidValue
+      });
+
+      res.json({ 
+        success: true, 
+        payment,
+        order: updatedOrder,
+        message: "Pagamento confirmado e associado ao pedido com sucesso"
+      });
     } catch (error) {
       console.error("Failed to associate payment:", error);
-      res.status(500).json({ error: "Failed to associate payment" });
+      res.status(500).json({ 
+        error: "Erro ao associar pagamento",
+        details: (error as Error).message 
+      });
     }
   });
 
