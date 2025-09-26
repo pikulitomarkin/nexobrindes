@@ -994,7 +994,7 @@ export class MemStorage implements IStorage {
     ];
 
     sampleExpenses.forEach(expense => {
-      this.mockData.expenses.push(expense);
+      this.mockData.expenseNotes.push(expense);
     });
   }
 
@@ -2241,15 +2241,15 @@ export class MemStorage implements IStorage {
 
   // Financial module methods - Expense Notes
   async getExpenseNotes(): Promise<ExpenseNote[]> {
-    return this.mockData.expenses || [];
+    return this.mockData.expenseNotes || [];
   }
 
   async getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]> {
-    return (this.mockData.expenses || []).filter(en => en.vendorId === vendorId);
+    return (this.mockData.expenseNotes || []).filter(en => en.vendorId === vendorId);
   }
 
   async getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]> {
-    return (this.mockData.expenses || []).filter(en => en.orderId === orderId);
+    return (this.mockData.expenseNotes || []).filter(en => en.orderId === orderId);
   }
 
   async createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote> {
@@ -2260,12 +2260,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.mockData.expenses.push(expense);
+    this.mockData.expenseNotes.push(expense);
     return expense;
   }
 
   async updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined> {
-    const existing = this.mockData.expenses.find(exp => exp.id === id);
+    const existing = this.mockData.expenseNotes.find(exp => exp.id === id);
     if (!existing) return undefined;
 
     const updated: ExpenseNote = {
@@ -2274,9 +2274,9 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    const index = this.mockData.expenses.findIndex(exp => exp.id === id);
+    const index = this.mockData.expenseNotes.findIndex(exp => exp.id === id);
     if (index !== -1) {
-      this.mockData.expenses[index] = updated;
+      this.mockData.expenseNotes[index] = updated;
     }
     return updated;
   }

@@ -892,7 +892,7 @@ export default function VendorBudgets() {
                                   />
                                 </div>
                               </div>
-                            )
+                            )}
 
                             {/* Image Upload for Product Customization */}
                             <div>
