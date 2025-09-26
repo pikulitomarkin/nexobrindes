@@ -2686,6 +2686,70 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get orders with pending balance for reconciliation
+  app.get("/api/finance/pending-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const clients = await storage.getClients();
+      const vendors = await storage.getUsers();
+      
+      const pendingOrders = orders
+        .filter(order => {
+          const totalValue = parseFloat(order.totalValue);
+          const paidValue = parseFloat(order.paidValue || '0');
+          return paidValue < totalValue; // Has pending balance
+        })
+        .map(order => {
+          const client = clients.find(c => c.id === order.clientId);
+          const vendor = vendors.find(v => v.id === order.vendorId);
+          
+          return {
+            ...order,
+            clientName: client?.name || 'Unknown',
+            vendorName: vendor?.name || 'Unknown',
+            remainingBalance: (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')).toFixed(2)
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      res.json(pendingOrders);
+    } catch (error) {
+      console.error("Failed to fetch pending orders:", error);
+      res.status(500).json({ error: "Failed to fetch pending orders" });
+    }
+  });
+
+  // Associate bank transaction with order payment
+  app.post("/api/finance/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, orderId, amount } = req.body;
+      
+      // Mark transaction as matched
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedOrderId: orderId,
+        matchedAt: new Date()
+      });
+
+      // Create payment record
+      const payment = await storage.createPayment({
+        orderId,
+        amount,
+        method: 'bank_transfer',
+        status: 'confirmed',
+        transactionId: `BANK-${transactionId}`,
+        paidAt: new Date()
+      });
+
+      // Update order paid value will be handled automatically by the payment creation
+
+      res.json({ success: true, payment });
+    } catch (error) {
+      console.error("Failed to associate payment:", error);
+      res.status(500).json({ error: "Failed to associate payment" });
+    }
+  });
+
   app.patch("/api/finance/expenses/:id", async (req, res) => {
     try {
       const expense = await storage.updateExpenseNote(req.params.id, req.body);

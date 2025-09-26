@@ -2107,7 +2107,7 @@ export class MemStorage implements IStorage {
     return transaction;
   }
 
-  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined> {
+  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined> {
     const existing = this.mockData.bankTransactions.find(txn => txn.id === id);
     if (!existing) return undefined;
 
