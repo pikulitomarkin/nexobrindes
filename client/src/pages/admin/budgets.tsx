@@ -13,6 +13,7 @@ import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, P
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
+import { CustomizationSelector } from "@/components/customization-selector";
 
 export default function AdminBudgets() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -93,8 +94,10 @@ export default function AdminBudgets() {
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
+      selectedCustomizationId: "",
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
+      additionalCustomizationNotes: "",
       productWidth: "",
       productHeight: "",
       productDepth: ""
@@ -640,26 +643,54 @@ export default function AdminBudgets() {
                         </div>
 
                         {item.hasItemCustomization && (
-                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
-                            <div>
-                              <Label htmlFor={`admin-item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
-                              <Input
-                                id={`admin-item-customization-value-${index}`}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.itemCustomizationValue}
-                                onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationValue', e.target.value)}
-                                placeholder="0,00"
-                              />
+                          <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
+                            <CustomizationSelector 
+                              productCategory={products.find((p: any) => p.id === item.productId)?.category}
+                              quantity={item.quantity}
+                              selectedCustomization={item.selectedCustomizationId || ''}
+                              onCustomizationChange={(customization) => {
+                                if (customization) {
+                                  updateAdminBudgetItem(index, 'selectedCustomizationId', customization.id);
+                                  updateAdminBudgetItem(index, 'itemCustomizationValue', customization.price);
+                                  updateAdminBudgetItem(index, 'itemCustomizationDescription', customization.name);
+                                } else {
+                                  updateAdminBudgetItem(index, 'selectedCustomizationId', '');
+                                  // Não limpar os valores manuais
+                                }
+                              }}
+                            />
+                            
+                            {/* Campos manuais sempre visíveis */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`admin-item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                                <Input
+                                  id={`admin-item-customization-value-${index}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.itemCustomizationValue || 0}
+                                  onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationValue', parseFloat(e.target.value) || 0)}
+                                  placeholder="0,00"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`admin-item-customization-description-${index}`}>Descrição da Personalização</Label>
+                                <Input
+                                  id={`admin-item-customization-description-${index}`}
+                                  value={item.itemCustomizationDescription || ''}
+                                  onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
+                                  placeholder="Ex: Gravação, bordado, cor especial..."
+                                />
+                              </div>
                             </div>
+                            
                             <div>
-                              <Label htmlFor={`admin-item-customization-description-${index}`}>Descrição</Label>
+                              <Label>Observações Adicionais (Opcional)</Label>
                               <Input
-                                id={`admin-item-customization-description-${index}`}
-                                value={item.itemCustomizationDescription}
-                                onChange={(e) => updateAdminBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
-                                placeholder="Ex: Gravação, cor especial..."
+                                value={item.additionalCustomizationNotes || ''}
+                                onChange={(e) => updateAdminBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
+                                placeholder="Observações extras sobre a personalização..."
                               />
                             </div>
                           </div>

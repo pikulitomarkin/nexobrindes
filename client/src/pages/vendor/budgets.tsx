@@ -874,31 +874,44 @@ export default function VendorBudgets() {
                                   updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
                                 } else {
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
-                                  updateBudgetItem(index, 'itemCustomizationValue', 0);
-                                  updateBudgetItem(index, 'itemCustomizationDescription', '');
+                                  // Não limpar os valores manuais quando "Sem personalização" for selecionado
+                                  // updateBudgetItem(index, 'itemCustomizationValue', 0);
+                                  // updateBudgetItem(index, 'itemCustomizationDescription', '');
                                 }
                               }}
                             />
                             
-                            {item.selectedCustomizationId && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label>Valor da Personalização</Label>
-                                  <Input
-                                    value={`R$ ${parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                    disabled
-                                  />
-                                </div>
-                                <div>
-                                  <Label>Descrição Adicional (Opcional)</Label>
-                                  <Input
-                                    value={item.additionalCustomizationNotes || ''}
-                                    onChange={(e) => updateBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
-                                    placeholder="Observações extras..."
-                                  />
-                                </div>
+                            {/* Campos manuais sempre visíveis quando personalização está ativa */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label>Valor da Personalização (R$)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.itemCustomizationValue || 0}
+                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationValue', parseFloat(e.target.value) || 0)}
+                                  placeholder="0,00"
+                                />
                               </div>
-                            )}
+                              <div>
+                                <Label>Descrição da Personalização</Label>
+                                <Input
+                                  value={item.itemCustomizationDescription || ''}
+                                  onChange={(e) => updateBudgetItem(index, 'itemCustomizationDescription', e.target.value)}
+                                  placeholder="Ex: Gravação, bordado, cor especial..."
+                                />
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <Label>Observações Adicionais (Opcional)</Label>
+                              <Input
+                                value={item.additionalCustomizationNotes || ''}
+                                onChange={(e) => updateBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
+                                placeholder="Observações extras sobre a personalização..."
+                              />
+                            </div>
 
                             {/* Image Upload for Product Customization */}
                             <div>

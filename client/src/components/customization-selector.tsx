@@ -44,16 +44,6 @@ export function CustomizationSelector({
     );
   }
 
-  if (customizations.length === 0) {
-    return (
-      <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
-        Nenhuma personalização disponível para a categoria "{productCategory}" com quantidade {quantity}.
-        <br />
-        <span className="text-xs">Verifique se há opções cadastradas com quantidade mínima menor ou igual a {quantity}.</span>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
       <div>
@@ -92,9 +82,20 @@ export function CustomizationSelector({
         </div>
       </div>
 
+      {customizations.length === 0 && (
+        <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
+          <p className="font-medium mb-1">Nenhuma personalização pré-cadastrada disponível</p>
+          <p className="text-xs">
+            Para a categoria "{productCategory}" com quantidade {quantity}, não há opções cadastradas.
+            <br />
+            Você pode criar uma personalização customizada usando os campos abaixo.
+          </p>
+        </div>
+      )}
+
       {customizations.length > 0 && (
         <div className="bg-gray-50 p-3 rounded text-sm">
-          <h4 className="font-medium mb-2">Opções disponíveis:</h4>
+          <h4 className="font-medium mb-2">Opções pré-cadastradas disponíveis:</h4>
           <div className="space-y-1">
             {customizations.map((customization: any) => (
               <div key={customization.id} className="flex justify-between text-xs">
