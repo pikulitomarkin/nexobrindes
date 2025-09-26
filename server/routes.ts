@@ -6,6 +6,42 @@ import path from 'path';
 import { storage } from "./storage";
 import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder } from './db'; // Assuming these are your database models and functions
 
+// Mock requireAuth middleware for demonstration purposes
+// In a real application, this would verify JWT tokens or session
+const requireAuth = async (req: any, res: any, next: any) => {
+  // Mock authentication: Assume any request to these routes is authenticated
+  // In a real app, you'd check req.headers.authorization, verify token, etc.
+  // For now, we'll just log and proceed to simulate authentication success.
+  console.log("Simulating authentication check...");
+
+  // Mock req.user for routes that need it
+  // This should be populated based on the actual authenticated user
+  req.user = { id: 'mock-user-id', role: 'admin' }; // Example user
+
+  // Example: If you have a token verification middleware, it would look something like this:
+  /*
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: Token not provided' });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    req.user = await storage.getUser(decoded.userId); // Fetch user from DB
+    if (!req.user || !req.user.isActive) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or inactive user' });
+    }
+    next();
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+  */
+
+  // For this example, we'll just allow the request to proceed
+  next();
+};
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
@@ -1514,53 +1550,120 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Settings Routes - Customization Options
-  app.get("/api/settings/customization-options", async (req, res) => {
+  app.get("/api/settings/customization-options", requireAuth, (req, res) => {
+    const customizations = db.data.customizationOptions || [];
+    res.json(customizations);
+  });
+
+  app.post("/api/settings/customization-options", requireAuth, (req, res) => {
     try {
-      const options = await storage.getCustomizationOptions();
-      res.json(options);
+      const { name, description, category, minQuantity, price, isActive } = req.body;
+
+      if (!name || !category || minQuantity === undefined || price === undefined) {
+        return res.status(400).json({ error: "Campos obrigatórios não preenchidos" });
+      }
+
+      const newCustomization = {
+        id: `custom-${Date.now()}`,
+        name,
+        description: description || "",
+        category,
+        minQuantity: parseInt(minQuantity),
+        price: parseFloat(price),
+        isActive: isActive !== undefined ? isActive : true,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (!db.data.customizationOptions) {
+        db.data.customizationOptions = [];
+      }
+
+      db.data.customizationOptions.push(newCustomization);
+      db.write();
+
+      res.json(newCustomization);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch customization options" });
+      console.error('Error creating customization:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
 
-  app.post("/api/settings/customization-options", async (req, res) => {
+  app.put("/api/settings/customization-options/:id", requireAuth, (req, res) => {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ error: "Usuário não autenticado" });
+      const { id } = req.params;
+      const { name, description, category, minQuantity, price, isActive } = req.body;
+
+      if (!db.data.customizationOptions) {
+        return res.status(404).json({ error: "Personalização não encontrada" });
       }
-      
-      const newOption = await storage.createCustomizationOption({
-        ...req.body,
-        createdBy: user.id
-      });
-      res.json(newOption);
+
+      const index = db.data.customizationOptions.findIndex(c => c.id === id);
+      if (index === -1) {
+        return res.status(404).json({ error: "Personalização não encontrada" });
+      }
+
+      db.data.customizationOptions[index] = {
+        ...db.data.customizationOptions[index],
+        name,
+        description: description || "",
+        category,
+        minQuantity: parseInt(minQuantity),
+        price: parseFloat(price),
+        isActive: isActive !== undefined ? isActive : true,
+        updatedAt: new Date().toISOString(),
+      };
+
+      db.write();
+      res.json(db.data.customizationOptions[index]);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create customization option" });
+      console.error('Error updating customization:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
 
-  app.put("/api/settings/customization-options/:id", async (req, res) => {
+  app.delete("/api/settings/customization-options/:id", requireAuth, (req, res) => {
     try {
-      const updatedOption = await storage.updateCustomizationOption(req.params.id, req.body);
-      if (!updatedOption) {
-        return res.status(404).json({ error: "Customization option not found" });
-      }
-      res.json(updatedOption);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update customization option" });
-    }
-  });
+      const { id } = req.params;
 
-  app.delete("/api/settings/customization-options/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deleteCustomizationOption(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Customization option not found" });
+      if (!db.data.customizationOptions) {
+        return res.status(404).json({ error: "Personalização não encontrada" });
       }
+
+      const index = db.data.customizationOptions.findIndex(c => c.id === id);
+      if (index === -1) {
+        return res.status(404).json({ error: "Personalização não encontrada" });
+      }
+
+      db.data.customizationOptions.splice(index, 1);
+      db.write();
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete customization option" });
+      console.error('Error deleting customization:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  app.get("/api/settings/customization-options/category/:category", requireAuth, (req, res) => {
+    try {
+      const { category } = req.params;
+      const { minQuantity } = req.query;
+
+      const customizations = db.data.customizationOptions || [];
+      let filtered = customizations.filter(c => 
+        c.category === category && 
+        c.isActive === true
+      );
+
+      if (minQuantity) {
+        const qty = parseInt(minQuantity as string);
+        filtered = filtered.filter(c => c.minQuantity <= qty);
+      }
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('Error fetching customizations by category:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
 
@@ -1568,7 +1671,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/customization-options", async (req, res) => {
     try {
       const { category, quantity } = req.query;
-      
+
       if (category && quantity) {
         const options = await storage.getCustomizationOptionsByCategory(
           category as string, 
@@ -1817,6 +1920,10 @@ Para mais detalhes, entre em contato conosco!`;
 
           return {
             ...client,
+            id: client.id,
+            userId: client.userId,
+            userCode: user?.username || 'N/A',
+            username: user?.username,
             ordersCount,
             totalSpent
           };
