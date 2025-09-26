@@ -1,4 +1,3 @@
-replit_final_file>
 import { 
   BarChart3, 
   Bus, 
@@ -337,4 +336,3 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     </div>
   );
 }
-</replit_final_file>
