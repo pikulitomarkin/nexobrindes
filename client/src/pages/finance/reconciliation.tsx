@@ -556,7 +556,7 @@ export default function FinanceReconciliation() {
                           size="sm"
                           onClick={() => openAssociationDialog(order)}
                           className="gradient-bg text-white hover:opacity-90"
-                          disabled={bankTransactions && bankTransactions.length === 0}
+                          disabled={!bankTransactions || bankTransactions.filter((t: any) => (t.status === 'unmatched' || !t.status) && parseFloat(t.amount) > 0).length === 0}
                         >
                           <Link className="h-3 w-3 mr-1" />
                           Confirmar Pagamento
