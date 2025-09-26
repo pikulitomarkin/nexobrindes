@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, CheckCircle, AlertCircle, Download, Plus, Link, DollarSign } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, FileText, CheckCircle, AlertCircle, Download, Plus, Link, DollarSign, CreditCard, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -456,177 +457,201 @@ export default function FinanceReconciliation() {
         </Card>
       </div>
 
-      {/* Conciliation Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Pending Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Pedidos com Saldo Devedor ({pendingOrders?.length || 0})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {pendingOrders?.map((order: any) => {
-                const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
-                const compatibleTransactions = getCompatibleTransactions(remainingValue);
-                
-                // Get budget down payment info if available
-                let budgetDownPayment = 0;
-                let expectedDownPayment = remainingValue; // Default to remaining value
-                
-                if (order.budgetInfo && order.budgetInfo.downPayment) {
-                  budgetDownPayment = parseFloat(order.budgetInfo.downPayment);
+      {/* Orders Reconciliation Section */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Conciliação de Pagamentos dos Pedidos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="awaiting-down-payment" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="awaiting-down-payment" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Aguardando Entrada ({pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') === 0).length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="awaiting-final-payment" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Aguardando Finalização ({pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0).length || 0})
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="awaiting-down-payment" className="mt-6">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') === 0).map((order: any) => {
+                  const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
                   
-                  // If no payment has been made yet, the expected payment is the down payment
-                  if (parseFloat(order.paidValue || '0') === 0) {
+                  // Get budget down payment info if available
+                  let budgetDownPayment = 0;
+                  let expectedDownPayment = remainingValue; // Default to remaining value
+                  
+                  if (order.budgetInfo && order.budgetInfo.downPayment) {
+                    budgetDownPayment = parseFloat(order.budgetInfo.downPayment);
                     expectedDownPayment = budgetDownPayment;
                   }
-                }
-                
-                // Get transactions that match the expected payment amount
-                const expectedCompatibleTransactions = getCompatibleTransactions(expectedDownPayment);
-                
-                return (
-                  <div key={order.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-gray-900">{order.orderNumber}</p>
-                        <p className="text-sm text-gray-600">{order.clientName}</p>
-                        <p className="text-xs text-gray-500">
-                          Criado em: {new Date(order.createdAt).toLocaleDateString('pt-BR')}
-                        </p>
+                  
+                  // Get transactions that match the expected payment amount
+                  const expectedCompatibleTransactions = getCompatibleTransactions(expectedDownPayment);
+                  
+                  return (
+                    <div key={order.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200 hover:border-orange-300 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                          <p className="text-sm text-gray-600">{order.clientName}</p>
+                          <p className="text-xs text-gray-500">
+                            Criado em: {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">
+                            R$ {remainingValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Total: R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          {budgetDownPayment > 0 && (
+                            <p className="text-xs text-blue-600 font-medium">
+                              Entrada esperada: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                          {budgetDownPayment === 0 && (
+                            <p className="text-xs text-orange-600">
+                              Aguardando entrada
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-red-600">
-                          R$ {remainingValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Total: R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        {parseFloat(order.paidValue || '0') > 0 && (
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          {budgetDownPayment > 0 ? (
+                            <span className="text-blue-600">
+                              Entrada orçamento: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({Math.round((budgetDownPayment / parseFloat(order.totalValue)) * 100)}%)
+                            </span>
+                          ) : (
+                            <span className="text-orange-600">Aguardando definição de entrada</span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {expectedCompatibleTransactions.length > 0 && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                              {expectedCompatibleTransactions.length} transação{expectedCompatibleTransactions.length !== 1 ? 'ões' : ''} compatível{expectedCompatibleTransactions.length !== 1 ? 'is' : ''}
+                              {budgetDownPayment > 0 && (
+                                <span className="ml-1">(R$ {expectedDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
+                              )}
+                            </Badge>
+                          )}
+                          {getAllUnmatchedTransactions().length > 0 && expectedCompatibleTransactions.length === 0 && (
+                            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
+                              {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => openAssociationDialog(order)}
+                            className="gradient-bg text-white hover:opacity-90"
+                            disabled={!bankTransactions || bankTransactions.filter((t: any) => (t.status === 'unmatched' || !t.status) && parseFloat(t.amount) > 0).length === 0}
+                          >
+                            <Link className="h-3 w-3 mr-1" />
+                            Confirmar Entrada
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }) || []}
+                
+                {(!pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') === 0) || pendingOrders.filter((order: any) => parseFloat(order.paidValue || '0') === 0).length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Nenhum pedido aguardando entrada</p>
+                    <p className="text-xs">Todos os pedidos já receberam o pagamento inicial</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="awaiting-final-payment" className="mt-6">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0).map((order: any) => {
+                  const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
+                  const compatibleTransactions = getCompatibleTransactions(remainingValue);
+                  
+                  return (
+                    <div key={order.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                          <p className="text-sm text-gray-600">{order.clientName}</p>
+                          <p className="text-xs text-gray-500">
+                            Criado em: {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600">
+                            R$ {remainingValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Total: R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
                           <p className="text-xs text-green-600">
                             Pago: R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
-                        )}
-                        {budgetDownPayment > 0 && parseFloat(order.paidValue || '0') === 0 && (
-                          <p className="text-xs text-blue-600 font-medium">
-                            Entrada esperada: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                        )}
-                        {budgetDownPayment === 0 && parseFloat(order.paidValue || '0') === 0 && (
-                          <p className="text-xs text-orange-600">
-                            Aguardando entrada
-                          </p>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
-                        {parseFloat(order.paidValue || '0') > 0 ? (
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
                           <span className="text-green-600">
                             {Math.round((parseFloat(order.paidValue) / parseFloat(order.totalValue)) * 100)}% pago
                           </span>
-                        ) : budgetDownPayment > 0 ? (
-                          <span className="text-blue-600">
-                            Entrada orçamento: R$ {budgetDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({Math.round((budgetDownPayment / parseFloat(order.totalValue)) * 100)}%)
+                          <span className="text-blue-600 ml-2">
+                            Aguardando R$ {remainingValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para finalização
                           </span>
-                        ) : (
-                          <span className="text-yellow-600">Aguardando entrada</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {expectedCompatibleTransactions.length > 0 && (
-                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                            {expectedCompatibleTransactions.length} transação{expectedCompatibleTransactions.length !== 1 ? 'ões' : ''} compatível{expectedCompatibleTransactions.length !== 1 ? 'is' : ''}
-                            {budgetDownPayment > 0 && parseFloat(order.paidValue || '0') === 0 && (
-                              <span className="ml-1">(R$ {expectedDownPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
-                            )}
-                          </Badge>
-                        )}
-                        {getAllUnmatchedTransactions().length > 0 && expectedCompatibleTransactions.length === 0 && (
-                          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
-                            {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
-                          </Badge>
-                        )}
-                        <Button
-                          size="sm"
-                          onClick={() => openAssociationDialog(order)}
-                          className="gradient-bg text-white hover:opacity-90"
-                          disabled={!bankTransactions || bankTransactions.filter((t: any) => (t.status === 'unmatched' || !t.status) && parseFloat(t.amount) > 0).length === 0}
-                        >
-                          <Link className="h-3 w-3 mr-1" />
-                          Confirmar Pagamento
-                        </Button>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {compatibleTransactions.length > 0 && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                              {compatibleTransactions.length} transação{compatibleTransactions.length !== 1 ? 'ões' : ''} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
+                            </Badge>
+                          )}
+                          {getAllUnmatchedTransactions().length > 0 && compatibleTransactions.length === 0 && (
+                            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
+                              {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => openAssociationDialog(order)}
+                            className="gradient-bg text-white hover:opacity-90"
+                            disabled={!bankTransactions || bankTransactions.filter((t: any) => (t.status === 'unmatched' || !t.status) && parseFloat(t.amount) > 0).length === 0}
+                          >
+                            <Link className="h-3 w-3 mr-1" />
+                            Confirmar Pagamento Final
+                          </Button>
+                        </div>
                       </div>
                     </div>
+                  );
+                }) || []}
+                
+                {(!pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0) || pendingOrders.filter((order: any) => parseFloat(order.paidValue || '0') > 0).length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Nenhum pedido aguardando pagamento final</p>
+                    <p className="text-xs">Todos os pedidos estão aguardando entrada ou já foram finalizados</p>
                   </div>
-                );
-              }) || []}
-              
-              {(!pendingOrders || pendingOrders.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
-                  <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Nenhum pedido com saldo devedor</p>
-                  <p className="text-xs">Todos os pedidos estão pagos integralmente</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Unreconciled Transactions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Transações Não Conciliadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {unreconciled.map((transaction: any) => (
-                <div key={transaction.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                      </p>
-                      <p className="text-sm text-gray-600 truncate max-w-[200px]">
-                        {transaction.description}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">
-                        R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      {transaction.bankRef && (
-                        <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <Badge variant="outline" className="text-xs">
-                      Aguardando associação
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-              
-              {unreconciled.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Todas as transações foram conciliadas</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Association Dialog */}
       <Dialog open={isAssociationDialogOpen} onOpenChange={setIsAssociationDialogOpen}>
