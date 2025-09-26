@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 
 interface CustomizationSelectorProps {
-  productCategory: string | undefined;
+  productCategory?: string | undefined;
   quantity: number;
   selectedCustomization: string | undefined;
   onCustomizationChange: (customization: any) => void;
@@ -17,14 +17,18 @@ export function CustomizationSelector({
   onCustomizationChange 
 }: CustomizationSelectorProps) {
   const { data: customizations = [], isLoading } = useQuery({
-    queryKey: ["/api/settings/customization-options"],
+    queryKey: ["/api/settings/customization-options", quantity],
     queryFn: async () => {
-      // Sempre busca todas as personalizações, independente da categoria
+      // Busca todas as personalizações ativas do sistema
       const response = await fetch('/api/settings/customization-options');
       if (!response.ok) return [];
       const allCustomizations = await response.json();
+      
       // Filtra apenas por quantidade mínima e status ativo
-      return allCustomizations.filter((c: any) => c.minQuantity <= quantity && c.isActive);
+      // Mostra TODAS as personalizações ativas, independente da categoria
+      return allCustomizations.filter((c: any) => 
+        c.isActive && c.minQuantity <= quantity
+      );
     },
     enabled: quantity > 0,
   });
@@ -60,10 +64,13 @@ export function CustomizationSelector({
             {customizations.map((customization: any) => (
               <SelectItem key={customization.id} value={customization.id}>
                 <div className="flex justify-between items-center w-full">
-                  <span>{customization.name}</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{customization.name}</span>
+                    <span className="text-xs text-gray-500">{customization.category}</span>
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
                     <span>Min: {customization.minQuantity}</span>
-                    <span>R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-medium text-green-600">R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </SelectItem>
@@ -71,17 +78,20 @@ export function CustomizationSelector({
           </SelectContent>
         </Select>
         <div className="text-xs text-gray-500 mt-1">
-          Mostrando todas as personalizações disponíveis para quantidade: {quantity} unidades
+          Mostrando todas as personalizações ativas do sistema para quantidade: {quantity} unidades
         </div>
       </div>
 
-      {customizations.length === 0 && (
+      {customizations.length === 0 && !isLoading && (
         <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
           <p className="font-medium mb-1">Nenhuma personalização disponível</p>
           <p className="text-xs">
-            Para quantidade {quantity}, não há personalizações cadastradas com quantidade mínima adequada.
+            {quantity > 0 ? 
+              `Para quantidade ${quantity}, não há personalizações ativas cadastradas com quantidade mínima adequada.` :
+              'Defina uma quantidade para ver as personalizações disponíveis.'
+            }
             <br />
-            Você pode criar uma personalização customizada usando os campos abaixo.
+            Cadastre novas personalizações no painel administrativo ou ajuste a quantidade mínima.
           </p>
         </div>
       )}
