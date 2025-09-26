@@ -19,22 +19,22 @@ export function CustomizationSelector({
   const { data: customizations = [], isLoading } = useQuery({
     queryKey: ["/api/settings/customization-options", { category: productCategory, quantity }],
     queryFn: async () => {
-      if (!productCategory) return [];
+      // Se não há categoria do produto ou categoria está vazia, busca todas as personalizações
+      if (!productCategory || productCategory.trim() === '') {
+        const response = await fetch('/api/settings/customization-options');
+        if (!response.ok) return [];
+        const allCustomizations = await response.json();
+        // Filtra apenas por quantidade mínima
+        return allCustomizations.filter((c: any) => c.minQuantity <= quantity && c.isActive);
+      }
       
+      // Se há categoria, busca por categoria específica
       const response = await fetch(`/api/settings/customization-options/category/${encodeURIComponent(productCategory)}?minQuantity=${quantity}`);
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: !!productCategory && quantity > 0,
+    enabled: quantity > 0,
   });
-
-  if (!productCategory) {
-    return (
-      <div className="text-sm text-gray-500">
-        Selecione um produto para ver as opções de personalização
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -78,7 +78,7 @@ export function CustomizationSelector({
           </SelectContent>
         </Select>
         <div className="text-xs text-gray-500 mt-1">
-          Categoria: {productCategory} | Quantidade: {quantity} unidades
+          Categoria: {productCategory || 'Todas as categorias'} | Quantidade: {quantity} unidades
         </div>
       </div>
 
@@ -86,7 +86,10 @@ export function CustomizationSelector({
         <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
           <p className="font-medium mb-1">Nenhuma personalização pré-cadastrada disponível</p>
           <p className="text-xs">
-            Para a categoria "{productCategory}" com quantidade {quantity}, não há opções cadastradas.
+            {productCategory ? 
+              `Para a categoria "${productCategory}" com quantidade ${quantity}, não há opções cadastradas.` :
+              `Para quantidade ${quantity}, não há opções cadastradas.`
+            }
             <br />
             Você pode criar uma personalização customizada usando os campos abaixo.
           </p>
