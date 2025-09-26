@@ -34,10 +34,10 @@ export default function AdminCustomizations() {
 
   // Queries
   const customizationsQuery = useQuery({
-    queryKey: ["/api/customizations"],
+    queryKey: ["/api/settings/customization-options"],
     queryFn: async () => {
-      const response = await fetch('/api/customizations');
-      if (!response.ok) throw new Error('Failed to fetch customizations');
+      const response = await fetch('/api/settings/customization-options');
+      if (!response.ok) throw new Error('Failed to fetch customization options');
       return response.json();
     },
   });
@@ -48,15 +48,20 @@ export default function AdminCustomizations() {
       const response = await fetch('/api/products?limit=9999');
       if (!response.ok) throw new Error('Failed to fetch products');
       const data = await response.json();
-      const categories = [...new Set((data.products || []).map((product: any) => product.category).filter(Boolean))];
-      return categories;
+      const categorySet = new Set<string>();
+      (data.products || []).forEach((product: any) => {
+        if (product.category && typeof product.category === 'string') {
+          categorySet.add(product.category);
+        }
+      });
+      return Array.from(categorySet);
     },
   });
 
   // Mutations
   const createCustomizationMutation = useMutation({
     mutationFn: async (data: typeof customizationForm) => {
-      const response = await fetch("/api/customizations", {
+      const response = await fetch("/api/settings/customization-options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,7 +75,7 @@ export default function AdminCustomizations() {
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização criada com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/customizations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
       resetForm();
       setIsDialogOpen(false);
     },
@@ -78,7 +83,7 @@ export default function AdminCustomizations() {
 
   const updateCustomizationMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof customizationForm }) => {
-      const response = await fetch(`/api/customizations/${id}`, {
+      const response = await fetch(`/api/settings/customization-options/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,7 +97,7 @@ export default function AdminCustomizations() {
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização atualizada com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/customizations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
       resetForm();
       setEditingCustomization(null);
       setIsDialogOpen(false);
@@ -101,13 +106,13 @@ export default function AdminCustomizations() {
 
   const deleteCustomizationMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/customizations/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/settings/customization-options/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Erro ao deletar personalização");
       return response.json();
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização deletada com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/customizations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
     },
   });
 
