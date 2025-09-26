@@ -1513,6 +1513,77 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Settings Routes - Customization Options
+  app.get("/api/settings/customization-options", async (req, res) => {
+    try {
+      const options = await storage.getCustomizationOptions();
+      res.json(options);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch customization options" });
+    }
+  });
+
+  app.post("/api/settings/customization-options", async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: "Usuário não autenticado" });
+      }
+      
+      const newOption = await storage.createCustomizationOption({
+        ...req.body,
+        createdBy: user.id
+      });
+      res.json(newOption);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create customization option" });
+    }
+  });
+
+  app.put("/api/settings/customization-options/:id", async (req, res) => {
+    try {
+      const updatedOption = await storage.updateCustomizationOption(req.params.id, req.body);
+      if (!updatedOption) {
+        return res.status(404).json({ error: "Customization option not found" });
+      }
+      res.json(updatedOption);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update customization option" });
+    }
+  });
+
+  app.delete("/api/settings/customization-options/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomizationOption(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Customization option not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete customization option" });
+    }
+  });
+
+  // Route to get customization options filtered by category and quantity
+  app.get("/api/customization-options", async (req, res) => {
+    try {
+      const { category, quantity } = req.query;
+      
+      if (category && quantity) {
+        const options = await storage.getCustomizationOptionsByCategory(
+          category as string, 
+          parseInt(quantity as string)
+        );
+        res.json(options);
+      } else {
+        const allOptions = await storage.getCustomizationOptions();
+        res.json(allOptions);
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch customization options" });
+    }
+  });
+
   // Active payment and shipping methods for vendor forms
   app.get("/api/payment-methods", async (req, res) => {
     try {

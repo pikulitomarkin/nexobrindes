@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Edit, Trash2, CreditCard, Truck, Settings } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Edit, Trash2, CreditCard, Truck, Settings, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -17,8 +18,10 @@ export default function AdminSettings() {
   const { toast } = useToast();
   const [paymentMethodDialogOpen, setPaymentMethodDialogOpen] = useState(false);
   const [shippingMethodDialogOpen, setShippingMethodDialogOpen] = useState(false);
+  const [customizationOptionDialogOpen, setCustomizationOptionDialogOpen] = useState(false);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<any>(null);
   const [editingShippingMethod, setEditingShippingMethod] = useState<any>(null);
+  const [editingCustomizationOption, setEditingCustomizationOption] = useState<any>(null);
 
   // Payment method form
   const [paymentMethodForm, setPaymentMethodForm] = useState({
@@ -39,6 +42,16 @@ export default function AdminSettings() {
     isActive: true
   });
 
+  // Customization option form
+  const [customizationOptionForm, setCustomizationOptionForm] = useState({
+    name: "",
+    description: "",
+    category: "",
+    minQuantity: 1,
+    price: 0,
+    isActive: true
+  });
+
   const { data: paymentMethods } = useQuery({
     queryKey: ["/api/settings/payment-methods"],
     queryFn: async () => {
@@ -53,6 +66,15 @@ export default function AdminSettings() {
     queryFn: async () => {
       const response = await fetch('/api/settings/shipping-methods');
       if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
+  const { data: customizationOptions } = useQuery({
+    queryKey: ["/api/settings/customization-options"],
+    queryFn: async () => {
+      const response = await fetch('/api/settings/customization-options');
+      if (!response.ok) throw new Error('Failed to fetch customization options');
       return response.json();
     },
   });
@@ -175,6 +197,66 @@ export default function AdminSettings() {
     },
   });
 
+  // Customization Options Mutations
+  const createCustomizationOptionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch("/api/settings/customization-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao criar opção de personalização");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      setCustomizationOptionDialogOpen(false);
+      resetCustomizationOptionForm();
+      toast({
+        title: "Sucesso!",
+        description: "Opção de personalização criada com sucesso",
+      });
+    },
+  });
+
+  const updateCustomizationOptionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/settings/customization-options/${editingCustomizationOption.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar opção de personalização");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      setCustomizationOptionDialogOpen(false);
+      resetCustomizationOptionForm();
+      toast({
+        title: "Sucesso!",
+        description: "Opção de personalização atualizada com sucesso",
+      });
+    },
+  });
+
+  const deleteCustomizationOptionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/settings/customization-options/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Erro ao excluir opção de personalização");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      toast({
+        title: "Sucesso!",
+        description: "Opção de personalização excluída com sucesso",
+      });
+    },
+  });
+
   const resetPaymentMethodForm = () => {
     setPaymentMethodForm({
       name: "",
@@ -196,6 +278,18 @@ export default function AdminSettings() {
       isActive: true
     });
     setEditingShippingMethod(null);
+  };
+
+  const resetCustomizationOptionForm = () => {
+    setCustomizationOptionForm({
+      name: "",
+      description: "",
+      category: "",
+      minQuantity: 1,
+      price: 0,
+      isActive: true
+    });
+    setEditingCustomizationOption(null);
   };
 
   const handleEditPaymentMethod = (method: any) => {
@@ -223,6 +317,19 @@ export default function AdminSettings() {
     setShippingMethodDialogOpen(true);
   };
 
+  const handleEditCustomizationOption = (option: any) => {
+    setCustomizationOptionForm({
+      name: option.name,
+      description: option.description || "",
+      category: option.category,
+      minQuantity: option.minQuantity || 1,
+      price: parseFloat(option.price) || 0,
+      isActive: option.isActive
+    });
+    setEditingCustomizationOption(option);
+    setCustomizationOptionDialogOpen(true);
+  };
+
   const handlePaymentMethodSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingPaymentMethod) {
@@ -238,6 +345,15 @@ export default function AdminSettings() {
       updateShippingMethodMutation.mutate(shippingMethodForm);
     } else {
       createShippingMethodMutation.mutate(shippingMethodForm);
+    }
+  };
+
+  const handleCustomizationOptionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingCustomizationOption) {
+      updateCustomizationOptionMutation.mutate(customizationOptionForm);
+    } else {
+      createCustomizationOptionMutation.mutate(customizationOptionForm);
     }
   };
 
@@ -535,6 +651,146 @@ export default function AdminSettings() {
               ))}
               {!shippingMethods?.length && (
                 <p className="text-center text-gray-500 py-8">Nenhum método de frete cadastrado</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Customization Options Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center">
+                <Palette className="h-5 w-5 mr-2" />
+                Opções de Personalização
+              </CardTitle>
+              <Dialog open={customizationOptionDialogOpen} onOpenChange={(open) => {
+                setCustomizationOptionDialogOpen(open);
+                if (!open) resetCustomizationOptionForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-bg text-white" data-testid="button-add-customization-option">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Opção
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingCustomizationOption ? "Editar Opção de Personalização" : "Nova Opção de Personalização"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Configure as opções de personalização disponíveis para os produtos.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCustomizationOptionSubmit} className="space-y-4">
+                    <div>
+                      <Label htmlFor="customization-name">Nome</Label>
+                      <Input
+                        id="customization-name"
+                        placeholder="Ex: Serigrafia 1 cor"
+                        value={customizationOptionForm.name}
+                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, name: e.target.value })}
+                        required
+                        data-testid="input-customization-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customization-description">Descrição</Label>
+                      <Textarea
+                        id="customization-description"
+                        placeholder="Descrição adicional da personalização"
+                        value={customizationOptionForm.description}
+                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, description: e.target.value })}
+                        data-testid="input-customization-description"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customization-category">Categoria</Label>
+                      <Input
+                        id="customization-category"
+                        placeholder="Ex: mochila, móveis, camiseta"
+                        value={customizationOptionForm.category}
+                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, category: e.target.value })}
+                        required
+                        data-testid="input-customization-category"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="customization-min-quantity">Quantidade Mínima</Label>
+                        <Input
+                          id="customization-min-quantity"
+                          type="number"
+                          min="1"
+                          value={customizationOptionForm.minQuantity}
+                          onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, minQuantity: parseInt(e.target.value) })}
+                          required
+                          data-testid="input-customization-min-quantity"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="customization-price">Preço (R$)</Label>
+                        <Input
+                          id="customization-price"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={customizationOptionForm.price}
+                          onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, price: parseFloat(e.target.value) })}
+                          required
+                          data-testid="input-customization-price"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={customizationOptionForm.isActive}
+                        onCheckedChange={(checked) => setCustomizationOptionForm({ ...customizationOptionForm, isActive: checked })}
+                        data-testid="switch-customization-active"
+                      />
+                      <Label>Ativo</Label>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setCustomizationOptionDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" data-testid="button-save-customization-option">
+                        {editingCustomizationOption ? "Atualizar" : "Criar"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {customizationOptions?.map((option: any) => (
+                <div key={option.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`card-customization-option-${option.id}`}>
+                  <div>
+                    <p className="font-medium">{option.name}</p>
+                    <p className="text-sm text-gray-500">{option.category} • Qty min: {option.minQuantity}</p>
+                    <div className="text-xs text-gray-400">
+                      R$ {parseFloat(option.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {option.description && ` • ${option.description}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 text-xs rounded-full ${option.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      {option.isActive ? 'Ativo' : 'Inativo'}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditCustomizationOption(option)} data-testid={`button-edit-customization-option-${option.id}`}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteCustomizationOptionMutation.mutate(option.id)} data-testid={`button-delete-customization-option-${option.id}`}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {!customizationOptions?.length && (
+                <p className="text-center text-gray-500 py-8">Nenhuma opção de personalização cadastrada</p>
               )}
             </div>
           </CardContent>

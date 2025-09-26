@@ -996,6 +996,74 @@ export class MemStorage implements IStorage {
     sampleExpenses.forEach(expense => {
       this.mockData.expenseNotes.push(expense);
     });
+
+    // Create sample customization options
+    const sampleCustomizationOptions = [
+      {
+        id: "custom-1",
+        name: "Serigrafia 1 cor",
+        description: "Impressão serigrafica em 1 cor",
+        category: "mochila",
+        minQuantity: 50,
+        price: "50.00",
+        isActive: true,
+        createdBy: "admin-1",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "custom-2", 
+        name: "Serigrafia 1 cor",
+        description: "Impressão serigrafica em 1 cor (quantidade maior)",
+        category: "mochila",
+        minQuantity: 100,
+        price: "45.00",
+        isActive: true,
+        createdBy: "admin-1",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "custom-3",
+        name: "Serigrafia 1 cor",
+        description: "Impressão serigrafica em 1 cor (quantidade alta)",
+        category: "mochila",
+        minQuantity: 200,
+        price: "35.00",
+        isActive: true,
+        createdBy: "admin-1",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "custom-4",
+        name: "Bordado",
+        description: "Bordado personalizado",
+        category: "mochila",
+        minQuantity: 20,
+        price: "80.00",
+        isActive: true,
+        createdBy: "admin-1",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "custom-5",
+        name: "Gravação Laser",
+        description: "Gravação a laser em madeira",
+        category: "móveis",
+        minQuantity: 1,
+        price: "120.00",
+        isActive: true,
+        createdBy: "admin-1",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    sampleCustomizationOptions.forEach(option => {
+      this.mockData.customizationOptions.push(option);
+    });
   }
 
   // User methods
