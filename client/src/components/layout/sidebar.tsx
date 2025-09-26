@@ -103,36 +103,17 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
 
       {/* Admin Panel Specific Links */}
       {activePanel === "admin" && (
-            <>
+            <nav className="mt-8">
+              <div className="px-6 mb-4">
+                <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+                  Administração
+                </p>
+              </div>
               <SidebarItem 
                 icon={LayoutDashboard} 
                 label="Dashboard" 
                 href="/admin-dashboard" 
                 isActive={pathname === '/admin-dashboard'}
-              />
-              <SidebarItem 
-                icon={Users} 
-                label="Usuários" 
-                href="/admin/users" 
-                isActive={pathname === '/admin/users'}
-              />
-              <SidebarItem 
-                icon={Store} 
-                label="Vendedores" 
-                href="/admin/vendors" 
-                isActive={pathname === '/admin/vendors'}
-              />
-              <SidebarItem 
-                icon={UserCheck} 
-                label="Clientes" 
-                href="/admin/clients" 
-                isActive={pathname === '/admin/clients'}
-              />
-              <SidebarItem 
-                icon={Hammer} 
-                label="Produtores" 
-                href="/admin/producers" 
-                isActive={pathname === '/admin/producers'}
               />
               <SidebarItem 
                 icon={Package} 
@@ -147,6 +128,42 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/customizations'}
               />
               <SidebarItem 
+                icon={Hammer} 
+                label="Produtores" 
+                href="/admin/producers" 
+                isActive={pathname === '/admin/producers'}
+              />
+              <SidebarItem 
+                icon={UserCheck} 
+                label="Clientes" 
+                href="/admin/clients" 
+                isActive={pathname === '/admin/clients'}
+              />
+              <SidebarItem 
+                icon={Store} 
+                label="Vendedores" 
+                href="/admin/vendors" 
+                isActive={pathname === '/admin/vendors'}
+              />
+              <SidebarItem 
+                icon={Percent} 
+                label="Gestão de Comissões" 
+                href="/admin/commission-management" 
+                isActive={pathname === '/admin/commission-management'}
+              />
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Módulo Financeiro" 
+                href="/finance" 
+                isActive={pathname === '/finance'}
+              />
+              
+              <div className="px-6 mb-4 mt-6">
+                <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+                  Gestão
+                </p>
+              </div>
+              <SidebarItem 
                 icon={Calculator} 
                 label="Orçamentos" 
                 href="/admin/budgets" 
@@ -159,16 +176,10 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/orders'}
               />
               <SidebarItem 
-                icon={Percent} 
-                label="Comissões" 
-                href="/admin/commission-management" 
-                isActive={pathname === '/admin/commission-management'}
-              />
-              <SidebarItem 
-                icon={CreditCard} 
-                label="Financeiro" 
-                href="/finance" 
-                isActive={pathname === '/finance'}
+                icon={Users} 
+                label="Usuários" 
+                href="/admin/users" 
+                isActive={pathname === '/admin/users'}
               />
               <SidebarItem 
                 icon={Settings} 
@@ -176,7 +187,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 href="/admin/settings" 
                 isActive={pathname === '/admin/settings'}
               />
-            </>
+            </nav>
           )}
 
       {/* Vendor Panel Specific Links */}
