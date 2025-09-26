@@ -1,6 +1,4 @@
-
 import { useQuery } from "@tanstack/react-query";
-import { Route } from "wouter";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,27 +17,6 @@ import {
   Archive,
   Package
 } from "lucide-react";
-import AdminProducts from "../../pages/admin/products";
-import AdminOrders from "../../pages/admin/orders";
-import AdminBudgets from "../../pages/admin/budgets";
-import AdminSettings from "../../pages/admin/settings";
-import AdminUsers from "../../pages/admin/users";
-import AdminClients from "../../pages/admin/clients";
-import AdminVendors from "../../pages/admin/vendors";
-import AdminProducers from "../../pages/admin/producers";
-import AdminCommissionManagement from "../../pages/admin/commission-management";
-import AdminCustomizations from "../../pages/admin/customizations";
-import AdminDashboard from "../../pages/dashboards/admin-dashboard";
-
-const NotFound = () => (
-  <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
-    <h1 className="text-4xl font-bold text-gray-800 mb-4">404</h1>
-    <p className="text-lg text-gray-600 mb-8">Página não encontrada.</p>
-    <Link href="/admin">
-      <Button>Voltar para o Painel</Button>
-    </Link>
-  </div>
-);
 
 export default function AdminPanel() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -163,6 +140,51 @@ export default function AdminPanel() {
         </Card>
       </div>
 
+      {/* Management Sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Gerenciamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/clients">
+              <Button variant="outline" className="w-full justify-start">
+                <Users className="h-4 w-4 mr-2" />
+                Gerenciar Clientes ({stats?.totalClients || 0})
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Package className="h-5 w-5 mr-2" />
+              Gestão de Vendas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/products">
+              <Button className="w-full justify-start gradient-bg text-white">
+                <Package className="h-4 w-4 mr-2" />
+                Gestão de Produtos & Orçamentos ({stats?.totalProducts || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/orders">
+              <Button variant="outline" className="w-full justify-start">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Pedidos ({stats?.totalOrders || 0})
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        
+      </div>
+
       {/* Recent Orders Table */}
       <Card>
         <CardHeader>
@@ -237,19 +259,6 @@ export default function AdminPanel() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Routes for admin pages */}
-      <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/admin/products" component={AdminProducts} />
-      <Route path="/admin/orders" component={AdminOrders} />
-      <Route path="/admin/budgets" component={AdminBudgets} />
-      <Route path="/admin/clients" component={AdminClients} />
-      <Route path="/admin/vendors" component={AdminVendors} />
-      <Route path="/admin/producers" component={AdminProducers} />
-      <Route path="/admin/commission-management" component={AdminCommissionManagement} />
-      <Route path="/admin/customizations" component={AdminCustomizations} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/settings" component={AdminSettings} />
     </div>
   );
 }

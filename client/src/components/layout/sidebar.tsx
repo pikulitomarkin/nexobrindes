@@ -1,3 +1,4 @@
+replit_final_file>
 import { 
   BarChart3, 
   Bus, 
@@ -24,7 +25,6 @@ import {
 } from "lucide-react";
 
 import { useLocation } from "wouter";
-import React from "react";
 
 // Assuming Link and SidebarMenu related components are imported from a UI library
 // For demonstration, let's assume they are available or mock them if necessary.
@@ -45,25 +45,16 @@ interface SidebarProps {
   onPanelChange: (panel: string) => void;
 }
 
-// SidebarItem component  
-const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => {
-  const [, navigate] = useLocation();
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate(href);
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
-    >
-      <Icon className="mr-3 h-5 w-5" />
-      <span>{label}</span>
-    </button>
-  );
-};
+// SidebarItem component
+const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
+  <a
+    href={href}
+    className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
+  >
+    <Icon className="mr-3 h-5 w-5" />
+    <span>{label}</span>
+  </a>
+);
 
 export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const [location] = useLocation();
@@ -112,18 +103,37 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       </nav>
 
       {/* Admin Panel Specific Links */}
-      {activePanel === "admin" && (
-            <nav className="mt-8">
-              <div className="px-6 mb-4">
-                <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-                  Administração
-                </p>
-              </div>
+      {user?.role === 'admin' && (
+            <>
               <SidebarItem 
                 icon={LayoutDashboard} 
                 label="Dashboard" 
                 href="/admin-dashboard" 
                 isActive={pathname === '/admin-dashboard'}
+              />
+              <SidebarItem 
+                icon={Users} 
+                label="Usuários" 
+                href="/admin/users" 
+                isActive={pathname === '/admin/users'}
+              />
+              <SidebarItem 
+                icon={Store} 
+                label="Vendedores" 
+                href="/admin/vendors" 
+                isActive={pathname === '/admin/vendors'}
+              />
+              <SidebarItem 
+                icon={UserCheck} 
+                label="Clientes" 
+                href="/admin/clients" 
+                isActive={pathname === '/admin/clients'}
+              />
+              <SidebarItem 
+                icon={Hammer} 
+                label="Produtores" 
+                href="/admin/producers" 
+                isActive={pathname === '/admin/producers'}
               />
               <SidebarItem 
                 icon={Package} 
@@ -150,38 +160,14 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/orders'}
               />
               <SidebarItem 
-                icon={Hammer} 
-                label="Produtores" 
-                href="/admin/producers" 
-                isActive={pathname === '/admin/producers'}
-              />
-              <SidebarItem 
-                icon={UserCheck} 
-                label="Clientes" 
-                href="/admin/clients" 
-                isActive={pathname === '/admin/clients'}
-              />
-              <SidebarItem 
-                icon={Store} 
-                label="Vendedores" 
-                href="/admin/vendors" 
-                isActive={pathname === '/admin/vendors'}
-              />
-              <SidebarItem 
-                icon={Users} 
-                label="Usuários" 
-                href="/admin/users" 
-                isActive={pathname === '/admin/users'}
-              />
-              <SidebarItem 
                 icon={Percent} 
-                label="Gestão de Comissões" 
+                label="Comissões" 
                 href="/admin/commission-management" 
                 isActive={pathname === '/admin/commission-management'}
               />
               <SidebarItem 
                 icon={CreditCard} 
-                label="Módulo Financeiro" 
+                label="Financeiro" 
                 href="/finance" 
                 isActive={pathname === '/finance'}
               />
@@ -191,7 +177,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 href="/admin/settings" 
                 isActive={pathname === '/admin/settings'}
               />
-            </nav>
+            </>
           )}
 
       {/* Vendor Panel Specific Links */}
@@ -351,3 +337,4 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     </div>
   );
 }
+</replit_final_file>
