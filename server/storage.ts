@@ -1,3 +1,4 @@
+replit_final_file>
 import {
   type User,
   type InsertUser,
@@ -20,8 +21,6 @@ import {
   type Product,
   type InsertProduct,
   type Budget,
-  type InsertBudget,
-  type BudgetItem,
   type InsertBudgetItem,
   type BudgetPhoto,
   type InsertBudgetPhoto,
@@ -268,6 +267,7 @@ export class MemStorage implements IStorage {
     expenseNotes: [] as ExpenseNote[],
     commissionPayouts: [] as CommissionPayout[],
     customizationOptions: [] as CustomizationOption[],
+    customizationCategories: [] as string[], // Added for storing customization categories
   };
 
   // Payment Methods
@@ -978,7 +978,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date()
       },
       {
-        id: "expense-2", 
+        id: "expense-2",
         vendorId: "vendor-1",
         orderId: null,
         description: "Transporte - Entrega de produtos",
@@ -1012,7 +1012,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date()
       },
       {
-        id: "custom-2", 
+        id: "custom-2",
         name: "Serigrafia 1 cor",
         description: "Impressão serigrafica em 1 cor (quantidade maior)",
         category: "mochila",
@@ -1063,6 +1063,10 @@ export class MemStorage implements IStorage {
 
     sampleCustomizationOptions.forEach(option => {
       this.mockData.customizationOptions.push(option);
+      // Also add categories to the list
+      if (!this.mockData.customizationCategories.includes(option.category)) {
+        this.mockData.customizationCategories.push(option.category);
+      }
     });
   }
 
@@ -2372,13 +2376,24 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     if (!this.mockData.customizationOptions) {
       this.mockData.customizationOptions = [];
     }
-    
+
     this.mockData.customizationOptions.push(newOption);
     console.log('Created customization option:', newOption);
+
+    // Garantir que a categoria está salva para uso futuro
+    if (data.category && !this.mockData.customizationCategories) {
+      this.mockData.customizationCategories = [];
+    }
+
+    if (data.category && !this.mockData.customizationCategories.includes(data.category)) {
+      this.mockData.customizationCategories.push(data.category);
+      console.log('Added new category to customizations:', data.category);
+    }
+
     return newOption;
   }
 
@@ -2393,8 +2408,8 @@ export class MemStorage implements IStorage {
     if (!this.mockData.customizationOptions) {
       this.mockData.customizationOptions = [];
     }
-    return this.mockData.customizationOptions.filter(option => 
-      option.category === category && 
+    return this.mockData.customizationOptions.filter(option =>
+      option.category === category &&
       option.minQuantity <= quantity &&
       option.isActive
     );
@@ -2404,7 +2419,7 @@ export class MemStorage implements IStorage {
     if (!this.mockData.customizationOptions) {
       this.mockData.customizationOptions = [];
     }
-    
+
     const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
     if (index === -1) return undefined;
 
@@ -2415,6 +2430,13 @@ export class MemStorage implements IStorage {
     };
     this.mockData.customizationOptions[index] = updated;
     console.log('Updated customization option:', updated);
+
+    // Also update categories if changed
+    if (data.category && !this.mockData.customizationCategories.includes(data.category)) {
+      this.mockData.customizationCategories.push(data.category);
+      console.log('Added new category to customizations:', data.category);
+    }
+
     return updated;
   }
 
@@ -2422,10 +2444,10 @@ export class MemStorage implements IStorage {
     if (!this.mockData.customizationOptions) {
       this.mockData.customizationOptions = [];
     }
-    
+
     const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
     if (index === -1) return false;
-    
+
     this.mockData.customizationOptions.splice(index, 1);
     console.log('Deleted customization option with id:', id);
     return true;
@@ -2433,3 +2455,4 @@ export class MemStorage implements IStorage {
 }
 
 export const storage = new MemStorage();
+</replit_final_file>

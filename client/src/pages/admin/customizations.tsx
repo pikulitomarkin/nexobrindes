@@ -45,18 +45,18 @@ export default function AdminCustomizations() {
   });
 
   const categoriesQuery = useQuery({
-    queryKey: ["/api/products/categories"],
+    queryKey: ["/api/customization-categories"],
     queryFn: async () => {
-      const response = await fetch('/api/products?limit=9999');
-      if (!response.ok) throw new Error('Failed to fetch products');
-      const data = await response.json();
+      const response = await fetch('/api/settings/customization-options');
+      if (!response.ok) throw new Error('Failed to fetch customization options');
+      const customizations = await response.json();
       const categorySet = new Set<string>();
-      (data.products || []).forEach((product: any) => {
-        if (product.category && typeof product.category === 'string') {
-          categorySet.add(product.category);
+      customizations.forEach((customization: any) => {
+        if (customization.category && typeof customization.category === 'string') {
+          categorySet.add(customization.category);
         }
       });
-      return Array.from(categorySet);
+      return Array.from(categorySet).sort();
     },
   });
 
@@ -78,6 +78,7 @@ export default function AdminCustomizations() {
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização criada com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
       resetForm();
       setIsDialogOpen(false);
     },
@@ -100,6 +101,7 @@ export default function AdminCustomizations() {
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização atualizada com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
       resetForm();
       setEditingCustomization(null);
       setIsDialogOpen(false);
@@ -115,6 +117,7 @@ export default function AdminCustomizations() {
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Personalização deletada com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
     },
   });
 
@@ -430,8 +433,8 @@ export default function AdminCustomizations() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomizations.map((customization: any) => (
-                  <TableRow key={customization.id}>
+                {filteredCustomizations.map((customization: any, index: number) => (
+                  <TableRow key={`${customization.id}-${index}`}>
                     <TableCell>
                       <div>
                         <p className="font-medium">{customization.name}</p>
