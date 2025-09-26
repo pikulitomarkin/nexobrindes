@@ -17,21 +17,14 @@ export function CustomizationSelector({
   onCustomizationChange 
 }: CustomizationSelectorProps) {
   const { data: customizations = [], isLoading } = useQuery({
-    queryKey: ["/api/settings/customization-options", { category: productCategory, quantity }],
+    queryKey: ["/api/settings/customization-options"],
     queryFn: async () => {
-      // Se não há categoria do produto ou categoria está vazia, busca todas as personalizações
-      if (!productCategory || productCategory.trim() === '') {
-        const response = await fetch('/api/settings/customization-options');
-        if (!response.ok) return [];
-        const allCustomizations = await response.json();
-        // Filtra apenas por quantidade mínima
-        return allCustomizations.filter((c: any) => c.minQuantity <= quantity && c.isActive);
-      }
-      
-      // Se há categoria, busca por categoria específica
-      const response = await fetch(`/api/settings/customization-options/category/${encodeURIComponent(productCategory)}?minQuantity=${quantity}`);
+      // Sempre busca todas as personalizações, independente da categoria
+      const response = await fetch('/api/settings/customization-options');
       if (!response.ok) return [];
-      return response.json();
+      const allCustomizations = await response.json();
+      // Filtra apenas por quantidade mínima e status ativo
+      return allCustomizations.filter((c: any) => c.minQuantity <= quantity && c.isActive);
     },
     enabled: quantity > 0,
   });
@@ -78,18 +71,15 @@ export function CustomizationSelector({
           </SelectContent>
         </Select>
         <div className="text-xs text-gray-500 mt-1">
-          Categoria: {productCategory || 'Todas as categorias'} | Quantidade: {quantity} unidades
+          Mostrando todas as personalizações disponíveis para quantidade: {quantity} unidades
         </div>
       </div>
 
       {customizations.length === 0 && (
         <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
-          <p className="font-medium mb-1">Nenhuma personalização pré-cadastrada disponível</p>
+          <p className="font-medium mb-1">Nenhuma personalização disponível</p>
           <p className="text-xs">
-            {productCategory ? 
-              `Para a categoria "${productCategory}" com quantidade ${quantity}, não há opções cadastradas.` :
-              `Para quantidade ${quantity}, não há opções cadastradas.`
-            }
+            Para quantidade {quantity}, não há personalizações cadastradas com quantidade mínima adequada.
             <br />
             Você pode criar uma personalização customizada usando os campos abaixo.
           </p>
@@ -98,11 +88,11 @@ export function CustomizationSelector({
 
       {customizations.length > 0 && (
         <div className="bg-gray-50 p-3 rounded text-sm">
-          <h4 className="font-medium mb-2">Opções pré-cadastradas disponíveis:</h4>
+          <h4 className="font-medium mb-2">Personalizações disponíveis:</h4>
           <div className="space-y-1">
             {customizations.map((customization: any) => (
               <div key={customization.id} className="flex justify-between text-xs">
-                <span>{customization.name}</span>
+                <span>{customization.name} ({customization.category})</span>
                 <span>
                   Mín: {customization.minQuantity} | R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>

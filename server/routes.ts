@@ -1900,6 +1900,9 @@ Para mais detalhes, entre em contato conosco!`;
             sum + parseFloat(order.totalValue || '0'), 0
           );
 
+          // Get user data for userCode
+          const user = await storage.getUser(client.userId);
+
           return {
             ...client,
             id: client.id,
