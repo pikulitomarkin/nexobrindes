@@ -2372,15 +2372,27 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    
+    if (!this.mockData.customizationOptions) {
+      this.mockData.customizationOptions = [];
+    }
+    
     this.mockData.customizationOptions.push(newOption);
+    console.log('Created customization option:', newOption);
     return newOption;
   }
 
   async getCustomizationOptions(): Promise<CustomizationOption[]> {
+    if (!this.mockData.customizationOptions) {
+      this.mockData.customizationOptions = [];
+    }
     return this.mockData.customizationOptions;
   }
 
   async getCustomizationOptionsByCategory(category: string, quantity: number): Promise<CustomizationOption[]> {
+    if (!this.mockData.customizationOptions) {
+      this.mockData.customizationOptions = [];
+    }
     return this.mockData.customizationOptions.filter(option => 
       option.category === category && 
       option.minQuantity <= quantity &&
@@ -2389,6 +2401,10 @@ export class MemStorage implements IStorage {
   }
 
   async updateCustomizationOption(id: string, data: Partial<InsertCustomizationOption>): Promise<CustomizationOption | undefined> {
+    if (!this.mockData.customizationOptions) {
+      this.mockData.customizationOptions = [];
+    }
+    
     const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
     if (index === -1) return undefined;
 
@@ -2398,13 +2414,20 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.mockData.customizationOptions[index] = updated;
+    console.log('Updated customization option:', updated);
     return updated;
   }
 
   async deleteCustomizationOption(id: string): Promise<boolean> {
+    if (!this.mockData.customizationOptions) {
+      this.mockData.customizationOptions = [];
+    }
+    
     const index = this.mockData.customizationOptions.findIndex(option => option.id === id);
     if (index === -1) return false;
+    
     this.mockData.customizationOptions.splice(index, 1);
+    console.log('Deleted customization option with id:', id);
     return true;
   }
 }

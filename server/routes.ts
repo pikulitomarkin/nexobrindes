@@ -1550,12 +1550,17 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Settings Routes - Customization Options
-  app.get("/api/settings/customization-options", requireAuth, (req, res) => {
-    const customizations = db.data.customizationOptions || [];
-    res.json(customizations);
+  app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
+    try {
+      const customizations = await storage.getCustomizationOptions();
+      res.json(customizations);
+    } catch (error) {
+      console.error('Error fetching customization options:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
   });
 
-  app.post("/api/settings/customization-options", requireAuth, (req, res) => {
+  app.post("/api/settings/customization-options", requireAuth, async (req, res) => {
     try {
       const { name, description, category, minQuantity, price, isActive } = req.body;
 
@@ -1563,23 +1568,15 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Campos obrigatórios não preenchidos" });
       }
 
-      const newCustomization = {
-        id: `custom-${Date.now()}`,
+      const newCustomization = await storage.createCustomizationOption({
         name,
         description: description || "",
         category,
         minQuantity: parseInt(minQuantity),
-        price: parseFloat(price),
+        price: parseFloat(price).toFixed(2),
         isActive: isActive !== undefined ? isActive : true,
-        createdAt: new Date().toISOString(),
-      };
-
-      if (!db.data.customizationOptions) {
-        db.data.customizationOptions = [];
-      }
-
-      db.data.customizationOptions.push(newCustomization);
-      db.write();
+        createdBy: req.user?.id || 'admin-1'
+      });
 
       res.json(newCustomization);
     } catch (error) {
@@ -1588,54 +1585,39 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.put("/api/settings/customization-options/:id", requireAuth, (req, res) => {
+  app.put("/api/settings/customization-options/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description, category, minQuantity, price, isActive } = req.body;
 
-      if (!db.data.customizationOptions) {
-        return res.status(404).json({ error: "Personalização não encontrada" });
-      }
-
-      const index = db.data.customizationOptions.findIndex(c => c.id === id);
-      if (index === -1) {
-        return res.status(404).json({ error: "Personalização não encontrada" });
-      }
-
-      db.data.customizationOptions[index] = {
-        ...db.data.customizationOptions[index],
+      const updatedCustomization = await storage.updateCustomizationOption(id, {
         name,
         description: description || "",
         category,
         minQuantity: parseInt(minQuantity),
-        price: parseFloat(price),
-        isActive: isActive !== undefined ? isActive : true,
-        updatedAt: new Date().toISOString(),
-      };
+        price: parseFloat(price).toFixed(2),
+        isActive: isActive !== undefined ? isActive : true
+      });
 
-      db.write();
-      res.json(db.data.customizationOptions[index]);
+      if (!updatedCustomization) {
+        return res.status(404).json({ error: "Personalização não encontrada" });
+      }
+
+      res.json(updatedCustomization);
     } catch (error) {
       console.error('Error updating customization:', error);
       res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
 
-  app.delete("/api/settings/customization-options/:id", requireAuth, (req, res) => {
+  app.delete("/api/settings/customization-options/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
 
-      if (!db.data.customizationOptions) {
+      const deleted = await storage.deleteCustomizationOption(id);
+      if (!deleted) {
         return res.status(404).json({ error: "Personalização não encontrada" });
       }
-
-      const index = db.data.customizationOptions.findIndex(c => c.id === id);
-      if (index === -1) {
-        return res.status(404).json({ error: "Personalização não encontrada" });
-      }
-
-      db.data.customizationOptions.splice(index, 1);
-      db.write();
 
       res.json({ success: true });
     } catch (error) {
@@ -1644,12 +1626,12 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/settings/customization-options/category/:category", requireAuth, (req, res) => {
+  app.get("/api/settings/customization-options/category/:category", requireAuth, async (req, res) => {
     try {
       const { category } = req.params;
       const { minQuantity } = req.query;
 
-      const customizations = db.data.customizationOptions || [];
+      let customizations = await storage.getCustomizationOptions();
       let filtered = customizations.filter(c => 
         c.category === category && 
         c.isActive === true
