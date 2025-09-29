@@ -916,7 +916,7 @@ export default function VendorBudgets() {
                                   disabled
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {item.customizationQuantity || 0} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {((item.quantity || 0) * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </p>
                               </div>
                             </div>

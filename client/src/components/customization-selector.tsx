@@ -40,22 +40,13 @@ export function CustomizationSelector({
     },
   });
 
-  // Filtra personalizações pela categoria digitada e pega apenas a primeira de cada categoria
+  // Filtra personalizações pela categoria digitada - TODAS da categoria
   const filteredCustomizations = customizations.filter((customization: any) => {
     if (!categoryFilter.trim()) return false;
     return customization.category.toLowerCase().includes(categoryFilter.toLowerCase());
   });
 
-  // Agrupa por categoria e pega apenas a primeira de cada categoria
-  const uniqueCustomizations = filteredCustomizations.reduce((acc: any[], current: any) => {
-    const existingCategory = acc.find(item => item.category.toLowerCase() === current.category.toLowerCase());
-    if (!existingCategory) {
-      acc.push(current);
-    }
-    return acc;
-  }, []);
-
-  const selectedCustomizationData = uniqueCustomizations.find((c: any) => c.id === selectedCustomization);
+  const selectedCustomizationData = filteredCustomizations.find((c: any) => c.id === selectedCustomization);
 
   if (isLoading) {
     return (
@@ -84,10 +75,10 @@ export function CustomizationSelector({
           </p>
         </div>
 
-        {categoryFilter.trim() && uniqueCustomizations.length > 0 && (
+        {categoryFilter.trim() && filteredCustomizations.length > 0 && (
           <div className="w-full">
             <Label htmlFor="customization-select" className="text-sm font-semibold text-blue-900 mb-2 block">
-              Personalização Disponível
+              Personalizações Disponíveis ({filteredCustomizations.length})
             </Label>
             <Select 
               value={selectedCustomization || "none"} 
@@ -95,7 +86,7 @@ export function CustomizationSelector({
                 if (value === "none") {
                   onCustomizationChange(null);
                 } else {
-                  const customization = uniqueCustomizations.find((c: any) => c.id === value);
+                  const customization = filteredCustomizations.find((c: any) => c.id === value);
                   onCustomizationChange(customization);
                   // Auto-preenche os valores
                   if (customization && onCustomizationValueChange) {
@@ -114,11 +105,12 @@ export function CustomizationSelector({
                 <SelectItem value="none">
                   <span className="font-medium text-gray-600">Sem personalização</span>
                 </SelectItem>
-                {uniqueCustomizations.map((customization: any) => (
+                {filteredCustomizations.map((customization: any) => (
                   <SelectItem key={customization.id} value={customization.id}>
                     <div className="flex flex-col">
                       <span className="font-medium">{customization.name}</span>
                       <span className="text-xs text-gray-500">
+                        {customization.description && `${customization.description} • `}
                         Min: {customization.minQuantity} un. • R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -129,7 +121,7 @@ export function CustomizationSelector({
           </div>
         )}
 
-        {categoryFilter.trim() && uniqueCustomizations.length === 0 && (
+        {categoryFilter.trim() && filteredCustomizations.length === 0 && (
           <div className="w-full text-sm text-orange-700 bg-orange-100 p-3 rounded border border-orange-300">
             <strong>Nenhuma personalização encontrada</strong> para a categoria "{categoryFilter}".
             <br />
