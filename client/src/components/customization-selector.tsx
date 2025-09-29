@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -154,73 +153,63 @@ export function CustomizationSelector({
 
       {/* Campos de configuração da personalização */}
       {selectedCustomizationData && (
-        <div className="w-full mt-6 p-5 bg-white rounded-lg border border-blue-300 shadow-sm">
-          <h4 className="text-lg font-semibold text-blue-900 mb-4 border-b border-blue-200 pb-2">
-            Configuração da Personalização: {selectedCustomizationData.name}
-          </h4>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <Label htmlFor="customization-value" className="text-sm font-semibold text-gray-700">
-                Valor da Personalização (R$)
-              </Label>
-              <Input
-                id="customization-value"
-                type="number"
-                step="0.01"
-                min="0"
-                value={customizationValue}
-                onChange={(e) => onCustomizationValueChange?.(parseFloat(e.target.value) || 0)}
-                placeholder="0,00"
-                className="h-11"
-              />
-              <p className="text-xs text-gray-500">
-                Preço sugerido: R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
+          <div className="w-full mt-6 p-5 bg-white rounded-lg border border-blue-300 shadow-sm">
+            <h4 className="text-lg font-semibold text-blue-900 mb-4 border-b border-blue-200 pb-2">
+              Configuração: {selectedCustomizationData.name}
+            </h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="customization-description" className="text-sm font-semibold text-gray-700">
-                Descrição da Personalização
-              </Label>
-              <Input
-                id="customization-description"
-                value={customizationDescription}
-                onChange={(e) => onCustomizationDescriptionChange?.(e.target.value)}
-                placeholder="Ex: Serigrafia 1 cor"
-                className="h-11"
-              />
-              <p className="text-xs text-gray-500">
-                Descreva detalhes da personalização
-              </p>
-            </div>
-          </div>
-
-          {/* Resumo da personalização */}
-          <div className="mt-5 pt-4 border-t border-gray-200">
-            {customizationValue > 0 ? (
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-800">
-                      ✅ Personalização Configurada
-                    </p>
-                    <p className="text-lg font-bold text-green-900">
-                      Valor da Personalização: R$ {customizationValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Configure o valor da personalização acima
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-4">
+              <div className="space-y-2">
+                <Label htmlFor="customization-value" className="text-sm font-semibold text-gray-700">
+                  Valor Unitário (R$)
+                </Label>
+                <Input
+                  id="customization-value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={customizationValue}
+                  onChange={(e) => onCustomizationValueChange?.(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  className="h-11"
+                />
+                <p className="text-xs text-gray-500">
+                  Preço sugerido: R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-            )}
+
+              <div className="space-y-2">
+                <Label htmlFor="customization-description" className="text-sm font-semibold text-gray-700">
+                  Descrição
+                </Label>
+                <Input
+                  id="customization-description"
+                  value={customizationDescription}
+                  onChange={(e) => onCustomizationDescriptionChange?.(e.target.value)}
+                  placeholder="Ex: Serigrafia 1 cor"
+                  className="h-11"
+                />
+                <p className="text-xs text-gray-500">
+                  Mínimo: {selectedCustomizationData.minQuantity} unidades
+                </p>
+              </div>
+            </div>
+
+            {/* Resumo simples */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    ✅ Personalização: {selectedCustomizationData.name}
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Categoria: {selectedCustomizationData.category} • Valor: R$ {customizationValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

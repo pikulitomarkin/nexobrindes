@@ -211,6 +211,10 @@ export default function VendorBudgets() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
+        // Se tem personalização e quantidade de personalização é maior que a nova quantidade, ajusta
+        if (item.hasItemCustomization && (item.customizationQuantity || 0) > quantity) {
+          item.customizationQuantity = quantity;
+        }
         // Recalculate totalPrice based on unitPrice and quantity, excluding customization for now
         item.totalPrice = item.unitPrice * quantity;
       } else if (field === 'itemCustomizationValue') {
@@ -877,8 +881,11 @@ export default function VendorBudgets() {
                                   updateBudgetItem(index, 'selectedCustomizationId', customization.id);
                                   updateBudgetItem(index, 'itemCustomizationValue', customization.price);
                                   updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
+                                  // Auto-define a quantidade de personalização igual à quantidade do produto
+                                  updateBudgetItem(index, 'customizationQuantity', item.quantity);
                                 } else {
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
+                                  updateBudgetItem(index, 'customizationQuantity', 0);
                                 }
                               }}
                               customizationValue={item.itemCustomizationValue || 0}
@@ -886,6 +893,33 @@ export default function VendorBudgets() {
                               customizationDescription={item.itemCustomizationDescription || ''}
                               onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
                             />
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label>Quantidade a Personalizar</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={item.quantity}
+                                  value={item.customizationQuantity || item.quantity}
+                                  onChange={(e) => updateBudgetItem(index, 'customizationQuantity', parseInt(e.target.value) || 0)}
+                                  placeholder="Qtd"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Máximo: {item.quantity} (quantidade do produto)
+                                </p>
+                              </div>
+                              <div>
+                                <Label>Total da Personalização</Label>
+                                <Input
+                                  value={`R$ ${((item.customizationQuantity || 0) * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                  disabled
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {item.customizationQuantity || 0} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            </div>
 
                             <div>
                               <Label>Observações Adicionais (Opcional)</Label>
