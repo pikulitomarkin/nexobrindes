@@ -881,8 +881,6 @@ export default function VendorBudgets() {
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
                                 }
                               }}
-                              customizationQuantity={item.customizationQuantity || 0}
-                              onCustomizationQuantityChange={(quantity) => updateBudgetItem(index, 'customizationQuantity', quantity)}
                               customizationValue={item.itemCustomizationValue || 0}
                               onCustomizationValueChange={(value) => updateBudgetItem(index, 'itemCustomizationValue', value)}
                               customizationDescription={item.itemCustomizationDescription || ''}

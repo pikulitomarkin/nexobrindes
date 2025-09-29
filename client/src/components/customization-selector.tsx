@@ -10,8 +10,6 @@ interface CustomizationSelectorProps {
   quantity: number;
   selectedCustomization: string | undefined;
   onCustomizationChange: (customization: any) => void;
-  customizationQuantity?: number;
-  onCustomizationQuantityChange?: (quantity: number) => void;
   customizationValue?: number;
   onCustomizationValueChange?: (value: number) => void;
   customizationDescription?: string;
@@ -23,8 +21,6 @@ export function CustomizationSelector({
   quantity, 
   selectedCustomization, 
   onCustomizationChange,
-  customizationQuantity = 0,
-  onCustomizationQuantityChange,
   customizationValue = 0,
   onCustomizationValueChange,
   customizationDescription = '',
@@ -163,44 +159,10 @@ export function CustomizationSelector({
             Configuração da Personalização: {selectedCustomizationData.name}
           </h4>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="space-y-2">
-              <Label htmlFor="customization-quantity" className="text-sm font-semibold text-gray-700">
-                Quantidade a Personalizar
-              </Label>
-              <Input
-                id="customization-quantity"
-                type="number"
-                min={selectedCustomizationData.minQuantity}
-                max={quantity}
-                value={customizationQuantity}
-                onChange={(e) => {
-                  const qty = parseInt(e.target.value) || 0;
-                  onCustomizationQuantityChange?.(qty);
-                  
-                  // Auto-calcular o valor baseado na quantidade mínima
-                  if (qty >= selectedCustomizationData.minQuantity) {
-                    onCustomizationValueChange?.(parseFloat(selectedCustomizationData.price) || 0);
-                  }
-                }}
-                placeholder={`Mínimo: ${selectedCustomizationData.minQuantity}`}
-                className={`h-11 ${customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity ? 'border-red-500' : ''}`}
-              />
-              <div className="space-y-1">
-                <p className="text-xs text-gray-500">
-                  Mínimo: {selectedCustomizationData.minQuantity} / Máximo: {quantity} unidades
-                </p>
-                {customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity && (
-                  <p className="text-xs text-red-600 font-medium bg-red-50 p-2 rounded">
-                    ⚠️ Quantidade insuficiente! Mínimo necessário: {selectedCustomizationData.minQuantity} unidades
-                  </p>
-                )}
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-2">
               <Label htmlFor="customization-value" className="text-sm font-semibold text-gray-700">
-                Valor Unitário (R$)
+                Valor da Personalização (R$)
               </Label>
               <Input
                 id="customization-value"
@@ -211,7 +173,6 @@ export function CustomizationSelector({
                 onChange={(e) => onCustomizationValueChange?.(parseFloat(e.target.value) || 0)}
                 placeholder="0,00"
                 className="h-11"
-                disabled={customizationQuantity < selectedCustomizationData.minQuantity}
               />
               <p className="text-xs text-gray-500">
                 Preço sugerido: R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -237,40 +198,23 @@ export function CustomizationSelector({
 
           {/* Resumo da personalização */}
           <div className="mt-5 pt-4 border-t border-gray-200">
-            {customizationQuantity >= selectedCustomizationData.minQuantity && customizationValue > 0 ? (
+            {customizationValue > 0 ? (
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-800">
-                      ✅ Personalização Válida
+                      ✅ Personalização Configurada
                     </p>
                     <p className="text-lg font-bold text-green-900">
-                      {customizationQuantity} × R$ {customizationValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
-                      <span className="ml-2 text-xl">R$ {(customizationQuantity * customizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      Valor da Personalização: R$ {customizationValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-green-600">Total da personalização</p>
-                  </div>
                 </div>
-              </div>
-            ) : customizationQuantity > 0 && customizationQuantity < selectedCustomizationData.minQuantity ? (
-              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                <p className="text-sm font-medium text-red-800 mb-2">
-                  ❌ Quantidade Insuficiente
-                </p>
-                <p className="text-sm text-red-700">
-                  Esta personalização requer no mínimo <strong>{selectedCustomizationData.minQuantity} unidades</strong>.
-                </p>
-                <p className="text-sm text-red-700 mt-2">
-                  <strong>Valor mínimo seria:</strong> {selectedCustomizationData.minQuantity} × R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = 
-                  <strong className="ml-1">R$ {(selectedCustomizationData.minQuantity * parseFloat(selectedCustomizationData.price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-                </p>
               </div>
             ) : (
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-600">
-                  Configure a quantidade e valores acima para ver o total da personalização
+                  Configure o valor da personalização acima
                 </p>
               </div>
             )}
