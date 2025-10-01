@@ -81,10 +81,10 @@ export function CustomizationSelector({
               Personalizações Disponíveis ({filteredCustomizations.length})
             </Label>
             <Select 
-              value={selectedCustomization || ""} 
+              value={selectedCustomization || "none"} 
               onValueChange={(value) => {
-                if (!value) {
-                  // Se valor vazio, limpar seleção
+                if (!value || value === "none") {
+                  // Se valor vazio ou 'none', limpar seleção
                   onCustomizationChange(null);
                   if (onCustomizationValueChange) {
                     onCustomizationValueChange(0);
@@ -112,7 +112,7 @@ export function CustomizationSelector({
                 <SelectValue placeholder="Selecione uma personalização (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value="none">
                   <span className="text-gray-500 italic">Nenhuma personalização</span>
                 </SelectItem>
                 {filteredCustomizations.map((customization: any) => (
