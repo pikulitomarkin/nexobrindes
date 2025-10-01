@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { CustomizationSelector } from "@/components/customization-selector";
 
 export default function VendorOrders() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -26,17 +28,81 @@ export default function VendorOrders() {
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("all"); // Added periodFilter state
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Image upload functions for individual products
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, itemIndex: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        title: "Erro",
+        description: "Imagem deve ter até 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'product-customizations');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+
+      const { url } = await response.json();
+
+      updateOrderItem(itemIndex, 'customizationPhoto', url);
+
+      toast({
+        title: "Sucesso!",
+        description: "Imagem enviada com sucesso"
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar imagem",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const removeProductImage = (itemIndex: number) => {
+    updateOrderItem(itemIndex, 'customizationPhoto', '');
+  };
 
   // Order form state - isolated for vendor
   const [vendorOrderForm, setVendorOrderForm] = useState({
     title: "",
     description: "",
     clientId: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
     vendorId: vendorId,
     deadline: "",
-    items: [] as any[]
+    deliveryDeadline: "",
+    deliveryType: "delivery", // 'delivery' or 'pickup'
+    items: [] as any[],
+    paymentMethodId: "",
+    shippingMethodId: "",
+    installments: 1,
+    downPayment: 0,
+    remainingAmount: 0,
+    shippingCost: 0,
+    hasDiscount: false,
+    discountType: "percentage",
+    discountPercentage: 0,
+    discountValue: 0
   });
 
   const { data: orders, isLoading } = useQuery({
@@ -66,6 +132,24 @@ export default function VendorOrders() {
     },
   });
 
+  const { data: paymentMethods } = useQuery({
+    queryKey: ["/api/payment-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/payment-methods');
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      return response.json();
+    },
+  });
+
+  const { data: shippingMethods } = useQuery({
+    queryKey: ["/api/shipping-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/shipping-methods');
+      if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
   const { data: producers } = useQuery({
     queryKey: ["/api/producers"],
     queryFn: async () => {
@@ -76,7 +160,34 @@ export default function VendorOrders() {
   });
 
   const products = productsData?.products || [];
-  const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+  const categorySet = new Set<string>();
+  (products || []).forEach((product: any) => {
+    if (product.category && typeof product.category === 'string') {
+      categorySet.add(product.category);
+    }
+  });
+  const categories: string[] = ['all', ...Array.from(categorySet)];
+
+  // Helper variables for selected payment and shipping methods
+  const selectedPaymentMethod = paymentMethods?.find((pm: any) => pm.id === vendorOrderForm.paymentMethodId);
+  const selectedShippingMethod = shippingMethods?.find((sm: any) => sm.id === vendorOrderForm.shippingMethodId);
+
+  // Calculate shipping cost based on selected method and delivery type
+  const calculateShippingCost = () => {
+    // If pickup, no shipping cost
+    if (vendorOrderForm.deliveryType === "pickup") return 0;
+
+    if (!selectedShippingMethod) return 0;
+
+    const subtotal = calculateOrderTotal();
+
+    if (selectedShippingMethod.type === "free") return 0;
+    if (selectedShippingMethod.freeShippingThreshold > 0 && subtotal >= selectedShippingMethod.freeShippingThreshold) return 0;
+    if (selectedShippingMethod.type === "fixed") return parseFloat(selectedShippingMethod.basePrice);
+
+    // For calculated, return base price as placeholder (could integrate with shipping API)
+    return parseFloat(selectedShippingMethod.basePrice || "0");
+  };
 
   // Order functions
   const addProductToOrder = (product: any) => {
@@ -87,8 +198,11 @@ export default function VendorOrders() {
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
       hasItemCustomization: false,
+      selectedCustomizationId: "",
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
+      additionalCustomizationNotes: "",
+      customizationPhoto: "",
       productWidth: "",
       productHeight: "",
       productDepth: "",
@@ -111,6 +225,7 @@ export default function VendorOrders() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
+        // Recalculate totalPrice based on unitPrice and quantity, excluding customization for now
         item.totalPrice = item.unitPrice * quantity;
       } else if (field === 'itemCustomizationValue') {
         item[field] = parseFloat(value) || 0;
@@ -131,16 +246,28 @@ export default function VendorOrders() {
   };
 
   const calculateOrderTotal = () => {
-    return vendorOrderForm.items.reduce((total, item) => {
+    const subtotal = vendorOrderForm.items.reduce((total, item) => {
       return total + calculateItemTotal(item);
     }, 0);
+
+    // Apply general discount
+    if (vendorOrderForm.hasDiscount) {
+      if (vendorOrderForm.discountType === 'percentage') {
+        const discountAmount = (subtotal * vendorOrderForm.discountPercentage) / 100;
+        return Math.max(0, subtotal - discountAmount);
+      } else if (vendorOrderForm.discountType === 'value') {
+        return Math.max(0, subtotal - vendorOrderForm.discountValue);
+      }
+    }
+
+    return subtotal;
   };
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
+    const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
     let subtotal = basePrice + customizationValue;
-    
+
     // Aplicar desconto do item
     if (item.hasItemDiscount) {
       if (item.itemDiscountType === 'percentage') {
@@ -150,8 +277,15 @@ export default function VendorOrders() {
         subtotal = subtotal - (item.itemDiscountValue || 0);
       }
     }
-    
+
     return Math.max(0, subtotal);
+  };
+
+  // Calculate the total including shipping cost
+  const calculateTotalWithShipping = () => {
+    const subtotal = calculateOrderTotal();
+    const shipping = vendorOrderForm.shippingCost || calculateShippingCost();
+    return subtotal + shipping;
   };
 
   const resetOrderForm = () => {
@@ -159,10 +293,27 @@ export default function VendorOrders() {
       title: "",
       description: "",
       clientId: "",
+      contactName: "",
+      contactPhone: "",
+      contactEmail: "",
       vendorId: vendorId,
       deadline: "",
-      items: []
+      deliveryDeadline: "",
+      deliveryType: "delivery",
+      items: [],
+      paymentMethodId: "",
+      shippingMethodId: "",
+      installments: 1,
+      downPayment: 0,
+      remainingAmount: 0,
+      shippingCost: 0,
+      hasDiscount: false,
+      discountType: "percentage",
+      discountPercentage: 0,
+      discountValue: 0
     });
+    setIsEditMode(false);
+    setEditingOrderId(null);
   };
 
   const createOrderMutation = useMutation({
@@ -172,7 +323,7 @@ export default function VendorOrders() {
       const orderData = {
         ...data,
         clientId: selectedClient?.userId || data.clientId, // Use userId for proper client linking
-        totalValue: calculateOrderTotal().toFixed(2),
+        totalValue: calculateTotalWithShipping().toFixed(2),
         status: "confirmed"
       };
       const response = await fetch("/api/orders", {
@@ -192,6 +343,35 @@ export default function VendorOrders() {
       toast({
         title: "Sucesso!",
         description: "Pedido criado com sucesso",
+      });
+    },
+  });
+
+  const updateOrderMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const selectedClient = clients?.find(c => c.id === data.clientId);
+      const orderData = {
+        ...data,
+        clientId: selectedClient?.userId || data.clientId,
+        totalValue: calculateTotalWithShipping().toFixed(2)
+      };
+      const response = await fetch(`/api/orders/${editingOrderId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar pedido");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
+      setIsOrderDialogOpen(false);
+      resetOrderForm();
+      setOrderProductSearch("");
+      setOrderCategoryFilter("all");
+      toast({
+        title: "Sucesso!",
+        description: "Pedido atualizado com sucesso",
       });
     },
   });
@@ -254,6 +434,56 @@ export default function VendorOrders() {
     }
   };
 
+  const handleEditOrder = (order: any) => {
+    // Pre-populate form with existing order data
+    setVendorOrderForm({
+      title: order.title,
+      description: order.description || "",
+      clientId: order.clientId || "",
+      contactName: order.contactName || "",
+      contactPhone: order.contactPhone || "",
+      contactEmail: order.contactEmail || "",
+      vendorId: order.vendorId,
+      deadline: order.deadline || "",
+      deliveryDeadline: order.deliveryDeadline || "",
+      deliveryType: order.deliveryType || "delivery",
+      items: order.items?.map((item: any) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: parseFloat(item.unitPrice),
+        totalPrice: parseFloat(item.totalPrice),
+        hasItemCustomization: item.hasItemCustomization,
+        selectedCustomizationId: item.selectedCustomizationId || "",
+        itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+        itemCustomizationDescription: item.itemCustomizationDescription || "",
+        additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+        customizationPhoto: item.customizationPhoto || "",
+        productWidth: item.productWidth || "",
+        productHeight: item.productHeight || "",
+        productDepth: item.productDepth || "",
+        hasItemDiscount: item.hasItemDiscount || false,
+        itemDiscountType: item.itemDiscountType || "percentage",
+        itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+        itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+      })) || [],
+      paymentMethodId: order.paymentMethodId || "",
+      shippingMethodId: order.shippingMethodId || "",
+      installments: order.installments || 1,
+      downPayment: order.downPayment || 0,
+      remainingAmount: order.remainingAmount || 0,
+      shippingCost: order.shippingCost || 0,
+      hasDiscount: order.hasDiscount || false,
+      discountType: order.discountType || "percentage",
+      discountPercentage: parseFloat(order.discountPercentage || 0),
+      discountValue: parseFloat(order.discountValue || 0)
+    });
+
+    setIsEditMode(true);
+    setEditingOrderId(order.id);
+    setIsOrderDialogOpen(true);
+  };
+
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (vendorOrderForm.items.length === 0) {
@@ -264,7 +494,12 @@ export default function VendorOrders() {
       });
       return;
     }
-    createOrderMutation.mutate(vendorOrderForm);
+
+    if (isEditMode) {
+      updateOrderMutation.mutate(vendorOrderForm);
+    } else {
+      createOrderMutation.mutate(vendorOrderForm);
+    }
   };
 
   // Filter products for order creation
@@ -366,22 +601,40 @@ export default function VendorOrders() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Pedidos</h1>
           <p className="text-gray-600">Gerencie pedidos criados para seus clientes</p>
         </div>
-        <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+        <Dialog open={isOrderDialogOpen} onOpenChange={(open) => {
+          setIsOrderDialogOpen(open);
+          if (open && !isEditMode) {
+            // Reset form when opening for new order
+            resetOrderForm();
+            setOrderProductSearch("");
+            setOrderCategoryFilter("all");
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="gradient-bg text-white">
+            <Button 
+              className="gradient-bg text-white"
+              onClick={() => {
+                // Ensure we're in create mode when clicking new order
+                setIsEditMode(false);
+                setEditingOrderId(null);
+                resetOrderForm();
+                setOrderProductSearch("");
+                setOrderCategoryFilter("all");
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Pedido
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Criar Novo Pedido</DialogTitle>
+              <DialogTitle>{isEditMode ? "Editar Pedido" : "Criar Novo Pedido"}</DialogTitle>
               <DialogDescription>
-                Crie um pedido personalizado com produtos do catálogo
+                {isEditMode ? "Modifique os dados do pedido existente" : "Crie um pedido personalizado com produtos do catálogo"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleOrderSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="order-title">Título do Pedido</Label>
                   <Input
@@ -400,6 +653,30 @@ export default function VendorOrders() {
                     onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deadline: e.target.value })}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="order-deliveryDeadline">Prazo de Entrega</Label>
+                  <Input
+                    id="order-deliveryDeadline"
+                    type="date"
+                    value={vendorOrderForm.deliveryDeadline || ""}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="order-delivery-type">Tipo de Entrega</Label>
+                  <Select 
+                    value={vendorOrderForm.deliveryType} 
+                    onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, deliveryType: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delivery">Entrega com Frete</SelectItem>
+                      <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
@@ -412,17 +689,51 @@ export default function VendorOrders() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="order-contact-name">Nome de Contato *</Label>
+                  <Input
+                    id="order-contact-name"
+                    value={vendorOrderForm.contactName}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactName: e.target.value })}
+                    required
+                    placeholder="Nome do cliente/contato"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="order-contact-phone">Telefone</Label>
+                  <Input
+                    id="order-contact-phone"
+                    value={vendorOrderForm.contactPhone}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="order-contact-email">Email</Label>
+                  <Input
+                    id="order-contact-email"
+                    type="email"
+                    value={vendorOrderForm.contactEmail}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactEmail: e.target.value })}
+                    placeholder="cliente@email.com"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="order-client">Cliente</Label>
-                <Select value={vendorOrderForm.clientId} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, clientId: value })}>
+                <Label htmlFor="order-client">Cliente Cadastrado (Opcional)</Label>
+                <Select 
+                  value={vendorOrderForm.clientId || "none"} 
+                  onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, clientId: value === "none" ? "" : value })}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
+                    <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Nenhum cliente selecionado</SelectItem>
                     {clients?.map((client: any) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} ({client.userCode || client.username || 'Sem código'})
-                      </SelectItem>
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -489,7 +800,7 @@ export default function VendorOrders() {
                               type="number"
                               step="0.1"
                               min="0"
-                              value={item.productWidth || ""}
+                              value={item.productWidth}
                               onChange={(e) => updateOrderItem(index, 'productWidth', e.target.value)}
                               placeholder="Ex: 150.0"
                             />
@@ -501,7 +812,7 @@ export default function VendorOrders() {
                               type="number"
                               step="0.1"
                               min="0"
-                              value={item.productHeight || ""}
+                              value={item.productHeight}
                               onChange={(e) => updateOrderItem(index, 'productHeight', e.target.value)}
                               placeholder="Ex: 80.0"
                             />
@@ -513,7 +824,7 @@ export default function VendorOrders() {
                               type="number"
                               step="0.1"
                               min="0"
-                              value={item.productDepth || ""}
+                              value={item.productDepth}
                               onChange={(e) => updateOrderItem(index, 'productDepth', e.target.value)}
                               placeholder="Ex: 60.0"
                             />
@@ -533,27 +844,96 @@ export default function VendorOrders() {
                         </div>
 
                         {item.hasItemCustomization && (
-                          <div className="grid grid-cols-2 gap-3 bg-blue-50 p-3 rounded mb-3">
+                          <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
+                            <CustomizationSelector 
+                              productCategory={products.find((p: any) => p.id === item.productId)?.category}
+                              quantity={item.quantity}
+                              selectedCustomization={item.selectedCustomizationId}
+                              onCustomizationChange={(customization) => {
+                                if (customization) {
+                                  updateOrderItem(index, 'selectedCustomizationId', customization.id);
+                                  updateOrderItem(index, 'itemCustomizationValue', customization.price);
+                                  updateOrderItem(index, 'itemCustomizationDescription', customization.name);
+                                } else {
+                                  // Limpar todos os dados de personalização
+                                  updateOrderItem(index, 'selectedCustomizationId', '');
+                                  updateOrderItem(index, 'itemCustomizationValue', 0);
+                                  updateOrderItem(index, 'itemCustomizationDescription', '');
+                                  updateOrderItem(index, 'additionalCustomizationNotes', '');
+                                }
+                              }}
+                              customizationValue={item.itemCustomizationValue || 0}
+                              onCustomizationValueChange={(value) => updateOrderItem(index, 'itemCustomizationValue', value)}
+                              customizationDescription={item.itemCustomizationDescription || ''}
+                              onCustomizationDescriptionChange={(description) => updateOrderItem(index, 'itemCustomizationDescription', description)}
+                            />
+
+                            <div className="grid grid-cols-1 gap-3">
+                              <div>
+                                <Label>Total da Personalização</Label>
+                                <Input
+                                  value={`R$ ${(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                  disabled
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            </div>
+
                             <div>
-                              <Label htmlFor={`item-customization-value-${index}`}>Valor da Personalização (R$)</Label>
+                              <Label>Observações Adicionais (Opcional)</Label>
                               <Input
-                                id={`item-customization-value-${index}`}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.itemCustomizationValue}
-                                onChange={(e) => updateOrderItem(index, 'itemCustomizationValue', e.target.value)}
-                                placeholder="0,00"
+                                value={item.additionalCustomizationNotes || ''}
+                                onChange={(e) => updateOrderItem(index, 'additionalCustomizationNotes', e.target.value)}
+                                placeholder="Observações extras sobre a personalização..."
                               />
                             </div>
+
+                            {/* Image Upload for Product Customization */}
                             <div>
-                              <Label htmlFor={`item-customization-description-${index}`}>Descrição</Label>
-                              <Input
-                                id={`item-customization-description-${index}`}
-                                value={item.itemCustomizationDescription}
-                                onChange={(e) => updateOrderItem(index, 'itemCustomizationDescription', e.target.value)}
-                                placeholder="Ex: Gravação, cor especial..."
-                              />
+                              <Label>Imagem da Personalização deste Produto</Label>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-center w-full">
+                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                                      <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                      </svg>
+                                      <p className="text-xs text-gray-500">Clique para enviar imagem</p>
+                                    </div>
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => handleProductImageUpload(e, index)}
+                                    />
+                                  </label>
+                                </div>
+
+                                {item.customizationPhoto && (
+                                  <div className="relative inline-block">
+                                    <img 
+                                      src={item.customizationPhoto} 
+                                      alt={`Personalização ${item.productName}`} 
+                                      className="w-24 h-24 object-cover rounded-lg"
+                                      onError={(e) => {
+                                        console.error('Erro ao carregar imagem:', item.customizationPhoto);
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                                      onClick={() => removeProductImage(index)}
+                                      type="button"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -667,7 +1047,7 @@ export default function VendorOrders() {
                             <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((category) => (
+                            {categories.map((category: string) => (
                               <SelectItem key={category} value={category}>
                                 {category === "all" ? "Todas as Categorias" : category}
                               </SelectItem>
@@ -728,13 +1108,272 @@ export default function VendorOrders() {
                 </Card>
               </div>
 
+              {/* Payment and Shipping Configuration */}
+              <Separator />
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Pagamento e Frete</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="payment-method">Forma de Pagamento</Label>
+                    <Select value={vendorOrderForm.paymentMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, paymentMethodId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a forma de pagamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="shipping-method">Método de Frete</Label>
+                    <Select value={vendorOrderForm.shippingMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, shippingMethodId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o método de frete" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shippingMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Payment Configuration */}
+                {selectedPaymentMethod && (
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Pagamento</h4>
+
+                    {selectedPaymentMethod.type === "credit_card" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="installments">Número de Parcelas</Label>
+                          <Select value={vendorOrderForm.installments?.toString() || "1"} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, installments: parseInt(value) })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: selectedPaymentMethod.maxInstallments }, (_, i) => i + 1).map(num => (
+                                <SelectItem key={num} value={num.toString()}>
+                                  {num}x {num > 1 && selectedPaymentMethod.installmentInterest > 0 && `(${selectedPaymentMethod.installmentInterest}% a.m.)`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Input
+                          id="down-payment"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={vendorOrderForm.downPayment || 0}
+                          onChange={(e) => {
+                            const downPayment = parseFloat(e.target.value) || 0;
+                            const total = calculateTotalWithShipping();
+                            setVendorOrderForm({ 
+                              ...vendorOrderForm, 
+                              downPayment,
+                              remainingAmount: Math.max(0, total - downPayment)
+                            });
+                          }}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
+                        <Input
+                          id="remaining-amount"
+                          value={`R$ ${(vendorOrderForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Shipping Configuration */}
+                {vendorOrderForm.deliveryType === "pickup" ? (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800">Retirada no Local</h4>
+                    <p className="text-sm text-blue-700 mt-2">
+                      O cliente irá retirar o pedido no local. Não há cobrança de frete.
+                    </p>
+                  </div>
+                ) : selectedShippingMethod && (
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Frete</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
+                        <Input
+                          id="shipping-cost"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={vendorOrderForm.shippingCost || calculateShippingCost()}
+                          onChange={(e) => {
+                            const shippingCost = parseFloat(e.target.value) || 0;
+                            const total = calculateTotalWithShipping();
+                            setVendorOrderForm({ 
+                              ...vendorOrderForm, 
+                              shippingCost,
+                              remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
+                            });
+                          }}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Prazo de Entrega</Label>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {selectedShippingMethod.estimatedDays} dias úteis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="has-discount"
+                    checked={vendorOrderForm.hasDiscount}
+                    onCheckedChange={(checked) => setVendorOrderForm({ ...vendorOrderForm, hasDiscount: checked })}
+                  />
+                  <Label htmlFor="has-discount" className="flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Aplicar Desconto
+                  </Label>
+                </div>
+
+                {vendorOrderForm.hasDiscount && (
+                  <div className="bg-orange-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label htmlFor="discount-type">Tipo de Desconto</Label>
+                        <Select value={vendorOrderForm.discountType} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, discountType: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                            <SelectItem value="value">Valor Fixo (R$)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {vendorOrderForm.discountType === 'percentage' ? (
+                        <div>
+                          <Label htmlFor="discount-percentage">Desconto (%)</Label>
+                          <Input
+                            id="discount-percentage"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={vendorOrderForm.discountPercentage}
+                            onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, discountPercentage: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 10.50"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <Label htmlFor="discount-value">Desconto (R$)</Label>
+                          <Input
+                            id="discount-value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={vendorOrderForm.discountValue}
+                            onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, discountValue: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ex: 150.00"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <Label>Valor do Desconto</Label>
+                        <p className="text-lg font-semibold text-orange-600 mt-2">
+                          R$ {(() => {
+                            const itemsSubtotal = vendorOrderForm.items.reduce((total, item) => {
+                              const basePrice = item.unitPrice * item.quantity;
+                              const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                              return total + basePrice + customizationValue;
+                            }, 0);
+
+                            if (vendorOrderForm.discountType === 'percentage') {
+                              return ((itemsSubtotal * vendorOrderForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            } else {
+                              return vendorOrderForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Order Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Total do Pedido:</span>
-                  <span className="text-blue-600">
-                    R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal dos Produtos:</span>
+                    <span>R$ {(() => {
+                      const itemsSubtotal = vendorOrderForm.items.reduce((total, item) => {
+                        const basePrice = item.unitPrice * item.quantity;
+                        const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                        return total + basePrice + customizationValue;
+                      }, 0);
+                      return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    })()}</span>
+                  </div>
+                  {vendorOrderForm.hasDiscount && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Desconto:</span>
+                      <span>- R$ {(() => {
+                        const itemsSubtotal = vendorOrderForm.items.reduce((total, item) => {
+                          const basePrice = item.unitPrice * item.quantity;
+                          const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                          return total + basePrice + customizationValue;
+                        }, 0);
+
+                        if (vendorOrderForm.discountType === 'percentage') {
+                          return ((itemsSubtotal * vendorOrderForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        } else {
+                          return vendorOrderForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        }
+                      })()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span>Frete:</span>
+                    <span>
+                      {vendorOrderForm.deliveryType === "pickup" ? 
+                        "Retirada no local" : 
+                        `R$ ${(vendorOrderForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      }
+                    </span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Total do Pedido:</span>
+                    <span className="text-blue-600">
+                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -745,15 +1384,20 @@ export default function VendorOrders() {
                   onClick={() => {
                     setIsOrderDialogOpen(false);
                     resetOrderForm();
+                    setOrderProductSearch("");
+                    setOrderCategoryFilter("all");
                   }}
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createOrderMutation.isPending || vendorOrderForm.items.length === 0}
+                  disabled={(isEditMode ? updateOrderMutation.isPending : createOrderMutation.isPending) || vendorOrderForm.items.length === 0}
                 >
-                  {createOrderMutation.isPending ? "Criando..." : "Criar Pedido"}
+                  {isEditMode
+                    ? (updateOrderMutation.isPending ? "Atualizando..." : "Atualizar Pedido")
+                    : (createOrderMutation.isPending ? "Criando..." : "Criar Pedido")
+                  }
                 </Button>
               </div>
             </form>
@@ -967,6 +1611,18 @@ export default function VendorOrders() {
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
+                        {order.status !== 'production' && order.status !== 'shipped' && order.status !== 'delivered' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditOrder(order)}
+                            data-testid={`button-edit-${order.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
                         {order.hasUnreadNotes && (
                           <Button
                             variant="ghost"
@@ -1172,7 +1828,7 @@ export default function VendorOrders() {
                 </div>
               )}
 
-              {/* Photos from Budget */}
+              {/* Photos from Order */}
               {selectedOrder.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Fotos de Personalização</h3>
