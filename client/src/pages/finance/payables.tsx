@@ -109,9 +109,29 @@ export default function FinancePayables() {
 
   const payPayableMutation = useMutation({
     mutationFn: async (data: { payableId: string; payment: any }) => {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { ...data.payment };
+      // Criar uma despesa/pagamento via API
+      const response = await fetch('/api/finance/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          description: `Pagamento manual - ${selectedPayable?.description || 'Conta a pagar'}`,
+          amount: data.payment.amount,
+          category: selectedPayable?.category || 'other',
+          status: 'approved',
+          vendorId: 'vendor-1', // Default vendor for manual payments
+          orderId: null,
+          notes: data.payment.notes
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao registrar pagamento');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       setIsPayDialogOpen(false);
@@ -125,12 +145,12 @@ export default function FinancePayables() {
         title: "Sucesso!",
         description: "Pagamento registrado com sucesso",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/payables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Não foi possível registrar o pagamento",
+        description: error.message || "Não foi possível registrar o pagamento",
         variant: "destructive",
       });
     },

@@ -62,17 +62,21 @@ export default function FinanceReceivables() {
 
   const receivePaymentMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch(`/api/receivables/${data.receivableId}/payment`, {
+      // Criar um pagamento direto via API
+      const response = await fetch('/api/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
+          orderId: data.receivableId, // Using receivableId as orderId for manual payments
           amount: data.amount,
           method: data.method,
+          status: 'confirmed',
           transactionId: data.transactionId,
-          notes: data.notes
+          notes: data.notes,
+          paidAt: new Date()
         })
       });
       
@@ -83,7 +87,7 @@ export default function FinanceReceivables() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
       setIsReceiveDialogOpen(false);
       setSelectedReceivable(null);
       setPaymentData({
@@ -97,10 +101,10 @@ export default function FinanceReceivables() {
         description: "Pagamento registrado com sucesso",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Não foi possível registrar o pagamento",
+        description: error.message || "Não foi possível registrar o pagamento",
         variant: "destructive",
       });
     },

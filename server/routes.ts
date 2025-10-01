@@ -200,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!orderData.clientId) {
         return res.status(400).json({ error: "Cliente é obrigatório" });
       }
-      
+
       if (!orderData.vendorId) {
         return res.status(400).json({ error: "Vendedor é obrigatório" });
       }
@@ -2874,6 +2874,31 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Manual payment for receivables
+  app.post("/api/receivables/:id/payment", async (req, res) => {
+    try {
+      const { amount, method, transactionId, notes } = req.body;
+      const receivableId = req.params.id;
+
+      // Create a confirmed payment record
+      const payment = await storage.createPayment({
+        orderId: receivableId, // For manual payments, we use receivableId as orderId
+        amount: amount,
+        method: method || "manual",
+        status: "confirmed",
+        transactionId: transactionId || `MANUAL-${Date.now()}`,
+        notes: notes,
+        paidAt: new Date()
+      });
+
+      res.json({ success: true, payment });
+    } catch (error) {
+      console.error("Error creating manual payment:", error);
+      res.status(500).json({ error: "Failed to create manual payment" });
+    }
+  });
+
+  // Receive Payment Dialog
   // Payment allocation routes
   app.post("/api/finance/receivables/:id/allocate-payment", async (req, res) => {
     try {
