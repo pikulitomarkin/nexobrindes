@@ -81,30 +81,23 @@ export function CustomizationSelector({
               Personalizações Disponíveis ({filteredCustomizations.length})
             </Label>
             <Select 
-              value={selectedCustomization || ""} 
+              value={selectedCustomization || undefined} 
               onValueChange={(value) => {
-                if (!value || value === "none") {
-                  onCustomizationChange(null);
-                } else {
-                  const customization = filteredCustomizations.find((c: any) => c.id === value);
-                  onCustomizationChange(customization);
-                  // Auto-preenche os valores
-                  if (customization && onCustomizationValueChange) {
-                    onCustomizationValueChange(parseFloat(customization.price) || 0);
-                  }
-                  if (customization && onCustomizationDescriptionChange) {
-                    onCustomizationDescriptionChange(customization.name);
-                  }
+                const customization = filteredCustomizations.find((c: any) => c.id === value);
+                onCustomizationChange(customization);
+                // Auto-preenche os valores
+                if (customization && onCustomizationValueChange) {
+                  onCustomizationValueChange(parseFloat(customization.price) || 0);
+                }
+                if (customization && onCustomizationDescriptionChange) {
+                  onCustomizationDescriptionChange(customization.name);
                 }
               }}
             >
               <SelectTrigger id="customization-select" className="w-full h-10">
-                <SelectValue placeholder="Selecione uma personalização" />
+                <SelectValue placeholder="Selecione uma personalização (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
-                  <span className="font-medium text-gray-600">Sem personalização</span>
-                </SelectItem>
                 {filteredCustomizations.map((customization: any) => (
                   <SelectItem key={customization.id} value={customization.id}>
                     <div className="flex flex-col">
