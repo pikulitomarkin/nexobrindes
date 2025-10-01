@@ -1215,18 +1215,24 @@ export class MemStorage implements IStorage {
     const paidValue = parseFloat(order.paidValue || "0");
     const totalValue = parseFloat(order.totalValue);
 
-    let status: 'pending' | 'partial' | 'paid' = 'pending';
+    let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
     if (paidValue >= totalValue) {
       status = 'paid';
     } else if (paidValue > 0) {
       status = 'partial';
     }
 
+    // Check if overdue
+    const dueDate = order.deadline ? new Date(order.deadline) : null;
+    if (dueDate && new Date() > dueDate && status !== 'paid') {
+      status = 'overdue';
+    }
+
     const receivable: AccountsReceivable = {
       id: `ar-${order.id}`,
       orderId: order.id,
       clientId: order.clientId,
-      vendorId: order.vendorId,
+      vendorId: order.vendorId || 'vendor-1',
       description: `Venda: ${order.product}`,
       amount: order.totalValue,
       receivedAmount: order.paidValue || "0.00",

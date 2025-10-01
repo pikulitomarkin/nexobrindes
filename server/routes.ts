@@ -2834,7 +2834,41 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/receivables", async (req, res) => {
     try {
       const receivables = await storage.getAccountsReceivable();
-      res.json(receivables);
+      
+      // Enrich with order and client data
+      const enrichedReceivables = await Promise.all(
+        receivables.map(async (receivable) => {
+          const order = await storage.getOrder(receivable.orderId);
+          let clientName = 'Cliente não identificado';
+          
+          if (order) {
+            // Try to get client details
+            const client = await storage.getClient(order.clientId);
+            if (client) {
+              clientName = client.name;
+            } else {
+              // Fallback to user table
+              const user = await storage.getUser(order.clientId);
+              if (user) {
+                clientName = user.name;
+              }
+            }
+          }
+
+          return {
+            ...receivable,
+            orderNumber: order?.orderNumber || `#${receivable.orderId}`,
+            clientName: clientName,
+            amount: receivable.amount.toString(),
+            receivedAmount: receivable.receivedAmount.toString(),
+            dueDate: receivable.dueDate ? new Date(receivable.dueDate).toISOString() : null,
+            createdAt: receivable.createdAt ? new Date(receivable.createdAt).toISOString() : null,
+            updatedAt: receivable.updatedAt ? new Date(receivable.updatedAt).toISOString() : null
+          };
+        })
+      );
+
+      res.json(enrichedReceivables);
     } catch (error) {
       console.error("Failed to fetch receivables:", error);
       res.status(500).json({ error: "Failed to fetch receivables" });
@@ -2880,15 +2914,40 @@ Para mais detalhes, entre em contato conosco!`;
       const { amount, method, transactionId, notes } = req.body;
       const receivableId = req.params.id;
 
-      // Create a confirmed payment record
+      // Get the receivable to find the actual order ID
+      const receivable = await storage.getAccountsReceivable().then(receivables => 
+        receivables.find(r => r.id === receivableId)
+      );
+
+      if (!receivable) {
+        return res.status(404).json({ error: "Conta a receber não encontrada" });
+      }
+
+      // Create a confirmed payment record using the actual order ID
       const payment = await storage.createPayment({
-        orderId: receivableId, // For manual payments, we use receivableId as orderId
-        amount: amount,
+        orderId: receivable.orderId, // Use the actual order ID
+        amount: amount.toString(),
         method: method || "manual",
         status: "confirmed",
         transactionId: transactionId || `MANUAL-${Date.now()}`,
-        notes: notes,
+        notes: notes || "",
         paidAt: new Date()
+      });
+
+      // Update the receivable with new received amount
+      const newReceivedAmount = parseFloat(receivable.receivedAmount) + parseFloat(amount);
+      const totalAmount = parseFloat(receivable.amount);
+      
+      let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = receivable.status;
+      if (newReceivedAmount >= totalAmount) {
+        newStatus = 'paid';
+      } else if (newReceivedAmount > 0) {
+        newStatus = 'partial';
+      }
+
+      await storage.updateAccountsReceivable(receivableId, {
+        receivedAmount: newReceivedAmount.toFixed(2),
+        status: newStatus
       });
 
       res.json({ success: true, payment });

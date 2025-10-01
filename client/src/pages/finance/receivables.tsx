@@ -24,41 +24,34 @@ export default function FinanceReceivables() {
   });
   const { toast } = useToast();
 
-  // Mock data - replace with actual API call
-  const mockReceivables = [
-    {
-      id: "rec-1",
-      orderNumber: "#12345",
-      clientName: "Empresa ABC Ltda",
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      amount: "2500.00",
-      paidAmount: "1000.00",
-      status: "partial",
-      createdAt: new Date(),
-      lastPaymentDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-    },
-    {
-      id: "rec-2",
-      orderNumber: "#12346",
-      clientName: "Corporação XYZ",
-      dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-      amount: "1200.00",
-      paidAmount: "1200.00",
-      status: "paid",
-      createdAt: new Date(),
-      lastPaymentDate: new Date()
-    },
-    {
-      id: "rec-3",
-      orderNumber: "#12347",
-      clientName: "Indústria 123",
-      dueDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      amount: "850.00",
-      paidAmount: "0.00",
-      status: "overdue",
-      createdAt: new Date()
+  // Fetch real receivables data from API
+  const { data: receivablesData = [], isLoading } = useQuery({
+    queryKey: ['/api/finance/receivables'],
+    queryFn: async () => {
+      const response = await fetch('/api/finance/receivables', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Erro ao carregar contas a receber');
+      }
+      return response.json();
     }
-  ];
+  });
+
+  // Convert API data to expected format
+  const mockReceivables = receivablesData.map((receivable: any) => ({
+    id: receivable.id,
+    orderNumber: receivable.orderNumber || `#${receivable.orderId}`,
+    clientName: receivable.clientName || 'Cliente não identificado',
+    dueDate: receivable.dueDate ? new Date(receivable.dueDate) : new Date(),
+    amount: receivable.amount || "0.00",
+    paidAmount: receivable.receivedAmount || "0.00",
+    status: receivable.status || "pending",
+    createdAt: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
+    lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null
+  }));
 
   const receivePaymentMutation = useMutation({
     mutationFn: async (data: any) => {
