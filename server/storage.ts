@@ -1185,18 +1185,18 @@ export class MemStorage implements IStorage {
     return this.orders.get(id);
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+  async createOrder(orderData: InsertOrder): Promise<Order> {
     const id = randomUUID();
     const order: Order = {
-      ...insertOrder,
+      ...orderData,
       id,
-      producerId: insertOrder.producerId || null,
-      budgetId: insertOrder.budgetId || null,
-      description: insertOrder.description || null,
-      paidValue: insertOrder.paidValue || "0.00",
-      deadline: insertOrder.deadline || null,
-      trackingCode: insertOrder.trackingCode || null,
-      status: insertOrder.status || 'pending',
+      producerId: orderData.producerId || null,
+      budgetId: orderData.budgetId || null,
+      description: orderData.description || null,
+      paidValue: orderData.paidValue || "0.00",
+      deadline: orderData.deadline || null,
+      trackingCode: orderData.trackingCode || null,
+      status: orderData.status || 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1206,7 +1206,7 @@ export class MemStorage implements IStorage {
     await this.createAccountsReceivableForOrder(order);
 
     // Automatically calculate and create commissions for this new order
-    await this.calculateAndCreateCommissions(order);
+    await this.calculateCommissions(order);
 
     return order;
   }
@@ -2496,7 +2496,7 @@ export class MemStorage implements IStorage {
   }
 
   // Automatic commission calculation and processing methods
-  async calculateAndCreateCommissions(order: Order): Promise<void> {
+  async calculateCommissions(order: Order): Promise<void> {
     try {
       console.log(`Calculating commissions for order ${order.orderNumber}`);
 

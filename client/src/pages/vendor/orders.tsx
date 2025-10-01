@@ -320,18 +320,51 @@ export default function VendorOrders() {
     mutationFn: async (data: any) => {
       // Ensure we're using the userId for clientId to match the order structure
       const selectedClient = clients?.find(c => c.id === data.clientId);
+      
+      // Create proper order structure
       const orderData = {
-        ...data,
         clientId: selectedClient?.userId || data.clientId, // Use userId for proper client linking
+        vendorId: data.vendorId,
+        product: data.title, // Use title as product name
+        description: data.description || "",
         totalValue: calculateTotalWithShipping().toFixed(2),
-        status: "confirmed"
+        deadline: data.deadline || null,
+        deliveryDeadline: data.deliveryDeadline || null,
+        status: "confirmed",
+        // Contact information
+        contactName: data.contactName,
+        contactPhone: data.contactPhone || "",
+        contactEmail: data.contactEmail || "",
+        // Delivery type
+        deliveryType: data.deliveryType || "delivery",
+        // Payment and shipping info
+        paymentMethodId: data.paymentMethodId || "",
+        shippingMethodId: data.shippingMethodId || "",
+        installments: data.installments || 1,
+        downPayment: data.downPayment || 0,
+        remainingAmount: data.remainingAmount || 0,
+        shippingCost: data.shippingCost || 0,
+        // Discount info
+        hasDiscount: data.hasDiscount || false,
+        discountType: data.discountType || "percentage",
+        discountPercentage: data.discountPercentage || 0,
+        discountValue: data.discountValue || 0,
+        // Items
+        items: data.items || []
       };
+      
+      console.log("Creating order with data:", orderData);
+      
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
       });
-      if (!response.ok) throw new Error("Erro ao criar pedido");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Order creation failed:", errorText);
+        throw new Error("Erro ao criar pedido: " + errorText);
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -350,17 +383,50 @@ export default function VendorOrders() {
   const updateOrderMutation = useMutation({
     mutationFn: async (data: any) => {
       const selectedClient = clients?.find(c => c.id === data.clientId);
+      
+      // Create proper order structure for update
       const orderData = {
-        ...data,
         clientId: selectedClient?.userId || data.clientId,
-        totalValue: calculateTotalWithShipping().toFixed(2)
+        vendorId: data.vendorId,
+        product: data.title, // Use title as product name
+        description: data.description || "",
+        totalValue: calculateTotalWithShipping().toFixed(2),
+        deadline: data.deadline || null,
+        deliveryDeadline: data.deliveryDeadline || null,
+        // Contact information
+        contactName: data.contactName,
+        contactPhone: data.contactPhone || "",
+        contactEmail: data.contactEmail || "",
+        // Delivery type
+        deliveryType: data.deliveryType || "delivery",
+        // Payment and shipping info
+        paymentMethodId: data.paymentMethodId || "",
+        shippingMethodId: data.shippingMethodId || "",
+        installments: data.installments || 1,
+        downPayment: data.downPayment || 0,
+        remainingAmount: data.remainingAmount || 0,
+        shippingCost: data.shippingCost || 0,
+        // Discount info
+        hasDiscount: data.hasDiscount || false,
+        discountType: data.discountType || "percentage",
+        discountPercentage: data.discountPercentage || 0,
+        discountValue: data.discountValue || 0,
+        // Items
+        items: data.items || []
       };
+      
+      console.log("Updating order with data:", orderData);
+      
       const response = await fetch(`/api/orders/${editingOrderId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
       });
-      if (!response.ok) throw new Error("Erro ao atualizar pedido");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Order update failed:", errorText);
+        throw new Error("Erro ao atualizar pedido: " + errorText);
+      }
       return response.json();
     },
     onSuccess: () => {

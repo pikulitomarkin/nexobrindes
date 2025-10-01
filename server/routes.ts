@@ -191,6 +191,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Orders
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const orderData = req.body;
+      console.log("Received order data:", orderData);
+
+      // Validate required fields
+      if (!orderData.clientId) {
+        return res.status(400).json({ error: "Cliente é obrigatório" });
+      }
+      
+      if (!orderData.vendorId) {
+        return res.status(400).json({ error: "Vendedor é obrigatório" });
+      }
+
+      if (!orderData.product && !orderData.title) {
+        return res.status(400).json({ error: "Produto/título é obrigatório" });
+      }
+
+      // Generate order number
+      const orderNumber = `PED-${Date.now()}`;
+
+      // Create order with all provided data
+      const newOrder = await storage.createOrder({
+        orderNumber,
+        clientId: orderData.clientId,
+        vendorId: orderData.vendorId,
+        product: orderData.product || orderData.title,
+        description: orderData.description || "",
+        totalValue: orderData.totalValue || "0.00",
+        status: orderData.status || "confirmed",
+        deadline: orderData.deadline ? new Date(orderData.deadline) : null,
+        deliveryDeadline: orderData.deliveryDeadline ? new Date(orderData.deliveryDeadline) : null,
+        // Additional fields
+        contactName: orderData.contactName || "",
+        contactPhone: orderData.contactPhone || "",
+        contactEmail: orderData.contactEmail || "",
+        deliveryType: orderData.deliveryType || "delivery",
+        paymentMethodId: orderData.paymentMethodId || "",
+        shippingMethodId: orderData.shippingMethodId || "",
+        installments: orderData.installments || 1,
+        downPayment: orderData.downPayment || 0,
+        remainingAmount: orderData.remainingAmount || 0,
+        shippingCost: orderData.shippingCost || 0,
+        hasDiscount: orderData.hasDiscount || false,
+        discountType: orderData.discountType || "percentage",
+        discountPercentage: orderData.discountPercentage || 0,
+        discountValue: orderData.discountValue || 0,
+        items: orderData.items || []
+      });
+
+      console.log("Created order:", newOrder);
+      res.json(newOrder);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      res.status(500).json({ error: "Failed to create order: " + error.message });
+    }
+  });
+
   app.get("/api/orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
