@@ -63,7 +63,7 @@ export default function FinancePanel() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Contas a Receber</h3>
+            <h3 className="text-sm font-medium text-gray-600 mb-2">Pedidos a Receber</h3>
             <p className="text-2xl font-bold gradient-text">
               R$ {(overview?.receivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>

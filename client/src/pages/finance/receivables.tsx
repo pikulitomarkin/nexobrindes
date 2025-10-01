@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,7 +99,7 @@ export default function FinanceReceivables() {
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
+
     return (
       <Badge variant={statusInfo.variant} className="capitalize">
         {statusInfo.label}
@@ -128,16 +127,19 @@ export default function FinanceReceivables() {
     }
   };
 
-  const totalReceivables = mockReceivables.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const totalToReceive = mockReceivables.reduce((sum, r) => sum + parseFloat(r.amount) - parseFloat(r.paidAmount), 0);
   const totalReceived = mockReceivables.reduce((sum, r) => sum + parseFloat(r.paidAmount), 0);
+  const awaitingEntryCount = mockReceivables.filter(r => r.status === 'pending' || r.status === 'partial').length;
+  const partiallyPaidCount = mockReceivables.filter(r => r.status === 'partial').length;
   const overdueCount = mockReceivables.filter(r => r.status === 'overdue').length;
   const pendingCount = mockReceivables.filter(r => r.status === 'pending').length;
+
 
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Contas a Receber</h1>
-        <p className="text-gray-600">Controle de valores a receber de clientes</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Pedidos a Receber</h1>
+        <p className="text-gray-600">Controle de pedidos a receber de clientes</p>
       </div>
 
       {/* Summary Cards */}
@@ -146,9 +148,9 @@ export default function FinanceReceivables() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total a Receber</p>
+                <p className="text-sm font-medium text-gray-600">Saldo a Receber</p>
                 <p className="text-2xl font-bold gradient-text">
-                  R$ {totalReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {totalToReceive.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -178,9 +180,9 @@ export default function FinanceReceivables() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {pendingCount}
+                <p className="text-sm font-medium text-gray-600">Aguardando Entrada</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {awaitingEntryCount}
                 </p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -194,13 +196,13 @@ export default function FinanceReceivables() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Em Atraso</p>
-                <p className="text-2xl font-bold gradient-text">
-                  {overdueCount}
+                <p className="text-sm font-medium text-gray-600">Entrada Recebida</p>
+                <p className="text-3xl font-bold gradient-text">
+                  {partiallyPaidCount}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-red-600" />
+              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
               </div>
             </div>
           </CardContent>
@@ -243,7 +245,7 @@ export default function FinanceReceivables() {
       {/* Receivables Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Contas a Receber ({filteredReceivables.length})</CardTitle>
+          <CardTitle>Pedidos a Receber ({filteredReceivables.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
