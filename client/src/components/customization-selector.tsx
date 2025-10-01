@@ -81,9 +81,9 @@ export function CustomizationSelector({
               Personalizações Disponíveis ({filteredCustomizations.length})
             </Label>
             <Select 
-              value={selectedCustomization || "none"} 
+              value={selectedCustomization || ""} 
               onValueChange={(value) => {
-                if (value === "none") {
+                if (!value || value === "none") {
                   onCustomizationChange(null);
                 } else {
                   const customization = filteredCustomizations.find((c: any) => c.id === value);
@@ -102,7 +102,7 @@ export function CustomizationSelector({
                 <SelectValue placeholder="Selecione uma personalização" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">
+                <SelectItem value="">
                   <span className="font-medium text-gray-600">Sem personalização</span>
                 </SelectItem>
                 {filteredCustomizations.map((customization: any) => (
