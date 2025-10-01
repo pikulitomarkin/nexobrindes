@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
@@ -1636,17 +1636,32 @@ export default function VendorOrders() {
                           </Button>
                         )}
                         {(order.status === 'confirmed' || order.status === 'pending') && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-600 hover:text-blue-900"
-                            onClick={() => handleSendToProductionClick(order.id)}
-                            disabled={sendToProductionMutation.isPending}
-                            data-testid={`button-production-${order.id}`}
-                          >
-                            <Send className="h-4 w-4 mr-1" />
-                            {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
-                          </Button>
+                          <>
+                            {parseFloat(order.paidValue || '0') > 0 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-blue-600 hover:text-blue-900"
+                                onClick={() => handleSendToProductionClick(order.id)}
+                                disabled={sendToProductionMutation.isPending}
+                                data-testid={`button-production-${order.id}`}
+                              >
+                                <Send className="h-4 w-4 mr-1" />
+                                {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-orange-600 hover:text-orange-900"
+                                disabled
+                                data-testid={`button-waiting-payment-${order.id}`}
+                              >
+                                <Clock className="h-4 w-4 mr-1" />
+                                Aguardando Pagamento
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
