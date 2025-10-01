@@ -85,7 +85,7 @@ export const commissions = pgTable("commissions", {
   type: text("type").notNull(), // 'vendor' or 'partner'
   percentage: decimal("percentage", { precision: 5, scale: 2 }).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'paid', 'deducted'
+  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'paid', 'deducted', 'cancelled'
   paidAt: timestamp("paid_at"),
   deductedAt: timestamp("deducted_at"),
   orderValue: decimal("order_value", { precision: 10, scale: 2 }),

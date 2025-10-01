@@ -587,13 +587,17 @@ export default function CommissionManagement() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`status-badge ${
                             commission.status === 'paid' ? 'status-confirmed' : 
+                            commission.status === 'confirmed' ? 'status-confirmed' : 
                             commission.status === 'pending' ? 'status-pending' : 
                             commission.status === 'deducted' ? 'status-cancelled' :
+                            commission.status === 'cancelled' ? 'status-cancelled' :
                             'status-production'
                           }`}>
                             {commission.status === 'paid' ? 'Paga' : 
+                             commission.status === 'confirmed' ? 'Confirmada' : 
                              commission.status === 'pending' ? 'Pendente' : 
                              commission.status === 'deducted' ? 'Abatida' :
+                             commission.status === 'cancelled' ? 'Cancelada' :
                              commission.status}
                           </span>
                         </td>
