@@ -874,7 +874,11 @@ export default function VendorBudgets() {
                                   updateBudgetItem(index, 'itemCustomizationValue', customization.price);
                                   updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
                                 } else {
+                                  // Limpar todos os dados de personalização
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
+                                  updateBudgetItem(index, 'itemCustomizationValue', 0);
+                                  updateBudgetItem(index, 'itemCustomizationDescription', '');
+                                  updateBudgetItem(index, 'additionalCustomizationNotes', '');
                                 }
                               }}
                               customizationValue={item.itemCustomizationValue || 0}
