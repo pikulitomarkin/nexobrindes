@@ -62,11 +62,28 @@ export default function FinanceReceivables() {
 
   const receivePaymentMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { id: Date.now(), ...data };
+      const response = await fetch(`/api/receivables/${data.receivableId}/payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          amount: data.amount,
+          method: data.method,
+          transactionId: data.transactionId,
+          notes: data.notes
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao registrar pagamento');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/receivables'] });
       setIsReceiveDialogOpen(false);
       setSelectedReceivable(null);
       setPaymentData({
@@ -252,28 +269,28 @@ export default function FinanceReceivables() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Vencimento
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pedido
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cliente
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Recebido
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Saldo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
@@ -281,43 +298,48 @@ export default function FinanceReceivables() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredReceivables.map((receivable: any) => (
                   <tr key={receivable.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                       {new Date(receivable.dueDate).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
                       {receivable.orderNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 max-w-[120px] truncate">
                       {receivable.clientName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(receivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {(parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {getStatusBadge(receivable.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
+                    <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
+                      <div className="flex space-x-1">
+                        <Button variant="ghost" size="sm" className="h-7 px-2">
+                          <Eye className="h-3 w-3 mr-1" />
                           Ver
                         </Button>
                         {receivable.status !== 'paid' && (
                           <Button 
                             variant="ghost" 
                             size="sm"
+                            className="h-7 px-2"
                             onClick={() => {
                               setSelectedReceivable(receivable);
+                              setPaymentData({
+                                ...paymentData,
+                                amount: (parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toString()
+                              });
                               setIsReceiveDialogOpen(true);
                             }}
                           >
-                            <CreditCard className="h-4 w-4 mr-1" />
+                            <CreditCard className="h-3 w-3 mr-1" />
                             Receber
                           </Button>
                         )}

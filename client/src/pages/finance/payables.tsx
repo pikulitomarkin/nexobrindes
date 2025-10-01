@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +17,20 @@ export default function FinancePayables() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [selectedPayable, setSelectedPayable] = useState<any>(null);
   const [payableData, setPayableData] = useState({
     dueDate: "",
     description: "",
     amount: "",
     category: "",
     vendorId: "",
+    notes: "",
+  });
+  const [paymentData, setPaymentData] = useState({
+    amount: "",
+    method: "",
+    transactionId: "",
     notes: "",
   });
   const { toast } = useToast();
@@ -89,11 +96,41 @@ export default function FinancePayables() {
         title: "Sucesso!",
         description: "Conta a pagar criada com sucesso",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payables"] });
     },
     onError: () => {
       toast({
         title: "Erro",
         description: "Não foi possível criar a conta a pagar",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const payPayableMutation = useMutation({
+    mutationFn: async (data: { payableId: string; payment: any }) => {
+      // Mock API call - replace with actual implementation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { ...data.payment };
+    },
+    onSuccess: () => {
+      setIsPayDialogOpen(false);
+      setPaymentData({
+        amount: "",
+        method: "",
+        transactionId: "",
+        notes: "",
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Pagamento registrado com sucesso",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/payables"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível registrar o pagamento",
         variant: "destructive",
       });
     },
@@ -109,7 +146,7 @@ export default function FinancePayables() {
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
+
     return (
       <Badge variant={statusInfo.variant} className="capitalize">
         {statusInfo.label}
@@ -150,14 +187,27 @@ export default function FinancePayables() {
     }
   };
 
+  const handlePayPayable = () => {
+    if (selectedPayable && paymentData.amount) {
+      payPayableMutation.mutate({
+        payableId: selectedPayable.id,
+        payment: {
+          ...paymentData,
+          amount: parseFloat(paymentData.amount).toFixed(2),
+          date: new Date(),
+        }
+      });
+    }
+  };
+
   const totalPayables = mockPayables.reduce((sum, p) => sum + parseFloat(p.amount), 0);
   const totalPaid = mockPayables.reduce((sum, p) => sum + parseFloat(p.paidAmount), 0);
   const overdueCount = mockPayables.filter(p => p.status === 'overdue').length;
   const pendingCount = mockPayables.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Contas a Pagar</h1>
           <p className="text-gray-600">Controle de valores a pagar para fornecedores</p>
@@ -199,7 +249,7 @@ export default function FinancePayables() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="payable-description">Descrição</Label>
                 <Textarea
@@ -276,66 +326,66 @@ export default function FinancePayables() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total a Pagar</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="text-xs font-medium text-gray-600">Total a Pagar</p>
+                <p className="text-xl font-bold gradient-text">
                   R$ {totalPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <TrendingDown className="h-6 w-6 text-red-600" />
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <TrendingDown className="h-5 w-5 text-red-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Já Pago</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="text-xs font-medium text-gray-600">Já Pago</p>
+                <p className="text-xl font-bold gradient-text">
                   R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="text-xs font-medium text-gray-600">Pendentes</p>
+                <p className="text-xl font-bold gradient-text">
                   {pendingCount}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-5 w-5 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Vencidos</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="text-xs font-medium text-gray-600">Vencidos</p>
+                <p className="text-xl font-bold gradient-text">
                   {overdueCount}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
             </div>
           </CardContent>
@@ -344,7 +394,7 @@ export default function FinancePayables() {
 
       {/* Filters */}
       <Card className="mb-6">
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -353,13 +403,13 @@ export default function FinancePayables() {
                   placeholder="Buscar por descrição ou fornecedor..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-8"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -370,9 +420,9 @@ export default function FinancePayables() {
                   <SelectItem value="overdue">Vencido</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,34 +446,34 @@ export default function FinancePayables() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Vencimento
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Categoria
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Descrição
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fornecedor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pago
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Saldo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
@@ -431,42 +481,49 @@ export default function FinancePayables() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredPayables.map((payable: any) => (
                   <tr key={payable.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                       {new Date(payable.dueDate).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                       <div className="flex items-center">
                         {getCategoryIcon(payable.category)}
                         <span className="ml-2 capitalize">{payable.category}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                    <td className="px-4 py-2 text-xs text-gray-900 max-w-xs truncate">
                       {payable.description}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                       {payable.vendorName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(payable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(payable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {(parseFloat(payable.amount) - parseFloat(payable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {getStatusBadge(payable.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    <td className="px-4 py-2 whitespace-nowrap text-xs font-medium">
+                      <div className="flex space-x-1">
                         <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3 w-3 mr-0.5" />
                           Ver
                         </Button>
                         {payable.status !== 'paid' && (
-                          <Button variant="ghost" size="sm">
-                            <CreditCard className="h-4 w-4 mr-1" />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setIsPayDialogOpen(true);
+                            }}
+                          >
+                            <CreditCard className="h-3 w-3 mr-0.5" />
                             Pagar
                           </Button>
                         )}
@@ -479,6 +536,84 @@ export default function FinancePayables() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pay Payment Dialog */}
+      <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+            <DialogDescription>
+              Registre o pagamento para {selectedPayable?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="payment-amount">Valor Pago</Label>
+                <Input
+                  id="payment-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={paymentData.amount}
+                  onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="payment-method">Método</Label>
+                <Select 
+                  value={paymentData.method} 
+                  onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="credit_card">Cartão</SelectItem>
+                    <SelectItem value="bank_transfer">TED/DOC</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="transaction-id">ID da Transação</Label>
+              <Input
+                id="transaction-id"
+                placeholder="ID ou referência do pagamento"
+                value={paymentData.transactionId}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, transactionId: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="payment-notes">Observações</Label>
+              <Input
+                id="payment-notes"
+                placeholder="Observações sobre o pagamento"
+                value={paymentData.notes}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="gradient-bg text-white"
+                onClick={handlePayPayable}
+                disabled={!paymentData.amount || payPayableMutation.isPending}
+              >
+                {payPayableMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
