@@ -1905,21 +1905,22 @@ Para mais detalhes, entre em contato conosco!`;
             console.log(`Processing transaction: ${transaction.id} - ${transaction.type} - R$ ${transaction.amount}`);
 
             // Import all debit transactions for producer payments (outgoing payments)
-            if (parseFloat(transaction.amount) > 0 && transaction.type === 'debit') {
+            // Debits have negative amounts in OFX, so we use absolute value for storage
+            if (transaction.type === 'debit') {
               await storage.createBankTransaction({
                 importId: bankImport.id,
                 transactionId: transaction.id,
                 date: transaction.date,
-                amount: parseFloat(transaction.amount).toFixed(2),
+                amount: Math.abs(parseFloat(transaction.amount)).toFixed(2),
                 description: transaction.description,
                 type: transaction.type,
                 status: 'unmatched'
               });
               importedCount++;
-              console.log(`Imported transaction: ${transaction.id}`);
+              console.log(`Imported debit transaction: ${transaction.id} - R$ ${Math.abs(parseFloat(transaction.amount)).toFixed(2)}`);
             } else {
               skippedCount++;
-              console.log(`Skipped transaction: ${transaction.id} (not a debit or zero amount)`);
+              console.log(`Skipped transaction: ${transaction.id} (not a debit - credits are not producer payments)`);
             }
           } catch (transactionError) {
             console.error(`Error importing producer payment transaction ${transaction.id}:`, transactionError);
