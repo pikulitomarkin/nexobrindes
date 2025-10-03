@@ -27,6 +27,7 @@ export default function AdminDashboard() {
     { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
     { href: "/admin/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
     { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+    { href: "/admin/producer-payments", icon: DollarSign, label: "Pagamentos Produtores", color: "text-red-600" },
     { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
     { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
     { href: "/admin/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
