@@ -38,10 +38,10 @@ async function seed() {
     console.log("✓ Vendor user created");
 
     // Create test producer
-  const producer1 = await createUser({
+  const producer1 = await storage.createUser({
     id: "producer-1",
     username: "produtor1",
-    password: "123456",
+    password: "producer123",
     role: "producer",
     name: "Marcenaria Santos",
     email: "contato@marcenariasantos.com",
@@ -51,17 +51,20 @@ async function seed() {
     isActive: true
   });
 
+  console.log("✓ Producer user created");
+
   // Create test partner
-  const partner1 = await createUser({
+  const partner = await storage.createUser({
     id: "partner-1",
     username: "partner1",
     password: "partner123",
     role: "partner",
-    name: "João Sócio",
-    email: "joao@partner.com",
-    phone: "(11) 91234-5678",
+    name: "Ana Parceira",
+    email: "parceira@empresa.com",
+    phone: "(11) 97777-6666",
     isActive: true
   });
+  console.log("✓ Partner user created");
 
     // Create client user
     const clientUser = await storage.createUser({
@@ -76,19 +79,6 @@ async function seed() {
       isActive: true
     });
     console.log("✓ Client user created");
-
-    // Create partner user
-    const partner = await storage.createUser({
-      id: "partner-1",
-      username: "parceiro1",
-      password: "partner123",
-      role: "partner",
-      name: "Ana Parceira",
-      email: "parceira@empresa.com",
-      phone: "(11) 97777-6666",
-      isActive: true
-    });
-    console.log("✓ Partner user created");
 
     // Create vendor record directly in vendors table
     const { db } = await import("./db");
@@ -162,7 +152,7 @@ async function seed() {
     console.log("\nTest Users:");
     console.log("  Admin:    admin / admin123");
     console.log("  Vendor:   vendedor1 / vendor123");
-    console.log("  Producer: produtor1 / 123456");
+    console.log("  Producer: produtor1 / producer123");
     console.log("  Client:   cliente1 / client123");
     console.log("  Partner:  partner1 / partner123");
 
