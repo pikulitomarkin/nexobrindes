@@ -522,8 +522,8 @@ export class MemStorage implements IStorage {
 
     const producerUser: User = {
       id: "producer-1",
-      username: "marcenaria.santos",
-      password: "123",
+      username: "produtor1",
+      password: "123456",
       role: "producer",
       name: "Marcenaria Santos",
       email: "contato@marcenariasantos.com",
