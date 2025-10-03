@@ -417,7 +417,7 @@ export class MemStorage implements IStorage {
       if (!vendorUser) {
         vendorUser = await this.createUser({
           username: "vendedor1",
-          password: "123456",
+          password: "vendor123",
           role: "vendor",
           name: "João Vendedor",
           email: "joao@nexobrindes.com",
@@ -425,11 +425,7 @@ export class MemStorage implements IStorage {
           isActive: true
         });
 
-        // Create vendor record
-        await this.createVendor({
-          userId: vendorUser.id,
-          commissionRate: "10.00"
-        });
+        console.log("Created vendor user:", vendorUser);
       }
 
       // Check and create client user
@@ -437,7 +433,7 @@ export class MemStorage implements IStorage {
       if (!clientUser) {
         clientUser = await this.createUser({
           username: "cliente1",
-          password: "123456",
+          password: "client123",
           role: "client",
           name: "Maria Cliente",
           email: "maria@empresa.com",
@@ -456,6 +452,8 @@ export class MemStorage implements IStorage {
           vendorId: vendorUser.id,
           isActive: true
         });
+
+        console.log("Created client user and record:", clientUser);
       }
 
       // Check and create producer user
@@ -1160,6 +1158,14 @@ export class MemStorage implements IStorage {
 
   async getClientByUserId(userId: string): Promise<Client | undefined> {
     return Array.from(this.clients.values()).find(client => client.userId === userId);
+  }
+
+  async getClientsByVendor(vendorId: string): Promise<Client[]> {
+    return Array.from(this.clients.values()).filter(client => client.vendorId === vendorId);
+  }
+
+  async getOrdersByClient(clientId: string): Promise<Order[]> {
+    return Array.from(this.orders.values()).filter(order => order.clientId === clientId);
   }
 
   // Order methods
