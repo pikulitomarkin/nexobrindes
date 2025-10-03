@@ -10,7 +10,8 @@ import {
   CreditCard,
   ArrowRight,
   FileText,
-  Users
+  Users,
+  Factory
 } from "lucide-react";
 
 export default function FinanceIndex() {
@@ -48,6 +49,14 @@ export default function FinanceIndex() {
       bgColor: "bg-green-100"
     },
     {
+      title: "Pagamentos de Produtores",
+      description: "Controle de pagamentos para produtores externos",
+      icon: Factory,
+      href: "/admin/producer-payments",
+      color: "text-purple-600",
+      bgColor: "bg-purple-100"
+    },
+    {
       title: "Conciliação Bancária",
       description: "Upload de arquivos OFX e conciliação",
       icon: Calculator,
@@ -73,7 +82,7 @@ export default function FinanceIndex() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -97,6 +106,20 @@ export default function FinanceIndex() {
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <TrendingDown className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Produtores a Pagar</p>
+                <p className="text-2xl font-bold gradient-text">R$ 830,00</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Factory className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
