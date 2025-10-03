@@ -55,6 +55,11 @@ export default function AdminFinance() {
                 <p className="text-2xl font-bold gradient-text">
                   R$ {(overview?.payables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
+                {overview?.producerPaymentsCount > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {overview.producerPaymentsPending} pendente{overview.producerPaymentsPending !== 1 ? 's' : ''} • {overview.producerPaymentsApproved} aprovado{overview.producerPaymentsApproved !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <TrendingDown className="h-6 w-6 text-red-600" />

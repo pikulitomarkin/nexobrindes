@@ -540,13 +540,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const productionOrder = await storage.getProductionOrder(id);
-      
+
       if (!productionOrder) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
       const order = await storage.getOrder(productionOrder.orderId);
-      
+
       let enrichedOrder = {
         ...productionOrder,
         product: 'Unknown',
@@ -1246,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get optional producerId from form data
       const producerId = req.body.producerId || null;
-      
+
       console.log(`Importing ${productsData.length} products${producerId ? ` for producer ${producerId}` : ''}...`);
 
       // If producerId is provided, add it to all products
@@ -2190,6 +2190,46 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Failed to fetch bank imports:", error);
       res.status(500).json({ error: "Failed to fetch bank imports" });
+    }
+  });
+
+  // Producer Payments
+  app.get("/api/producer-payments", async (req, res) => {
+    try {
+      const producerPayments = await storage.getProducerPayments();
+
+      // Enrich with production order and order data
+      const enrichedPayments = await Promise.all(
+        producerPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          let order = null;
+          let producerName = 'Unknown';
+
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+            const producer = await storage.getUser(productionOrder.producerId);
+            if (producer) {
+              producerName = producer.name;
+            }
+          }
+
+          return {
+            ...payment,
+            producerName,
+            order: order ? {
+              orderNumber: order.orderNumber,
+              product: order.product,
+              totalValue: order.totalValue,
+              clientId: order.clientId
+            } : null
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
     }
   });
 

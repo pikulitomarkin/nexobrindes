@@ -2624,23 +2624,27 @@ export class MemStorage implements IStorage {
 
     if (existingPayments.length === 0) {
       // Criar automaticamente um registro de pagamento pendente apenas se não existir
-      await this.createProducerPayment({
+      const newPayment = await this.createProducerPayment({
         productionOrderId: id,
         producerId: productionOrder.producerId,
         amount: value,
         status: 'pending',
         notes: notes || null
       });
-      console.log(`Storage: Created new producer payment for order ${id}`);
+      console.log(`Storage: Created new producer payment for order ${id}:`, newPayment);
     } else {
       // Atualizar o pagamento existente
       const existingPayment = existingPayments[0];
-      await this.updateProducerPayment(existingPayment.id, {
+      const updatedPayment = await this.updateProducerPayment(existingPayment.id, {
         amount: value,
         notes: notes || existingPayment.notes
       });
-      console.log(`Storage: Updated existing producer payment ${existingPayment.id}`);
+      console.log(`Storage: Updated existing producer payment ${existingPayment.id}:`, updatedPayment);
     }
+
+    // Log total producer payments after update
+    const allPayments = Array.from(this.producerPayments.values());
+    console.log(`Storage: Total producer payments after update: ${allPayments.length}`, allPayments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
 
     return updated;
   }
