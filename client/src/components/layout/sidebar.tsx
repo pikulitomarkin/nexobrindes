@@ -102,111 +102,88 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       </nav>
 
       {/* Admin Panel Specific Links */}
-      {activePanel === "admin" && (
-        <nav className="mt-8">
-          <div className="px-6 mb-4">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Administração
-            </p>
-          </div>
-          <SidebarItem 
-            icon={LayoutDashboard} 
-            label="Dashboard" 
-            href="/admin-dashboard" 
-            isActive={pathname === '/admin-dashboard'}
-          />
-          <SidebarItem 
-            icon={Users} 
-            label="Usuários" 
-            href="/admin/users" 
-            isActive={pathname === '/admin/users'}
-          />
-          <SidebarItem 
-            icon={Store} 
-            label="Vendedores" 
-            href="/admin/vendors" 
-            isActive={pathname === '/admin/vendors'}
-          />
-          <SidebarItem 
-            icon={UserCheck} 
-            label="Clientes" 
-            href="/admin/clients" 
-            isActive={pathname === '/admin/clients'}
-          />
-          
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Produção
-            </p>
-          </div>
-          <SidebarItem 
-            icon={Hammer} 
-            label="Produtores" 
-            href="/admin/producers" 
-            isActive={pathname === '/admin/producers'}
-          />
-          <SidebarItem 
-            icon={DollarSign} 
-            label="Pagamentos Produtores" 
-            href="/admin/producer-payments"
-            isActive={pathname === "/admin/producer-payments"}
-          />
-          
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Vendas & Produtos
-            </p>
-          </div>
-          <SidebarItem 
-            icon={Package} 
-            label="Produtos" 
-            href="/admin/products" 
-            isActive={pathname === '/admin/products'}
-          />
-          <SidebarItem 
-            icon={Palette} 
-            label="Personalizações" 
-            href="/admin/customizations" 
-            isActive={pathname === '/admin/customizations'}
-          />
-          <SidebarItem 
-            icon={Calculator} 
-            label="Orçamentos" 
-            href="/admin/budgets" 
-            isActive={pathname === '/admin/budgets'}
-          />
-          <SidebarItem 
-            icon={ShoppingCart} 
-            label="Pedidos" 
-            href="/admin/orders" 
-            isActive={pathname === '/admin/orders'}
-          />
-          
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Financeiro
-            </p>
-          </div>
-          <SidebarItem 
-            icon={Percent} 
-            label="Comissões" 
-            href="/admin/commission-management" 
-            isActive={pathname === '/admin/commission-management'}
-          />
-          <SidebarItem 
-            icon={CreditCard} 
-            label="Módulo Financeiro" 
-            href="/finance" 
-            isActive={pathname === '/finance'}
-          />
-          <SidebarItem 
-            icon={Settings} 
-            label="Configurações" 
-            href="/admin/commission-settings"
-            isActive={pathname === "/admin/commission-settings"}
-          />
-        </nav>
-      )}
+      {user?.role === 'admin' && (
+            <>
+              <SidebarItem 
+                icon={LayoutDashboard} 
+                label="Dashboard" 
+                href="/admin-dashboard" 
+                isActive={pathname === '/admin-dashboard'}
+              />
+              <SidebarItem 
+                icon={Users} 
+                label="Usuários" 
+                href="/admin/users" 
+                isActive={pathname === '/admin/users'}
+              />
+              <SidebarItem 
+                icon={Store} 
+                label="Vendedores" 
+                href="/admin/vendors" 
+                isActive={pathname === '/admin/vendors'}
+              />
+              <SidebarItem 
+                icon={UserCheck} 
+                label="Clientes" 
+                href="/admin/clients" 
+                isActive={pathname === '/admin/clients'}
+              />
+              <SidebarItem 
+                icon={Hammer} 
+                label="Produtores" 
+                href="/admin/producers" 
+                isActive={pathname === '/admin/producers'}
+              />
+              <SidebarItem 
+                icon={Package} 
+                label="Produtos" 
+                href="/admin/products" 
+                isActive={pathname === '/admin/products'}
+              />
+              <SidebarItem 
+                icon={Palette} 
+                label="Personalizações" 
+                href="/admin/customizations" 
+                isActive={pathname === '/admin/customizations'}
+              />
+              <SidebarItem 
+                icon={Calculator} 
+                label="Orçamentos" 
+                href="/admin/budgets" 
+                isActive={pathname === '/admin/budgets'}
+              />
+              <SidebarItem 
+                icon={ShoppingCart} 
+                label="Pedidos" 
+                href="/admin/orders" 
+                isActive={pathname === '/admin/orders'}
+              />
+              <SidebarItem 
+                icon={Percent} 
+                label="Comissões" 
+                href="/admin/commission-management" 
+                isActive={pathname === '/admin/commission-management'}
+              />
+              <SidebarItem 
+                icon={CreditCard} 
+                label="Financeiro" 
+                href="/finance" 
+                isActive={pathname === '/finance'}
+              />
+              <SidebarItem 
+                icon={Settings} 
+                label="Configurações de Comissão" 
+                href="/admin/commission-settings"
+                isActive={location === "/admin/commission-settings"}
+              />
+              <SidebarItem 
+                icon={DollarSign} 
+                label="Pagamentos Produtores" 
+                href="/admin/producer-payments"
+                isActive={location === "/admin/producer-payments"}
+              />
+            </>
+          )}
 
       {/* Vendor Panel Specific Links */}
       {activePanel === "vendor" && (

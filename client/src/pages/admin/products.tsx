@@ -29,7 +29,6 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState(0);
-  const [selectedProducerId, setSelectedProducerId] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Product form state
@@ -68,15 +67,6 @@ export default function AdminProducts() {
       
       const response = await fetch(`/api/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
-    },
-  });
-
-  const producersQuery = useQuery({
-    queryKey: ["/api/producers"],
-    queryFn: async () => {
-      const response = await fetch("/api/producers");
-      if (!response.ok) throw new Error('Failed to fetch producers');
       return response.json();
     },
   });
@@ -132,16 +122,13 @@ export default function AdminProducts() {
   });
 
   const importProductsMutation = useMutation({
-    mutationFn: async ({ file, producerId }: { file: File; producerId?: string }) => {
+    mutationFn: async (file: File) => {
       if (file.size > 50 * 1024 * 1024) {
         throw new Error('Arquivo muito grande. O limite é de 50MB.');
       }
 
       const formData = new FormData();
       formData.append('file', file);
-      if (producerId) {
-        formData.append('producerId', producerId);
-      }
       
       const response = await fetch('/api/products/import', {
         method: 'POST',
@@ -170,7 +157,6 @@ export default function AdminProducts() {
       setIsImportDialogOpen(false);
       setImportFile(null);
       setImportProgress(0);
-      setSelectedProducerId("");
       
       if (hasErrors) {
         console.log('Import errors:', data.errors);
@@ -229,10 +215,7 @@ export default function AdminProducts() {
   const handleImport = () => {
     if (importFile) {
       setImportProgress(25);
-      importProductsMutation.mutate({ 
-        file: importFile, 
-        producerId: selectedProducerId || undefined 
-      });
+      importProductsMutation.mutate(importFile);
     }
   };
 
@@ -333,25 +316,6 @@ export default function AdminProducts() {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="producer">Produtor (Opcional)</Label>
-                      <Select value={selectedProducerId} onValueChange={setSelectedProducerId}>
-                        <SelectTrigger data-testid="select-producer">
-                          <SelectValue placeholder="Selecionar produtor..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Nenhum produtor</SelectItem>
-                          {producersQuery.data?.map((producer: any) => (
-                            <SelectItem key={producer.id} value={producer.id}>
-                              {producer.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Selecione o produtor responsável por estes produtos
-                      </p>
-                    </div>
-                    <div>
                       <Label htmlFor="file">Arquivo JSON</Label>
                       <input
                         ref={fileInputRef}
@@ -359,7 +323,6 @@ export default function AdminProducts() {
                         accept=".json,application/json"
                         onChange={handleFileChange}
                         className="w-full mt-1 p-2 border rounded-md"
-                        data-testid="input-import-file"
                       />
                       <p className="text-sm text-gray-500 mt-1">
                         Selecione um arquivo JSON com a estrutura de produtos
