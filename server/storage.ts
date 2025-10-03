@@ -3787,7 +3787,10 @@ export class DatabaseStorage implements IStorage {
       status = 'partial';
     }
 
-    if (order.deadline && new Date() > new Date(order.deadline) && status !== 'paid') {
+    // Use order.deadline or default to 30 days from now
+    const dueDate = order.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    if (new Date() > new Date(dueDate) && status !== 'paid') {
       status = 'overdue';
     }
 
@@ -3798,7 +3801,7 @@ export class DatabaseStorage implements IStorage {
       description: `Venda: ${order.product}`,
       amount: order.totalValue,
       receivedAmount: order.paidValue || "0.00",
-      dueDate: order.deadline,
+      dueDate,
       status,
       type: 'sale'
     });
