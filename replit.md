@@ -6,6 +6,13 @@ The application features vendor-specific sales links, automated client and order
 
 ## Recent Changes (October 2025)
 
+### CRUD Operations Fix (October 3, 2025)
+- **Product Creation**: Fixed numeric field validation - empty strings now properly converted to null before database insertion
+- **Client Creation**: Created missing POST /api/clients endpoint for vendor panel client registration
+- **Budget Creation**: Implemented automatic budget_number generation (format: ORC-{timestamp}-{random})
+- **Order Creation**: Fixed accounts_receivable constraint by adding 30-day default due date when order deadline is not provided
+- All create operations now functioning correctly across the system
+
 ### Product Import Enhancement
 - Added optional producer selection field to product import dialog (JSON files)
 - Removed 10,000 product limit from import functionality
