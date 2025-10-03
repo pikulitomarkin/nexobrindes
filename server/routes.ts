@@ -3495,6 +3495,24 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  app.patch("/api/finance/bank-transactions/:id", async (req, res) => {
+    try {
+      const { status, matchedProducerPaymentId, matchedAt } = req.body;
+      const transaction = await storage.updateBankTransaction(req.params.id, {
+        status,
+        matchedProducerPaymentId,
+        matchedAt: matchedAt ? new Date(matchedAt) : undefined
+      });
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      console.error("Failed to update bank transaction:", error);
+      res.status(500).json({ error: "Failed to update bank transaction" });
+    }
+  });
+
   // OFX Import route with file processing
   app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
     try {

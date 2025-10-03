@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, CheckCircle, Clock, CreditCard, User } from "lucide-react";
+import { Search, Eye, DollarSign, CheckCircle, Clock, CreditCard, User, Upload, FileText, Link } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 export default function AdminProducerPayments() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,10 +21,18 @@ export default function AdminProducerPayments() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [isOFXDialogOpen, setIsOFXDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const { data: producerPayments, isLoading } = useQuery({
     queryKey: ["/api/producer-payments"],
+  });
+
+  // Fetch bank transactions for reconciliation
+  const { data: bankTransactions, refetch: refetchBankTransactions } = useQuery({
+    queryKey: ["/api/bank-transactions"],
+    enabled: false, // Fetch only when needed
   });
 
   const updatePaymentMutation = useMutation({
@@ -56,6 +65,37 @@ export default function AdminProducerPayments() {
     },
   });
 
+  const uploadOFXMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload-ofx", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Erro ao importar OFX");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/producer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-transactions"] }); // Invalidate bank transactions to refresh
+      setIsOFXDialogOpen(false);
+      setSelectedFile(null);
+      toast({
+        title: "Sucesso!",
+        description: `Arquivo OFX importado. ${data.message || ''}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro na importação",
+        description: error.message || "Não foi possível importar o arquivo OFX.",
+        variant: "destructive",
+      });
+    },
+  });
+
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       pending: { label: "Pendente", variant: "secondary" as const, color: "bg-yellow-100 text-yellow-800" },
@@ -65,7 +105,7 @@ export default function AdminProducerPayments() {
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
+
     return (
       <Badge className={`${statusInfo.color} border-0`}>
         {statusInfo.label}
@@ -115,17 +155,91 @@ export default function AdminProducerPayments() {
 
   const filteredPayments = producerPayments?.filter((payment: any) => {
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       payment.producerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.order?.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.order?.product?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
+  // Filter for payments that are approved but not yet paid (for reconciliation tab)
+  const pendingProducerPayments = producerPayments?.filter((p: any) => p.status === 'approved');
+
   // Calculate summary statistics
   const totalPending = producerPayments?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
   const totalApproved = producerPayments?.filter((p: any) => p.status === 'approved').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
   const totalPaid = producerPayments?.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
+
+  // OFX Import Handlers
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    }
+  };
+
+  const handleUpload = () => {
+    if (selectedFile) {
+      uploadOFXMutation.mutate(selectedFile);
+    }
+  };
+
+  // Reconciliation Logic
+  const getAllUnmatchedOutgoingTransactions = () => {
+    if (!bankTransactions) return [];
+    return bankTransactions.filter((tx: any) => tx.type === 'debit' && !tx.reconciled);
+  };
+
+  const getCompatibleTransactions = (amount: number) => {
+    if (!bankTransactions) return [];
+    return bankTransactions.filter((tx: any) =>
+      tx.type === 'debit' &&
+      !tx.reconciled &&
+      parseFloat(tx.amount) === amount
+    );
+  };
+
+  const openReconciliationDialog = (payment: any) => {
+    // Logic to open a dialog to select transactions for a specific payment
+    // For now, just log and potentially mark as reconciled if a direct match is found
+    const paymentAmount = parseFloat(payment.amount);
+    const compatibleTransactions = getCompatibleTransactions(paymentAmount);
+
+    if (compatibleTransactions.length > 0) {
+      // Assume we match with the first compatible transaction found
+      const transactionToReconcile = compatibleTransactions[0];
+      reconcilePayment(payment.id, transactionToReconcile.id);
+    } else {
+      toast({
+        title: "Atenção",
+        description: "Nenhuma transação bancária compatível encontrada para conciliação automática.",
+        variant: "warning",
+      });
+    }
+  };
+
+  const reconcilePayment = async (paymentId: string, transactionId: string) => {
+    try {
+      const response = await fetch('/api/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId, transactionId }),
+      });
+      if (!response.ok) throw new Error('Erro ao conciliar pagamento');
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/producer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-transactions"] });
+      toast({
+        title: "Sucesso!",
+        description: "Pagamento conciliado com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro na conciliação",
+        description: error.message || "Não foi possível conciliar o pagamento.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -145,9 +259,59 @@ export default function AdminProducerPayments() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Pagamentos de Produtores</h1>
-        <p className="text-gray-600">Gerencie os pagamentos dos serviços de produção</p>
+      {/* Page Header with OFX Import Button */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Pagamentos de Produtores</h1>
+          <p className="text-gray-600">Gestão de pagamentos para produtores externos</p>
+        </div>
+        <div className="flex space-x-2">
+          <Dialog open={isOFXDialogOpen} onOpenChange={setIsOFXDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-bg text-white">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar OFX
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importar Arquivo OFX</DialogTitle>
+                <DialogDescription>
+                  Selecione o arquivo OFX do seu banco para importar as transações de saída e conciliar com os pagamentos dos produtores
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="ofx-file">Arquivo OFX</Label>
+                  <Input
+                    id="ofx-file"
+                    type="file"
+                    accept=".ofx,.OFX"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                {selectedFile && (
+                  <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                    <FileText className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm text-gray-700">{selectedFile.name}</span>
+                  </div>
+                )}
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsOFXDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="gradient-bg text-white"
+                    onClick={handleUpload}
+                    disabled={!selectedFile || uploadOFXMutation.isPending}
+                  >
+                    {uploadOFXMutation.isPending ? "Importando..." : "Importar"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -234,121 +398,210 @@ export default function AdminProducerPayments() {
         </CardContent>
       </Card>
 
-      {/* Payments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pagamentos ({filteredPayments?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produtor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pedido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data Criação
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments?.map((payment: any) => (
-                  <tr key={payment.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <User className="h-4 w-4 mr-2 text-gray-400" />
-                        {payment.producerName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {payment.order?.orderNumber || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payment.order?.product || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                      R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(payment.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(payment.createdAt).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        {payment.status === 'pending' && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleApprove(payment)}
-                              disabled={updatePaymentMutation.isPending}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Aprovar
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleReject(payment)}
-                              disabled={updatePaymentMutation.isPending}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              Rejeitar
-                            </Button>
-                          </>
-                        )}
-                        {payment.status === 'approved' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleMarkAsPaid(payment)}
-                            disabled={updatePaymentMutation.isPending}
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Marcar como Pago
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="payments" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="payments">Gerenciar Pagamentos</TabsTrigger>
+          <TabsTrigger value="reconciliation">Conciliação Bancária</TabsTrigger>
+        </TabsList>
 
-          {(!filteredPayments || filteredPayments.length === 0) && (
-            <div className="text-center py-12">
-              <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum pagamento encontrado</h3>
-              <p className="text-gray-500">Não há pagamentos de produtores que correspondam aos filtros selecionados.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="payments" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pagamentos ({filteredPayments?.length || 0})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Produtor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pedido
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Produto
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Data Criação
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPayments?.map((payment: any) => (
+                      <tr key={payment.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2 text-gray-400" />
+                            {payment.producerName}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                          {payment.order?.orderNumber || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {payment.order?.product || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                          R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(payment.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(payment.createdAt).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            {payment.status === 'pending' && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleApprove(payment)}
+                                  disabled={updatePaymentMutation.isPending}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Aprovar
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleReject(payment)}
+                                  disabled={updatePaymentMutation.isPending}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  Rejeitar
+                                </Button>
+                              </>
+                            )}
+                            {payment.status === 'approved' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleMarkAsPaid(payment)}
+                                disabled={updatePaymentMutation.isPending}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                <CreditCard className="h-4 w-4 mr-1" />
+                                Marcar como Pago
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {(!filteredPayments || filteredPayments.length === 0) && (
+                <div className="text-center py-12">
+                  <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum pagamento encontrado</h3>
+                  <p className="text-gray-500">Não há pagamentos de produtores que correspondam aos filtros selecionados.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reconciliation" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link className="h-5 w-5" />
+                Conciliação de Pagamentos Aprovados
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Associe as transações bancárias de saída com os pagamentos aprovados para os produtores
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {pendingProducerPayments?.map((payment: any) => {
+                  const paymentAmount = parseFloat(payment.amount);
+                  const compatibleTransactions = getCompatibleTransactions(paymentAmount);
+
+                  return (
+                    <div key={payment.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium text-gray-900">{payment.producerName}</p>
+                          <p className="text-sm text-gray-600">
+                            {payment.order?.orderNumber} - {payment.order?.product}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Aprovado em: {payment.approvedAt ? new Date(payment.approvedAt).toLocaleDateString('pt-BR') : 'N/A'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600">
+                            R$ {paymentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <Badge className="bg-blue-100 text-blue-800">Aprovado</Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          <span className="text-blue-600">Aguardando pagamento</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {compatibleTransactions.length > 0 && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                              {compatibleTransactions.length} transação{compatibleTransactions.length !== 1 ? 'ões' : ''} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
+                            </Badge>
+                          )}
+                          {getAllUnmatchedOutgoingTransactions().length > 0 && compatibleTransactions.length === 0 && (
+                            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
+                              {getAllUnmatchedOutgoingTransactions().length} transação{getAllUnmatchedOutgoingTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedOutgoingTransactions().length !== 1 ? 'is' : ''}
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => openReconciliationDialog(payment)}
+                            className="gradient-bg text-white hover:opacity-90"
+                            disabled={!bankTransactions || getAllUnmatchedOutgoingTransactions().length === 0}
+                          >
+                            <Link className="h-3 w-3 mr-1" />
+                            Conciliar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }) || []}
+
+                {(!pendingProducerPayments || pendingProducerPayments.length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>Nenhum pagamento aprovado aguardando conciliação</p>
+                    <p className="text-xs">Aprove pagamentos na aba anterior para conciliar aqui</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
