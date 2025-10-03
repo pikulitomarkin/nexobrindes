@@ -658,6 +658,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update production order status
+  app.patch("/api/production-orders/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, notes, deliveryDate, trackingCode } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ error: "Status é obrigatório" });
+      }
+
+      const validStatuses = ['pending', 'accepted', 'production', 'quality_check', 'ready', 'completed', 'shipped', 'delivered'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Status inválido" });
+      }
+
+      const productionOrder = await storage.getProductionOrder(id);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      const updated = await storage.updateProductionOrderStatus(
+        id, 
+        status, 
+        notes || undefined, 
+        deliveryDate || undefined, 
+        trackingCode || undefined
+      );
+
+      res.json({ success: true, productionOrder: updated });
+    } catch (error) {
+      console.error("Error updating production order status:", error);
+      res.status(500).json({ error: "Failed to update production order status" });
+    }
+  });
+
   // Producers
   app.get("/api/producers", async (req, res) => {
     try {
