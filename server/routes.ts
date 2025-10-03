@@ -1394,7 +1394,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome de contato é obrigatório" });
       }
 
-      const newBudget = await storage.createBudget(budgetData);
+      // Generate budget number
+      const budgetNumber = `ORC-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+      const newBudget = await storage.createBudget({
+        ...budgetData,
+        budgetNumber
+      });
 
       // Process budget items
       for (const item of budgetData.items) {
