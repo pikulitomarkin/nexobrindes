@@ -844,12 +844,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orders = await storage.getOrders();
       const payments = await storage.getPayments();
       const commissions = await storage.getCommissionsByVendor("");
+      const producerPayments = await storage.getProducerPayments();
 
       const receivables = orders
         .filter(order => order.status !== 'cancelled')
         .reduce((total, order) => total + (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')), 0);
 
-      const payables = 12450; // Mock data for suppliers/producers
+      // Calculate payables from producer payments (pending + approved, not paid yet)
+      const producerPayables = producerPayments
+        .filter(pp => pp.status === 'pending' || pp.status === 'approved')
+        .reduce((total, pp) => total + parseFloat(pp.amount), 0);
+
+      const payables = producerPayables;
       const balance = 89230; // Mock bank balance
       const pendingCommissions = commissions
         .filter(c => c.status === 'pending')
@@ -862,6 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingCommissions
       });
     } catch (error) {
+      console.error("Error fetching financial overview:", error);
       res.status(500).json({ error: "Failed to fetch financial overview" });
     }
   });
