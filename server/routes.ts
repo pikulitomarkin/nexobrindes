@@ -1983,6 +1983,40 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get bank transactions
+  app.get("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getBankTransactions();
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to fetch bank transactions:", error);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  // Update bank transaction (for reconciliation)
+  app.patch("/api/finance/bank-transactions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, matchedPaymentId, reconciled } = req.body;
+
+      const updated = await storage.updateBankTransaction(id, {
+        status,
+        matchedOrderId: matchedPaymentId,
+        matchedAt: reconciled ? new Date() : undefined
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update bank transaction:", error);
+      res.status(500).json({ error: "Failed to update bank transaction" });
+    }
+  });
+
   // Helper function to extract transactions from OFX content (original function for regular imports)
   function extractOFXTransactions(ofxContent: string) {
     const transactions: any[] = [];
