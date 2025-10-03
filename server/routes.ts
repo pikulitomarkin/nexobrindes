@@ -1827,27 +1827,31 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       const { value, notes } = req.body;
 
-      console.log(`Setting value for production order ${id}:`, { value, notes });
+      console.log(`API: Setting value for production order ${id}:`, { value, notes, type: typeof value });
 
-      if (!value) {
+      if (!value && value !== 0) {
+        console.log("API: Value is missing");
         return res.status(400).json({ error: "Valor é obrigatório" });
       }
 
       const numericValue = parseFloat(value);
       if (isNaN(numericValue) || numericValue <= 0) {
+        console.log("API: Invalid numeric value:", numericValue);
         return res.status(400).json({ error: "Valor deve ser um número válido maior que zero" });
       }
 
+      console.log("API: Calling storage.updateProductionOrderValue...");
       const updated = await storage.updateProductionOrderValue(id, numericValue.toFixed(2), notes);
 
       if (!updated) {
+        console.log("API: Production order not found");
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      console.log("Value updated successfully:", updated);
+      console.log("API: Value updated successfully:", { id: updated.id, producerValue: updated.producerValue });
       res.json({ success: true, productionOrder: updated });
     } catch (error) {
-      console.error("Error setting production order value:", error);
+      console.error("API Error setting production order value:", error);
       res.status(500).json({ 
         error: "Failed to set production order value",
         details: error.message 

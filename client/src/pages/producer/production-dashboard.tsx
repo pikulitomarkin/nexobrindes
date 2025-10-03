@@ -137,16 +137,16 @@ export default function ProductionDashboard() {
       return;
     }
 
-    if (!producerValue || producerValue.trim() === '' || parseFloat(producerValue) <= 0) {
+    if (!producerValue || producerValue.trim() === '') {
       toast({
         title: "Erro",
-        description: "Por favor, insira um valor válido maior que zero",
+        description: "Por favor, insira um valor",
         variant: "destructive",
       });
       return;
     }
 
-    const numericValue = parseFloat(producerValue);
+    const numericValue = parseFloat(producerValue.replace(',', '.'));
     if (isNaN(numericValue) || numericValue <= 0) {
       toast({
         title: "Erro",
@@ -155,6 +155,12 @@ export default function ProductionDashboard() {
       });
       return;
     }
+
+    console.log("Salvando valor:", {
+      orderId: selectedOrder.id,
+      value: numericValue.toFixed(2),
+      notes: producerNotes.trim() || null
+    });
 
     setValueMutation.mutate({
       id: selectedOrder.id,

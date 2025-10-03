@@ -2564,26 +2564,47 @@ export class MemStorage implements IStorage {
   }
 
   async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
+    console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
+    
     const productionOrder = this.productionOrders.get(id);
-    if (!productionOrder) return undefined;
+    if (!productionOrder) {
+      console.log(`Storage: Production order not found with id: ${id}`);
+      return undefined;
+    }
 
     const updated = {
       ...productionOrder,
       producerValue: value,
-      producerNotes: notes || productionOrder.producerNotes,
+      producerNotes: notes || productionOrder.producerNotes || null,
       producerPaymentStatus: 'pending' as const
     };
 
     this.productionOrders.set(id, updated);
+    console.log(`Storage: Updated production order:`, updated);
 
-    // Criar automaticamente um registro de pagamento pendente
-    await this.createProducerPayment({
-      productionOrderId: id,
-      producerId: productionOrder.producerId,
-      amount: value,
-      status: 'pending',
-      notes: notes
-    });
+    // Verificar se já existe um pagamento pendente para esta ordem
+    const existingPayments = Array.from(this.producerPayments.values())
+      .filter(payment => payment.productionOrderId === id);
+
+    if (existingPayments.length === 0) {
+      // Criar automaticamente um registro de pagamento pendente apenas se não existir
+      await this.createProducerPayment({
+        productionOrderId: id,
+        producerId: productionOrder.producerId,
+        amount: value,
+        status: 'pending',
+        notes: notes || null
+      });
+      console.log(`Storage: Created new producer payment for order ${id}`);
+    } else {
+      // Atualizar o pagamento existente
+      const existingPayment = existingPayments[0];
+      await this.updateProducerPayment(existingPayment.id, {
+        amount: value,
+        notes: notes || existingPayment.notes
+      });
+      console.log(`Storage: Updated existing producer payment ${existingPayment.id}`);
+    }
 
     return updated;
   }
