@@ -1002,9 +1002,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", async (req, res) => {
     try {
       const productData = req.body;
-      const newProduct = await storage.createProduct(productData);
+      
+      // Convert empty strings to null for numeric fields
+      const cleanedData = {
+        ...productData,
+        weight: productData.weight === '' ? null : productData.weight,
+        height: productData.height === '' ? null : productData.height,
+        width: productData.width === '' ? null : productData.width,
+        depth: productData.depth === '' ? null : productData.depth,
+        availableQuantity: productData.availableQuantity === '' ? null : productData.availableQuantity,
+      };
+      
+      console.log('Creating product with data:', cleanedData);
+      const newProduct = await storage.createProduct(cleanedData);
+      console.log('Product created successfully:', newProduct.id);
       res.json(newProduct);
     } catch (error) {
+      console.error('Error creating product:', error);
       res.status(500).json({ error: "Failed to create product" });
     }
   });

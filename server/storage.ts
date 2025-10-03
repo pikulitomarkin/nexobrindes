@@ -3213,7 +3213,22 @@ export class DatabaseStorage implements IStorage {
     return vendor;
   }
 
-  async createVendor(vendorData: any): Promise<User> {
+  async createVendor(vendorData: any): Promise<any> {
+    // If userId is provided, just create vendor record (user already exists)
+    if (vendorData.userId) {
+      await db.insert(schema.vendors).values({
+        userId: vendorData.userId,
+        salesLink: vendorData.salesLink || null,
+        commissionRate: vendorData.commissionRate || "10.00",
+        isActive: true
+      });
+      
+      // Return the user info
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, vendorData.userId));
+      return user;
+    }
+    
+    // Otherwise create both user and vendor (legacy support)
     const [newUser] = await db.insert(schema.users).values({
       username: vendorData.username,
       password: vendorData.password || "123456",
