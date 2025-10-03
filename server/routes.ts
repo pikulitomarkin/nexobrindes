@@ -459,27 +459,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
               orderNumber: 'Unknown',
               clientName: 'Unknown',
               clientAddress: null,
-              clientPhone: null
+              clientPhone: null,
+              order: null
             };
           }
 
-          // Get client details - first check if clientId refers to a client record
+          // Get client details - try multiple approaches to find the client
           let clientName = 'Unknown';
           let clientAddress = null;
           let clientPhone = null;
+          let clientEmail = null;
 
-          // Try to get client by ID first
-          const clientDetails = await storage.getClient(order.clientId);
-          if (clientDetails) {
-            clientName = clientDetails.name;
-            clientAddress = clientDetails.address;
-            clientPhone = clientDetails.phone;
+          console.log(`Looking for client with ID: ${order.clientId}`);
+
+          // Method 1: Try to get client record directly by ID
+          const clientRecord = await storage.getClient(order.clientId);
+          if (clientRecord) {
+            console.log(`Found client record:`, clientRecord);
+            clientName = clientRecord.name;
+            clientAddress = clientRecord.address;
+            clientPhone = clientRecord.phone;
+            clientEmail = clientRecord.email;
           } else {
-            // Fallback to user table
-            const clientUser = await storage.getUser(order.clientId);
-            if (clientUser) {
-              clientName = clientUser.name;
-              clientPhone = clientUser.phone;
+            // Method 2: Try to find client record by userId
+            const clientByUserId = await storage.getClientByUserId(order.clientId);
+            if (clientByUserId) {
+              console.log(`Found client by userId:`, clientByUserId);
+              clientName = clientByUserId.name;
+              clientAddress = clientByUserId.address;
+              clientPhone = clientByUserId.phone;
+              clientEmail = clientByUserId.email;
+            } else {
+              // Method 3: Fallback to user table
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                console.log(`Found user record:`, clientUser);
+                clientName = clientUser.name;
+                clientPhone = clientUser.phone;
+                clientEmail = clientUser.email;
+                clientAddress = clientUser.address;
+              } else {
+                console.log(`No client found for ID: ${order.clientId}`);
+              }
             }
           }
 
@@ -489,11 +510,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orderNumber: order.orderNumber || 'Unknown',
             clientName: clientName,
             clientAddress: clientAddress,
-            clientPhone: clientPhone
+            clientPhone: clientPhone,
+            order: {
+              ...order,
+              clientName: clientName,
+              clientAddress: clientAddress,
+              clientPhone: clientPhone,
+              clientEmail: clientEmail,
+              shippingAddress: order.deliveryType === 'pickup' 
+                ? 'Sede Principal - Retirada no Local'
+                : (clientAddress || 'Endereço não informado'),
+              deliveryType: order.deliveryType || 'delivery'
+            }
           };
         })
       );
 
+      console.log(`Returning ${enrichedOrders.length} enriched production orders`);
       res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching production orders:", error);
@@ -2511,9 +2544,45 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(404).json({ error: "Related order not found" });
       }
 
-      // Get client info
-      const clientUser = await storage.getUser(order.clientId);
-      const clientDetails = await storage.getClient(order.clientId);
+      // Get client info - try multiple approaches
+      let clientName = 'Cliente não encontrado';
+      let clientAddress = 'Endereço não informado';
+      let clientPhone = null;
+      let clientEmail = null;
+
+      console.log(`Getting client details for order ${order.id}, clientId: ${order.clientId}`);
+
+      // Method 1: Try to get client record directly by ID
+      const clientRecord = await storage.getClient(order.clientId);
+      if (clientRecord) {
+        console.log(`Found client record for details:`, clientRecord);
+        clientName = clientRecord.name;
+        clientAddress = clientRecord.address || 'Endereço não informado';
+        clientPhone = clientRecord.phone;
+        clientEmail = clientRecord.email;
+      } else {
+        // Method 2: Try to find client record by userId
+        const clientByUserId = await storage.getClientByUserId(order.clientId);
+        if (clientByUserId) {
+          console.log(`Found client by userId for details:`, clientByUserId);
+          clientName = clientByUserId.name;
+          clientAddress = clientByUserId.address || 'Endereço não informado';
+          clientPhone = clientByUserId.phone;
+          clientEmail = clientByUserId.email;
+        } else {
+          // Method 3: Fallback to user table
+          const clientUser = await storage.getUser(order.clientId);
+          if (clientUser) {
+            console.log(`Found user record for details:`, clientUser);
+            clientName = clientUser.name;
+            clientPhone = clientUser.phone;
+            clientEmail = clientUser.email;
+            clientAddress = clientUser.address || 'Endereço não informado';
+          } else {
+            console.log(`No client found for details with ID: ${order.clientId}`);
+          }
+        }
+      }
 
       // Get budget items if order has budgetId
       let budgetItems = [];
@@ -2543,13 +2612,13 @@ Para mais detalhes, entre em contato conosco!`;
         ...productionOrder,
         order: {
           ...order,
-          clientName: clientUser?.name || 'Cliente não encontrado',
-          clientAddress: clientDetails?.address || clientUser?.address || 'Endereço não informado',
-          clientPhone: clientDetails?.phone || clientUser?.phone || null,
-          clientEmail: clientDetails?.email || clientUser?.email || null,
+          clientName: clientName,
+          clientAddress: clientAddress,
+          clientPhone: clientPhone,
+          clientEmail: clientEmail,
           shippingAddress: order.deliveryType === 'pickup' 
             ? 'Sede Principal - Retirada no Local'
-            : (clientDetails?.address || clientUser?.address || 'Endereço não informado'),
+            : clientAddress,
           deliveryType: order.deliveryType || 'delivery'
         },
         items: budgetItems,

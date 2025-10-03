@@ -594,6 +594,23 @@ export class MemStorage implements IStorage {
     };
     this.clients.set(sampleClient.id, sampleClient);
 
+    // Create additional sample client to ensure we have test data
+    const sampleClient2: Client = {
+      id: "client-2",
+      userId: "client-2",
+      name: "Maria Santos",
+      email: "maria@gmail.com", 
+      phone: "(11) 99876-5432",
+      whatsapp: "(11) 99876-5432",
+      cpfCnpj: "987.654.321-00",
+      address: "Av. Paulista, 456, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.clients.set(sampleClient2.id, sampleClient2);
+
     // Create sample orders
     mockOrders = [
       {
