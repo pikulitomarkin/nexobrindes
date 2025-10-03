@@ -182,6 +182,29 @@ export default function AdminPanel() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Factory className="h-5 w-5 mr-2" />
+              Gestão de Produção
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/producers">
+              <Button variant="outline" className="w-full justify-start">
+                <Factory className="h-4 w-4 mr-2" />
+                Produtores ({stats?.totalProducers || 0})
+              </Button>
+            </Link>
+            <Link href="/admin/producer-payments">
+              <Button className="w-full justify-start gradient-bg text-white">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Pagamentos de Produtores
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         
       </div>
 

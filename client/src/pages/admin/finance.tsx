@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Clock } from "lucide-r`";
 
 export default function AdminFinance() {
   const { data: overview, isLoading } = useQuery({
     queryKey: ["/api/finance/overview"],
+  });
+
+  // Buscar pagamentos de produtores para calcular valores reais
+  const { data: producerPayments } = useQuery({
+    queryKey: ["/api/producer-payments"],
   });
 
   if (isLoading) {
@@ -23,6 +28,21 @@ export default function AdminFinance() {
     );
   }
 
+  // Calcular valores reais dos pagamentos de produtores
+  const producerPaymentsPending = producerPayments?.filter((p: any) => p.status === 'pending') || [];
+  const producerPaymentsApproved = producerPayments?.filter((p: any) => p.status === 'approved') || [];
+  const totalProducerPayables = producerPaymentsPending.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) + 
+                                producerPaymentsApproved.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+
+  // Atualizar overview com dados reais
+  const realOverview = {
+    ...overview,
+    payables: totalProducerPayables,
+    producerPaymentsPending: producerPaymentsPending.length,
+    producerPaymentsApproved: producerPaymentsApproved.length,
+    producerPaymentsCount: producerPayments?.length || 0
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -37,7 +57,7 @@ export default function AdminFinance() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Contas a Receber</p>
                 <p className="text-2xl font-bold gradient-text">
-                  R$ {(overview?.receivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(realOverview?.receivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -53,8 +73,13 @@ export default function AdminFinance() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Contas a Pagar</p>
                 <p className="text-2xl font-bold gradient-text">
-                  R$ {(overview?.payables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {totalProducerPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
+                {realOverview?.producerPaymentsCount > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {realOverview.producerPaymentsPending} pendente{realOverview.producerPaymentsPending !== 1 ? 's' : ''} • {realOverview.producerPaymentsApproved} aprovado{realOverview.producerPaymentsApproved !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <TrendingDown className="h-6 w-6 text-red-600" />
@@ -69,7 +94,7 @@ export default function AdminFinance() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Saldo em Conta</p>
                 <p className="text-2xl font-bold gradient-text">
-                  R$ {(overview?.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(realOverview?.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
@@ -85,7 +110,7 @@ export default function AdminFinance() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Comissões Pendentes</p>
                 <p className="text-2xl font-bold gradient-text">
-                  R$ {(overview?.pendingCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(realOverview?.pendingCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">

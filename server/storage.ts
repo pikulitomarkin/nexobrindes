@@ -50,6 +50,9 @@ import {
   type InsertProducerPayment,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, and, or, desc, sql, isNull } from "drizzle-orm";
+import * as schema from "@shared/schema";
 
 // Mock data for orders, budgets, and products (to be replaced with actual storage operations)
 let mockOrders: Order[] = [];
@@ -176,7 +179,7 @@ export interface IStorage {
   // Budget Payment Info
   getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined>;
   createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo>;
-  updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo>;
+  updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined>;
 
   // Financial module - Accounts Receivable
   getAccountsReceivable(): Promise<AccountsReceivable[]>;
@@ -196,10 +199,11 @@ export interface IStorage {
   getBankImports(): Promise<BankImport[]>;
   getBankImport(id: string): Promise<BankImport | undefined>;
   createBankImport(data: InsertBankImport): Promise<BankImport>;
+  updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined>;
   getBankTransactionsByImport(importId: string): Promise<BankTransaction[]>;
   getBankTransactions(): Promise<BankTransaction[]>;
   createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction>;
-  updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined>;
+  updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined>;
   matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined>;
 
   // Financial module - Expense Notes
@@ -389,521 +393,474 @@ export class MemStorage implements IStorage {
     };
 
     this.initializeData();
-    this.createTestUsers();
+    // createTestUsers() is now called within initializeData()
   }
 
   // Create test users for each role
-  private createTestUsers() {
-    // Override existing users with test users
-    this.users.clear();
+  async createTestUsers() {
+    try {
+      // Check and create admin user
+      let adminUser = await this.getUserByUsername("admin");
+      if (!adminUser) {
+        adminUser = await this.createUser({
+          username: "admin",
+          password: "123456",
+          role: "admin",
+          name: "Administrador",
+          email: "admin@nexobrindes.com",
+          isActive: true
+        });
+      }
 
-    // Admin user
-    const adminUser = {
-      id: "admin-1",
-      username: "admin",
-      password: "123456", // In production, this should be hashed
-      name: "Administrador do Sistema",
-      email: "admin@erp.com",
-      phone: null,
-      vendorId: null,
-      role: "admin",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(adminUser.id, adminUser);
+      // Check and create vendor user
+      let vendorUser = await this.getUserByUsername("vendedor1");
+      if (!vendorUser) {
+        vendorUser = await this.createUser({
+          username: "vendedor1",
+          password: "123456",
+          role: "vendor",
+          name: "João Vendedor",
+          email: "joao@nexobrindes.com",
+          phone: "(11) 99999-0001",
+          isActive: true
+        });
 
-    // Vendor user
-    const vendorUser = {
-      id: "vendor-1",
-      username: "vendedor1",
-      password: "123456",
-      name: "Maria Santos",
-      email: "maria.santos@erp.com",
-      phone: null,
-      vendorId: "vendor-1",
-      role: "vendor",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(vendorUser.id, vendorUser);
+        // Create vendor record
+        await this.createVendor({
+          userId: vendorUser.id,
+          commissionRate: "10.00"
+        });
+      }
 
-    // Client user
-    const clientUser = {
-      id: "client-1",
-      username: "cliente1",
-      password: "123456",
-      name: "João Silva",
-      email: "joao.silva@email.com",
-      phone: null,
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser.id, clientUser);
+      // Check and create client user
+      let clientUser = await this.getUserByUsername("cliente1");
+      if (!clientUser) {
+        clientUser = await this.createUser({
+          username: "cliente1",
+          password: "123456",
+          role: "client",
+          name: "Maria Cliente",
+          email: "maria@empresa.com",
+          phone: "(11) 99999-0002",
+          address: "Rua das Empresas, 123",
+          isActive: true
+        });
 
-    // Producer user
-    const producerUser = {
-      id: "producer-1",
-      username: "produtor1",
-      password: "123456",
-      name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com",
-      phone: null,
-      vendorId: null,
-      role: "producer",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(producerUser.id, producerUser);
+        // Create client record
+        await this.createClient({
+          userId: clientUser.id,
+          name: clientUser.name,
+          email: clientUser.email,
+          phone: clientUser.phone,
+          address: clientUser.address,
+          vendorId: vendorUser.id,
+          isActive: true
+        });
+      }
 
-    // Partner user
-    const partnerUser = {
-      id: "partner-1",
-      username: "partner1",
-      password: "partner123",
-      name: "João Sócio",
-      email: "joao.socio@erp.com",
-      phone: null,
-      vendorId: null,
-      role: "partner",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(partnerUser.id, partnerUser);
+      // Check and create producer user
+      let producerUser = await this.getUserByUsername("produtor1");
+      if (!producerUser) {
+        producerUser = await this.createUser({
+          username: "produtor1",
+          password: "123456",
+          role: "producer",
+          name: "Marcenaria Santos",
+          email: "contato@marcenariasantos.com",
+          phone: "(11) 99999-0003",
+          specialty: "Marcenaria e Móveis",
+          address: "Rua das Oficinas, 456",
+          isActive: true
+        });
+        console.log("Producer user created:", producerUser.username);
+      } else {
+        console.log("Producer user already exists:", producerUser.username);
+      }
+
+      // Check and create partner user
+      let partnerUser = await this.getUserByUsername("partner1");
+      if (!partnerUser) {
+        partnerUser = await this.createUser({
+          username: "partner1",
+          password: "partner123",
+          role: "partner",
+          name: "Carlos Sócio",
+          email: "carlos@nexobrindes.com",
+          phone: "(11) 99999-0004",
+          isActive: true
+        });
+      }
+
+      console.log("Test users verification/creation completed");
+    } catch (error) {
+      console.error("Error in createTestUsers:", error);
+    }
   }
 
-  private initializeData() {
-    // This will be called first, then createTestUsers() will override with test users
-    const adminUser: User = {
-      id: "admin-1",
-      username: "admin",
-      password: "123",
-      role: "admin",
-      name: "Administrador",
-      email: "admin@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+  async initializeData() {
+    try {
+      // Always ensure test users exist (will not duplicate if already created)
+      await this.createTestUsers();
 
-    const vendorUser: User = {
-      id: "vendor-1",
-      username: "maria.santos",
-      password: "123",
-      role: "vendor",
-      name: "Maria Santos",
-      email: "maria@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      const users = await this.getUsers();
+      if (users.length > 5) {
+        console.log("Database already seeded. Skipping...");
+        return;
+      }
 
-    const clientUser: User = {
-      id: "client-1",
-      username: "joao.silva",
-      password: "123",
-      role: "client",
-      name: "João Silva",
-      email: "joao@gmail.com",
-      phone: null,
-      vendorId: "vendor-1",
-      isActive: true
-    };
+      console.log("Starting database seeding...");
 
-    const producerUser: User = {
-      id: "producer-1",
-      username: "marcenaria.santos",
-      password: "123",
-      role: "producer",
-      name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      // Create vendor profile
+      const vendor: Vendor = {
+        id: "vendor-profile-1",
+        userId: "vendor-1",
+        salesLink: "https://erp.com/v/maria123",
+        commissionRate: "10.00",
+        isActive: true
+      };
+      this.vendors.set(vendor.id, vendor);
 
-    const financeUser: User = {
-      id: "finance-1",
-      username: "financeiro",
-      password: "123",
-      role: "finance",
-      name: "Departamento Financeiro",
-      email: "financeiro@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      // Create partner profile
+      const partner: Partner = {
+        id: "partner-profile-1",
+        userId: "partner-1",
+        commissionRate: "15.00",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.partners.set(partner.id, partner);
 
-    const partnerUser: User = {
-      id: "partner-1",
-      username: "socio1",
-      password: "123",
-      role: "partner",
-      name: "João Sócio",
-      email: "socio@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
-
-    [adminUser, vendorUser, clientUser, producerUser, financeUser, partnerUser].forEach(user => {
-      this.users.set(user.id, user);
-    });
-
-    // Create vendor profile
-    const vendor: Vendor = {
-      id: "vendor-profile-1",
-      userId: "vendor-1",
-      salesLink: "https://erp.com/v/maria123",
-      commissionRate: "10.00",
-      isActive: true
-    };
-    this.vendors.set(vendor.id, vendor);
-
-    // Create partner profile
-    const partner: Partner = {
-      id: "partner-profile-1",
-      userId: "partner-1",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.partners.set(partner.id, partner);
-
-    // Create sample clients
-    const sampleClient: Client = {
-      id: "client-1",
-      userId: "client-1",
-      name: "João Silva",
-      email: "joao@gmail.com",
-      phone: "(11) 98765-4321",
-      whatsapp: "(11) 98765-4321",
-      cpfCnpj: "123.456.789-00",
-      address: "Rua das Flores, 123, São Paulo, SP",
-      vendorId: "vendor-1",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient.id, sampleClient);
-
-    // Create additional sample client to ensure we have test data
-    const sampleClient2: Client = {
-      id: "client-2",
-      userId: "client-2",
-      name: "Maria Santos",
-      email: "maria@gmail.com", 
-      phone: "(11) 99876-5432",
-      whatsapp: "(11) 99876-5432",
-      cpfCnpj: "987.654.321-00",
-      address: "Av. Paulista, 456, São Paulo, SP",
-      vendorId: "vendor-1",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient2.id, sampleClient2);
-
-    // Create sample orders
-    mockOrders = [
-      {
-        id: "order-1",
-        orderNumber: "#12345",
-        clientId: "client-1",
+      // Create sample clients
+      const sampleClient: Client = {
+        id: "client-1",
+        userId: "client-1",
+        name: "João Silva",
+        email: "joao@gmail.com",
+        phone: "(11) 98765-4321",
+        whatsapp: "(11) 98765-4321",
+        cpfCnpj: "123.456.789-00",
+        address: "Rua das Flores, 123, São Paulo, SP",
         vendorId: "vendor-1",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.clients.set(sampleClient.id, sampleClient);
+
+      // Create additional sample client to ensure we have test data
+      const sampleClient2: Client = {
+        id: "client-2",
+        userId: "client-2",
+        name: "Maria Santos",
+        email: "maria@gmail.com",
+        phone: "(11) 99876-5432",
+        whatsapp: "(11) 99876-5432",
+        cpfCnpj: "987.654.321-00",
+        address: "Av. Paulista, 456, São Paulo, SP",
+        vendorId: "vendor-1",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.clients.set(sampleClient2.id, sampleClient2);
+
+      // Create sample orders
+      mockOrders = [
+        {
+          id: "order-1",
+          orderNumber: "#12345",
+          clientId: "client-1",
+          vendorId: "vendor-1",
+          producerId: "producer-1",
+          budgetId: null,
+          product: "Mesa de Jantar Personalizada",
+          description: "Mesa de madeira maciça para 6 pessoas",
+          totalValue: "2450.00",
+          paidValue: "735.00",
+          status: "production",
+          deadline: new Date("2024-11-22"),
+          trackingCode: null,
+          createdAt: new Date("2024-11-15"),
+          updatedAt: new Date("2024-11-16")
+        },
+        {
+          id: "order-2",
+          orderNumber: "#12346",
+          clientId: "client-1",
+          vendorId: "vendor-1",
+          producerId: null,
+          budgetId: null,
+          product: "Estante Personalizada",
+          description: "Estante de madeira com 5 prateleiras",
+          totalValue: "1890.00",
+          paidValue: "567.00",
+          status: "pending",
+          deadline: new Date("2024-11-25"),
+          trackingCode: null,
+          createdAt: new Date("2024-11-14"),
+          updatedAt: new Date("2024-11-14")
+        }
+      ];
+
+      mockOrders.forEach(order => {
+        this.orders.set(order.id, order);
+      });
+
+      // Create production order
+      const productionOrder: ProductionOrder = {
+        id: "po-1",
+        orderId: "order-1",
         producerId: "producer-1",
-        budgetId: null,
-        product: "Mesa de Jantar Personalizada",
-        description: "Mesa de madeira maciça para 6 pessoas",
-        totalValue: "2450.00",
-        paidValue: "735.00",
         status: "production",
-        deadline: new Date("2024-11-22"),
-        trackingCode: null,
-        createdAt: new Date("2024-11-15"),
-        updatedAt: new Date("2024-11-16")
-      },
-      {
-        id: "order-2",
-        orderNumber: "#12346",
-        clientId: "client-1",
-        vendorId: "vendor-1",
-        producerId: null,
-        budgetId: null,
-        product: "Estante Personalizada",
-        description: "Estante de madeira com 5 prateleiras",
-        totalValue: "1890.00",
-        paidValue: "567.00",
-        status: "pending",
-        deadline: new Date("2024-11-25"),
-        trackingCode: null,
-        createdAt: new Date("2024-11-14"),
-        updatedAt: new Date("2024-11-14")
-      }
-    ];
+        deadline: new Date("2024-11-20"),
+        acceptedAt: new Date("2024-11-16"),
+        completedAt: null,
+        notes: "Produção iniciada conforme especificações"
+      };
+      this.productionOrders.set(productionOrder.id, productionOrder);
 
-    mockOrders.forEach(order => {
-      this.orders.set(order.id, order);
-    });
-
-    // Create production order
-    const productionOrder: ProductionOrder = {
-      id: "po-1",
-      orderId: "order-1",
-      producerId: "producer-1",
-      status: "production",
-      deadline: new Date("2024-11-20"),
-      acceptedAt: new Date("2024-11-16"),
-      completedAt: null,
-      notes: "Produção iniciada conforme especificações"
-    };
-    this.productionOrders.set(productionOrder.id, productionOrder);
-
-    // Create sample payment
-    const payment: Payment = {
-      id: "payment-1",
-      orderId: "order-1",
-      amount: "735.00",
-      method: "pix",
-      status: "confirmed",
-      transactionId: "PIX123456789",
-      paidAt: new Date("2024-11-15"),
-      createdAt: new Date("2024-11-15")
-    };
-    this.payments.set(payment.id, payment);
-
-    // Create commission
-    const commission: Commission = {
-      id: "commission-1",
-      vendorId: "vendor-1",
-      orderId: "order-1",
-      percentage: "10.00",
-      amount: "245.00",
-      status: "pending",
-      paidAt: null,
-      createdAt: new Date("2024-11-15")
-    };
-    this.commissions.set(commission.id, commission);
-
-    // Create additional payments for recent orders to show correct values
-    const allOrders = Array.from(this.orders.values());
-
-    // Find orders that need test payments and ensure all orders have some payment
-    const ordersToAddPayments = allOrders.filter(o =>
-      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
-    );
-
-    ordersToAddPayments.forEach((order, index) => {
-      // Create test payment for each order with better amounts
-      let paymentAmount = "567.00"; // Default
-
-      if (order.orderNumber?.includes("#12345")) {
-        paymentAmount = "735.00"; // 30% of 2450
-      } else if (order.orderNumber?.includes("#12346")) {
-        paymentAmount = "567.00"; // 30% of 1890
-      } else if (order.orderNumber?.includes("PED-")) {
-        paymentAmount = "3000.00"; // Example for newer orders
-      }
-
-      const testPayment: Payment = {
-        id: `payment-visible-${index + 1}`,
-        orderId: order.id,
-        amount: paymentAmount,
+      // Create sample payment
+      const payment: Payment = {
+        id: "payment-1",
+        orderId: "order-1",
+        amount: "735.00",
         method: "pix",
         status: "confirmed",
-        transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
-        paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
-        createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
+        transactionId: "PIX123456789",
+        paidAt: new Date("2024-11-15"),
+        createdAt: new Date("2024-11-15")
       };
-      this.payments.set(testPayment.id, testPayment);
+      this.payments.set(payment.id, payment);
 
-      // Update the order's paid value immediately
-      this.updateOrderPaidValue(order.id);
-    });
-
-    // Initialize mock budgets
-    mockBudgets = [
-      {
-        id: "budget-1",
-        budgetNumber: "ORC-2024-001",
-        title: "Orçamento Mesa de Jantar Personalizada",
-        description: "Mesa de jantar em madeira maciça com personalização especial",
+      // Create commission
+      const commission: Commission = {
+        id: "commission-1",
         vendorId: "vendor-1",
-        clientId: "client-1",
-        contactName: "Maria Silva",
-        contactPhone: "(11) 99999-9999",
-        contactEmail: "maria@email.com",
-        status: "draft",
-        validUntil: "2024-12-31",
-        deliveryDeadline: "2025-01-15",
-        totalValue: 2500.00,
-        shippingCost: 150.00,
-        hasDiscount: true,
-        discountType: "percentage",
-        discountPercentage: 10,
-        discountValue: 0,
-        paymentMethodId: "pm-1",
-        shippingMethodId: "sm-1",
-        installments: 3,
-        downPayment: 800.00,
-        remainingAmount: 1700.00,
-        items: [
-          {
-            id: "item-1",
-            productId: "product-1",
-            productName: "Mesa de Jantar Premium",
-            quantity: 1,
-            unitPrice: 2500.00,
-            totalPrice: 2500.00,
-            hasItemCustomization: true,
-            itemCustomizationValue: 300.00,
-            itemCustomizationDescription: "Gravação personalizada no tampo",
-            customizationPhoto: "/uploads/image-1757959263873-hw4asmucqgh.png",
-            productWidth: "180",
-            productHeight: "75",
-            productDepth: "90"
-          }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'budget-2',
-        budgetNumber: 'ORC-002',
-        clientId: 'client-2',
-        vendorId: 'vendor-1',
-        title: 'Estante Personalizada',
-        description: 'Estante sob medida para escritório',
-        totalValue: '3200.00',
-        status: 'approved',
-        validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
-    mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
+        orderId: "order-1",
+        percentage: "10.00",
+        amount: "245.00",
+        status: "pending",
+        paidAt: null,
+        createdAt: new Date("2024-11-15")
+      };
+      this.commissions.set(commission.id, commission);
 
-    // Initialize mock products
-    mockProducts = [
-      {
-        id: 'product-1',
-        name: 'Mesa de Jantar Clássica',
-        description: 'Mesa de madeira maciça com acabamento premium',
-        category: 'Móveis',
-        basePrice: '2500.00',
-        unit: 'un',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'product-2',
-        name: 'Cadeira Estofada',
-        description: 'Cadeira com estofado em couro sintético',
-        category: 'Móveis',
-        basePrice: '450.00',
-        unit: 'un',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'product-3',
-        name: 'Estante Modular',
-        description: 'Estante com módulos personalizáveis',
-        category: 'Móveis',
-        basePrice: '1200.00',
-        unit: 'm',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      }
-    ];
-    mockProducts.forEach(product => this.products.set(product.id, product));
+      // Create additional payments for recent orders to show correct values
+      const allOrders = Array.from(this.orders.values());
 
-    // Create sample commission settings
-    const defaultCommissionSettings: CommissionSettings = {
-      id: "settings-1",
-      vendorCommissionRate: "10.00",
-      partnerCommissionRate: "15.00",
-      vendorPaymentTiming: "order_completion",
-      partnerPaymentTiming: "order_start",
-      isActive: true,
-      updatedAt: new Date(),
-    };
-    this.mockData.commissionSettings.push(defaultCommissionSettings);
+      // Find orders that need test payments and ensure all orders have some payment
+      const ordersToAddPayments = allOrders.filter(o =>
+        o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
+      );
 
-    // Create sample customization options
-    const sampleCustomizations: CustomizationOption[] = [
-      {
-        id: "custom-1",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 50,
-        price: "5.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-2",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 100,
-        price: "4.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-3",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 200,
-        price: "3.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-4",
-        name: "Bordado",
-        description: "Personalização com bordado",
-        category: "Mochila",
-        minQuantity: 25,
-        price: "8.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-5",
-        name: "Gravação a laser",
-        description: "Personalização com gravação a laser",
-        category: "Copo",
-        minQuantity: 20,
-        price: "12.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    ];
-    this.mockData.customizationOptions.push(...sampleCustomizations);
+      ordersToAddPayments.forEach((order, index) => {
+        // Create test payment for each order with better amounts
+        let paymentAmount = "567.00"; // Default
 
-    // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
-    this.initializeFinancialIntegration();
+        if (order.orderNumber?.includes("#12345")) {
+          paymentAmount = "735.00"; // 30% of 2450
+        } else if (order.orderNumber?.includes("#12346")) {
+          paymentAmount = "567.00"; // 30% of 1890
+        } else if (order.orderNumber?.includes("PED-")) {
+          paymentAmount = "3000.00"; // Example for newer orders
+        }
+
+        const testPayment: Payment = {
+          id: `payment-visible-${index + 1}`,
+          orderId: order.id,
+          amount: paymentAmount,
+          method: "pix",
+          status: "confirmed",
+          transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
+          paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
+          createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
+        };
+        this.payments.set(testPayment.id, testPayment);
+
+        // Update the order's paid value immediately
+        this.updateOrderPaidValue(order.id);
+      });
+
+      // Initialize mock budgets
+      mockBudgets = [
+        {
+          id: "budget-1",
+          budgetNumber: "ORC-2024-001",
+          title: "Orçamento Mesa de Jantar Personalizada",
+          description: "Mesa de jantar em madeira maciça com personalização especial",
+          vendorId: "vendor-1",
+          clientId: "client-1",
+          contactName: "Maria Silva",
+          contactPhone: "(11) 99999-9999",
+          contactEmail: "maria@email.com",
+          status: "draft",
+          validUntil: "2024-12-31",
+          deliveryDeadline: "2025-01-15",
+          totalValue: 2500.00,
+          shippingCost: 150.00,
+          hasDiscount: true,
+          discountType: "percentage",
+          discountPercentage: 10,
+          discountValue: 0,
+          paymentMethodId: "pm-1",
+          shippingMethodId: "sm-1",
+          installments: 3,
+          downPayment: 800.00,
+          remainingAmount: 1700.00,
+          items: [
+            {
+              id: "item-1",
+              productId: "product-1",
+              productName: "Mesa de Jantar Premium",
+              quantity: 1,
+              unitPrice: 2500.00,
+              totalPrice: 2500.00,
+              hasItemCustomization: true,
+              itemCustomizationValue: 300.00,
+              itemCustomizationDescription: "Gravação personalizada no tampo",
+              customizationPhoto: "/uploads/image-1757959263873-hw4asmucqgh.png",
+              productWidth: "180",
+              productHeight: "75",
+              productDepth: "90"
+            }
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'budget-2',
+          budgetNumber: 'ORC-002',
+          clientId: 'client-2',
+          vendorId: 'vendor-1',
+          title: 'Estante Personalizada',
+          description: 'Estante sob medida para escritório',
+          totalValue: '3200.00',
+          status: 'approved',
+          validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+      mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
+
+      // Initialize mock products
+      mockProducts = [
+        {
+          id: 'product-1',
+          name: 'Mesa de Jantar Clássica',
+          description: 'Mesa de madeira maciça com acabamento premium',
+          category: 'Móveis',
+          basePrice: '2500.00',
+          unit: 'un',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'product-2',
+          name: 'Cadeira Estofada',
+          description: 'Cadeira com estofado em couro sintético',
+          category: 'Móveis',
+          basePrice: '450.00',
+          unit: 'un',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'product-3',
+          name: 'Estante Modular',
+          description: 'Estante com módulos personalizáveis',
+          category: 'Móveis',
+          basePrice: '1200.00',
+          unit: 'm',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        }
+      ];
+      mockProducts.forEach(product => this.products.set(product.id, product));
+
+      // Create sample commission settings
+      const defaultCommissionSettings: CommissionSettings = {
+        id: "settings-1",
+        vendorCommissionRate: "10.00",
+        partnerCommissionRate: "15.00",
+        vendorPaymentTiming: "order_completion",
+        partnerPaymentTiming: "order_start",
+        isActive: true,
+        updatedAt: new Date(),
+      };
+      this.mockData.commissionSettings.push(defaultCommissionSettings);
+
+      // Create sample customization options
+      const sampleCustomizations: CustomizationOption[] = [
+        {
+          id: "custom-1",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 50,
+          price: "5.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-2",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 100,
+          price: "4.50",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-3",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 200,
+          price: "3.50",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-4",
+          name: "Bordado",
+          description: "Personalização com bordado",
+          category: "Mochila",
+          minQuantity: 25,
+          price: "8.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-5",
+          name: "Gravação a laser",
+          description: "Personalização com gravação a laser",
+          category: "Copo",
+          minQuantity: 20,
+          price: "12.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      ];
+      this.mockData.customizationOptions.push(...sampleCustomizations);
+
+      // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
+      this.initializeFinancialIntegration();
+    } catch (error) {
+      console.error("Error during initializeData:", error);
+    }
   }
 
   private initializeFinancialIntegration() {
@@ -2125,19 +2082,43 @@ export class MemStorage implements IStorage {
     return newBudgetPaymentInfo;
   }
 
-  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo> {
-    const index = this.budgetPaymentInfo.findIndex(bpi => bpi.budgetId === budgetId);
-    if (index !== -1) {
-      this.budgetPaymentInfo[index] = {
-        ...this.budgetPaymentInfo[index],
-        ...data
-      };
-      return this.budgetPaymentInfo[index];
-    } else {
+  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined> {
+    const existing = Array.from(this.budgetPaymentInfo).find(info => info.budgetId === budgetId);
+    if (!existing) {
       // Create new if doesn't exist
-      return this.createBudgetPaymentInfo({ budgetId, ...data } as InsertBudgetPaymentInfo);
+      return this.createBudgetPaymentInfo({
+        budgetId,
+        ...data
+      } as InsertBudgetPaymentInfo);
     }
+
+    const updated: BudgetPaymentInfo = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    // Since budgetPaymentInfo is an array, we need to find and update it
+    const index = this.budgetPaymentInfo.findIndex(bpi => bpi.id === existing.id);
+    if (index !== -1) {
+      this.budgetPaymentInfo[index] = updated;
+    }
+    return updated;
   }
+
+  // Bank Transaction methods
+  async updateBankTransaction(id: string, data: Partial<any>): Promise<any> {
+    const existing = this.bankTransactions.get(id);
+    if (!existing) return undefined;
+
+    const updated = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.bankTransactions.set(id, updated);
+    return updated;
+  }
+
 
   // Helper method to recalculate budget total
   private async recalculateBudgetTotal(budgetId: string): Promise<void> {
@@ -2298,6 +2279,7 @@ export class MemStorage implements IStorage {
     const bankImport: BankImport = {
       id,
       ...data,
+      importType: data.importType || 'general',
       uploadedAt: new Date(),
       updatedAt: new Date()
     };
@@ -2328,6 +2310,13 @@ export class MemStorage implements IStorage {
 
   async getBankTransactions(): Promise<BankTransaction[]> {
     return this.mockData.bankTransactions || [];
+  }
+
+  async getOutgoingBankTransactions(): Promise<BankTransaction[]> {
+    return (this.mockData.bankTransactions || []).filter(txn => 
+      parseFloat(txn.amount) < 0 && // Negative amounts are outgoing
+      (txn.status === 'unmatched' || !txn.status)
+    );
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
@@ -2565,7 +2554,7 @@ export class MemStorage implements IStorage {
 
   async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
     console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
-    
+
     const productionOrder = this.productionOrders.get(id);
     if (!productionOrder) {
       console.log(`Storage: Production order not found with id: ${id}`);
@@ -2588,23 +2577,27 @@ export class MemStorage implements IStorage {
 
     if (existingPayments.length === 0) {
       // Criar automaticamente um registro de pagamento pendente apenas se não existir
-      await this.createProducerPayment({
+      const newPayment = await this.createProducerPayment({
         productionOrderId: id,
         producerId: productionOrder.producerId,
         amount: value,
         status: 'pending',
         notes: notes || null
       });
-      console.log(`Storage: Created new producer payment for order ${id}`);
+      console.log(`Storage: Created new producer payment for order ${id}:`, newPayment);
     } else {
       // Atualizar o pagamento existente
       const existingPayment = existingPayments[0];
-      await this.updateProducerPayment(existingPayment.id, {
+      const updatedPayment = await this.updateProducerPayment(existingPayment.id, {
         amount: value,
         notes: notes || existingPayment.notes
       });
-      console.log(`Storage: Updated existing producer payment ${existingPayment.id}`);
+      console.log(`Storage: Updated existing producer payment ${existingPayment.id}:`, updatedPayment);
     }
+
+    // Log total producer payments after update
+    const allPayments = Array.from(this.producerPayments.values());
+    console.log(`Storage: Total producer payments after update: ${allPayments.length}`, allPayments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
 
     return updated;
   }
@@ -2847,4 +2840,1100 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// DatabaseStorage - PostgreSQL implementation using Drizzle ORM
+export class DatabaseStorage implements IStorage {
+
+  // ==================== PRODUCER PAYMENTS ====================
+  async getProducerPayments(): Promise<ProducerPayment[]> {
+    return await db.select().from(schema.producerPayments);
+  }
+
+  async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
+    return await db.select().from(schema.producerPayments)
+      .where(eq(schema.producerPayments.producerId, producerId));
+  }
+
+  async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
+    const [payment] = await db.insert(schema.producerPayments).values(data).returning();
+    return payment;
+  }
+
+  async updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined> {
+    const [updated] = await db.update(schema.producerPayments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.producerPayments.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== PRODUCTION ORDERS ====================
+  async getProductionOrders(): Promise<ProductionOrder[]> {
+    return await db.select().from(schema.productionOrders);
+  }
+
+  async getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
+    const [po] = await db.select().from(schema.productionOrders)
+      .where(eq(schema.productionOrders.id, id));
+    return po;
+  }
+
+  async getProductionOrdersByProducer(producerId: string): Promise<ProductionOrder[]> {
+    return await db.select().from(schema.productionOrders)
+      .where(eq(schema.productionOrders.producerId, producerId));
+  }
+
+  async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {
+    return await db.select().from(schema.productionOrders)
+      .where(eq(schema.productionOrders.orderId, orderId));
+  }
+
+  async createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder> {
+    const [po] = await db.insert(schema.productionOrders).values(productionOrder).returning();
+    return po;
+  }
+
+  async updateProductionOrderStatus(
+    id: string, 
+    status: string, 
+    notes?: string, 
+    deliveryDate?: string, 
+    trackingCode?: string
+  ): Promise<ProductionOrder | undefined> {
+    const po = await this.getProductionOrder(id);
+    if (!po) return undefined;
+
+    const updates: any = {
+      status: status === 'unchanged' ? po.status : status,
+      notes: notes || po.notes,
+      hasUnreadNotes: notes ? true : po.hasUnreadNotes,
+      lastNoteAt: notes ? new Date() : po.lastNoteAt,
+      acceptedAt: status === 'accepted' && !po.acceptedAt ? new Date() : po.acceptedAt,
+      completedAt: (status === 'completed' || status === 'shipped' || status === 'delivered') && !po.completedAt ? new Date() : po.completedAt,
+      deadline: deliveryDate ? new Date(deliveryDate) : po.deadline,
+      deliveryDeadline: deliveryDate ? new Date(deliveryDate) : po.deliveryDeadline,
+      trackingCode: trackingCode !== undefined ? trackingCode : po.trackingCode,
+    };
+
+    if (['shipped', 'delivered'].includes(status) && !['shipped', 'delivered'].includes(po.status)) {
+      updates.completedAt = new Date();
+    }
+
+    const [updated] = await db.update(schema.productionOrders)
+      .set(updates)
+      .where(eq(schema.productionOrders.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
+    const po = await this.getProductionOrder(id);
+    if (!po) return undefined;
+
+    const [updated] = await db.update(schema.productionOrders)
+      .set({
+        producerValue: value,
+        producerNotes: notes || po.producerNotes,
+        producerPaymentStatus: 'pending'
+      })
+      .where(eq(schema.productionOrders.id, id))
+      .returning();
+
+    // Check if producer payment already exists
+    const existingPayments = await db.select().from(schema.producerPayments)
+      .where(eq(schema.producerPayments.productionOrderId, id));
+
+    if (existingPayments.length === 0) {
+      // Create new producer payment
+      await this.createProducerPayment({
+        productionOrderId: id,
+        producerId: po.producerId,
+        amount: value,
+        status: 'pending',
+        notes: notes || null
+      });
+    } else {
+      // Update existing payment
+      await db.update(schema.producerPayments)
+        .set({ amount: value, notes: notes || existingPayments[0].notes, updatedAt: new Date() })
+        .where(eq(schema.producerPayments.productionOrderId, id));
+    }
+
+    return updated;
+  }
+
+  // ==================== USERS ====================
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(schema.users);
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(schema.users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(schema.users)
+      .set(updates)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(schema.users).where(eq(schema.users.role, role));
+  }
+
+  // ==================== ORDERS ====================
+  async getOrders(): Promise<Order[]> {
+    return await db.select().from(schema.orders);
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+    return order;
+  }
+
+  async createOrder(orderData: InsertOrder): Promise<Order> {
+    const [order] = await db.insert(schema.orders).values(orderData).returning();
+
+    // Create AccountsReceivable entry
+    await this.createAccountsReceivableForOrder(order);
+
+    // Calculate and create commissions
+    await this.calculateCommissions(order);
+
+    return order;
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    const order = await this.getOrder(id);
+    if (!order) return undefined;
+
+    const oldStatus = order.status;
+    const [updated] = await db.update(schema.orders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.orders.id, id))
+      .returning();
+
+    // Process commission payments if status changed
+    if (updates.status && updates.status !== oldStatus) {
+      await this.processCommissionPayments(updated, updates.status);
+    }
+
+    return updated;
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
+    const order = await this.getOrder(id);
+    if (!order) return undefined;
+
+    const [updated] = await db.update(schema.orders)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(schema.orders.id, id))
+      .returning();
+
+    await this.processCommissionPayments(updated, status);
+    return updated;
+  }
+
+  async getOrdersByVendor(vendorId: string): Promise<Order[]> {
+    return await db.select().from(schema.orders).where(eq(schema.orders.vendorId, vendorId));
+  }
+
+  async getOrdersByClient(clientId: string): Promise<Order[]> {
+    // Try direct match first
+    const directMatch = await db.select().from(schema.orders).where(eq(schema.orders.clientId, clientId));
+    if (directMatch.length > 0) return directMatch;
+
+    // Check if clientId is a user ID
+    const clientRecord = await db.select().from(schema.clients).where(eq(schema.clients.userId, clientId));
+    if (clientRecord.length > 0) {
+      return await db.select().from(schema.orders).where(eq(schema.orders.clientId, clientRecord[0].id));
+    }
+
+    return [];
+  }
+
+  async getClientsByVendor(vendorId: string): Promise<Client[]> {
+    return await db.select().from(schema.clients).where(eq(schema.clients.vendorId, vendorId));
+  }
+
+  // ==================== PAYMENTS ====================
+  async getPayments(): Promise<Payment[]> {
+    return await db.select().from(schema.payments);
+  }
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [newPayment] = await db.insert(schema.payments).values(payment).returning();
+
+    // If payment is confirmed, update order paid value
+    if (newPayment.status === 'confirmed') {
+      await this.updateOrderPaidValue(newPayment.orderId);
+    }
+
+    return newPayment;
+  }
+
+  async getPaymentsByOrder(orderId: string): Promise<Payment[]> {
+    return await db.select().from(schema.payments).where(eq(schema.payments.orderId, orderId));
+  }
+
+  // ==================== COMMISSIONS ====================
+  async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
+    return await db.select().from(schema.commissions).where(eq(schema.commissions.vendorId, vendorId));
+  }
+
+  async getAllCommissions(): Promise<Commission[]> {
+    return await db.select().from(schema.commissions);
+  }
+
+  async createCommission(commission: InsertCommission): Promise<Commission> {
+    const [newCommission] = await db.insert(schema.commissions).values(commission).returning();
+    return newCommission;
+  }
+
+  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
+    const updates: any = { status };
+    if (status === 'paid') updates.paidAt = new Date();
+    if (status === 'deducted') updates.deductedAt = new Date();
+
+    const [updated] = await db.update(schema.commissions)
+      .set(updates)
+      .where(eq(schema.commissions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deductPartnerCommission(partnerId: string, amount: string): Promise<void> {
+    const partnerCommissions = await db.select().from(schema.commissions)
+      .where(and(
+        eq(schema.commissions.partnerId, partnerId),
+        eq(schema.commissions.status, 'pending')
+      ))
+      .orderBy(schema.commissions.createdAt);
+
+    let remainingToDeduct = parseFloat(amount);
+
+    for (const commission of partnerCommissions) {
+      if (remainingToDeduct <= 0) break;
+
+      const commissionAmount = parseFloat(commission.amount);
+      if (commissionAmount <= remainingToDeduct) {
+        await this.updateCommissionStatus(commission.id, 'deducted');
+        remainingToDeduct -= commissionAmount;
+      } else {
+        const newAmount = (commissionAmount - remainingToDeduct).toFixed(2);
+        await db.update(schema.commissions)
+          .set({ amount: newAmount })
+          .where(eq(schema.commissions.id, commission.id));
+        remainingToDeduct = 0;
+      }
+    }
+  }
+
+  // ==================== PARTNERS ====================
+  async getPartners(): Promise<User[]> {
+    return await this.getUsersByRole('partner');
+  }
+
+  async getPartner(userId: string): Promise<Partner | undefined> {
+    const [partner] = await db.select().from(schema.partners).where(eq(schema.partners.userId, userId));
+    return partner;
+  }
+
+  async createPartner(partnerData: any): Promise<User> {
+    const [newUser] = await db.insert(schema.users).values({
+      username: partnerData.username,
+      password: partnerData.password || "123456",
+      role: 'partner',
+      name: partnerData.name,
+      email: partnerData.email || null,
+      phone: partnerData.phone || null,
+      isActive: true
+    }).returning();
+
+    await db.insert(schema.partners).values({
+      userId: newUser.id,
+      commissionRate: partnerData.commissionRate || "15.00",
+      isActive: true
+    });
+
+    return newUser;
+  }
+
+  async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
+    await db.update(schema.partners)
+      .set({ commissionRate, updatedAt: new Date() })
+      .where(eq(schema.partners.userId, userId));
+  }
+
+  // ==================== COMMISSION SETTINGS ====================
+  async getCommissionSettings(): Promise<CommissionSettings | undefined> {
+    const [settings] = await db.select().from(schema.commissionSettings).limit(1);
+    return settings;
+  }
+
+  async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
+    const existing = await this.getCommissionSettings();
+
+    if (existing) {
+      const [updated] = await db.update(schema.commissionSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(schema.commissionSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(schema.commissionSettings).values(settings).returning();
+      return created;
+    }
+  }
+
+  // ==================== VENDORS ====================
+  async getVendors(): Promise<User[]> {
+    return await this.getUsersByRole('vendor');
+  }
+
+  async getVendor(userId: string): Promise<Vendor | undefined> {
+    const [vendor] = await db.select().from(schema.vendors).where(eq(schema.vendors.userId, userId));
+    return vendor;
+  }
+
+  async createVendor(vendorData: any): Promise<User> {
+    const [newUser] = await db.insert(schema.users).values({
+      username: vendorData.username,
+      password: vendorData.password || "123456",
+      role: 'vendor',
+      name: vendorData.name,
+      email: vendorData.email || null,
+      phone: vendorData.phone || null,
+      isActive: true
+    }).returning();
+
+    await db.insert(schema.vendors).values({
+      userId: newUser.id,
+      salesLink: vendorData.salesLink || null,
+      commissionRate: vendorData.commissionRate || "10.00",
+      isActive: true
+    });
+
+    return newUser;
+  }
+
+  async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
+    await db.update(schema.vendors)
+      .set({ commissionRate })
+      .where(eq(schema.vendors.userId, userId));
+  }
+
+  // ==================== CLIENTS ====================
+  async getClients(): Promise<Client[]> {
+    return await db.select().from(schema.clients);
+  }
+
+  async getClient(id: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(schema.clients).where(eq(schema.clients.id, id));
+    return client;
+  }
+
+  async createClient(clientData: InsertClient): Promise<Client> {
+    const [client] = await db.insert(schema.clients).values(clientData).returning();
+    return client;
+  }
+
+  async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
+    const [updated] = await db.update(schema.clients)
+      .set({ ...clientData, updatedAt: new Date() })
+      .where(eq(schema.clients.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    const result = await db.delete(schema.clients).where(eq(schema.clients.id, id));
+    return true;
+  }
+
+  // ==================== PRODUCTS ====================
+  async getProducts(options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+  }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    let query = db.select().from(schema.products);
+
+    const conditions = [];
+    if (options?.search) {
+      conditions.push(
+        or(
+          sql`${schema.products.name} ILIKE ${`%${options.search}%`}`,
+          sql`${schema.products.description} ILIKE ${`%${options.search}%`}`
+        )
+      );
+    }
+    if (options?.category) {
+      conditions.push(eq(schema.products.category, options.category));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    const products = await query.limit(limit).offset(offset);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(schema.products);
+    const total = Number(count);
+
+    return {
+      products,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  async getProduct(id: string): Promise<any> {
+    const [product] = await db.select().from(schema.products).where(eq(schema.products.id, id));
+    return product;
+  }
+
+  async createProduct(productData: any): Promise<any> {
+    const [product] = await db.insert(schema.products).values(productData).returning();
+    return product;
+  }
+
+  async updateProduct(id: string, productData: any): Promise<any> {
+    const [updated] = await db.update(schema.products)
+      .set({ ...productData, updatedAt: new Date() })
+      .where(eq(schema.products.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    await db.delete(schema.products).where(eq(schema.products.id, id));
+    return true;
+  }
+
+  async importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }> {
+    const errors: any[] = [];
+    let imported = 0;
+
+    for (const productData of productsData) {
+      try {
+        await this.createProduct(productData);
+        imported++;
+      } catch (error) {
+        errors.push({ product: productData, error });
+      }
+    }
+
+    return { imported, errors };
+  }
+
+  async searchProducts(query: string): Promise<any[]> {
+    return await db.select().from(schema.products)
+      .where(
+        or(
+          sql`${schema.products.name} ILIKE ${`%${query}%`}`,
+          sql`${schema.products.description} ILIKE ${`%${query}%`}`
+        )
+      )
+      .limit(20);
+  }
+
+  // ==================== BUDGETS ====================
+  async getBudgets(): Promise<any[]> {
+    return await db.select().from(schema.budgets);
+  }
+
+  async getBudget(id: string): Promise<any> {
+    const [budget] = await db.select().from(schema.budgets).where(eq(schema.budgets.id, id));
+    return budget;
+  }
+
+  async getBudgetsByVendor(vendorId: string): Promise<any[]> {
+    return await db.select().from(schema.budgets).where(eq(schema.budgets.vendorId, vendorId));
+  }
+
+  async getBudgetsByClient(clientId: string): Promise<any[]> {
+    return await db.select().from(schema.budgets).where(eq(schema.budgets.clientId, clientId));
+  }
+
+  async createBudget(budgetData: any): Promise<any> {
+    const [budget] = await db.insert(schema.budgets).values(budgetData).returning();
+    return budget;
+  }
+
+  async updateBudget(id: string, budgetData: any): Promise<any> {
+    const [updated] = await db.update(schema.budgets)
+      .set({ ...budgetData, updatedAt: new Date() })
+      .where(eq(schema.budgets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBudget(id: string): Promise<boolean> {
+    await db.delete(schema.budgets).where(eq(schema.budgets.id, id));
+    return true;
+  }
+
+  async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
+    const budget = await this.getBudget(budgetId);
+    if (!budget) throw new Error('Budget not found');
+
+    const orderNumber = `#${Date.now()}`;
+    const [order] = await db.insert(schema.orders).values({
+      orderNumber,
+      clientId: budget.clientId,
+      vendorId: budget.vendorId,
+      producerId: producerId || null,
+      budgetId: budgetId,
+      product: budget.title,
+      description: budget.description,
+      totalValue: budget.totalValue,
+      paidValue: "0.00",
+      status: 'pending'
+    }).returning();
+
+    await this.updateBudget(budgetId, { status: 'converted' });
+
+    return order;
+  }
+
+  // ==================== BUDGET ITEMS ====================
+  async getBudgetItems(budgetId: string): Promise<any[]> {
+    return await db.select().from(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
+  }
+
+  async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
+    const [item] = await db.insert(schema.budgetItems).values({ ...itemData, budgetId }).returning();
+    await this.recalculateBudgetTotal(budgetId);
+    return item;
+  }
+
+  async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
+    const [updated] = await db.update(schema.budgetItems)
+      .set(itemData)
+      .where(eq(schema.budgetItems.id, itemId))
+      .returning();
+    if (updated) {
+      await this.recalculateBudgetTotal(updated.budgetId);
+    }
+    return updated;
+  }
+
+  async deleteBudgetItem(itemId: string): Promise<boolean> {
+    const [item] = await db.select().from(schema.budgetItems).where(eq(schema.budgetItems.id, itemId));
+    if (item) {
+      await db.delete(schema.budgetItems).where(eq(schema.budgetItems.id, itemId));
+      await this.recalculateBudgetTotal(item.budgetId);
+      return true;
+    }
+    return false;
+  }
+
+  async deleteBudgetItems(budgetId: string): Promise<boolean> {
+    await db.delete(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
+    return true;
+  }
+
+  // ==================== BUDGET PHOTOS ====================
+  async getBudgetPhotos(budgetId: string): Promise<any[]> {
+    return await db.select().from(schema.budgetPhotos).where(eq(schema.budgetPhotos.budgetId, budgetId));
+  }
+
+  async createBudgetPhoto(budgetId: string, photoData: any): Promise<any> {
+    const [photo] = await db.insert(schema.budgetPhotos).values({
+      budgetId,
+      photoUrl: photoData.imageUrl,
+      description: photoData.description || ""
+    }).returning();
+    return photo;
+  }
+
+  async deleteBudgetPhoto(photoId: string): Promise<boolean> {
+    await db.delete(schema.budgetPhotos).where(eq(schema.budgetPhotos.id, photoId));
+    return true;
+  }
+
+  // ==================== PAYMENT METHODS ====================
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    return await db.select().from(schema.paymentMethods).where(eq(schema.paymentMethods.isActive, true));
+  }
+
+  async getAllPaymentMethods(): Promise<PaymentMethod[]> {
+    return await db.select().from(schema.paymentMethods);
+  }
+
+  async createPaymentMethod(data: InsertPaymentMethod): Promise<PaymentMethod> {
+    const [method] = await db.insert(schema.paymentMethods).values(data).returning();
+    return method;
+  }
+
+  async updatePaymentMethod(id: string, data: Partial<InsertPaymentMethod>): Promise<PaymentMethod | null> {
+    const [updated] = await db.update(schema.paymentMethods)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.paymentMethods.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deletePaymentMethod(id: string): Promise<boolean> {
+    await db.delete(schema.paymentMethods).where(eq(schema.paymentMethods.id, id));
+    return true;
+  }
+
+  // ==================== SHIPPING METHODS ====================
+  async getShippingMethods(): Promise<ShippingMethod[]> {
+    return await db.select().from(schema.shippingMethods).where(eq(schema.shippingMethods.isActive, true));
+  }
+
+  async getAllShippingMethods(): Promise<ShippingMethod[]> {
+    return await db.select().from(schema.shippingMethods);
+  }
+
+  async createShippingMethod(data: InsertShippingMethod): Promise<ShippingMethod> {
+    const [method] = await db.insert(schema.shippingMethods).values(data).returning();
+    return method;
+  }
+
+  async updateShippingMethod(id: string, data: Partial<InsertShippingMethod>): Promise<ShippingMethod | null> {
+    const [updated] = await db.update(schema.shippingMethods)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.shippingMethods.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteShippingMethod(id: string): Promise<boolean> {
+    await db.delete(schema.shippingMethods).where(eq(schema.shippingMethods.id, id));
+    return true;
+  }
+
+  // ==================== BUDGET PAYMENT INFO ====================
+  async getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined> {
+    const [info] = await db.select().from(schema.budgetPaymentInfo).where(eq(schema.budgetPaymentInfo.budgetId, budgetId));
+    return info;
+  }
+
+  async createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo> {
+    const [info] = await db.insert(schema.budgetPaymentInfo).values(data).returning();
+    return info;
+  }
+
+  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined> {
+    const existing = await this.getBudgetPaymentInfo(budgetId);
+
+    if (!existing) {
+      return await this.createBudgetPaymentInfo({ budgetId, ...data } as InsertBudgetPaymentInfo);
+    }
+
+    const [updated] = await db.update(schema.budgetPaymentInfo)
+      .set(data)
+      .where(eq(schema.budgetPaymentInfo.budgetId, budgetId))
+      .returning();
+    return updated;
+  }
+
+  // ==================== ACCOUNTS RECEIVABLE ====================
+  async getAccountsReceivable(): Promise<AccountsReceivable[]> {
+    return await db.select().from(schema.accountsReceivable);
+  }
+
+  async getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]> {
+    return await db.select().from(schema.accountsReceivable).where(eq(schema.accountsReceivable.orderId, orderId));
+  }
+
+  async getAccountsReceivableByClient(clientId: string): Promise<AccountsReceivable[]> {
+    return await db.select().from(schema.accountsReceivable).where(eq(schema.accountsReceivable.clientId, clientId));
+  }
+
+  async getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]> {
+    return await db.select().from(schema.accountsReceivable).where(eq(schema.accountsReceivable.vendorId, vendorId));
+  }
+
+  async createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable> {
+    const [ar] = await db.insert(schema.accountsReceivable).values(data).returning();
+    return ar;
+  }
+
+  async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
+    const [updated] = await db.update(schema.accountsReceivable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.accountsReceivable.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== PAYMENT ALLOCATIONS ====================
+  async getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]> {
+    return await db.select().from(schema.paymentAllocations).where(eq(schema.paymentAllocations.paymentId, paymentId));
+  }
+
+  async getPaymentAllocationsByReceivable(receivableId: string): Promise<PaymentAllocation[]> {
+    return await db.select().from(schema.paymentAllocations).where(eq(schema.paymentAllocations.receivableId, receivableId));
+  }
+
+  async createPaymentAllocation(data: InsertPaymentAllocation): Promise<PaymentAllocation> {
+    const [allocation] = await db.insert(schema.paymentAllocations).values(data).returning();
+    return allocation;
+  }
+
+  async allocatePaymentToReceivable(paymentId: string, receivableId: string, amount: string): Promise<PaymentAllocation> {
+    const allocation = await this.createPaymentAllocation({ paymentId, receivableId, amount });
+
+    const [receivable] = await db.select().from(schema.accountsReceivable).where(eq(schema.accountsReceivable.id, receivableId));
+
+    if (receivable) {
+      const currentReceived = parseFloat(receivable.receivedAmount);
+      const allocationAmount = parseFloat(amount);
+      const newReceived = currentReceived + allocationAmount;
+
+      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+      if (newReceived >= parseFloat(receivable.amount)) {
+        status = 'paid';
+      } else if (newReceived > 0) {
+        status = 'partial';
+      }
+
+      await this.updateAccountsReceivable(receivableId, {
+        receivedAmount: newReceived.toFixed(2),
+        status
+      });
+    }
+
+    return allocation;
+  }
+
+  // ==================== BANK IMPORTS & TRANSACTIONS ====================
+  async getBankImports(): Promise<BankImport[]> {
+    return await db.select().from(schema.bankImports);
+  }
+
+  async getBankImport(id: string): Promise<BankImport | undefined> {
+    const [bankImport] = await db.select().from(schema.bankImports).where(eq(schema.bankImports.id, id));
+    return bankImport;
+  }
+
+  async createBankImport(data: InsertBankImport): Promise<BankImport> {
+    const [bankImport] = await db.insert(schema.bankImports).values(data).returning();
+    return bankImport;
+  }
+
+  async updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined> {
+    const [updated] = await db.update(schema.bankImports)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.bankImports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getBankTransactionsByImport(importId: string): Promise<BankTransaction[]> {
+    return await db.select().from(schema.bankTransactions).where(eq(schema.bankTransactions.importId, importId));
+  }
+
+  async getBankTransactions(): Promise<BankTransaction[]> {
+    return await db.select().from(schema.bankTransactions);
+  }
+
+  async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
+    const [transaction] = await db.insert(schema.bankTransactions).values(data).returning();
+    return transaction;
+  }
+
+  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined> {
+    const [updated] = await db.update(schema.bankTransactions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.bankTransactions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined> {
+    return await this.updateBankTransaction(transactionId, {
+      status: 'matched',
+      matchedReceivableId: receivableId,
+      matchedAt: new Date()
+    });
+  }
+
+  // ==================== EXPENSE NOTES ====================
+  async getExpenseNotes(): Promise<ExpenseNote[]> {
+    return await db.select().from(schema.expenseNotes);
+  }
+
+  async getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]> {
+    return await db.select().from(schema.expenseNotes).where(eq(schema.expenseNotes.vendorId, vendorId));
+  }
+
+  async getExpenseNotesByOrder(orderId: string): Promise<ExpenseNote[]> {
+    return await db.select().from(schema.expenseNotes).where(eq(schema.expenseNotes.orderId, orderId));
+  }
+
+  async createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote> {
+    const [expense] = await db.insert(schema.expenseNotes).values(data).returning();
+    return expense;
+  }
+
+  async updateExpenseNote(id: string, data: Partial<InsertExpenseNote>): Promise<ExpenseNote | undefined> {
+    const [updated] = await db.update(schema.expenseNotes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.expenseNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== COMMISSION PAYOUTS ====================
+  async getCommissionPayouts(): Promise<CommissionPayout[]> {
+    return await db.select().from(schema.commissionPayouts);
+  }
+
+  async getCommissionPayoutsByUser(userId: string, type: 'vendor' | 'partner'): Promise<CommissionPayout[]> {
+    return await db.select().from(schema.commissionPayouts)
+      .where(and(
+        eq(schema.commissionPayouts.userId, userId),
+        eq(schema.commissionPayouts.type, type)
+      ));
+  }
+
+  async createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout> {
+    const [payout] = await db.insert(schema.commissionPayouts).values(data).returning();
+    return payout;
+  }
+
+  async updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined> {
+    const [updated] = await db.update(schema.commissionPayouts)
+      .set(data)
+      .where(eq(schema.commissionPayouts.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== CUSTOMIZATION OPTIONS ====================
+  async createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption> {
+    const [option] = await db.insert(schema.customizationOptions).values(data).returning();
+    return option;
+  }
+
+  async getCustomizationOptions(): Promise<CustomizationOption[]> {
+    return await db.select().from(schema.customizationOptions);
+  }
+
+  async getCustomizationOptionsByCategory(category: string, quantity: number): Promise<CustomizationOption[]> {
+    return await db.select().from(schema.customizationOptions)
+      .where(and(
+        eq(schema.customizationOptions.category, category),
+        sql`${schema.customizationOptions.minQuantity} <= ${quantity}`,
+        eq(schema.customizationOptions.isActive, true)
+      ));
+  }
+
+  async updateCustomizationOption(id: string, data: Partial<InsertCustomizationOption>): Promise<CustomizationOption | undefined> {
+    const [updated] = await db.update(schema.customizationOptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.customizationOptions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCustomizationOption(id: string): Promise<boolean> {
+    await db.delete(schema.customizationOptions).where(eq(schema.customizationOptions.id, id));
+    return true;
+  }
+
+  // ==================== HELPER METHODS ====================
+  private async createAccountsReceivableForOrder(order: Order): Promise<void> {
+    const paidValue = parseFloat(order.paidValue || "0");
+    const totalValue = parseFloat(order.totalValue);
+
+    let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+    if (paidValue >= totalValue) {
+      status = 'paid';
+    } else if (paidValue > 0) {
+      status = 'partial';
+    }
+
+    if (order.deadline && new Date() > new Date(order.deadline) && status !== 'paid') {
+      status = 'overdue';
+    }
+
+    await this.createAccountsReceivable({
+      orderId: order.id,
+      clientId: order.clientId,
+      vendorId: order.vendorId || 'vendor-1',
+      description: `Venda: ${order.product}`,
+      amount: order.totalValue,
+      receivedAmount: order.paidValue || "0.00",
+      dueDate: order.deadline,
+      status,
+      type: 'sale'
+    });
+  }
+
+  private async calculateCommissions(order: Order): Promise<void> {
+    const settings = await this.getCommissionSettings();
+    if (!settings) return;
+
+    // Vendor commission
+    if (order.vendorId) {
+      const vendor = await this.getVendor(order.vendorId);
+      const vendorRate = vendor?.commissionRate || settings.vendorCommissionRate;
+      const vendorAmount = (parseFloat(order.totalValue) * parseFloat(vendorRate)) / 100;
+
+      await this.createCommission({
+        vendorId: order.vendorId,
+        orderId: order.id,
+        type: 'vendor',
+        percentage: vendorRate,
+        amount: vendorAmount.toFixed(2),
+        status: 'pending',
+        orderValue: order.totalValue,
+        orderNumber: order.orderNumber
+      });
+    }
+
+    // Partner commission (if exists)
+    const partners = await this.getPartners();
+    for (const partner of partners) {
+      const partnerData = await this.getPartner(partner.id);
+      if (partnerData && partnerData.isActive) {
+        const partnerRate = partnerData.commissionRate;
+        const partnerAmount = (parseFloat(order.totalValue) * parseFloat(partnerRate)) / 100;
+
+        await this.createCommission({
+          partnerId: partner.id,
+          orderId: order.id,
+          type: 'partner',
+          percentage: partnerRate,
+          amount: partnerAmount.toFixed(2),
+          status: settings.partnerPaymentTiming === 'order_start' ? 'confirmed' : 'pending',
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber
+        });
+      }
+    }
+  }
+
+  private async processCommissionPayments(order: Order, status: string): Promise<void> {
+    const settings = await this.getCommissionSettings();
+    if (!settings) return;
+
+    const commissions = await db.select().from(schema.commissions).where(eq(schema.commissions.orderId, order.id));
+
+    // Process vendor commissions
+    const vendorCommissions = commissions.filter(c => c.type === 'vendor');
+    for (const commission of vendorCommissions) {
+      if (status === 'completed' || status === 'delivered') {
+        if (commission.status === 'pending') {
+          await this.updateCommissionStatus(commission.id, 'confirmed');
+        }
+      } else if (status === 'cancelled') {
+        await this.updateCommissionStatus(commission.id, 'cancelled');
+      }
+    }
+
+    // Process partner commissions
+    const partnerCommissions = commissions.filter(c => c.type === 'partner');
+    for (const commission of partnerCommissions) {
+      if (status === 'cancelled' && commission.status === 'confirmed') {
+        await this.createPartnerDeduction(commission);
+      }
+    }
+  }
+
+  private async createPartnerDeduction(originalCommission: Commission): Promise<void> {
+    await this.createCommission({
+      partnerId: originalCommission.partnerId,
+      orderId: originalCommission.orderId,
+      type: 'partner',
+      percentage: originalCommission.percentage,
+      amount: `-${originalCommission.amount}`,
+      status: 'pending',
+      orderValue: originalCommission.orderValue,
+      orderNumber: `DEDUCTION-${originalCommission.orderNumber}`
+    });
+  }
+
+  private async updateOrderPaidValue(orderId: string): Promise<void> {
+    const payments = await this.getPaymentsByOrder(orderId);
+    const totalPaid = payments
+      .filter(p => p.status === 'confirmed')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const order = await this.getOrder(orderId);
+    if (!order) return;
+
+    if (totalPaid.toFixed(2) !== order.paidValue) {
+      await this.updateOrder(orderId, { paidValue: totalPaid.toFixed(2) });
+
+      // Update AccountsReceivable
+      const receivables = await this.getAccountsReceivableByOrder(orderId);
+      for (const receivable of receivables) {
+        const totalValue = parseFloat(receivable.amount);
+        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+
+        if (totalPaid >= totalValue) {
+          status = 'paid';
+        } else if (totalPaid > 0) {
+          status = 'partial';
+        }
+
+        await this.updateAccountsReceivable(receivable.id, {
+          receivedAmount: totalPaid.toFixed(2),
+          status
+        });
+      }
+    }
+  }
+
+  private async recalculateBudgetTotal(budgetId: string): Promise<void> {
+    const budget = await this.getBudget(budgetId);
+    const items = await this.getBudgetItems(budgetId);
+
+    if (!budget) return;
+
+    let subtotal = items.reduce((sum, item) => {
+      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity || '1');
+      if (item.hasItemCustomization) {
+        const customizationValue = parseFloat(item.itemCustomizationValue || '0');
+        return sum + basePrice + customizationValue;
+      }
+      return sum + basePrice;
+    }, 0);
+
+    let finalTotal = subtotal;
+    if (budget.hasDiscount) {
+      if (budget.discountType === 'percentage') {
+        const discountAmount = (subtotal * parseFloat(budget.discountPercentage || '0')) / 100;
+        finalTotal = subtotal - discountAmount;
+      } else if (budget.discountType === 'value') {
+        finalTotal = subtotal - parseFloat(budget.discountValue || '0');
+      }
+    }
+
+    await this.updateBudget(budgetId, {
+      totalValue: Math.max(0, finalTotal).toFixed(2)
+    });
+  }
+}
+
+export const storage = new DatabaseStorage();

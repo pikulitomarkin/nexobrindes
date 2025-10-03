@@ -1,44 +1,21 @@
-// Import storage and export as db for compatibility with existing imports
-import { storage } from "./storage";
-export const db = storage;
-export { eq, desc, sql } from "drizzle-orm";
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema";
 
-// Re-export types from schema for compatibility
-export type {
-  User,
-  Client,
-  Order,
-  ProductionOrder,
-  Payment,
-  Commission,
-  Partner,
-  CommissionSettings,
-  Vendor,
-  Product,
-  Budget,
-  BudgetItem,
-  BudgetPhoto,
-  PaymentMethod,
-  ShippingMethod,
-  BudgetPaymentInfo
-} from "../shared/schema";
+neonConfig.webSocketConstructor = ws;
 
-// Export schema tables for compatibility (these will reference the storage interface)
-export const {
-  users,
-  clients,
-  orders,
-  productionOrders,
-  payments,
-  commissions,
-  partners,
-  commissionSettings,
-  vendors,
-  products,
-  budgets,
-  budgetItems,
-  budgetPhotos,
-  paymentMethods,
-  shippingMethods,
-  budgetPaymentInfo
-} = {} as any; // Placeholder for schema compatibility
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to provision a database?",
+  );
+}
+
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle({ client: pool, schema });
+
+// Re-export commonly used drizzle operators
+export { eq, desc, sql, and, or, isNull, isNotNull } from "drizzle-orm";
+
+// Re-export schema for convenience
+export * from "@shared/schema";
