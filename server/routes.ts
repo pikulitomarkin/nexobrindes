@@ -1727,6 +1727,125 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Producer Payment routes
+  app.get("/api/producer-payments", async (req, res) => {
+    try {
+      const payments = await storage.getProducerPayments();
+
+      // Enrich with production order and producer data
+      const enrichedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const producer = await storage.getUser(payment.producerId);
+          let order = null;
+          
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            producerName: producer?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
+  app.get("/api/producer-payments/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      const payments = await storage.getProducerPaymentsByProducer(producerId);
+
+      // Enrich with production order data
+      const enrichedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          let order = null;
+          
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
+  app.post("/api/production-orders/:id/set-value", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { value, notes } = req.body;
+
+      if (!value || parseFloat(value) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      const updated = await storage.updateProductionOrderValue(id, value, notes);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      res.json({ success: true, productionOrder: updated });
+    } catch (error) {
+      console.error("Error setting production order value:", error);
+      res.status(500).json({ error: "Failed to set production order value" });
+    }
+  });
+
+  app.patch("/api/producer-payments/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, approvedBy, paidBy, paymentMethod, notes } = req.body;
+
+      const updateData: any = { status };
+      
+      if (status === 'approved') {
+        updateData.approvedBy = approvedBy;
+        updateData.approvedAt = new Date();
+      }
+      
+      if (status === 'paid') {
+        updateData.paidBy = paidBy;
+        updateData.paidAt = new Date();
+        updateData.paymentMethod = paymentMethod;
+      }
+      
+      if (notes !== undefined) {
+        updateData.notes = notes;
+      }
+
+      const updated = await storage.updateProducerPayment(id, updateData);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating producer payment:", error);
+      res.status(500).json({ error: "Failed to update producer payment" });
+    }
+  });
+
   // Active payment and shipping methods for vendor forms
   app.get("/api/payment-methods", async (req, res) => {
     try {

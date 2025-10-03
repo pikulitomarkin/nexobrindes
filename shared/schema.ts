@@ -64,6 +64,11 @@ export const productionOrders = pgTable("production_orders", {
   lastNoteAt: timestamp("last_note_at"),
   trackingCode: text("tracking_code"), // Código de rastreamento
   shippingAddress: text("shipping_address"), // Endereço de envio
+  
+  // Campos financeiros para pagamento do produtor
+  producerValue: decimal("producer_value", { precision: 10, scale: 2 }), // Valor que o produtor cobrará
+  producerPaymentStatus: text("producer_payment_status").default('pending'), // 'pending', 'approved', 'paid'
+  producerNotes: text("producer_notes"), // Observações do produtor sobre o valor
 });
 
 export const payments = pgTable("payments", {
@@ -338,6 +343,22 @@ export const customizationOptions = pgTable("customization_options", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const producerPayments = pgTable("producer_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productionOrderId: varchar("production_order_id").references(() => productionOrders.id).notNull(),
+  producerId: varchar("producer_id").references(() => users.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'paid', 'rejected'
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  paidBy: varchar("paid_by").references(() => users.id),
+  paidAt: timestamp("paid_at"),
+  paymentMethod: text("payment_method"), // 'pix', 'transfer', 'check'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -364,6 +385,7 @@ export const insertBankTransactionSchema = createInsertSchema(bankTransactions).
 export const insertExpenseNoteSchema = createInsertSchema(expenseNotes).omit({ id: true, createdAt: true });
 export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({ id: true, createdAt: true });
 export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProducerPaymentSchema = createInsertSchema(producerPayments).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -414,3 +436,5 @@ export type CommissionPayout = typeof commissionPayouts.$inferSelect;
 export type InsertCommissionPayout = z.infer<typeof insertCommissionPayoutSchema>;
 export type CustomizationOption = typeof customizationOptions.$inferSelect;
 export type InsertCustomizationOption = z.infer<typeof insertCustomizationOptionSchema>;
+export type ProducerPayment = typeof producerPayments.$inferSelect;
+export type InsertProducerPayment = z.infer<typeof insertProducerPaymentSchema>;

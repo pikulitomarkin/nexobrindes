@@ -44,7 +44,10 @@ import {
   type InsertCommissionPayout,
   // Customization Option types
   type CustomizationOption,
-  type InsertCustomizationOption
+  type InsertCustomizationOption,
+  // Producer Payment types
+  type ProducerPayment,
+  type InsertProducerPayment,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -83,6 +86,7 @@ export interface IStorage {
   getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
   updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined>;
+  updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined>; // New method
 
   // Payments
   getPayments(): Promise<Payment[]>;
@@ -217,6 +221,12 @@ export interface IStorage {
   getCustomizationOptionsByCategory(category: string, quantity: number): Promise<CustomizationOption[]>;
   updateCustomizationOption(id: string, data: Partial<InsertCustomizationOption>): Promise<CustomizationOption | undefined>;
   deleteCustomizationOption(id: string): Promise<boolean>;
+
+  // Producer Payments
+  getProducerPayments(): Promise<ProducerPayment[]>;
+  getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]>;
+  createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
+  updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -233,6 +243,7 @@ export class MemStorage implements IStorage {
   private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
   private commissionSettings: CommissionSettings;
+  private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
 
   // Financial module storage
   private accountsReceivable: Map<string, AccountsReceivable>;
@@ -356,6 +367,7 @@ export class MemStorage implements IStorage {
     this.budgets = new Map();
     this.budgetItems = []; // Initialize as empty array
     this.budgetPhotos = []; // Initialize as empty array
+    this.producerPayments = new Map(); // Initialize producerPayments Map
 
     // Initialize financial module Maps
     this.accountsReceivable = new Map();
@@ -2499,6 +2511,64 @@ export class MemStorage implements IStorage {
     this.mockData.customizationOptions.splice(index, 1);
     console.log('Deleted customization option with id:', id);
     return true;
+  }
+
+  // Producer Payments methods
+  async getProducerPayments(): Promise<ProducerPayment[]> {
+    return Array.from(this.producerPayments.values());
+  }
+
+  async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
+    return Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
+  }
+
+  async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
+    const newPayment: ProducerPayment = {
+      id: randomUUID(),
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.producerPayments.set(newPayment.id, newPayment);
+    return newPayment;
+  }
+
+  async updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined> {
+    const existing = this.producerPayments.get(id);
+    if (!existing) return undefined;
+
+    const updated: ProducerPayment = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.producerPayments.set(id, updated);
+    return updated;
+  }
+
+  async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
+    const productionOrder = this.productionOrders.get(id);
+    if (!productionOrder) return undefined;
+
+    const updated = {
+      ...productionOrder,
+      producerValue: value,
+      producerNotes: notes || productionOrder.producerNotes,
+      producerPaymentStatus: 'pending' as const
+    };
+
+    this.productionOrders.set(id, updated);
+
+    // Criar automaticamente um registro de pagamento pendente
+    await this.createProducerPayment({
+      productionOrderId: id,
+      producerId: productionOrder.producerId,
+      amount: value,
+      status: 'pending',
+      notes: notes
+    });
+
+    return updated;
   }
 
   // Automatic commission calculation and processing methods

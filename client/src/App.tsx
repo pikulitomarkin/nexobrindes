@@ -17,6 +17,9 @@ import AdminCommissionManagement from './pages/admin/commission-management';
 import AdminProducts from "@/pages/admin/products";
 import AdminProducers from "@/pages/admin/producers";
 import AdminCustomizations from "@/pages/admin/customizations"; // Importação da página de customizações
+import AdminCommissionSettings from "./pages/admin/commission-settings";
+import AdminProducerPayments from "./pages/admin/producer-payments";
+
 
 // Partner pages - Same functionality as admin but with separate commissions
 import PartnerClients from "@/pages/partner/clients";
@@ -123,6 +126,22 @@ function App() {
             <ProtectedRoute requiredRole="admin">
               <MainLayout>
                 <AdminProducers />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/commission-settings">
+            <ProtectedRoute requiredRoles={["admin"]}>
+              <MainLayout>
+                <AdminCommissionSettings />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/producer-payments">
+            <ProtectedRoute requiredRoles={["admin"]}>
+              <MainLayout>
+                <AdminProducerPayments />
               </MainLayout>
             </ProtectedRoute>
           </Route>

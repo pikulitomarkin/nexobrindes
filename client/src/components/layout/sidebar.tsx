@@ -1,4 +1,3 @@
-replit_final_file>
 import { 
   BarChart3, 
   Bus, 
@@ -173,9 +172,15 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               />
               <SidebarItem 
                 icon={Settings} 
-                label="Configurações" 
-                href="/admin/settings" 
-                isActive={pathname === '/admin/settings'}
+                label="Configurações de Comissão" 
+                href="/admin/commission-settings"
+                isActive={location === "/admin/commission-settings"}
+              />
+              <SidebarItem 
+                icon={DollarSign} 
+                label="Pagamentos Produtores" 
+                href="/admin/producer-payments"
+                isActive={location === "/admin/producer-payments"}
               />
             </>
           )}
@@ -337,4 +342,3 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     </div>
   );
 }
-</replit_final_file>

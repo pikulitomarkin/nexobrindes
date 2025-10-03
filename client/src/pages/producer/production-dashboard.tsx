@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Eye, RefreshCw, CheckCircle, Clock, AlertTriangle, Calendar, Package, Truck, MapPin, User, Phone, Mail } from "lucide-react";
+import { Eye, RefreshCw, CheckCircle, Clock, AlertTriangle, Calendar, Package, Truck, MapPin, User, Phone, Mail, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -16,11 +16,14 @@ import { useLocation } from "wouter";
 export default function ProductionDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isValueDialogOpen, setIsValueDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
   const [updateNotes, setUpdateNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
+  const [producerValue, setProducerValue] = useState("");
+  const [producerNotes, setProducerNotes] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -31,6 +34,10 @@ export default function ProductionDashboard() {
 
   const { data: stats } = useQuery({
     queryKey: ["/api/producer", producerId, "stats"],
+  });
+
+  const { data: producerPayments } = useQuery({
+    queryKey: ["/api/producer-payments/producer", producerId],
   });
 
   const updateStatusMutation = useMutation({
@@ -63,6 +70,30 @@ export default function ProductionDashboard() {
     },
   });
 
+  const setValueMutation = useMutation({
+    mutationFn: async ({ id, value, notes }: { id: string; value: string; notes?: string }) => {
+      const response = await fetch(`/api/production-orders/${id}/set-value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value, notes }),
+      });
+      if (!response.ok) throw new Error("Erro ao definir valor");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer", producerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/producer-payments/producer", producerId] });
+      setIsValueDialogOpen(false);
+      setProducerValue("");
+      setProducerNotes("");
+      setSelectedOrder(null);
+      toast({
+        title: "Sucesso!",
+        description: "Valor definido com sucesso",
+      });
+    },
+  });
+
   const handleStatusUpdate = (order: any, newStatus: string) => {
     if (newStatus === 'shipped') {
       setSelectedOrder(order);
@@ -81,6 +112,30 @@ export default function ProductionDashboard() {
       notes: updateNotes,
       deliveryDate: deliveryDate || undefined,
       trackingCode: trackingCode
+    });
+  };
+
+  const handleSetValue = (order: any) => {
+    setSelectedOrder(order);
+    setProducerValue(order.producerValue || "");
+    setProducerNotes(order.producerNotes || "");
+    setIsValueDialogOpen(true);
+  };
+
+  const handleSaveValue = () => {
+    if (!selectedOrder || !producerValue || parseFloat(producerValue) <= 0) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um valor válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setValueMutation.mutate({
+      id: selectedOrder.id,
+      value: producerValue,
+      notes: producerNotes
     });
   };
 
@@ -236,7 +291,7 @@ export default function ProductionDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -289,6 +344,20 @@ export default function ProductionDashboard() {
                 </p>
               </div>
               <Truck className="h-8 w-8 text-cyan-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">A Receber</p>
+                <p className="text-2xl font-bold text-green-600">
+                  R$ {(producerPayments?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -429,9 +498,25 @@ export default function ProductionDashboard() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>Produto: {order.order?.product || 'N/A'}</span>
-                      <span>Valor: R$ {parseFloat(order.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>Valor Cliente: R$ {parseFloat(order.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      {order.producerValue && (
+                        <span className="font-semibold text-green-600">
+                          Meu Valor: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </div>
-                    {getNextAction(order)}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSetValue(order)}
+                        className="flex items-center gap-1"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        {order.producerValue ? 'Alterar Valor' : 'Definir Valor'}
+                      </Button>
+                      {getNextAction(order)}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -439,6 +524,63 @@ export default function ProductionDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Value Setting Dialog */}
+      <Dialog open={isValueDialogOpen} onOpenChange={setIsValueDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Definir Valor do Serviço</DialogTitle>
+            <DialogDescription>
+              Defina o valor que você cobrará por este serviço de produção
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="producer-value">Valor do Serviço (R$) *</Label>
+              <Input
+                id="producer-value"
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={producerValue}
+                onChange={(e) => setProducerValue(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="producer-notes">Observações (Opcional)</Label>
+              <Textarea
+                id="producer-notes"
+                placeholder="Detalhes sobre o valor, materiais inclusos, etc..."
+                value={producerNotes}
+                onChange={(e) => setProducerNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {selectedOrder && (
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Valor do pedido para o cliente:</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  R$ {parseFloat(selectedOrder.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveValue}
+              disabled={setValueMutation.isPending || !producerValue || parseFloat(producerValue) <= 0}
+            >
+              {setValueMutation.isPending ? "Salvando..." : "Definir Valor"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Update Dialog with Tracking */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
