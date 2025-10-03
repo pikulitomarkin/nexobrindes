@@ -85,10 +85,10 @@ export default function Login() {
   };
 
   const demoUsers = [
-    { username: "admin", password: "123456", role: "Administrador", icon: Shield, color: "text-red-600" },
-    { username: "vendedor1", password: "123456", role: "Vendedor", icon: Users, color: "text-blue-600" },
-    { username: "cliente1", password: "123456", role: "Cliente", icon: User, color: "text-green-600" },
-    { username: "produtor1", password: "123456", role: "Produtor", icon: Factory, color: "text-purple-600" },
+    { username: "admin", password: "admin123", role: "Administrador", icon: Shield, color: "text-red-600" },
+    { username: "vendedor1", password: "vendor123", role: "Vendedor", icon: Users, color: "text-blue-600" },
+    { username: "cliente1", password: "client123", role: "Cliente", icon: User, color: "text-green-600" },
+    { username: "produtor1", password: "producer123", role: "Produtor", icon: Factory, color: "text-purple-600" },
     { username: "partner1", password: "partner123", role: "Sócio", icon: DollarSign, color: "text-yellow-600" },
   ];
 
