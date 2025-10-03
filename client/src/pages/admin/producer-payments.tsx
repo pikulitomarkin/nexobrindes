@@ -23,6 +23,9 @@ export default function AdminProducerPayments() {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [isOFXDialogOpen, setIsOFXDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPaymentForReconciliation, setSelectedPaymentForReconciliation] = useState<any>(null);
+  const [selectedTransactionForReconciliation, setSelectedTransactionForReconciliation] = useState<any>(null);
+  const [isReconciliationDialogOpen, setIsReconciliationDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: producerPayments, isLoading } = useQuery({
@@ -191,51 +194,62 @@ export default function AdminProducerPayments() {
   // Reconciliation Logic
   const getAllUnmatchedOutgoingTransactions = () => {
     if (!bankTransactions) return [];
-    return bankTransactions.filter((tx: any) => tx.type === 'debit' && !tx.reconciled);
+    return bankTransactions.filter((tx: any) => 
+      parseFloat(tx.amount) < 0 && // Negative amounts are outgoing payments
+      (tx.status === 'unmatched' || !tx.status)
+    );
   };
 
   const getCompatibleTransactions = (amount: number) => {
     if (!bankTransactions) return [];
+    const tolerance = 0.05; // 5% tolerance
     return bankTransactions.filter((tx: any) =>
-      tx.type === 'debit' &&
-      !tx.reconciled &&
-      parseFloat(tx.amount) === amount
+      parseFloat(tx.amount) < 0 && // Outgoing payments only
+      (tx.status === 'unmatched' || !tx.status) &&
+      Math.abs(Math.abs(parseFloat(tx.amount)) - amount) <= (amount * tolerance)
     );
   };
 
   const openReconciliationDialog = (payment: any) => {
-    // Logic to open a dialog to select transactions for a specific payment
-    // For now, just log and potentially mark as reconciled if a direct match is found
-    const paymentAmount = parseFloat(payment.amount);
-    const compatibleTransactions = getCompatibleTransactions(paymentAmount);
-
-    if (compatibleTransactions.length > 0) {
-      // Assume we match with the first compatible transaction found
-      const transactionToReconcile = compatibleTransactions[0];
-      reconcilePayment(payment.id, transactionToReconcile.id);
-    } else {
-      toast({
-        title: "Atenção",
-        description: "Nenhuma transação bancária compatível encontrada para conciliação automática.",
-        variant: "warning",
-      });
-    }
+    setSelectedPaymentForReconciliation(payment);
+    setSelectedTransactionForReconciliation(null);
+    setIsReconciliationDialogOpen(true);
   };
 
   const reconcilePayment = async (paymentId: string, transactionId: string) => {
     try {
-      const response = await fetch('/api/reconcile', {
-        method: 'POST',
+      // Mark the transaction as reconciled
+      const response = await fetch(`/api/finance/bank-transactions/${transactionId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentId, transactionId }),
+        body: JSON.stringify({ 
+          status: 'matched',
+          matchedPaymentId: paymentId,
+          reconciled: true
+        }),
       });
-      if (!response.ok) throw new Error('Erro ao conciliar pagamento');
       
+      if (!response.ok) throw new Error('Erro ao conciliar transação');
+
+      // Mark the producer payment as paid/reconciled
+      await updatePaymentMutation.mutateAsync({
+        id: paymentId,
+        status: 'paid',
+        paidBy: 'admin-1', // TODO: Get from auth context
+        paymentMethod: 'bank_transfer',
+        notes: `Conciliado com transação bancária: ${selectedTransactionForReconciliation?.bankRef || transactionId}`
+      });
+
       queryClient.invalidateQueries({ queryKey: ["/api/producer-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
+      refetchBankTransactions();
+      setIsReconciliationDialogOpen(false);
+      setSelectedPaymentForReconciliation(null);
+      setSelectedTransactionForReconciliation(null);
+      
       toast({
         title: "Sucesso!",
-        description: "Pagamento conciliado com sucesso.",
+        description: "Pagamento conciliado com sucesso com a transação bancária.",
       });
     } catch (error: any) {
       toast({
@@ -603,6 +617,39 @@ export default function AdminProducerPayments() {
                   </div>
                 )}
               </div>
+
+              {/* Seção de Transações Bancárias Disponíveis */}
+              {getAllUnmatchedOutgoingTransactions().length > 0 && (
+                <div className="mt-8 pt-6 border-t">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-red-100 text-red-600 rounded-full text-xs font-bold">
+                      {getAllUnmatchedOutgoingTransactions().length}
+                    </span>
+                    💳 Transações de Saída Não Conciliadas
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-red-50">
+                    {getAllUnmatchedOutgoingTransactions().map((transaction: any) => (
+                      <div key={transaction.id} className="p-3 border border-red-200 rounded-lg bg-white">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-sm text-gray-600">{transaction.description}</p>
+                            <p className="text-xs text-red-600">Saída não conciliada</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-red-600">
+                              R$ {Math.abs(parseFloat(transaction.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            {transaction.bankRef && (
+                              <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -663,6 +710,172 @@ export default function AdminProducerPayments() {
               {updatePaymentMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconciliation Dialog */}
+      <Dialog open={isReconciliationDialogOpen} onOpenChange={setIsReconciliationDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="h-5 w-5" />
+              Conciliar Pagamento do Produtor
+            </DialogTitle>
+            <DialogDescription>
+              Selecione a transação bancária de saída que corresponde ao pagamento deste produtor.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPaymentForReconciliation && (
+            <div className="space-y-6">
+              {/* Payment Info */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-900 mb-3">💰 Pagamento Selecionado</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700 font-medium">Produtor:</span> {selectedPaymentForReconciliation.producerName}
+                  </div>
+                  <div>
+                    <span className="text-blue-700 font-medium">Pedido:</span> {selectedPaymentForReconciliation.order?.orderNumber}
+                  </div>
+                  <div>
+                    <span className="text-blue-700 font-medium">Produto:</span> {selectedPaymentForReconciliation.order?.product}
+                  </div>
+                  <div>
+                    <span className="text-blue-700 font-medium">Valor:</span> 
+                    <span className="font-bold"> R$ {parseFloat(selectedPaymentForReconciliation.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-blue-700 font-medium">Status:</span> 
+                    <span className="font-bold text-green-600"> Aprovado - Aguardando Pagamento</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selected Transaction Preview */}
+              {selectedTransactionForReconciliation && (
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-2">✅ Transação Selecionada</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-green-700 font-medium">Data:</span> {new Date(selectedTransactionForReconciliation.date).toLocaleDateString('pt-BR')}
+                    </div>
+                    <div>
+                      <span className="text-green-700 font-medium">Valor:</span> 
+                      <span className="font-bold"> R$ {Math.abs(parseFloat(selectedTransactionForReconciliation.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-green-700 font-medium">Descrição:</span> {selectedTransactionForReconciliation.description}
+                    </div>
+                    {selectedTransactionForReconciliation.bankRef && (
+                      <div className="col-span-2">
+                        <span className="text-green-700 font-medium">Referência:</span> {selectedTransactionForReconciliation.bankRef}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Compatible Transactions */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 bg-green-100 text-green-600 rounded-full text-xs font-bold">
+                    {getCompatibleTransactions(parseFloat(selectedPaymentForReconciliation.amount)).length}
+                  </span>
+                  🎯 Transações Compatíveis (valor similar)
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-green-50">
+                  {getCompatibleTransactions(parseFloat(selectedPaymentForReconciliation.amount)).map((transaction: any) => (
+                    <div
+                      key={transaction.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                        selectedTransactionForReconciliation?.id === transaction.id
+                          ? 'border-green-500 bg-green-100 shadow-md'
+                          : 'border-green-200 hover:bg-white hover:shadow-sm'
+                      }`}
+                      onClick={() => setSelectedTransactionForReconciliation(transaction)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                          <div className="text-xs text-green-600 font-medium mt-1">
+                            ✓ Valor compatível com o pagamento
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-red-600">
+                            R$ {Math.abs(parseFloat(transaction.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          {transaction.bankRef && (
+                            <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {getCompatibleTransactions(parseFloat(selectedPaymentForReconciliation.amount)).length === 0 && (
+                    <p className="text-center text-gray-500 py-4">Nenhuma transação com valor compatível encontrada</p>
+                  )}
+                </div>
+              </div>
+
+              {/* All Unreconciled Outgoing Transactions */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
+                    {getAllUnmatchedOutgoingTransactions().length}
+                  </span>
+                  Todas as Transações de Saída Não Conciliadas
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                  {getAllUnmatchedOutgoingTransactions().map((transaction: any) => (
+                    <div
+                      key={transaction.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                        selectedTransactionForReconciliation?.id === transaction.id
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:bg-white hover:shadow-sm'
+                      }`}
+                      onClick={() => setSelectedTransactionForReconciliation(transaction)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-red-600">
+                            R$ {Math.abs(parseFloat(transaction.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                          {transaction.bankRef && (
+                            <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsReconciliationDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="gradient-bg text-white"
+                  onClick={() => {
+                    if (selectedTransactionForReconciliation && selectedPaymentForReconciliation) {
+                      reconcilePayment(selectedPaymentForReconciliation.id, selectedTransactionForReconciliation.id);
+                    }
+                  }}
+                  disabled={!selectedTransactionForReconciliation}
+                >
+                  Confirmar Conciliação
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

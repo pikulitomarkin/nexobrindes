@@ -1761,7 +1761,96 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Upload OFX for producer payments reconciliation
+  app.post("/api/upload-ofx", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const fileContent = req.file.buffer.toString('utf8');
+      
+      // Mock OFX parsing - in production, use a proper OFX parser
+      console.log(`Processing OFX file: ${req.file.originalname}`);
+      
+      // Simulate parsing and creating transactions
+      const mockTransactions = [
+        {
+          id: `txn-${Date.now()}-1`,
+          date: new Date(),
+          amount: "-850.00", // Negative for outgoing payments
+          description: "PIX - Pagamento Produtor",
+          bankRef: `REF-${Date.now()}-1`,
+          type: "debit",
+          status: "unmatched",
+          reconciled: false
+        },
+        {
+          id: `txn-${Date.now()}-2`, 
+          date: new Date(),
+          amount: "-1200.00",
+          description: "TED - Pagamento Fornecedor",
+          bankRef: `REF-${Date.now()}-2`,
+          type: "debit",
+          status: "unmatched",
+          reconciled: false
+        }
+      ];
+
+      // Store transactions in mock data
+      for (const transaction of mockTransactions) {
+        await storage.createBankTransaction({
+          importId: `import-${Date.now()}`,
+          date: transaction.date,
+          amount: transaction.amount,
+          description: transaction.description,
+          bankRef: transaction.bankRef,
+          status: transaction.status
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `${mockTransactions.length} transações importadas com sucesso`,
+        transactionsImported: mockTransactions.length
+      });
+    } catch (error) {
+      console.error("Error processing OFX file:", error);
+      res.status(500).json({ error: "Erro ao processar arquivo OFX" });
+    }
+  });
+
   // Producer Payment routes
+  // Get bank transactions for reconciliation
+  app.get("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getBankTransactions();
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching bank transactions:", error);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  // Update bank transaction (for reconciliation)
+  app.patch("/api/finance/bank-transactions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      const updated = await storage.updateBankTransaction(id, updateData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating bank transaction:", error);
+      res.status(500).json({ error: "Failed to update bank transaction" });
+    }
+  });
+
   app.get("/api/producer-payments", async (req, res) => {
     try {
       const payments = await storage.getProducerPayments();

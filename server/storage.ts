@@ -2356,6 +2356,13 @@ export class MemStorage implements IStorage {
     return this.mockData.bankTransactions || [];
   }
 
+  async getOutgoingBankTransactions(): Promise<BankTransaction[]> {
+    return (this.mockData.bankTransactions || []).filter(txn => 
+      parseFloat(txn.amount) < 0 && // Negative amounts are outgoing
+      (txn.status === 'unmatched' || !txn.status)
+    );
+  }
+
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
     const id = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const transaction: BankTransaction = {
