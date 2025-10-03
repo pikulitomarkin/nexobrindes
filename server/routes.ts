@@ -2017,6 +2017,17 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get bank imports history
+  app.get("/api/finance/bank-imports", async (req, res) => {
+    try {
+      const imports = await storage.getBankImports();
+      res.json(imports);
+    } catch (error) {
+      console.error("Failed to fetch bank imports:", error);
+      res.status(500).json({ error: "Failed to fetch bank imports" });
+    }
+  });
+
   // Helper function to extract transactions from OFX content (original function for regular imports)
   function extractOFXTransactions(ofxContent: string) {
     const transactions: any[] = [];
