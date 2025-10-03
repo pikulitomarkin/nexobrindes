@@ -37,20 +37,31 @@ async function seed() {
     });
     console.log("✓ Vendor user created");
 
-    // Create producer user
-    const producer = await storage.createUser({
-      id: "producer-1",
-      username: "produtor1",
-      password: "producer123",
-      role: "producer",
-      name: "Maria Produtora",
-      email: "produtora@empresa.com",
-      phone: "(11) 99876-5432",
-      specialty: "Marcenaria",
-      address: "Rua das Fábricas, 123",
-      isActive: true
-    });
-    console.log("✓ Producer user created");
+    // Create test producer
+  const producer1 = await createUser({
+    id: "producer-1",
+    username: "produtor1",
+    password: "123456",
+    role: "producer",
+    name: "Marcenaria Santos",
+    email: "contato@marcenariasantos.com",
+    phone: "(11) 98765-4321",
+    specialty: "Móveis sob medida",
+    address: "Rua Industrial, 456, Distrito Industrial, São Paulo, SP",
+    isActive: true
+  });
+
+  // Create test partner
+  const partner1 = await createUser({
+    id: "partner-1",
+    username: "partner1",
+    password: "partner123",
+    role: "partner",
+    name: "João Sócio",
+    email: "joao@partner.com",
+    phone: "(11) 91234-5678",
+    isActive: true
+  });
 
     // Create client user
     const clientUser = await storage.createUser({
@@ -82,7 +93,7 @@ async function seed() {
     // Create vendor record directly in vendors table
     const { db } = await import("./db");
     const { vendors: vendorsTable, partners: partnersTable } = await import("@shared/schema");
-    
+
     await db.insert(vendorsTable).values({
       userId: vendor.id,
       salesLink: "vendor-joao",
@@ -130,7 +141,7 @@ async function seed() {
     // Create production order
     const productionOrder = await storage.createProductionOrder({
       orderId: order.id,
-      producerId: producer.id,
+      producerId: producer1.id,
       status: "production",
       deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000), // 20 days from now
       notes: "Aguardando definição de valor pelo produtor"
@@ -151,9 +162,9 @@ async function seed() {
     console.log("\nTest Users:");
     console.log("  Admin:    admin / admin123");
     console.log("  Vendor:   vendedor1 / vendor123");
-    console.log("  Producer: produtor1 / producer123");
+    console.log("  Producer: produtor1 / 123456");
     console.log("  Client:   cliente1 / client123");
-    console.log("  Partner:  parceiro1 / partner123");
+    console.log("  Partner:  partner1 / partner123");
 
   } catch (error) {
     console.error("Error seeding database:", error);

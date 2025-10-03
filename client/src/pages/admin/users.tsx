@@ -230,7 +230,7 @@ export default function AdminUsers() {
     mutationFn: async (data: PartnerFormValues) => {
       const partnerData = {
         ...data,
-        username: partnerUserCode,
+        userCode: partnerUserCode,
       };
       const response = await fetch("/api/partners", {
         method: "POST",
@@ -255,7 +255,7 @@ export default function AdminUsers() {
     mutationFn: async (data: ProducerFormValues) => {
       const producerData = {
         ...data,
-        username: producerUserCode,
+        userCode: producerUserCode,
       };
       const response = await fetch("/api/producers", {
         method: "POST",

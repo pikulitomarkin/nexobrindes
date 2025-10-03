@@ -689,17 +689,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/producers", async (req, res) => {
     try {
-      const { name, email, phone, specialty, address, password, username } = req.body;
+      const { name, email, phone, specialty, address, password, userCode } = req.body;
 
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username || email);
+      // Check if userCode already exists
+      const existingUser = await storage.getUserByUsername(userCode);
       if (existingUser) {
         return res.status(400).json({ error: "Código de usuário já existe" });
       }
 
       // Create user with role producer including specialty and address
       const user = await storage.createUser({
-        username: username || email,
+        username: userCode,
         password: password || "123456",
         role: "producer",
         name,
@@ -792,6 +792,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating vendor:', error);
       res.status(500).json({ error: "Failed to create vendor" });
+    }
+  });
+
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const { name, email, password, commissionRate, userCode, phone } = req.body;
+
+      console.log('Creating partner with data:', { name, email, userCode, phone, commissionRate });
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(userCode);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      // Create user with role partner
+      const user = await storage.createUser({
+        username: userCode,
+        password: password,
+        role: "partner",
+        name,
+        email: email || null,
+        phone: phone || null,
+        isActive: true
+      });
+
+      res.json({ success: true, user });
+    } catch (error) {
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: "Failed to create partner" });
     }
   });
 
