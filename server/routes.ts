@@ -535,6 +535,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single production order by ID
+  app.get("/api/production-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const productionOrder = await storage.getProductionOrder(id);
+      
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      const order = await storage.getOrder(productionOrder.orderId);
+      
+      let enrichedOrder = {
+        ...productionOrder,
+        product: 'Unknown',
+        orderNumber: 'Unknown',
+        clientName: 'Unknown',
+        order: null as any
+      };
+
+      if (order) {
+        let clientName = 'Unknown';
+        let clientAddress = null;
+        let clientPhone = null;
+        let clientEmail = null;
+
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          clientName = clientRecord.name;
+          clientAddress = clientRecord.address;
+          clientPhone = clientRecord.phone;
+          clientEmail = clientRecord.email;
+        } else {
+          const clientByUserId = await storage.getClientByUserId(order.clientId);
+          if (clientByUserId) {
+            clientName = clientByUserId.name;
+            clientAddress = clientByUserId.address;
+            clientPhone = clientByUserId.phone;
+            clientEmail = clientByUserId.email;
+          } else {
+            const clientUser = await storage.getUser(order.clientId);
+            if (clientUser) {
+              clientName = clientUser.name;
+              clientPhone = clientUser.phone;
+              clientEmail = clientUser.email;
+              clientAddress = clientUser.address;
+            }
+          }
+        }
+
+        enrichedOrder = {
+          ...productionOrder,
+          product: order.product || 'Unknown',
+          orderNumber: order.orderNumber || 'Unknown',
+          clientName: clientName,
+          clientAddress: clientAddress,
+          clientPhone: clientPhone,
+          clientEmail: clientEmail,
+          order: {
+            ...order,
+            clientName: clientName,
+            clientAddress: clientAddress,
+            clientPhone: clientPhone,
+            clientEmail: clientEmail,
+            shippingAddress: order.deliveryType === 'pickup' 
+              ? 'Sede Principal - Retirada no Local'
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
+          }
+        };
+      }
+
+      res.json(enrichedOrder);
+    } catch (error) {
+      console.error("Error fetching production order:", error);
+      res.status(500).json({ error: "Failed to fetch production order" });
+    }
+  });
+
+  // Set producer value for a production order
+  app.post("/api/production-orders/:id/set-value", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { value, notes } = req.body;
+
+      if (!value) {
+        return res.status(400).json({ error: "Valor é obrigatório" });
+      }
+
+      const productionOrder = await storage.getProductionOrder(id);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Update production order with producer value
+      const updated = await storage.updateProductionOrderValue(id, value, notes || undefined);
+
+      // Create or update producer payment record
+      const existingPayments = await storage.getProducerPaymentsByProducer(productionOrder.producerId);
+      const existingPayment = existingPayments.find(p => p.productionOrderId === id);
+
+      if (existingPayment) {
+        await storage.updateProducerPayment(existingPayment.id, {
+          amount: value,
+          notes: notes || null
+        });
+      } else {
+        await storage.createProducerPayment({
+          productionOrderId: id,
+          producerId: productionOrder.producerId,
+          amount: value,
+          status: 'pending',
+          notes: notes || null
+        });
+      }
+
+      res.json({ success: true, productionOrder: updated });
+    } catch (error) {
+      console.error("Error setting producer value:", error);
+      res.status(500).json({ error: "Failed to set producer value" });
+    }
+  });
+
   // Producers
   app.get("/api/producers", async (req, res) => {
     try {
