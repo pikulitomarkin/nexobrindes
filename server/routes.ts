@@ -1214,13 +1214,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (productsData.length > 10000) {
-        return res.status(400).json({
-          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
-        });
-      }
+      // Get optional producerId from form data
+      const producerId = req.body.producerId || null;
+      
+      console.log(`Importing ${productsData.length} products${producerId ? ` for producer ${producerId}` : ''}...`);
 
-      console.log(`Importing ${productsData.length} products...`);
+      // If producerId is provided, add it to all products
+      if (producerId) {
+        productsData = productsData.map((product: any) => ({
+          ...product,
+          producerId
+        }));
+      }
 
       const result = await storage.importProducts(productsData);
 
