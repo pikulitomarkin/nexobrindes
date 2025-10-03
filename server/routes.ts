@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import multer from 'multer';
 import express from 'express';
 import path from 'path';
+import { z } from 'zod';
 import { storage } from "./storage";
 import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder } from './db'; // Assuming these are your database models and functions
 
@@ -662,16 +663,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/production-orders/:id/status", async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, notes, deliveryDate, trackingCode } = req.body;
 
-      if (!status) {
-        return res.status(400).json({ error: "Status é obrigatório" });
+      const updateStatusSchema = z.object({
+        status: z.enum(['pending', 'accepted', 'production', 'quality_check', 'ready', 'completed', 'shipped', 'delivered']),
+        notes: z.string().optional(),
+        deliveryDate: z.string().optional(),
+        trackingCode: z.string().optional(),
+      }).refine(
+        (data) => {
+          if (['completed', 'shipped', 'delivered'].includes(data.status)) {
+            return !!data.trackingCode;
+          }
+          return true;
+        },
+        {
+          message: "Código de rastreamento é obrigatório para pedidos concluídos, enviados ou entregues",
+          path: ["trackingCode"],
+        }
+      );
+
+      const validationResult = updateStatusSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: validationResult.error.errors[0]?.message || "Dados inválidos" 
+        });
       }
 
-      const validStatuses = ['pending', 'accepted', 'production', 'quality_check', 'ready', 'completed', 'shipped', 'delivered'];
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({ error: "Status inválido" });
-      }
+      const { status, notes, deliveryDate, trackingCode } = validationResult.data;
 
       const productionOrder = await storage.getProductionOrder(id);
       if (!productionOrder) {
