@@ -511,6 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clientName: clientName,
             clientAddress: clientAddress,
             clientPhone: clientPhone,
+            clientEmail: clientEmail,
             order: {
               ...order,
               clientName: clientName,
