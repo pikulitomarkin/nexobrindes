@@ -825,6 +825,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clients
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const { name, email, phone, whatsapp, cpfCnpj, address, password, userCode, vendorId } = req.body;
+
+      console.log('Creating client with data:', { name, email, userCode, phone, vendorId });
+
+      // Check if userCode already exists
+      const existingUser = await storage.getUserByUsername(userCode);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      // Create user with role client
+      const user = await storage.createUser({
+        username: userCode,
+        password: password,
+        role: "client",
+        name,
+        email: email || null,
+        phone: phone || null,
+        address: address || null,
+        isActive: true
+      });
+
+      // Create client record
+      const client = await storage.createClient({
+        userId: user.id,
+        name: user.name,
+        email: email || null,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+        cpfCnpj: cpfCnpj || null,
+        address: address || null,
+        vendorId: vendorId || null,
+        isActive: true
+      });
+
+      res.json({ 
+        success: true, 
+        name: client.name,
+        userCode: userCode,
+        ...client
+      });
+    } catch (error) {
+      console.error('Error creating client:', error);
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
   app.put("/api/vendors/:vendorId/commission", async (req, res) => {
     try {
       const { vendorId } = req.params;
