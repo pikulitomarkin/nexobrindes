@@ -117,16 +117,40 @@ export default function ProductionDashboard() {
 
   const handleSetValue = (order: any) => {
     setSelectedOrder(order);
-    setProducerValue(order.producerValue || "");
+    // Limpar valores ou carregar existentes
+    if (order.producerValue) {
+      setProducerValue(parseFloat(order.producerValue).toFixed(2));
+    } else {
+      setProducerValue("");
+    }
     setProducerNotes(order.producerNotes || "");
     setIsValueDialogOpen(true);
   };
 
   const handleSaveValue = () => {
-    if (!selectedOrder || !producerValue || parseFloat(producerValue) <= 0) {
+    if (!selectedOrder) {
       toast({
         title: "Erro",
-        description: "Por favor, insira um valor válido",
+        description: "Nenhuma ordem selecionada",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!producerValue || producerValue.trim() === '' || parseFloat(producerValue) <= 0) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um valor válido maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const numericValue = parseFloat(producerValue);
+    if (isNaN(numericValue) || numericValue <= 0) {
+      toast({
+        title: "Erro",
+        description: "O valor deve ser um número válido maior que zero",
         variant: "destructive",
       });
       return;
@@ -134,8 +158,8 @@ export default function ProductionDashboard() {
 
     setValueMutation.mutate({
       id: selectedOrder.id,
-      value: producerValue,
-      notes: producerNotes
+      value: numericValue.toFixed(2),
+      notes: producerNotes.trim() || null
     });
   };
 
@@ -498,10 +522,14 @@ export default function ProductionDashboard() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>Produto: {order.order?.product || 'N/A'}</span>
-                      <span>Valor do Pedido: R$ {parseFloat(order.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       {order.producerValue && (
-                        <span className="font-semibold text-blue-600">
-                          Valor Produção: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <span className="font-semibold text-green-600">
+                          Meu Serviço: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                      {!order.producerValue && (
+                        <span className="text-orange-600 font-medium">
+                          Valor do serviço não definido
                         </span>
                       )}
                     </div>
@@ -513,7 +541,7 @@ export default function ProductionDashboard() {
                         className="flex items-center gap-1"
                       >
                         <DollarSign className="h-4 w-4" />
-                        {order.producerValue ? 'Alterar Valor Produção' : 'Definir Valor Produção'}
+                        {order.producerValue ? 'Alterar Valor' : 'Definir Valor'}
                       </Button>
                       {getNextAction(order)}
                     </div>
@@ -536,23 +564,27 @@ export default function ProductionDashboard() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="producer-value">Valor do Serviço (R$) *</Label>
+              <Label htmlFor="producer-value">Valor do Seu Serviço (R$) *</Label>
               <Input
                 id="producer-value"
                 type="number"
                 step="0.01"
-                placeholder="0,00"
+                min="0.01"
+                placeholder="Digite o valor do seu serviço"
                 value={producerValue}
                 onChange={(e) => setProducerValue(e.target.value)}
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Este é o valor que você cobrará pela produção deste item
+              </p>
             </div>
 
             <div>
-              <Label htmlFor="producer-notes">Observações (Opcional)</Label>
+              <Label htmlFor="producer-notes">Observações sobre o Serviço (Opcional)</Label>
               <Textarea
                 id="producer-notes"
-                placeholder="Detalhes sobre o valor, materiais inclusos, etc..."
+                placeholder="Ex: Materiais inclusos, tempo de produção, detalhes técnicos..."
                 value={producerNotes}
                 onChange={(e) => setProducerNotes(e.target.value)}
                 rows={3}
@@ -560,10 +592,12 @@ export default function ProductionDashboard() {
             </div>
 
             {selectedOrder && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Valor do pedido para o cliente:</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  R$ {parseFloat(selectedOrder.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-800 mb-1">
+                  Produto: {selectedOrder.order?.product || 'Não especificado'}
+                </p>
+                <p className="text-xs text-blue-600">
+                  Pedido #{selectedOrder.order?.orderNumber || selectedOrder.id?.slice(-6)}
                 </p>
               </div>
             )}
@@ -576,7 +610,7 @@ export default function ProductionDashboard() {
               onClick={handleSaveValue}
               disabled={setValueMutation.isPending || !producerValue || parseFloat(producerValue) <= 0}
             >
-              {setValueMutation.isPending ? "Salvando..." : "Definir Valor"}
+              {setValueMutation.isPending ? "Salvando..." : "Confirmar Valor"}
             </Button>
           </div>
         </DialogContent>

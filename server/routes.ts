@@ -1827,20 +1827,31 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       const { value, notes } = req.body;
 
-      if (!value || parseFloat(value) <= 0) {
-        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      console.log(`Setting value for production order ${id}:`, { value, notes });
+
+      if (!value) {
+        return res.status(400).json({ error: "Valor é obrigatório" });
       }
 
-      const updated = await storage.updateProductionOrderValue(id, value, notes);
+      const numericValue = parseFloat(value);
+      if (isNaN(numericValue) || numericValue <= 0) {
+        return res.status(400).json({ error: "Valor deve ser um número válido maior que zero" });
+      }
+
+      const updated = await storage.updateProductionOrderValue(id, numericValue.toFixed(2), notes);
 
       if (!updated) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
+      console.log("Value updated successfully:", updated);
       res.json({ success: true, productionOrder: updated });
     } catch (error) {
       console.error("Error setting production order value:", error);
-      res.status(500).json({ error: "Failed to set production order value" });
+      res.status(500).json({ 
+        error: "Failed to set production order value",
+        details: error.message 
+      });
     }
   });
 
