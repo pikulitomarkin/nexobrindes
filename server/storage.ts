@@ -393,521 +393,474 @@ export class MemStorage implements IStorage {
     };
 
     this.initializeData();
-    this.createTestUsers();
+    // createTestUsers() is now called within initializeData()
   }
 
   // Create test users for each role
-  private createTestUsers() {
-    // Override existing users with test users
-    this.users.clear();
+  async createTestUsers() {
+    try {
+      // Check and create admin user
+      let adminUser = await this.getUserByUsername("admin");
+      if (!adminUser) {
+        adminUser = await this.createUser({
+          username: "admin",
+          password: "123456",
+          role: "admin",
+          name: "Administrador",
+          email: "admin@nexobrindes.com",
+          isActive: true
+        });
+      }
 
-    // Admin user
-    const adminUser = {
-      id: "admin-1",
-      username: "admin",
-      password: "123456", // In production, this should be hashed
-      name: "Administrador do Sistema",
-      email: "admin@erp.com",
-      phone: null,
-      vendorId: null,
-      role: "admin",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(adminUser.id, adminUser);
+      // Check and create vendor user
+      let vendorUser = await this.getUserByUsername("vendedor1");
+      if (!vendorUser) {
+        vendorUser = await this.createUser({
+          username: "vendedor1",
+          password: "123456",
+          role: "vendor",
+          name: "João Vendedor",
+          email: "joao@nexobrindes.com",
+          phone: "(11) 99999-0001",
+          isActive: true
+        });
 
-    // Vendor user
-    const vendorUser = {
-      id: "vendor-1",
-      username: "vendedor1",
-      password: "123456",
-      name: "Maria Santos",
-      email: "maria.santos@erp.com",
-      phone: null,
-      vendorId: "vendor-1",
-      role: "vendor",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(vendorUser.id, vendorUser);
+        // Create vendor record
+        await this.createVendor({
+          userId: vendorUser.id,
+          commissionRate: "10.00"
+        });
+      }
 
-    // Client user
-    const clientUser = {
-      id: "client-1",
-      username: "cliente1",
-      password: "123456",
-      name: "João Silva",
-      email: "joao.silva@email.com",
-      phone: null,
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser.id, clientUser);
+      // Check and create client user
+      let clientUser = await this.getUserByUsername("cliente1");
+      if (!clientUser) {
+        clientUser = await this.createUser({
+          username: "cliente1",
+          password: "123456",
+          role: "client",
+          name: "Maria Cliente",
+          email: "maria@empresa.com",
+          phone: "(11) 99999-0002",
+          address: "Rua das Empresas, 123",
+          isActive: true
+        });
 
-    // Producer user
-    const producerUser = {
-      id: "producer-1",
-      username: "produtor1",
-      password: "123456",
-      name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com",
-      phone: null,
-      vendorId: null,
-      role: "producer",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(producerUser.id, producerUser);
+        // Create client record
+        await this.createClient({
+          userId: clientUser.id,
+          name: clientUser.name,
+          email: clientUser.email,
+          phone: clientUser.phone,
+          address: clientUser.address,
+          vendorId: vendorUser.id,
+          isActive: true
+        });
+      }
 
-    // Partner user
-    const partnerUser = {
-      id: "partner-1",
-      username: "partner1",
-      password: "partner123",
-      name: "João Sócio",
-      email: "joao.socio@erp.com",
-      phone: null,
-      vendorId: null,
-      role: "partner",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(partnerUser.id, partnerUser);
+      // Check and create producer user
+      let producerUser = await this.getUserByUsername("produtor1");
+      if (!producerUser) {
+        producerUser = await this.createUser({
+          username: "produtor1",
+          password: "123456",
+          role: "producer",
+          name: "Marcenaria Santos",
+          email: "contato@marcenariasantos.com",
+          phone: "(11) 99999-0003",
+          specialty: "Marcenaria e Móveis",
+          address: "Rua das Oficinas, 456",
+          isActive: true
+        });
+        console.log("Producer user created:", producerUser.username);
+      } else {
+        console.log("Producer user already exists:", producerUser.username);
+      }
+
+      // Check and create partner user
+      let partnerUser = await this.getUserByUsername("partner1");
+      if (!partnerUser) {
+        partnerUser = await this.createUser({
+          username: "partner1",
+          password: "partner123",
+          role: "partner",
+          name: "Carlos Sócio",
+          email: "carlos@nexobrindes.com",
+          phone: "(11) 99999-0004",
+          isActive: true
+        });
+      }
+
+      console.log("Test users verification/creation completed");
+    } catch (error) {
+      console.error("Error in createTestUsers:", error);
+    }
   }
 
-  private initializeData() {
-    // This will be called first, then createTestUsers() will override with test users
-    const adminUser: User = {
-      id: "admin-1",
-      username: "admin",
-      password: "123",
-      role: "admin",
-      name: "Administrador",
-      email: "admin@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+  async initializeData() {
+    try {
+      // Always ensure test users exist (will not duplicate if already created)
+      await this.createTestUsers();
 
-    const vendorUser: User = {
-      id: "vendor-1",
-      username: "maria.santos",
-      password: "123",
-      role: "vendor",
-      name: "Maria Santos",
-      email: "maria@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      const users = await this.getUsers();
+      if (users.length > 5) {
+        console.log("Database already seeded. Skipping...");
+        return;
+      }
 
-    const clientUser: User = {
-      id: "client-1",
-      username: "joao.silva",
-      password: "123",
-      role: "client",
-      name: "João Silva",
-      email: "joao@gmail.com",
-      phone: null,
-      vendorId: "vendor-1",
-      isActive: true
-    };
+      console.log("Starting database seeding...");
 
-    const producerUser: User = {
-      id: "producer-1",
-      username: "produtor1",
-      password: "123456",
-      role: "producer",
-      name: "Marcenaria Santos",
-      email: "contato@marcenariasantos.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      // Create vendor profile
+      const vendor: Vendor = {
+        id: "vendor-profile-1",
+        userId: "vendor-1",
+        salesLink: "https://erp.com/v/maria123",
+        commissionRate: "10.00",
+        isActive: true
+      };
+      this.vendors.set(vendor.id, vendor);
 
-    const financeUser: User = {
-      id: "finance-1",
-      username: "financeiro",
-      password: "123",
-      role: "finance",
-      name: "Departamento Financeiro",
-      email: "financeiro@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
+      // Create partner profile
+      const partner: Partner = {
+        id: "partner-profile-1",
+        userId: "partner-1",
+        commissionRate: "15.00",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.partners.set(partner.id, partner);
 
-    const partnerUser: User = {
-      id: "partner-1",
-      username: "socio1",
-      password: "123",
-      role: "partner",
-      name: "João Sócio",
-      email: "socio@erp.com",
-      phone: null,
-      vendorId: null,
-      isActive: true
-    };
-
-    [adminUser, vendorUser, clientUser, producerUser, financeUser, partnerUser].forEach(user => {
-      this.users.set(user.id, user);
-    });
-
-    // Create vendor profile
-    const vendor: Vendor = {
-      id: "vendor-profile-1",
-      userId: "vendor-1",
-      salesLink: "https://erp.com/v/maria123",
-      commissionRate: "10.00",
-      isActive: true
-    };
-    this.vendors.set(vendor.id, vendor);
-
-    // Create partner profile
-    const partner: Partner = {
-      id: "partner-profile-1",
-      userId: "partner-1",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.partners.set(partner.id, partner);
-
-    // Create sample clients
-    const sampleClient: Client = {
-      id: "client-1",
-      userId: "client-1",
-      name: "João Silva",
-      email: "joao@gmail.com",
-      phone: "(11) 98765-4321",
-      whatsapp: "(11) 98765-4321",
-      cpfCnpj: "123.456.789-00",
-      address: "Rua das Flores, 123, São Paulo, SP",
-      vendorId: "vendor-1",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient.id, sampleClient);
-
-    // Create additional sample client to ensure we have test data
-    const sampleClient2: Client = {
-      id: "client-2",
-      userId: "client-2",
-      name: "Maria Santos",
-      email: "maria@gmail.com",
-      phone: "(11) 99876-5432",
-      whatsapp: "(11) 99876-5432",
-      cpfCnpj: "987.654.321-00",
-      address: "Av. Paulista, 456, São Paulo, SP",
-      vendorId: "vendor-1",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient2.id, sampleClient2);
-
-    // Create sample orders
-    mockOrders = [
-      {
-        id: "order-1",
-        orderNumber: "#12345",
-        clientId: "client-1",
+      // Create sample clients
+      const sampleClient: Client = {
+        id: "client-1",
+        userId: "client-1",
+        name: "João Silva",
+        email: "joao@gmail.com",
+        phone: "(11) 98765-4321",
+        whatsapp: "(11) 98765-4321",
+        cpfCnpj: "123.456.789-00",
+        address: "Rua das Flores, 123, São Paulo, SP",
         vendorId: "vendor-1",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.clients.set(sampleClient.id, sampleClient);
+
+      // Create additional sample client to ensure we have test data
+      const sampleClient2: Client = {
+        id: "client-2",
+        userId: "client-2",
+        name: "Maria Santos",
+        email: "maria@gmail.com",
+        phone: "(11) 99876-5432",
+        whatsapp: "(11) 99876-5432",
+        cpfCnpj: "987.654.321-00",
+        address: "Av. Paulista, 456, São Paulo, SP",
+        vendorId: "vendor-1",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.clients.set(sampleClient2.id, sampleClient2);
+
+      // Create sample orders
+      mockOrders = [
+        {
+          id: "order-1",
+          orderNumber: "#12345",
+          clientId: "client-1",
+          vendorId: "vendor-1",
+          producerId: "producer-1",
+          budgetId: null,
+          product: "Mesa de Jantar Personalizada",
+          description: "Mesa de madeira maciça para 6 pessoas",
+          totalValue: "2450.00",
+          paidValue: "735.00",
+          status: "production",
+          deadline: new Date("2024-11-22"),
+          trackingCode: null,
+          createdAt: new Date("2024-11-15"),
+          updatedAt: new Date("2024-11-16")
+        },
+        {
+          id: "order-2",
+          orderNumber: "#12346",
+          clientId: "client-1",
+          vendorId: "vendor-1",
+          producerId: null,
+          budgetId: null,
+          product: "Estante Personalizada",
+          description: "Estante de madeira com 5 prateleiras",
+          totalValue: "1890.00",
+          paidValue: "567.00",
+          status: "pending",
+          deadline: new Date("2024-11-25"),
+          trackingCode: null,
+          createdAt: new Date("2024-11-14"),
+          updatedAt: new Date("2024-11-14")
+        }
+      ];
+
+      mockOrders.forEach(order => {
+        this.orders.set(order.id, order);
+      });
+
+      // Create production order
+      const productionOrder: ProductionOrder = {
+        id: "po-1",
+        orderId: "order-1",
         producerId: "producer-1",
-        budgetId: null,
-        product: "Mesa de Jantar Personalizada",
-        description: "Mesa de madeira maciça para 6 pessoas",
-        totalValue: "2450.00",
-        paidValue: "735.00",
         status: "production",
-        deadline: new Date("2024-11-22"),
-        trackingCode: null,
-        createdAt: new Date("2024-11-15"),
-        updatedAt: new Date("2024-11-16")
-      },
-      {
-        id: "order-2",
-        orderNumber: "#12346",
-        clientId: "client-1",
-        vendorId: "vendor-1",
-        producerId: null,
-        budgetId: null,
-        product: "Estante Personalizada",
-        description: "Estante de madeira com 5 prateleiras",
-        totalValue: "1890.00",
-        paidValue: "567.00",
-        status: "pending",
-        deadline: new Date("2024-11-25"),
-        trackingCode: null,
-        createdAt: new Date("2024-11-14"),
-        updatedAt: new Date("2024-11-14")
-      }
-    ];
+        deadline: new Date("2024-11-20"),
+        acceptedAt: new Date("2024-11-16"),
+        completedAt: null,
+        notes: "Produção iniciada conforme especificações"
+      };
+      this.productionOrders.set(productionOrder.id, productionOrder);
 
-    mockOrders.forEach(order => {
-      this.orders.set(order.id, order);
-    });
-
-    // Create production order
-    const productionOrder: ProductionOrder = {
-      id: "po-1",
-      orderId: "order-1",
-      producerId: "producer-1",
-      status: "production",
-      deadline: new Date("2024-11-20"),
-      acceptedAt: new Date("2024-11-16"),
-      completedAt: null,
-      notes: "Produção iniciada conforme especificações"
-    };
-    this.productionOrders.set(productionOrder.id, productionOrder);
-
-    // Create sample payment
-    const payment: Payment = {
-      id: "payment-1",
-      orderId: "order-1",
-      amount: "735.00",
-      method: "pix",
-      status: "confirmed",
-      transactionId: "PIX123456789",
-      paidAt: new Date("2024-11-15"),
-      createdAt: new Date("2024-11-15")
-    };
-    this.payments.set(payment.id, payment);
-
-    // Create commission
-    const commission: Commission = {
-      id: "commission-1",
-      vendorId: "vendor-1",
-      orderId: "order-1",
-      percentage: "10.00",
-      amount: "245.00",
-      status: "pending",
-      paidAt: null,
-      createdAt: new Date("2024-11-15")
-    };
-    this.commissions.set(commission.id, commission);
-
-    // Create additional payments for recent orders to show correct values
-    const allOrders = Array.from(this.orders.values());
-
-    // Find orders that need test payments and ensure all orders have some payment
-    const ordersToAddPayments = allOrders.filter(o =>
-      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
-    );
-
-    ordersToAddPayments.forEach((order, index) => {
-      // Create test payment for each order with better amounts
-      let paymentAmount = "567.00"; // Default
-
-      if (order.orderNumber?.includes("#12345")) {
-        paymentAmount = "735.00"; // 30% of 2450
-      } else if (order.orderNumber?.includes("#12346")) {
-        paymentAmount = "567.00"; // 30% of 1890
-      } else if (order.orderNumber?.includes("PED-")) {
-        paymentAmount = "3000.00"; // Example for newer orders
-      }
-
-      const testPayment: Payment = {
-        id: `payment-visible-${index + 1}`,
-        orderId: order.id,
-        amount: paymentAmount,
+      // Create sample payment
+      const payment: Payment = {
+        id: "payment-1",
+        orderId: "order-1",
+        amount: "735.00",
         method: "pix",
         status: "confirmed",
-        transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
-        paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
-        createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
+        transactionId: "PIX123456789",
+        paidAt: new Date("2024-11-15"),
+        createdAt: new Date("2024-11-15")
       };
-      this.payments.set(testPayment.id, testPayment);
+      this.payments.set(payment.id, payment);
 
-      // Update the order's paid value immediately
-      this.updateOrderPaidValue(order.id);
-    });
-
-    // Initialize mock budgets
-    mockBudgets = [
-      {
-        id: "budget-1",
-        budgetNumber: "ORC-2024-001",
-        title: "Orçamento Mesa de Jantar Personalizada",
-        description: "Mesa de jantar em madeira maciça com personalização especial",
+      // Create commission
+      const commission: Commission = {
+        id: "commission-1",
         vendorId: "vendor-1",
-        clientId: "client-1",
-        contactName: "Maria Silva",
-        contactPhone: "(11) 99999-9999",
-        contactEmail: "maria@email.com",
-        status: "draft",
-        validUntil: "2024-12-31",
-        deliveryDeadline: "2025-01-15",
-        totalValue: 2500.00,
-        shippingCost: 150.00,
-        hasDiscount: true,
-        discountType: "percentage",
-        discountPercentage: 10,
-        discountValue: 0,
-        paymentMethodId: "pm-1",
-        shippingMethodId: "sm-1",
-        installments: 3,
-        downPayment: 800.00,
-        remainingAmount: 1700.00,
-        items: [
-          {
-            id: "item-1",
-            productId: "product-1",
-            productName: "Mesa de Jantar Premium",
-            quantity: 1,
-            unitPrice: 2500.00,
-            totalPrice: 2500.00,
-            hasItemCustomization: true,
-            itemCustomizationValue: 300.00,
-            itemCustomizationDescription: "Gravação personalizada no tampo",
-            customizationPhoto: "/uploads/image-1757959263873-hw4asmucqgh.png",
-            productWidth: "180",
-            productHeight: "75",
-            productDepth: "90"
-          }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'budget-2',
-        budgetNumber: 'ORC-002',
-        clientId: 'client-2',
-        vendorId: 'vendor-1',
-        title: 'Estante Personalizada',
-        description: 'Estante sob medida para escritório',
-        totalValue: '3200.00',
-        status: 'approved',
-        validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
-    mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
+        orderId: "order-1",
+        percentage: "10.00",
+        amount: "245.00",
+        status: "pending",
+        paidAt: null,
+        createdAt: new Date("2024-11-15")
+      };
+      this.commissions.set(commission.id, commission);
 
-    // Initialize mock products
-    mockProducts = [
-      {
-        id: 'product-1',
-        name: 'Mesa de Jantar Clássica',
-        description: 'Mesa de madeira maciça com acabamento premium',
-        category: 'Móveis',
-        basePrice: '2500.00',
-        unit: 'un',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'product-2',
-        name: 'Cadeira Estofada',
-        description: 'Cadeira com estofado em couro sintético',
-        category: 'Móveis',
-        basePrice: '450.00',
-        unit: 'un',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'product-3',
-        name: 'Estante Modular',
-        description: 'Estante com módulos personalizáveis',
-        category: 'Móveis',
-        basePrice: '1200.00',
-        unit: 'm',
-        isActive: true,
-        createdAt: new Date().toISOString()
-      }
-    ];
-    mockProducts.forEach(product => this.products.set(product.id, product));
+      // Create additional payments for recent orders to show correct values
+      const allOrders = Array.from(this.orders.values());
 
-    // Create sample commission settings
-    const defaultCommissionSettings: CommissionSettings = {
-      id: "settings-1",
-      vendorCommissionRate: "10.00",
-      partnerCommissionRate: "15.00",
-      vendorPaymentTiming: "order_completion",
-      partnerPaymentTiming: "order_start",
-      isActive: true,
-      updatedAt: new Date(),
-    };
-    this.mockData.commissionSettings.push(defaultCommissionSettings);
+      // Find orders that need test payments and ensure all orders have some payment
+      const ordersToAddPayments = allOrders.filter(o =>
+        o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
+      );
 
-    // Create sample customization options
-    const sampleCustomizations: CustomizationOption[] = [
-      {
-        id: "custom-1",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 50,
-        price: "5.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-2",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 100,
-        price: "4.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-3",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 200,
-        price: "3.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-4",
-        name: "Bordado",
-        description: "Personalização com bordado",
-        category: "Mochila",
-        minQuantity: 25,
-        price: "8.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-5",
-        name: "Gravação a laser",
-        description: "Personalização com gravação a laser",
-        category: "Copo",
-        minQuantity: 20,
-        price: "12.00",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    ];
-    this.mockData.customizationOptions.push(...sampleCustomizations);
+      ordersToAddPayments.forEach((order, index) => {
+        // Create test payment for each order with better amounts
+        let paymentAmount = "567.00"; // Default
 
-    // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
-    this.initializeFinancialIntegration();
+        if (order.orderNumber?.includes("#12345")) {
+          paymentAmount = "735.00"; // 30% of 2450
+        } else if (order.orderNumber?.includes("#12346")) {
+          paymentAmount = "567.00"; // 30% of 1890
+        } else if (order.orderNumber?.includes("PED-")) {
+          paymentAmount = "3000.00"; // Example for newer orders
+        }
+
+        const testPayment: Payment = {
+          id: `payment-visible-${index + 1}`,
+          orderId: order.id,
+          amount: paymentAmount,
+          method: "pix",
+          status: "confirmed",
+          transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
+          paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
+          createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
+        };
+        this.payments.set(testPayment.id, testPayment);
+
+        // Update the order's paid value immediately
+        this.updateOrderPaidValue(order.id);
+      });
+
+      // Initialize mock budgets
+      mockBudgets = [
+        {
+          id: "budget-1",
+          budgetNumber: "ORC-2024-001",
+          title: "Orçamento Mesa de Jantar Personalizada",
+          description: "Mesa de jantar em madeira maciça com personalização especial",
+          vendorId: "vendor-1",
+          clientId: "client-1",
+          contactName: "Maria Silva",
+          contactPhone: "(11) 99999-9999",
+          contactEmail: "maria@email.com",
+          status: "draft",
+          validUntil: "2024-12-31",
+          deliveryDeadline: "2025-01-15",
+          totalValue: 2500.00,
+          shippingCost: 150.00,
+          hasDiscount: true,
+          discountType: "percentage",
+          discountPercentage: 10,
+          discountValue: 0,
+          paymentMethodId: "pm-1",
+          shippingMethodId: "sm-1",
+          installments: 3,
+          downPayment: 800.00,
+          remainingAmount: 1700.00,
+          items: [
+            {
+              id: "item-1",
+              productId: "product-1",
+              productName: "Mesa de Jantar Premium",
+              quantity: 1,
+              unitPrice: 2500.00,
+              totalPrice: 2500.00,
+              hasItemCustomization: true,
+              itemCustomizationValue: 300.00,
+              itemCustomizationDescription: "Gravação personalizada no tampo",
+              customizationPhoto: "/uploads/image-1757959263873-hw4asmucqgh.png",
+              productWidth: "180",
+              productHeight: "75",
+              productDepth: "90"
+            }
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'budget-2',
+          budgetNumber: 'ORC-002',
+          clientId: 'client-2',
+          vendorId: 'vendor-1',
+          title: 'Estante Personalizada',
+          description: 'Estante sob medida para escritório',
+          totalValue: '3200.00',
+          status: 'approved',
+          validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+      mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
+
+      // Initialize mock products
+      mockProducts = [
+        {
+          id: 'product-1',
+          name: 'Mesa de Jantar Clássica',
+          description: 'Mesa de madeira maciça com acabamento premium',
+          category: 'Móveis',
+          basePrice: '2500.00',
+          unit: 'un',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'product-2',
+          name: 'Cadeira Estofada',
+          description: 'Cadeira com estofado em couro sintético',
+          category: 'Móveis',
+          basePrice: '450.00',
+          unit: 'un',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'product-3',
+          name: 'Estante Modular',
+          description: 'Estante com módulos personalizáveis',
+          category: 'Móveis',
+          basePrice: '1200.00',
+          unit: 'm',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        }
+      ];
+      mockProducts.forEach(product => this.products.set(product.id, product));
+
+      // Create sample commission settings
+      const defaultCommissionSettings: CommissionSettings = {
+        id: "settings-1",
+        vendorCommissionRate: "10.00",
+        partnerCommissionRate: "15.00",
+        vendorPaymentTiming: "order_completion",
+        partnerPaymentTiming: "order_start",
+        isActive: true,
+        updatedAt: new Date(),
+      };
+      this.mockData.commissionSettings.push(defaultCommissionSettings);
+
+      // Create sample customization options
+      const sampleCustomizations: CustomizationOption[] = [
+        {
+          id: "custom-1",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 50,
+          price: "5.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-2",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 100,
+          price: "4.50",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-3",
+          name: "Serigrafia 1 cor",
+          description: "Personalização com serigrafia em uma cor",
+          category: "Mochila",
+          minQuantity: 200,
+          price: "3.50",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-4",
+          name: "Bordado",
+          description: "Personalização com bordado",
+          category: "Mochila",
+          minQuantity: 25,
+          price: "8.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "custom-5",
+          name: "Gravação a laser",
+          description: "Personalização com gravação a laser",
+          category: "Copo",
+          minQuantity: 20,
+          price: "12.00",
+          isActive: true,
+          createdBy: adminUser.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      ];
+      this.mockData.customizationOptions.push(...sampleCustomizations);
+
+      // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
+      this.initializeFinancialIntegration();
+    } catch (error) {
+      console.error("Error during initializeData:", error);
+    }
   }
 
   private initializeFinancialIntegration() {
@@ -2889,7 +2842,7 @@ export class MemStorage implements IStorage {
 
 // DatabaseStorage - PostgreSQL implementation using Drizzle ORM
 export class DatabaseStorage implements IStorage {
-  
+
   // ==================== PRODUCER PAYMENTS ====================
   async getProducerPayments(): Promise<ProducerPayment[]> {
     return await db.select().from(schema.producerPayments);
@@ -3237,7 +3190,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
     const existing = await this.getCommissionSettings();
-    
+
     if (existing) {
       const [updated] = await db.update(schema.commissionSettings)
         .set({ ...settings, updatedAt: new Date() })
@@ -3327,7 +3280,7 @@ export class DatabaseStorage implements IStorage {
     const offset = (page - 1) * limit;
 
     let query = db.select().from(schema.products);
-    
+
     const conditions = [];
     if (options?.search) {
       conditions.push(
@@ -3589,7 +3542,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined> {
     const existing = await this.getBudgetPaymentInfo(budgetId);
-    
+
     if (!existing) {
       return await this.createBudgetPaymentInfo({ budgetId, ...data } as InsertBudgetPaymentInfo);
     }
@@ -3649,7 +3602,7 @@ export class DatabaseStorage implements IStorage {
     const allocation = await this.createPaymentAllocation({ paymentId, receivableId, amount });
 
     const [receivable] = await db.select().from(schema.accountsReceivable).where(eq(schema.accountsReceivable.id, receivableId));
-    
+
     if (receivable) {
       const currentReceived = parseFloat(receivable.receivedAmount);
       const allocationAmount = parseFloat(amount);
