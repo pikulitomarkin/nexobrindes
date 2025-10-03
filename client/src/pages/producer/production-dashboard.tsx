@@ -41,9 +41,9 @@ export default function ProductionDashboard() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, notes, deliveryDate, trackingCode }: { 
-      id: string; 
-      status: string; 
+    mutationFn: async ({ id, status, notes, deliveryDate, trackingCode }: {
+      id: string;
+      status: string;
       notes?: string;
       deliveryDate?: string;
       trackingCode?: string;
@@ -106,8 +106,8 @@ export default function ProductionDashboard() {
   const handleUpdateWithTracking = () => {
     if (!selectedOrder) return;
 
-    updateStatusMutation.mutate({ 
-      id: selectedOrder.id, 
+    updateStatusMutation.mutate({
+      id: selectedOrder.id,
       status: 'shipped',
       notes: updateNotes,
       deliveryDate: deliveryDate || undefined,
@@ -151,7 +151,7 @@ export default function ProductionDashboard() {
       rejected: { label: "Rejeitado", className: "bg-red-100 text-red-800" },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || 
+    const config = statusConfig[status as keyof typeof statusConfig] ||
                    { label: status, className: "bg-gray-100 text-gray-800" };
 
     return (
@@ -166,16 +166,16 @@ export default function ProductionDashboard() {
       case 'pending':
         return (
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="bg-green-600 hover:bg-green-700"
               onClick={() => handleStatusUpdate(order, 'accepted')}
             >
               <CheckCircle className="h-4 w-4 mr-1" />
               Aceitar
             </Button>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="destructive"
               onClick={() => handleStatusUpdate(order, 'rejected')}
             >
@@ -186,8 +186,8 @@ export default function ProductionDashboard() {
         );
       case 'accepted':
         return (
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-purple-600 hover:bg-purple-700"
             onClick={() => handleStatusUpdate(order, 'production')}
           >
@@ -197,8 +197,8 @@ export default function ProductionDashboard() {
         );
       case 'production':
         return (
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'ready')}
           >
@@ -208,8 +208,8 @@ export default function ProductionDashboard() {
         );
       case 'ready':
         return (
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-cyan-600 hover:bg-cyan-700"
             onClick={() => handleStatusUpdate(order, 'shipped')}
           >
@@ -220,16 +220,16 @@ export default function ProductionDashboard() {
       case 'shipped':
         return (
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
               onClick={() => handleStatusUpdate(order, 'delivered')}
             >
               <CheckCircle className="h-4 w-4 mr-1" />
               Marcar Entregue
             </Button>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="bg-green-600 hover:bg-green-700"
               onClick={() => handleStatusUpdate(order, 'completed')}
             >
@@ -239,8 +239,8 @@ export default function ProductionDashboard() {
         );
       case 'delivered':
         return (
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'completed')}
           >
@@ -498,10 +498,10 @@ export default function ProductionDashboard() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>Produto: {order.order?.product || 'N/A'}</span>
-                      <span>Valor Cliente: R$ {parseFloat(order.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>Valor do Pedido: R$ {parseFloat(order.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       {order.producerValue && (
-                        <span className="font-semibold text-green-600">
-                          Meu Valor: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <span className="font-semibold text-blue-600">
+                          Valor Produção: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>
@@ -513,7 +513,7 @@ export default function ProductionDashboard() {
                         className="flex items-center gap-1"
                       >
                         <DollarSign className="h-4 w-4" />
-                        {order.producerValue ? 'Alterar Valor' : 'Definir Valor'}
+                        {order.producerValue ? 'Alterar Valor Produção' : 'Definir Valor Produção'}
                       </Button>
                       {getNextAction(order)}
                     </div>
@@ -572,7 +572,7 @@ export default function ProductionDashboard() {
             <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveValue}
               disabled={setValueMutation.isPending || !producerValue || parseFloat(producerValue) <= 0}
             >
@@ -628,7 +628,7 @@ export default function ProductionDashboard() {
             <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleUpdateWithTracking}
               disabled={updateStatusMutation.isPending || !trackingCode}
             >
