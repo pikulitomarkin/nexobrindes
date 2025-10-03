@@ -2323,6 +2323,7 @@ export class MemStorage implements IStorage {
     const bankImport: BankImport = {
       id,
       ...data,
+      importType: data.importType || 'general',
       uploadedAt: new Date(),
       updatedAt: new Date()
     };

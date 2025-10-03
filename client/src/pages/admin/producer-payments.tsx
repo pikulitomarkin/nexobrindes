@@ -31,8 +31,8 @@ export default function AdminProducerPayments() {
 
   // Fetch bank transactions for reconciliation
   const { data: bankTransactions, refetch: refetchBankTransactions } = useQuery({
-    queryKey: ["/api/bank-transactions"],
-    enabled: false, // Fetch only when needed
+    queryKey: ["/api/finance/bank-transactions"],
+    enabled: true, // Always fetch to show available transactions
   });
 
   const updatePaymentMutation = useMutation({
@@ -73,20 +73,25 @@ export default function AdminProducerPayments() {
         method: "POST",
         body: formData,
       });
-      if (!response.ok) throw new Error("Erro ao importar OFX");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao importar OFX");
+      }
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/producer-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-transactions"] }); // Invalidate bank transactions to refresh
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
+      refetchBankTransactions(); // Refetch bank transactions
       setIsOFXDialogOpen(false);
       setSelectedFile(null);
       toast({
         title: "Sucesso!",
-        description: `Arquivo OFX importado. ${data.message || ''}`,
+        description: data.message || `${data.transactionsImported || 0} transações importadas`,
       });
     },
     onError: (error: any) => {
+      console.error("OFX Upload Error:", error);
       toast({
         title: "Erro na importação",
         description: error.message || "Não foi possível importar o arquivo OFX.",
