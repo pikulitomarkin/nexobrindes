@@ -737,7 +737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching orders for vendor: ${vendorId}`);
-      
+
       const orders = await storage.getOrdersByVendor(vendorId);
       console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
 
@@ -879,7 +879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Receita Total do Mês
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
-      
+
       const monthlyRevenue = orders
         .filter(order => {
           if (!order.createdAt || order.status === 'cancelled') return false;
@@ -1914,7 +1914,7 @@ Para mais detalhes, entre em contato conosco!`;
             isActive: customization.isActive !== undefined ? customization.isActive : true,
             createdBy: req.user?.id || 'admin-1'
           });
-          
+
           importedCount++;
         } catch (error) {
           console.error(`Erro ao importar personalização ${customization.name}:`, error);
@@ -1988,7 +1988,7 @@ Para mais detalhes, entre em contato conosco!`;
           const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
           const producer = await storage.getUser(payment.producerId);
           let order = null;
-          
+
           if (productionOrder) {
             order = await storage.getOrder(productionOrder.orderId);
           }
@@ -2019,7 +2019,7 @@ Para mais detalhes, entre em contato conosco!`;
         payments.map(async (payment) => {
           const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
           let order = null;
-          
+
           if (productionOrder) {
             order = await storage.getOrder(productionOrder.orderId);
           }
@@ -2082,18 +2082,18 @@ Para mais detalhes, entre em contato conosco!`;
       const { status, approvedBy, paidBy, paymentMethod, notes } = req.body;
 
       const updateData: any = { status };
-      
+
       if (status === 'approved') {
         updateData.approvedBy = approvedBy;
         updateData.approvedAt = new Date();
       }
-      
+
       if (status === 'paid') {
         updateData.paidBy = paidBy;
         updateData.paidAt = new Date();
         updateData.paymentMethod = paymentMethod;
       }
-      
+
       if (notes !== undefined) {
         updateData.notes = notes;
       }
@@ -3254,13 +3254,13 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/receivables", async (req, res) => {
     try {
       const receivables = await storage.getAccountsReceivable();
-      
+
       // Enrich with order and client data
       const enrichedReceivables = await Promise.all(
         receivables.map(async (receivable) => {
           const order = await storage.getOrder(receivable.orderId);
           let clientName = 'Cliente não identificado';
-          
+
           if (order) {
             // Try to get client details
             const client = await storage.getClient(order.clientId);
@@ -3357,7 +3357,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Update the receivable with new received amount
       const newReceivedAmount = parseFloat(receivable.receivedAmount) + parseFloat(amount);
       const totalAmount = parseFloat(receivable.amount);
-      
+
       let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = receivable.status;
       if (newReceivedAmount >= totalAmount) {
         newStatus = 'paid';
@@ -3789,14 +3789,14 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/producer-payments", async (req, res) => {
     try {
       const productionOrders = await storage.getProductionOrders();
-      
+
       const producerPayments = await Promise.all(
         productionOrders
           .filter(po => po.producerValue && parseFloat(po.producerValue) > 0)
           .map(async (po) => {
             const order = await storage.getOrder(po.orderId);
             const producer = await storage.getUser(po.producerId);
-            
+
             let clientName = 'Unknown';
             if (order) {
               const client = await storage.getClient(order.clientId);
@@ -3832,7 +3832,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/producer-payments/pending", async (req, res) => {
     try {
       const productionOrders = await storage.getProductionOrders();
-      
+
       const pendingPayments = await Promise.all(
         productionOrders
           .filter(po => 
@@ -3843,7 +3843,7 @@ Para mais detalhes, entre em contato conosco!`;
           .map(async (po) => {
             const order = await storage.getOrder(po.orderId);
             const producer = await storage.getUser(po.producerId);
-            
+
             let clientName = 'Unknown';
             if (order) {
               const client = await storage.getClient(order.clientId);
@@ -3879,7 +3879,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       const updated = await storage.updateProductionOrder(id, {
         producerPaymentStatus: 'approved'
       });
@@ -3950,7 +3950,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       const ofxContent = req.file.buffer.toString('utf-8');
-      
+
       const bankImport = await storage.createBankImport({
         fileName: req.file.originalname,
         uploadedBy: 'current-user',
@@ -3963,21 +3963,21 @@ Para mais detalhes, entre em contato conosco!`;
 
       let importedCount = 0;
       let skippedCount = 0;
-      
+
       for (const transaction of transactions) {
         try {
           const transactionAmount = parseFloat(transaction.amount);
-          
+
           if (transactionAmount < 0) {
             // Verificar se já existe transação com mesmo FITID
             const existingTransaction = await storage.getBankTransactionByFitId(transaction.id);
-            
+
             if (existingTransaction) {
               console.log(`Transação ${transaction.id} já existe, pulando importação`);
               skippedCount++;
               continue;
             }
-            
+
             await storage.createBankTransaction({
               importId: bankImport.id,
               transactionId: transaction.id,
@@ -4080,6 +4080,163 @@ Para mais detalhes, entre em contato conosco!`;
 
     return transactions;
   }
+
+  // Associate payment with order (for reconciliation)
+  app.post("/api/finance/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, orderId, amount } = req.body;
+
+      console.log("Associating payment:", { transactionId, orderId, amount });
+
+      if (!transactionId || !orderId || !amount) {
+        return res.status(400).json({ error: "Transaction ID, Order ID e valor são obrigatórios" });
+      }
+
+      // Get order details
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Get transaction details
+      const bankTransaction = await storage.getBankTransaction(transactionId);
+      if (!bankTransaction) {
+        return res.status(404).json({ error: "Transação bancária não encontrada" });
+      }
+
+      // Verificar se a transação já foi conciliada
+      if (bankTransaction.status === 'matched') {
+        return res.status(400).json({ error: "Esta transação já foi conciliada com outro pagamento" });
+      }
+
+      // Create payment record
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: parseFloat(amount).toFixed(2),
+        method: "bank_transfer", // Assume bank transfer for OFX transactions
+        status: "confirmed",
+        transactionId: transactionId,
+        paidAt: bankTransaction.date ? new Date(bankTransaction.date) : new Date()
+      });
+
+      // Update bank transaction status
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedPaymentId: payment.id,
+        matchedOrderId: orderId
+      });
+
+      // Get enriched payment for response
+      const client = await storage.getUser(order.clientId);
+      const vendor = await storage.getUser(order.vendorId);
+
+      const enrichedPayment = {
+        ...payment,
+        orderNumber: order.orderNumber,
+        clientName: client?.name || 'Unknown',
+        vendorName: vendor?.name || 'Unknown'
+      };
+
+      console.log("Payment associated successfully:", enrichedPayment);
+
+      res.json({ 
+        success: true, 
+        payment: enrichedPayment
+      });
+    } catch (error) {
+      console.error("Error associating payment:", error);
+      res.status(500).json({ error: "Failed to associate payment: " + error.message });
+    }
+  });
+
+  // Associate multiple payments with order (for reconciliation)
+  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
+    try {
+      const { transactions, orderId, totalAmount } = req.body;
+
+      console.log("Associating multiple payments:", { transactionCount: transactions.length, orderId, totalAmount });
+
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        return res.status(400).json({ error: "Lista de transações é obrigatória" });
+      }
+
+      if (!orderId || !totalAmount) {
+        return res.status(400).json({ error: "Order ID e valor total são obrigatórios" });
+      }
+
+      // Get order details
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      const createdPayments = [];
+      const processedTransactions = [];
+
+      // Process each transaction
+      for (const txn of transactions) {
+        const { transactionId, amount } = txn;
+
+        // Get transaction details
+        const bankTransaction = await storage.getBankTransaction(transactionId);
+        if (!bankTransaction) {
+          console.warn(`Transaction ${transactionId} not found, skipping`);
+          continue;
+        }
+
+        // Verificar se a transação já foi conciliada
+        if (bankTransaction.status === 'matched') {
+          console.warn(`Transaction ${transactionId} already matched, skipping`);
+          continue;
+        }
+
+        // Create payment record
+        const payment = await storage.createPayment({
+          orderId: orderId,
+          amount: parseFloat(amount).toFixed(2),
+          method: "bank_transfer",
+          status: "confirmed",
+          transactionId: transactionId,
+          paidAt: bankTransaction.date ? new Date(bankTransaction.date) : new Date()
+        });
+
+        // Update bank transaction status
+        await storage.updateBankTransaction(transactionId, {
+          status: 'matched',
+          matchedPaymentId: payment.id,
+          matchedOrderId: orderId
+        });
+
+        createdPayments.push(payment);
+        processedTransactions.push({ transactionId, amount });
+      }
+
+      if (createdPayments.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
+      }
+
+      // Get enriched data for response
+      const client = await storage.getUser(order.clientId);
+      const vendor = await storage.getUser(order.vendorId);
+
+      console.log(`Successfully processed ${createdPayments.length} payments for order ${order.orderNumber}`);
+
+      res.json({
+        success: true,
+        paymentsCreated: createdPayments.length,
+        totalAmount: totalAmount,
+        orderNumber: order.orderNumber,
+        clientName: client?.name || 'Unknown',
+        vendorName: vendor?.name || 'Unknown',
+        payments: createdPayments,
+        processedTransactions: processedTransactions
+      });
+
+    } catch (error) {
+      console.error("Error associating multiple payments:", error);
+      res.status(500).json({ error: "Failed to associate multiple payments: " + error.message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

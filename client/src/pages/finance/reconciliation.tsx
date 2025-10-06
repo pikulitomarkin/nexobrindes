@@ -17,7 +17,7 @@ export default function FinanceReconciliation() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [selectedTransactions, setSelectedTransactions] = useState<any[]>([]);
   const [isAssociationDialogOpen, setIsAssociationDialogOpen] = useState(false);
   const [expenseData, setExpenseData] = useState({
     description: "",
@@ -137,7 +137,7 @@ export default function FinanceReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       setIsAssociationDialogOpen(false);
       setSelectedOrder(null);
-      setSelectedTransaction(null);
+      setSelectedTransactions([]);
       toast({
         title: "Sucesso!",
         description: `Pagamento de R$ ${parseFloat(data.payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado para o pedido ${selectedOrder?.orderNumber}`,
@@ -147,6 +147,49 @@ export default function FinanceReconciliation() {
       toast({
         title: "Erro",
         description: error.message || "Não foi possível associar o pagamento",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const associateMultiplePaymentsMutation = useMutation({
+    mutationFn: async ({ transactions, orderId, totalAmount }: { transactions: any[]; orderId: string; totalAmount: string }) => {
+      const response = await fetch("/api/finance/associate-multiple-payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactions: transactions.map(txn => ({
+            transactionId: txn.id,
+            amount: parseFloat(txn.amount).toFixed(2)
+          })),
+          orderId,
+          totalAmount
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao associar pagamentos múltiplos");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      setIsAssociationDialogOpen(false);
+      setSelectedOrder(null);
+      setSelectedTransactions([]);
+      toast({
+        title: "Sucesso!",
+        description: `${data.paymentsCreated} pagamentos totalizando R$ ${parseFloat(data.totalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmados para o pedido ${selectedOrder?.orderNumber}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível associar os pagamentos",
         variant: "destructive",
       });
     },
@@ -179,35 +222,37 @@ export default function FinanceReconciliation() {
 
   const openAssociationDialog = (order: any) => {
     setSelectedOrder(order);
+    setSelectedTransactions([]);
     setIsAssociationDialogOpen(true);
   };
 
   const handleAssociatePayment = () => {
-    if (!selectedOrder || !selectedTransaction) {
+    if (!selectedOrder || selectedTransactions.length === 0) {
       toast({
         title: "Erro",
-        description: "Selecione um pedido e uma transação para confirmar o pagamento",
+        description: "Selecione um pedido e pelo menos uma transação para confirmar o pagamento",
         variant: "destructive",
       });
       return;
     }
 
-    const transactionAmount = parseFloat(selectedTransaction.amount);
+    const totalTransactionAmount = selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
     const remainingBalance = parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0');
 
-    if (transactionAmount > remainingBalance + (remainingBalance * 0.05)) { // 5% de tolerância
+    if (totalTransactionAmount > remainingBalance + (remainingBalance * 0.05)) { // 5% de tolerância
       toast({
         title: "Atenção",
-        description: `O valor da transação (R$ ${transactionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o saldo devedor (R$ ${remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Deseja continuar?`,
+        description: `O valor total das transações (R$ ${totalTransactionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) é maior que o saldo devedor (R$ ${remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Deseja continuar?`,
         variant: "destructive",
       });
       // Continua mesmo assim, mas alerta o usuário
     }
 
-    associatePaymentMutation.mutate({
-      transactionId: selectedTransaction.id,
+    // Processar múltiplas transações sequencialmente
+    associateMultiplePaymentsMutation.mutate({
+      transactions: selectedTransactions,
       orderId: selectedOrder.id,
-      amount: selectedTransaction.amount
+      totalAmount: totalTransactionAmount.toFixed(2)
     });
   };
 
@@ -229,6 +274,20 @@ export default function FinanceReconciliation() {
       (transaction.status === 'unmatched' || !transaction.status) &&
       parseFloat(transaction.amount) > 0 // Apenas entradas (valores positivos)
     );
+  };
+
+  const getAvailableTransactions = (transactions: any[]) => {
+    // Remove transações já selecionadas para evitar duplicação visual
+    return transactions.filter(txn => !selectedTransactions.find(selected => selected.id === txn.id));
+  };
+
+  const handleSelectAllCompatible = (transactions: any[]) => {
+    const availableTransactions = getAvailableTransactions(transactions);
+    setSelectedTransactions(prev => [...prev, ...availableTransactions]);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedTransactions([]);
   };
 
   if (isLoading) {
@@ -703,32 +762,47 @@ export default function FinanceReconciliation() {
                 </div>
               </div>
 
-              {/* Selected Transaction Preview */}
-              {selectedTransaction && (
+              {/* Selected Transactions Preview */}
+              {selectedTransactions.length > 0 && (
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="font-semibold text-green-900 mb-2">✅ Transação Selecionada</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-green-700 font-medium">Data:</span> {new Date(selectedTransaction.date).toLocaleDateString('pt-BR')}
-                    </div>
-                    <div>
-                      <span className="text-green-700 font-medium">Valor:</span> 
-                      <span className="font-bold"> R$ {parseFloat(selectedTransaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-green-700 font-medium">Descrição:</span> {selectedTransaction.description}
-                    </div>
+                  <h4 className="font-semibold text-green-900 mb-2">
+                    ✅ {selectedTransactions.length} Transação{selectedTransactions.length !== 1 ? 'ões' : ''} Selecionada{selectedTransactions.length !== 1 ? 's' : ''}
+                  </h4>
+                  <div className="space-y-3">
+                    {selectedTransactions.map((transaction, index) => (
+                      <div key={transaction.id} className="grid grid-cols-2 gap-4 text-sm p-3 bg-white rounded border">
+                        <div>
+                          <span className="text-green-700 font-medium">#{index + 1} Data:</span> {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        </div>
+                        <div>
+                          <span className="text-green-700 font-medium">Valor:</span> 
+                          <span className="font-bold"> R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-green-700 font-medium">Descrição:</span> {transaction.description}
+                        </div>
+                      </div>
+                    ))}
                     {selectedOrder && (
-                      <div className="col-span-2 mt-2 p-2 bg-white rounded border">
-                        <span className="text-green-700 font-medium">Correspondência:</span>
-                        <div className="text-xs mt-1">
-                          <span className="text-gray-600">Saldo devedor: </span>
-                          <span className="font-medium">R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                          <br />
-                          <span className="text-gray-600">Diferença: </span>
-                          <span className={`font-medium ${Math.abs(parseFloat(selectedTransaction.amount) - (parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0'))) < 1 ? 'text-green-600' : 'text-orange-600'}`}>
-                            R$ {Math.abs(parseFloat(selectedTransaction.amount) - (parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0'))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
+                      <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                        <span className="text-blue-700 font-medium">Resumo dos Pagamentos:</span>
+                        <div className="text-sm mt-2 grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-gray-600">Total das transações: </span>
+                            <span className="font-bold text-green-600">
+                              R$ {selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Saldo devedor: </span>
+                            <span className="font-medium">R$ {(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Saldo após pagamentos: </span>
+                            <span className={`font-medium ${(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0') - selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0)) <= 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                              R$ {Math.max(0, parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0') - selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -740,29 +814,57 @@ export default function FinanceReconciliation() {
               <div>
                 {selectedOrder.budgetInfo && selectedOrder.budgetInfo.downPayment > 0 && parseFloat(selectedOrder.paidValue || '0') === 0 ? (
                   <>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 bg-green-100 text-green-600 rounded-full text-xs font-bold">
-                        {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).length}
-                      </span>
-                      🎯 Transações Compatíveis com Entrada (R$ {selectedOrder.budgetInfo.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-green-100 text-green-600 rounded-full text-xs font-bold">
+                          {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).length}
+                        </span>
+                        🎯 Transações Compatíveis com Entrada (R$ {selectedOrder.budgetInfo.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                      </h4>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSelectAllCompatible(getCompatibleTransactions(selectedOrder.budgetInfo.downPayment))}
+                          disabled={getAvailableTransactions(getCompatibleTransactions(selectedOrder.budgetInfo.downPayment)).length === 0}
+                          className="text-xs"
+                        >
+                          Selecionar Todas
+                        </Button>
+                      </div>
+                    </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-green-50">
                       {getCompatibleTransactions(selectedOrder.budgetInfo.downPayment).map((transaction: any) => (
                         <div
                           key={transaction.id}
                           className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedTransaction?.id === transaction.id
+                            selectedTransactions.find(t => t.id === transaction.id)
                               ? 'border-green-500 bg-green-100 shadow-md'
                               : 'border-green-200 hover:bg-white hover:shadow-sm'
                           }`}
-                          onClick={() => setSelectedTransaction(transaction)}
+                          onClick={() => {
+                            const isSelected = selectedTransactions.find(t => t.id === transaction.id);
+                            if (isSelected) {
+                              setSelectedTransactions(prev => prev.filter(t => t.id !== transaction.id));
+                            } else {
+                              setSelectedTransactions(prev => [...prev, transaction]);
+                            }
+                          }}
                         >
                           <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                              <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
-                              <div className="text-xs text-green-600 font-medium mt-1">
-                                ✓ Corresponde à entrada esperada
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={!!selectedTransactions.find(t => t.id === transaction.id)}
+                                onChange={() => {}}
+                                className="h-4 w-4 text-green-600 rounded"
+                              />
+                              <div>
+                                <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                                <div className="text-xs text-green-600 font-medium mt-1">
+                                  ✓ Corresponde à entrada esperada
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
@@ -783,27 +885,55 @@ export default function FinanceReconciliation() {
                   </>
                 ) : (
                   <>
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
-                        {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length}
-                      </span>
-                      Transações Compatíveis (valor similar ao saldo devedor)
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
+                          {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).length}
+                        </span>
+                        Transações Compatíveis (valor similar ao saldo devedor)
+                      </h4>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSelectAllCompatible(getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')))}
+                          disabled={getAvailableTransactions(getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0'))).length === 0}
+                          className="text-xs"
+                        >
+                          Selecionar Todas
+                        </Button>
+                      </div>
+                    </div>
                     <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
                       {getCompatibleTransactions(parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0')).map((transaction: any) => (
                         <div
                           key={transaction.id}
                           className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedTransaction?.id === transaction.id
+                            selectedTransactions.find(t => t.id === transaction.id)
                               ? 'border-blue-500 bg-blue-50 shadow-md'
                               : 'border-gray-200 hover:bg-white hover:shadow-sm'
                           }`}
-                          onClick={() => setSelectedTransaction(transaction)}
+                          onClick={() => {
+                            const isSelected = selectedTransactions.find(t => t.id === transaction.id);
+                            if (isSelected) {
+                              setSelectedTransactions(prev => prev.filter(t => t.id !== transaction.id));
+                            } else {
+                              setSelectedTransactions(prev => [...prev, transaction]);
+                            }
+                          }}
                         >
                           <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                              <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={!!selectedTransactions.find(t => t.id === transaction.id)}
+                                onChange={() => {}}
+                                className="h-4 w-4 text-blue-600 rounded"
+                              />
+                              <div>
+                                <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="font-bold text-green-600">
@@ -826,27 +956,55 @@ export default function FinanceReconciliation() {
 
               {/* All Unreconciled Transactions */}
               <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
-                    {getAllUnmatchedTransactions().length}
-                  </span>
-                  Todas as Transações Não Conciliadas
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
+                      {getAllUnmatchedTransactions().length}
+                    </span>
+                    Todas as Transações Não Conciliadas
+                  </h4>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSelectAllCompatible(getAllUnmatchedTransactions())}
+                      disabled={getAvailableTransactions(getAllUnmatchedTransactions()).length === 0}
+                      className="text-xs"
+                    >
+                      Selecionar Todas
+                    </Button>
+                  </div>
+                </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
                   {getAllUnmatchedTransactions().map((transaction: any) => (
                     <div
                       key={transaction.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                        selectedTransaction?.id === transaction.id
+                        selectedTransactions.find(t => t.id === transaction.id)
                           ? 'border-blue-500 bg-blue-50 shadow-md'
                           : 'border-gray-200 hover:bg-white hover:shadow-sm'
                       }`}
-                      onClick={() => setSelectedTransaction(transaction)}
+                      onClick={() => {
+                        const isSelected = selectedTransactions.find(t => t.id === transaction.id);
+                        if (isSelected) {
+                          setSelectedTransactions(prev => prev.filter(t => t.id !== transaction.id));
+                        } else {
+                          setSelectedTransactions(prev => [...prev, transaction]);
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                          <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedTransactions.find(t => t.id === transaction.id)}
+                            onChange={() => {}}
+                            className="h-4 w-4 text-blue-600 rounded"
+                          />
+                          <div>
+                            <p className="font-medium">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-green-600">
@@ -862,17 +1020,32 @@ export default function FinanceReconciliation() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsAssociationDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="gradient-bg text-white"
-                  onClick={handleAssociatePayment}
-                  disabled={!selectedTransaction || associatePaymentMutation.isPending}
-                >
-                  {associatePaymentMutation.isPending ? "Confirmando..." : "Confirmar Pagamento"}
-                </Button>
+              <div className="flex justify-between pt-4 border-t">
+                <div className="flex space-x-2">
+                  {selectedTransactions.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedTransactions([])}
+                      className="text-orange-600 hover:text-orange-700"
+                    >
+                      Limpar Seleção ({selectedTransactions.length})
+                    </Button>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => setIsAssociationDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="gradient-bg text-white"
+                    onClick={handleAssociatePayment}
+                    disabled={selectedTransactions.length === 0 || associatePaymentMutation.isPending || associateMultiplePaymentsMutation.isPending}
+                  >
+                    {(associatePaymentMutation.isPending || associateMultiplePaymentsMutation.isPending) 
+                      ? "Confirmando..." 
+                      : `Confirmar ${selectedTransactions.length > 1 ? `${selectedTransactions.length} Pagamentos` : 'Pagamento'}`}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
