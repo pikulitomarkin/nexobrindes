@@ -1115,53 +1115,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mock OFX import endpoint for producer payments
-  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
-      }
-
-      // Mock OFX processing - in a real implementation, you would parse the OFX file
-      const mockTransactions = [
-        {
-          id: `txn-${Date.now()}-1`,
-          amount: "850.00",
-          description: "TED PAGAMENTO PRODUTOR MARCENARIA SANTOS",
-          date: new Date(),
-          type: "debit",
-          status: "unmatched",
-          fitId: `FIT${Date.now()}001`
-        },
-        {
-          id: `txn-${Date.now()}-2`,
-          amount: "1200.00",
-          description: "PIX PAGAMENTO PRODUTOR JOAO SILVA",
-          date: new Date(),
-          type: "debit",
-          status: "unmatched",
-          fitId: `FIT${Date.now()}002`
-        }
-      ];
-
-      // Store transactions (in a real app, these would be stored in the database)
-      const bankTransactions = await storage.getBankTransactions();
-      for (const transaction of mockTransactions) {
-        await storage.createBankTransaction(transaction);
-      }
-
-      res.json({
-        success: true,
-        message: `${mockTransactions.length} transações importadas com sucesso`,
-        imported: mockTransactions.length,
-        transactions: mockTransactions
-      });
-    } catch (error) {
-      console.error("Error importing OFX for producer payments:", error);
-      res.status(500).json({ error: "Failed to import OFX file" });
-    }
-  });
-
   // Products
   app.get("/api/products", async (req, res) => {
     try {
