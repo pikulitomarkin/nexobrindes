@@ -3901,11 +3901,16 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
     try {
-      const { transactionId, productionOrderId, amount } = req.body;
+      const { transactionIds, productionOrderId } = req.body;
 
-      const transaction = await storage.getBankTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transação não encontrada" });
+      console.log("Associating producer payment:", { transactionIds, productionOrderId });
+
+      if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
+        return res.status(400).json({ error: "Lista de transações é obrigatória" });
+      }
+
+      if (!productionOrderId) {
+        return res.status(400).json({ error: "ID da ordem de produção é obrigatório" });
       }
 
       const productionOrder = await storage.getProductionOrder(productionOrderId);
@@ -3913,13 +3918,42 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      await storage.updateBankTransaction(transactionId, {
-        status: 'matched',
-        isMatched: true,
-        matchedOrderId: productionOrder.orderId,
-        notes: `Pagamento ao produtor - Ordem ${productionOrder.id}`
-      });
+      const bankTransactions = await storage.getBankTransactions();
+      const validTransactions = [];
+      let totalAmount = 0;
 
+      // Validar todas as transações
+      for (const transactionId of transactionIds) {
+        const transaction = bankTransactions.find(t => t.id === transactionId);
+        if (!transaction) {
+          console.warn(`Transação ${transactionId} não encontrada`);
+          continue;
+        }
+
+        if (transaction.status === 'matched') {
+          console.warn(`Transação ${transactionId} já foi conciliada`);
+          continue;
+        }
+
+        validTransactions.push(transaction);
+        totalAmount += parseFloat(transaction.amount);
+      }
+
+      if (validTransactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida encontrada" });
+      }
+
+      // Processar as transações válidas
+      for (const transaction of validTransactions) {
+        await storage.updateBankTransaction(transaction.id, {
+          status: 'matched',
+          isMatched: true,
+          matchedOrderId: productionOrder.orderId,
+          notes: `Pagamento ao produtor - Ordem ${productionOrder.id}`
+        });
+      }
+
+      // Atualizar status do pagamento do produtor
       await storage.updateProductionOrder(productionOrderId, {
         producerPaymentStatus: 'paid'
       });
@@ -3927,19 +3961,28 @@ Para mais detalhes, entre em contato conosco!`;
       const order = await storage.getOrder(productionOrder.orderId);
       const producer = await storage.getUser(productionOrder.producerId);
 
+      console.log("Producer payment associated successfully:", {
+        transactionsProcessed: validTransactions.length,
+        totalAmount: totalAmount.toFixed(2)
+      });
+
       res.json({
         success: true,
-        message: "Pagamento associado com sucesso",
+        message: `${validTransactions.length} transação${validTransactions.length !== 1 ? 'ões' : ''} associada${validTransactions.length !== 1 ? 's' : ''} com sucesso`,
         payment: {
-          amount: amount,
+          amount: totalAmount.toFixed(2),
           productionOrderId: productionOrderId,
           producerName: producer?.name || 'Unknown',
-          orderNumber: order?.orderNumber || 'Unknown'
+          orderNumber: order?.orderNumber || 'Unknown',
+          transactionsProcessed: validTransactions.length
         }
       });
     } catch (error) {
       console.error("Failed to associate producer payment:", error);
-      res.status(500).json({ error: "Failed to associate producer payment" });
+      res.status(500).json({ 
+        error: "Falha ao associar pagamento do produtor",
+        details: error.message 
+      });
     }
   });
 

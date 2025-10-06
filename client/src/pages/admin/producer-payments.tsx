@@ -106,6 +106,12 @@ export default function AdminProducerPayments() {
 
   const associatePaymentMutation = useMutation({
     mutationFn: async ({ transactions, productionOrderId }: { transactions: any[]; productionOrderId: string }) => {
+      console.log("Sending association request:", {
+        transactionIds: transactions.map((t: any) => t.id),
+        productionOrderId,
+        transactionCount: transactions.length
+      });
+      
       const res = await apiRequest("POST", "/api/finance/producer-payments/associate-payment", {
         transactionIds: transactions.map((t: any) => t.id),
         productionOrderId,
@@ -125,9 +131,10 @@ export default function AdminProducerPayments() {
       });
     },
     onError: (error: any) => {
+      console.error("Association error:", error);
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível associar o pagamento",
+        title: "Erro na Associação",
+        description: error.message || "Não foi possível associar o pagamento. Verifique se as transações são válidas e não foram conciliadas anteriormente.",
         variant: "destructive",
       });
     },
@@ -168,8 +175,27 @@ export default function AdminProducerPayments() {
       return;
     }
 
+    // Verificar se as transações são válidas
+    const invalidTransactions = selectedTransactions.filter(txn => !txn.id || txn.status === 'matched');
+    if (invalidTransactions.length > 0) {
+      toast({
+        title: "Transações Inválidas",
+        description: `${invalidTransactions.length} transação${invalidTransactions.length !== 1 ? 'ões' : ''} ${invalidTransactions.length !== 1 ? 'são inválidas ou já foram' : 'é inválida ou já foi'} conciliada${invalidTransactions.length !== 1 ? 's' : ''}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const totalTransactionAmount = selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
     const paymentAmount = parseFloat(selectedPayment.amount);
+
+    console.log("Association validation:", {
+      selectedPayment: selectedPayment.id,
+      productionOrderId: selectedPayment.productionOrderId,
+      transactionCount: selectedTransactions.length,
+      totalTransactionAmount,
+      paymentAmount
+    });
 
     if (totalTransactionAmount > paymentAmount * 1.05) { // 5% de tolerância
       toast({
