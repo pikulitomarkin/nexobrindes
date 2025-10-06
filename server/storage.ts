@@ -285,75 +285,10 @@ export class MemStorage implements IStorage {
   };
 
   // Payment Methods
-  private paymentMethods: PaymentMethod[] = [
-    {
-      id: "pm-1",
-      name: "PIX",
-      type: "pix",
-      maxInstallments: 1,
-      installmentInterest: "0.00",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "pm-2",
-      name: "Cartão de Crédito",
-      type: "credit_card",
-      maxInstallments: 12,
-      installmentInterest: "2.99",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "pm-3",
-      name: "Boleto Bancário",
-      type: "boleto",
-      maxInstallments: 1,
-      installmentInterest: "0.00",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  ];
+  private paymentMethods: PaymentMethod[] = [];
 
   // Shipping Methods
-  private shippingMethods: ShippingMethod[] = [
-    {
-      id: "sm-1",
-      name: "Correios PAC",
-      type: "calculated",
-      basePrice: "0.00",
-      freeShippingThreshold: "150.00",
-      estimatedDays: 8,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "sm-2",
-      name: "Transportadora",
-      type: "fixed",
-      basePrice: "25.00",
-      freeShippingThreshold: "300.00",
-      estimatedDays: 5,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "sm-3",
-      name: "Frete Grátis",
-      type: "free",
-      basePrice: "0.00",
-      freeShippingThreshold: "0.00",
-      estimatedDays: 7,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  ];
+  private shippingMethods: ShippingMethod[] = [];
 
   // Budget Payment Info
   private budgetPaymentInfo: BudgetPaymentInfo[] = [];
@@ -394,6 +329,79 @@ export class MemStorage implements IStorage {
 
     this.initializeData();
     // createTestUsers() is now called within initializeData()
+  }
+
+  private initializePaymentMethods(): PaymentMethod[] {
+    return [
+      {
+        id: "pm-1",
+        name: "PIX",
+        type: "pix",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "pm-2",
+        name: "Cartão de Crédito",
+        type: "credit_card",
+        maxInstallments: 12,
+        installmentInterest: "2.99",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "pm-3",
+        name: "Boleto Bancário",
+        type: "boleto",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  private initializeShippingMethods(): ShippingMethod[] {
+    return [
+      {
+        id: "sm-1",
+        name: "Correios PAC",
+        type: "calculated",
+        basePrice: "0.00",
+        freeShippingThreshold: "150.00",
+        estimatedDays: 8,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-2",
+        name: "Transportadora",
+        type: "fixed",
+        basePrice: "25.00",
+        freeShippingThreshold: "300.00",
+        estimatedDays: 5,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-3",
+        name: "Frete Grátis",
+        type: "free",
+        basePrice: "0.00",
+        freeShippingThreshold: "0.00",
+        estimatedDays: 7,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
   }
 
   // Create test users for each role
@@ -858,6 +866,10 @@ export class MemStorage implements IStorage {
 
       // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
       this.initializeFinancialIntegration();
+
+      // Initialize Payment and Shipping Methods
+      this.paymentMethods = this.initializePaymentMethods();
+      this.shippingMethods = this.initializeShippingMethods();
     } catch (error) {
       console.error("Error during initializeData:", error);
     }
@@ -1138,14 +1150,14 @@ export class MemStorage implements IStorage {
     console.log(`Storage: Creating client with data:`, clientData);
     console.log(`Storage: Final client object:`, client);
     console.log(`Storage: VendorId being set:`, client.vendorId);
-    
+
     this.clients.set(id, client);
-    
+
     // Log all clients to verify storage
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients after creation: ${allClients.length}`);
     console.log(`Storage: Clients for vendor ${client.vendorId}:`, allClients.filter(c => c.vendorId === client.vendorId).map(c => ({ id: c.id, name: c.name })));
-    
+
     return client;
   }
 
@@ -1814,27 +1826,45 @@ export class MemStorage implements IStorage {
   }
 
   async createBudget(budgetData: any): Promise<any> {
-    const id = `budget-${Date.now()}`;
-    const newBudget = {
-      id,
-      budgetNumber: `ORC-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+    const id = randomUUID();
+
+    // Ensure dates are properly formatted
+    let validUntil = null;
+    let deliveryDeadline = null;
+
+    if (budgetData.validUntil) {
+      try {
+        validUntil = typeof budgetData.validUntil === 'string' ? budgetData.validUntil : new Date(budgetData.validUntil).toISOString();
+      } catch (e) {
+        console.warn("Invalid validUntil date:", budgetData.validUntil);
+      }
+    }
+
+    if (budgetData.deliveryDeadline) {
+      try {
+        deliveryDeadline = typeof budgetData.deliveryDeadline === 'string' ? budgetData.deliveryDeadline : new Date(budgetData.deliveryDeadline).toISOString();
+      } catch (e) {
+        console.warn("Invalid deliveryDeadline date:", budgetData.deliveryDeadline);
+      }
+    }
+
+    const budget = {
       ...budgetData,
-      totalValue: budgetData.totalValue || '0.00',
-      status: budgetData.status || 'draft',
-      deliveryType: budgetData.deliveryType || 'delivery',
-      hasCustomization: budgetData.hasCustomization || false,
-      customizationPercentage: budgetData.customizationPercentage || '0.00',
-      customizationValue: budgetData.customizationValue || '0.00',
-      customizationDescription: budgetData.customizationDescription || '',
-      hasDiscount: budgetData.hasDiscount || false,
-      discountType: budgetData.discountType || 'percentage',
-      discountPercentage: budgetData.discountPercentage || '0.00',
-      discountValue: budgetData.discountValue || '0.00',
+      id,
+      validUntil,
+      deliveryDeadline,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    this.budgets.set(id, newBudget);
-    return newBudget;
+
+    console.log("Creating budget with processed data:", { 
+      id: budget.id, 
+      validUntil: budget.validUntil, 
+      deliveryDeadline: budget.deliveryDeadline 
+    });
+
+    this.budgets.set(id, budget);
+    return budget;
   }
 
   async updateBudget(id: string, budgetData: any): Promise<any> {
@@ -1885,7 +1915,7 @@ export class MemStorage implements IStorage {
       description: budget.description,
       totalValue: budget.totalValue,
       status: 'confirmed', // Default status for a new order from budget
-      deadline: budget.validUntil,
+      deadline: budget.validUntil, // Using validUntil as the order deadline
       shippingAddress: shippingAddress, // Include shipping address
       deliveryType: budget.deliveryType
     });
@@ -1993,15 +2023,19 @@ export class MemStorage implements IStorage {
   }
 
   // Payment Methods
-  async getPaymentMethods() {
-    return this.paymentMethods.filter(pm => pm.isActive);
-  }
-
-  async getAllPaymentMethods() {
+  async getPaymentMethods(): Promise<PaymentMethod[]> {
+    // Se não há métodos de pagamento, reinicializa
+    if (!this.paymentMethods || this.paymentMethods.length === 0) {
+      this.paymentMethods = this.initializePaymentMethods();
+    }
     return this.paymentMethods;
   }
 
-  async createPaymentMethod(data: InsertPaymentMethod) {
+  async getAllPaymentMethods(): Promise<PaymentMethod[]> {
+    return await this.getPaymentMethods();
+  }
+
+  async createPaymentMethod(data: InsertPaymentMethod): Promise<PaymentMethod> {
     const newPaymentMethod: PaymentMethod = {
       id: `pm-${Date.now()}-${Math.random()}`,
       ...data,
@@ -2012,7 +2046,7 @@ export class MemStorage implements IStorage {
     return newPaymentMethod;
   }
 
-  async updatePaymentMethod(id: string, data: Partial<InsertPaymentMethod>) {
+  async updatePaymentMethod(id: string, data: Partial<InsertPaymentMethod>): Promise<PaymentMethod | null> {
     const index = this.paymentMethods.findIndex(pm => pm.id === id);
     if (index !== -1) {
       this.paymentMethods[index] = {
@@ -2025,7 +2059,7 @@ export class MemStorage implements IStorage {
     return null;
   }
 
-  async deletePaymentMethod(id: string) {
+  async deletePaymentMethod(id: string): Promise<boolean> {
     const index = this.paymentMethods.findIndex(pm => pm.id === id);
     if (index !== -1) {
       this.paymentMethods.splice(index, 1);
@@ -2035,15 +2069,19 @@ export class MemStorage implements IStorage {
   }
 
   // Shipping Methods
-  async getShippingMethods() {
-    return this.shippingMethods.filter(sm => sm.isActive);
-  }
-
-  async getAllShippingMethods() {
+  async getShippingMethods(): Promise<ShippingMethod[]> {
+    // Se não há métodos de frete, reinicializa
+    if (!this.shippingMethods || this.shippingMethods.length === 0) {
+      this.shippingMethods = this.initializeShippingMethods();
+    }
     return this.shippingMethods;
   }
 
-  async createShippingMethod(data: InsertShippingMethod) {
+  async getAllShippingMethods(): Promise<ShippingMethod[]> {
+    return await this.getShippingMethods();
+  }
+
+  async createShippingMethod(data: InsertShippingMethod): Promise<ShippingMethod> {
     const newShippingMethod: ShippingMethod = {
       id: `sm-${Date.now()}-${Math.random()}`,
       ...data,
@@ -2054,7 +2092,7 @@ export class MemStorage implements IStorage {
     return newShippingMethod;
   }
 
-  async updateShippingMethod(id: string, data: Partial<InsertShippingMethod>) {
+  async updateShippingMethod(id: string, data: Partial<InsertShippingMethod>): Promise<ShippingMethod | null> {
     const index = this.shippingMethods.findIndex(sm => sm.id === id);
     if (index !== -1) {
       this.shippingMethods[index] = {
@@ -2067,7 +2105,7 @@ export class MemStorage implements IStorage {
     return null;
   }
 
-  async deleteShippingMethod(id: string) {
+  async deleteShippingMethod(id: string): Promise<boolean> {
     const index = this.shippingMethods.findIndex(sm => sm.id === id);
     if (index !== -1) {
       this.shippingMethods.splice(index, 1);
@@ -3231,12 +3269,12 @@ export class DatabaseStorage implements IStorage {
         commissionRate: vendorData.commissionRate || "10.00",
         isActive: true
       });
-      
+
       // Return the user info
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, vendorData.userId));
       return user;
     }
-    
+
     // Otherwise create both user and vendor (legacy support)
     const [newUser] = await db.insert(schema.users).values({
       username: vendorData.username,
@@ -3288,7 +3326,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteClient(id: string): Promise<boolean> {
-    const result = await db.delete(schema.clients).where(eq(schema.clients.id, id));
+    await db.delete(schema.clients).where(eq(schema.clients.id, id));
     return true;
   }
 
