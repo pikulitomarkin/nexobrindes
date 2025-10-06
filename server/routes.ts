@@ -212,10 +212,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
+      // Ensure we have the correct clientId - if it's a client record ID, get the userId
+      let finalClientId = orderData.clientId;
+      console.log("Original clientId:", finalClientId);
+
+      // Check if clientId is a client record - if so, we might need to use the userId instead
+      const clientRecord = await storage.getClient(orderData.clientId);
+      if (clientRecord && clientRecord.userId) {
+        console.log("Found client record, using userId for order:", clientRecord.userId);
+        finalClientId = clientRecord.userId;
+      } else {
+        // Check if it's a userId that has a client record
+        const clientByUserId = await storage.getClientByUserId(orderData.clientId);
+        if (clientByUserId) {
+          console.log("Found client by userId, keeping original clientId:", orderData.clientId);
+          finalClientId = orderData.clientId;
+        }
+      }
+
+      console.log("Final clientId for order:", finalClientId);
+
       // Create order with all provided data
       const newOrder = await storage.createOrder({
         orderNumber,
-        clientId: orderData.clientId,
+        clientId: finalClientId,
         vendorId: orderData.vendorId,
         product: orderData.product || orderData.title,
         description: orderData.description || "",
@@ -241,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: orderData.items || []
       });
 
-      console.log("Created order:", newOrder);
+      console.log("Created order with final clientId:", newOrder.clientId);
       res.json(newOrder);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -298,16 +318,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
+          let clientName = 'Unknown';
+
+          // Try multiple approaches to find the client name
+          console.log(`Looking for client name for order ${order.orderNumber}, clientId: ${order.clientId}`);
+
+          // Method 1: Try to get client record directly by ID
+          const clientRecord = await storage.getClient(order.clientId);
+          if (clientRecord) {
+            console.log(`Found client record:`, clientRecord);
+            clientName = clientRecord.name;
+          } else {
+            // Method 2: Try to find client record by userId
+            const clientByUserId = await storage.getClientByUserId(order.clientId);
+            if (clientByUserId) {
+              console.log(`Found client by userId:`, clientByUserId);
+              clientName = clientByUserId.name;
+            } else {
+              // Method 3: Fallback to user table
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                console.log(`Found user record:`, clientUser);
+                clientName = clientUser.name;
+              } else {
+                console.log(`No client found for ID: ${order.clientId}`);
+              }
+            }
+          }
+
           return {
             ...order,
-            clientName: client?.name || 'Unknown'
+            clientName: clientName
           };
         })
       );
 
       res.json(enrichedOrders);
     } catch (error) {
+      console.error("Error fetching vendor orders:", error);
       res.status(500).json({ error: "Failed to fetch vendor orders" });
     }
   });
@@ -681,6 +729,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update vendor commission" });
+    }
+  });
+
+  // Endpoint específico para pedidos do vendedor (usado na página de pedidos do vendedor)
+  app.get("/api/vendors/:vendorId/orders", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching orders for vendor: ${vendorId}`);
+      
+      const orders = await storage.getOrdersByVendor(vendorId);
+      console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
+
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          let clientName = 'Unknown';
+
+          console.log(`Processing order ${order.orderNumber}, clientId: ${order.clientId}`);
+
+          // Try multiple approaches to find the client name
+          // Method 1: Try to get client record directly by ID
+          const clientRecord = await storage.getClient(order.clientId);
+          if (clientRecord) {
+            console.log(`Found client record for order ${order.orderNumber}:`, { id: clientRecord.id, name: clientRecord.name });
+            clientName = clientRecord.name;
+          } else {
+            // Method 2: Try to find client record by userId
+            const clientByUserId = await storage.getClientByUserId(order.clientId);
+            if (clientByUserId) {
+              console.log(`Found client by userId for order ${order.orderNumber}:`, { id: clientByUserId.id, name: clientByUserId.name });
+              clientName = clientByUserId.name;
+            } else {
+              // Method 3: Fallback to user table
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                console.log(`Found user record for order ${order.orderNumber}:`, { id: clientUser.id, name: clientUser.name });
+                clientName = clientUser.name;
+              } else {
+                console.log(`No client found for order ${order.orderNumber}, clientId: ${order.clientId}`);
+                // Method 4: Search all clients for a match
+                const allClients = await storage.getClients();
+                const matchingClient = allClients.find(c => c.userId === order.clientId || c.id === order.clientId);
+                if (matchingClient) {
+                  console.log(`Found matching client in all clients for order ${order.orderNumber}:`, { id: matchingClient.id, name: matchingClient.name });
+                  clientName = matchingClient.name;
+                }
+              }
+            }
+          }
+
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            hasUnreadNotes = productionOrders.some(po => po.hasUnreadNotes);
+          }
+
+          return {
+            ...order,
+            clientName: clientName,
+            producerName: producer?.name || null,
+            hasUnreadNotes: hasUnreadNotes
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} enriched orders for vendor ${vendorId}`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching vendor orders:", error);
+      res.status(500).json({ error: "Failed to fetch vendor orders" });
     }
   });
 
