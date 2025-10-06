@@ -46,12 +46,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
-  // Configure multer for file uploads
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 }
-  });
-
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
@@ -913,208 +907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Producer Payments routes
-  app.get("/api/finance/producer-payments", async (req, res) => {
-    try {
-      const payments = await storage.getProducerPayments();
-
-      // Enrich with production order and producer data
-      const enrichedPayments = await Promise.all(
-        payments.map(async (payment) => {
-          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-          const producer = await storage.getUser(payment.producerId);
-          let order = null;
-          let product = 'Unknown';
-          let orderNumber = 'Unknown';
-          let clientName = 'Unknown';
-          
-          if (productionOrder) {
-            order = await storage.getOrder(productionOrder.orderId);
-            if (order) {
-              product = order.product || 'Unknown';
-              orderNumber = order.orderNumber || 'Unknown';
-              
-              // Get client name
-              const client = await storage.getUser(order.clientId);
-              if (client) {
-                clientName = client.name;
-              } else {
-                const clientRecord = await storage.getClient(order.clientId);
-                if (clientRecord) {
-                  clientName = clientRecord.name;
-                }
-              }
-            }
-          }
-
-          return {
-            ...payment,
-            productionOrder,
-            order,
-            product,
-            orderNumber,
-            clientName,
-            producerName: producer?.name || 'Unknown'
-          };
-        })
-      );
-
-      res.json(enrichedPayments);
-    } catch (error) {
-      console.error("Error fetching producer payments:", error);
-      res.status(500).json({ error: "Failed to fetch producer payments" });
-    }
-  });
-
-  app.get("/api/finance/producer-payments/pending", async (req, res) => {
-    try {
-      const payments = await storage.getProducerPayments();
-      const pendingPayments = payments.filter(payment => 
-        payment.status === 'pending' || payment.status === 'approved'
-      );
-
-      // Enrich with production order and producer data
-      const enrichedPayments = await Promise.all(
-        pendingPayments.map(async (payment) => {
-          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-          const producer = await storage.getUser(payment.producerId);
-          let order = null;
-          let product = 'Unknown';
-          let orderNumber = 'Unknown';
-          let clientName = 'Unknown';
-          
-          if (productionOrder) {
-            order = await storage.getOrder(productionOrder.orderId);
-            if (order) {
-              product = order.product || 'Unknown';
-              orderNumber = order.orderNumber || 'Unknown';
-              
-              // Get client name
-              const client = await storage.getUser(order.clientId);
-              if (client) {
-                clientName = client.name;
-              } else {
-                const clientRecord = await storage.getClient(order.clientId);
-                if (clientRecord) {
-                  clientName = clientRecord.name;
-                }
-              }
-            }
-          }
-
-          return {
-            ...payment,
-            productionOrder,
-            order,
-            product,
-            orderNumber,
-            clientName,
-            producerName: producer?.name || 'Unknown'
-          };
-        })
-      );
-
-      res.json(enrichedPayments);
-    } catch (error) {
-      console.error("Error fetching pending producer payments:", error);
-      res.status(500).json({ error: "Failed to fetch pending producer payments" });
-    }
-  });
-
-  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const updated = await storage.updateProducerPayment(id, {
-        status: 'approved',
-        approvedBy: 'admin-1', // In a real app, get from auth
-        approvedAt: new Date()
-      });
-
-      if (!updated) {
-        return res.status(404).json({ error: "Pagamento não encontrado" });
-      }
-
-      res.json({ success: true, payment: updated });
-    } catch (error) {
-      console.error("Error approving producer payment:", error);
-      res.status(500).json({ error: "Failed to approve producer payment" });
-    }
-  });
-
-  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
-    try {
-      const { transactionId, productionOrderId, amount } = req.body;
-
-      console.log(`Associating payment: transactionId=${transactionId}, productionOrderId=${productionOrderId}, amount=${amount}`);
-
-      // Find the producer payment for this production order
-      const payments = await storage.getProducerPayments();
-      const producerPayment = payments.find(p => p.productionOrderId === productionOrderId && p.status === 'approved');
-
-      if (!producerPayment) {
-        return res.status(404).json({ error: "Pagamento aprovado não encontrado para esta ordem de produção" });
-      }
-
-      // Get transaction details (mock for now since we don't have full OFX implementation)
-      const transactionDetails = {
-        id: transactionId,
-        amount: amount,
-        description: `Pagamento ao produtor - Ordem ${productionOrderId}`,
-        date: new Date(),
-        status: 'matched'
-      };
-
-      // Update producer payment status to paid
-      await storage.updateProducerPayment(producerPayment.id, {
-        status: 'paid',
-        paidBy: 'admin-1', // In a real app, get from auth
-        paidAt: new Date(),
-        paymentMethod: 'transfer',
-        notes: `Pagamento confirmado via transação ${transactionId}`
-      });
-
-      // Get enriched payment data for response
-      const productionOrder = await storage.getProductionOrder(producerPayment.productionOrderId);
-      const producer = await storage.getUser(producerPayment.producerId);
-      let order = null;
-      let clientName = 'Unknown';
-      
-      if (productionOrder) {
-        order = await storage.getOrder(productionOrder.orderId);
-        if (order) {
-          const client = await storage.getUser(order.clientId);
-          if (client) {
-            clientName = client.name;
-          } else {
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              clientName = clientRecord.name;
-            }
-          }
-        }
-      }
-
-      const enrichedPayment = {
-        ...producerPayment,
-        status: 'paid',
-        paidAt: new Date(),
-        producerName: producer?.name || 'Unknown',
-        clientName,
-        orderNumber: order?.orderNumber || 'Unknown'
-      };
-
-      res.json({ 
-        success: true, 
-        payment: enrichedPayment,
-        transaction: transactionDetails
-      });
-    } catch (error) {
-      console.error("Error associating producer payment:", error);
-      res.status(500).json({ error: "Failed to associate producer payment" });
-    }
-  });
-
   // Products
   app.get("/api/products", async (req, res) => {
     try {
@@ -1175,6 +967,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Failed to create product" });
     }
+  });
+
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
   });
 
   // Client profile endpoints
