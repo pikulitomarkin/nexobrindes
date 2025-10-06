@@ -230,9 +230,6 @@ export interface IStorage {
   getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]>;
   createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
   updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
-
-  // Financial Notes
-  createFinancialNote(note: any): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -492,7 +489,7 @@ export class MemStorage implements IStorage {
       username: "admin",
       password: "123",
       role: "admin",
-      name: "Administrador",
+      name: "Administrador do Sistema",
       email: "admin@erp.com",
       phone: null,
       vendorId: null,
@@ -702,7 +699,7 @@ export class MemStorage implements IStorage {
     };
     this.commissions.set(commission.id, commission);
 
-    // Create additional payments for recent orders to show correct values
+    // Create additional sample payments for recent orders to show correct values
     const allOrders = Array.from(this.orders.values());
 
     // Find orders that need test payments and ensure all orders have some payment
@@ -2386,7 +2383,7 @@ export class MemStorage implements IStorage {
     return newTransaction;
   }
 
-  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined> {
+  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date; matchedPaymentId?: string }>): Promise<BankTransaction | undefined> {
     const existing = this.mockData.bankTransactions.find(txn => txn.id === id);
     if (!existing) return undefined;
 
@@ -2397,9 +2394,8 @@ export class MemStorage implements IStorage {
     };
 
     const index = this.mockData.bankTransactions.findIndex(txn => txn.id === id);
-    if (index !== -1) {
-      this.mockData.bankTransactions[index] = updated;
-    }
+    this.mockData.bankTransactions[index] = updated;
+
     return updated;
   }
 

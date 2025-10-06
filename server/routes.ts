@@ -3735,7 +3735,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Create bank import record
       const bankImport = await storage.createBankImport({
         fileName: originalname,
-        fileSize: size,
+        uploadedBy: 'current-user',
         status: 'processing',
         importedAt: new Date(),
         transactionCount: 0
@@ -3901,59 +3901,58 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
     try {
-      const { transactionIds, productionOrderId } = req.body;
+      const { transactionIds, productionOrderId, transactionId } = req.body;
 
-      console.log("Associating producer payment:", { transactionIds, productionOrderId });
+      // Support both single transactionId and multiple transactionIds for compatibility
+      const transactionIdsList = transactionIds || (transactionId ? [transactionId] : []);
 
-      if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
-        return res.status(400).json({ error: "Lista de transações é obrigatória" });
+      console.log("Associating producer payment:", { transactionIdsList, productionOrderId });
+
+      if (!transactionIdsList || transactionIdsList.length === 0 || !productionOrderId) {
+        return res.status(400).json({ error: "Transaction IDs e Production Order ID são obrigatórios" });
       }
 
-      if (!productionOrderId) {
-        return res.status(400).json({ error: "ID da ordem de produção é obrigatório" });
+      // Get all transactions to debug
+      const allTransactions = await storage.getBankTransactions();
+      console.log(`Available transactions: ${allTransactions.length}`);
+      console.log(`Looking for transaction IDs:`, transactionIdsList);
+
+      const transactions = [];
+      for (const txnId of transactionIdsList) {
+        const transaction = allTransactions.find(t => t.id === txnId);
+        if (!transaction) {
+          console.log(`Transaction ${txnId} not found in:`, allTransactions.map(t => t.id));
+          return res.status(404).json({ 
+            error: "Transação não encontrada",
+            missingId: txnId,
+            availableTransactions: allTransactions.map(t => ({ id: t.id, description: t.description }))
+          });
+        }
+        transactions.push(transaction);
       }
+
+      console.log(`Found ${transactions.length} transactions:`, transactions.map(t => ({ id: t.id, amount: t.amount })));
 
       const productionOrder = await storage.getProductionOrder(productionOrderId);
       if (!productionOrder) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      const bankTransactions = await storage.getBankTransactions();
-      const validTransactions = [];
-      let totalAmount = 0;
+      console.log(`Found production order:`, productionOrder);
 
-      // Validar todas as transações
-      for (const transactionId of transactionIds) {
-        const transaction = bankTransactions.find(t => t.id === transactionId);
-        if (!transaction) {
-          console.warn(`Transação ${transactionId} não encontrada`);
-          continue;
-        }
+      // Calculate total transaction amount
+      const totalTransactionAmount = transactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-        if (transaction.status === 'matched') {
-          console.warn(`Transação ${transactionId} já foi conciliada`);
-          continue;
-        }
-
-        validTransactions.push(transaction);
-        totalAmount += parseFloat(transaction.amount);
-      }
-
-      if (validTransactions.length === 0) {
-        return res.status(400).json({ error: "Nenhuma transação válida encontrada" });
-      }
-
-      // Processar as transações válidas
-      for (const transaction of validTransactions) {
+      // Update all transactions status
+      for (const transaction of transactions) {
         await storage.updateBankTransaction(transaction.id, {
           status: 'matched',
-          isMatched: true,
           matchedOrderId: productionOrder.orderId,
           notes: `Pagamento ao produtor - Ordem ${productionOrder.id}`
         });
       }
 
-      // Atualizar status do pagamento do produtor
+      // Update production order payment status
       await storage.updateProductionOrder(productionOrderId, {
         producerPaymentStatus: 'paid'
       });
@@ -3961,21 +3960,15 @@ Para mais detalhes, entre em contato conosco!`;
       const order = await storage.getOrder(productionOrder.orderId);
       const producer = await storage.getUser(productionOrder.producerId);
 
-      console.log("Producer payment associated successfully:", {
-        transactionsProcessed: validTransactions.length,
-        totalAmount: totalAmount.toFixed(2)
-      });
+      console.log("Producer payment associated successfully");
 
       res.json({
         success: true,
-        message: `${validTransactions.length} transação${validTransactions.length !== 1 ? 'ões' : ''} associada${validTransactions.length !== 1 ? 's' : ''} com sucesso`,
-        payment: {
-          amount: totalAmount.toFixed(2),
-          productionOrderId: productionOrderId,
-          producerName: producer?.name || 'Unknown',
-          orderNumber: order?.orderNumber || 'Unknown',
-          transactionsProcessed: validTransactions.length
-        }
+        message: `${transactions.length} transação${transactions.length !== 1 ? 'ões' : ''} associada${transactions.length !== 1 ? 's' : ''} com sucesso`,
+        amount: totalTransactionAmount.toFixed(2),
+        productionOrderId: productionOrderId,
+        producerName: producer?.name || 'Unknown',
+        orderNumber: order?.orderNumber || 'Unknown',
       });
     } catch (error) {
       console.error("Failed to associate producer payment:", error);
@@ -4013,7 +4006,7 @@ Para mais detalhes, entre em contato conosco!`;
           continue;
         }
 
-        await storage.updateBankTransaction(txn.transactionId, {
+        await storage.updateBankTransaction(transaction.id, {
           status: 'matched',
           isMatched: true,
           matchedOrderId: productionOrder.orderId,
@@ -4037,12 +4030,12 @@ Para mais detalhes, entre em contato conosco!`;
       const expectedAmount = parseFloat(productionOrder.amount || '0');
       const difference = totalAmount - expectedAmount;
       let differenceNote = '';
-      
+
       if (Math.abs(difference) > 0.01) {
         differenceNote = difference > 0 
           ? `Pagamento excedeu em R$ ${difference.toFixed(2)}`
           : `Faltou R$ ${Math.abs(difference).toFixed(2)} para completar o pagamento`;
-        
+
         // Criar registro da diferença no sistema
         await storage.createFinancialNote({
           type: 'payment_difference',
@@ -4253,7 +4246,7 @@ Para mais detalhes, entre em contato conosco!`;
         matchedOrderId: orderId
       });
 
-      // Get enriched payment for response
+      // Get enriched data for response
       const client = await storage.getUser(order.clientId);
       const vendor = await storage.getUser(order.vendorId);
 
