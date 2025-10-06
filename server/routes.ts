@@ -3569,6 +3569,226 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Producer Payments API
+  app.get("/api/finance/producer-payments", async (req, res) => {
+    try {
+      const productionOrders = await storage.getProductionOrders();
+      
+      const producerPayments = await Promise.all(
+        productionOrders
+          .filter(po => po.producerValue && parseFloat(po.producerValue) > 0)
+          .map(async (po) => {
+            const order = await storage.getOrder(po.orderId);
+            const producer = await storage.getUser(po.producerId);
+            
+            let clientName = 'Unknown';
+            if (order) {
+              const client = await storage.getClient(order.clientId);
+              if (client) {
+                clientName = client.name;
+              }
+            }
+
+            return {
+              id: po.id,
+              productionOrderId: po.id,
+              producerId: po.producerId,
+              producerName: producer?.name || 'Unknown',
+              amount: po.producerValue,
+              status: po.producerPaymentStatus || 'pending',
+              orderNumber: order?.orderNumber || 'Unknown',
+              product: order?.product || po.product || 'Unknown',
+              clientName: clientName,
+              deadline: po.deadline,
+              notes: po.producerNotes,
+              createdAt: po.acceptedAt || new Date()
+            };
+          })
+      );
+
+      res.json(producerPayments);
+    } catch (error) {
+      console.error("Failed to fetch producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
+  app.get("/api/finance/producer-payments/pending", async (req, res) => {
+    try {
+      const productionOrders = await storage.getProductionOrders();
+      
+      const pendingPayments = await Promise.all(
+        productionOrders
+          .filter(po => 
+            po.producerValue && 
+            parseFloat(po.producerValue) > 0 && 
+            (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
+          )
+          .map(async (po) => {
+            const order = await storage.getOrder(po.orderId);
+            const producer = await storage.getUser(po.producerId);
+            
+            let clientName = 'Unknown';
+            if (order) {
+              const client = await storage.getClient(order.clientId);
+              if (client) {
+                clientName = client.name;
+              }
+            }
+
+            return {
+              id: po.id,
+              productionOrderId: po.id,
+              producerId: po.producerId,
+              producerName: producer?.name || 'Unknown',
+              amount: po.producerValue,
+              status: po.producerPaymentStatus || 'pending',
+              orderNumber: order?.orderNumber || 'Unknown',
+              product: order?.product || po.product || 'Unknown',
+              clientName: clientName,
+              deadline: po.deadline,
+              notes: po.producerNotes,
+              createdAt: po.acceptedAt || new Date()
+            };
+          })
+      );
+
+      res.json(pendingPayments);
+    } catch (error) {
+      console.error("Failed to fetch pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
+    }
+  });
+
+  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updated = await storage.updateProductionOrder(id, {
+        producerPaymentStatus: 'approved'
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Production order not found" });
+      }
+
+      res.json({
+        success: true,
+        message: "Pagamento aprovado com sucesso",
+        productionOrder: updated
+      });
+    } catch (error) {
+      console.error("Failed to approve producer payment:", error);
+      res.status(500).json({ error: "Failed to approve producer payment" });
+    }
+  });
+
+  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, productionOrderId, amount } = req.body;
+
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      const productionOrder = await storage.getProductionOrder(productionOrderId);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        isMatched: true,
+        matchedOrderId: productionOrder.orderId,
+        notes: `Pagamento ao produtor - Ordem ${productionOrder.id}`
+      });
+
+      await storage.updateProductionOrder(productionOrderId, {
+        producerPaymentStatus: 'paid'
+      });
+
+      const order = await storage.getOrder(productionOrder.orderId);
+      const producer = await storage.getUser(productionOrder.producerId);
+
+      res.json({
+        success: true,
+        message: "Pagamento associado com sucesso",
+        payment: {
+          amount: amount,
+          productionOrderId: productionOrderId,
+          producerName: producer?.name || 'Unknown',
+          orderNumber: order?.orderNumber || 'Unknown'
+        }
+      });
+    } catch (error) {
+      console.error("Failed to associate producer payment:", error);
+      res.status(500).json({ error: "Failed to associate producer payment" });
+    }
+  });
+
+  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const ofxContent = req.file.buffer.toString('utf-8');
+      
+      const bankImport = await storage.createBankImport({
+        fileName: req.file.originalname,
+        uploadedBy: 'current-user',
+        status: 'processing',
+        fileContent: ofxContent,
+        transactionCount: 0
+      });
+
+      const transactions = extractOFXTransactions(ofxContent);
+
+      let importedCount = 0;
+      for (const transaction of transactions) {
+        try {
+          const transactionAmount = parseFloat(transaction.amount);
+          
+          if (transactionAmount < 0) {
+            await storage.createBankTransaction({
+              importId: bankImport.id,
+              transactionId: transaction.id,
+              date: transaction.date,
+              amount: Math.abs(transactionAmount).toFixed(2),
+              description: transaction.description || 'Pagamento a produtor',
+              type: 'debit',
+              status: 'unmatched',
+              isMatched: false
+            });
+            importedCount++;
+          }
+        } catch (error) {
+          console.error(`Error importing transaction ${transaction.id}:`, error);
+        }
+      }
+
+      await storage.updateBankImport(bankImport.id, {
+        status: 'completed',
+        transactionCount: importedCount
+      });
+
+      res.json({
+        success: true,
+        importId: bankImport.id,
+        transactionsImported: importedCount,
+        message: `${importedCount} transações de saída importadas com sucesso`
+      });
+
+    } catch (error) {
+      console.error("Producer OFX import error:", error);
+      res.status(500).json({ 
+        error: "Erro ao processar arquivo OFX",
+        details: (error as Error).message 
+      });
+    }
+  });
+
   // Get reconciliation data
   app.get("/api/finance/reconciliation", async (req, res) => {
     try {

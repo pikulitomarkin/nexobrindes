@@ -662,7 +662,10 @@ export class MemStorage implements IStorage {
       deadline: new Date("2024-11-20"),
       acceptedAt: new Date("2024-11-16"),
       completedAt: null,
-      notes: "Produção iniciada conforme especificações"
+      notes: "Produção iniciada conforme especificações",
+      producerValue: "850.00",
+      producerPaymentStatus: "pending",
+      producerNotes: "Valor inclui material e mão de obra"
     };
     this.productionOrders.set(productionOrder.id, productionOrder);
 

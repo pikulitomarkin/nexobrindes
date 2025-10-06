@@ -141,7 +141,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Management Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -182,7 +182,28 @@ export default function AdminPanel() {
           </CardContent>
         </Card>
 
-        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <DollarSign className="h-5 w-5 mr-2" />
+              Financeiro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/admin/producer-payments">
+              <Button variant="outline" className="w-full justify-start">
+                <Factory className="h-4 w-4 mr-2" />
+                Pagamentos aos Produtores
+              </Button>
+            </Link>
+            <Link href="/finance/reconciliation">
+              <Button variant="outline" className="w-full justify-start">
+                <FileText className="h-4 w-4 mr-2" />
+                Conciliação Bancária
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Orders Table */}
