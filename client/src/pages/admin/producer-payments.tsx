@@ -364,12 +364,15 @@ export default function AdminProducerPayments() {
       </div>
 
       <Tabs defaultValue="pending-payments" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="pending-payments" data-testid="tab-pending-payments">
             Aguardando Aprovação ({pendingPayments?.filter((p: any) => p.status === 'pending').length || 0})
           </TabsTrigger>
           <TabsTrigger value="approved-payments" data-testid="tab-approved-payments">
             Aguardando Pagamento ({pendingPayments?.filter((p: any) => p.status === 'approved').length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="ofx-transactions" data-testid="tab-ofx-transactions">
+            Transações OFX ({unreconciled.length + reconciled.length})
           </TabsTrigger>
           <TabsTrigger value="all-payments" data-testid="tab-all-payments">
             Todos ({filteredPayments?.length || 0})
@@ -486,6 +489,111 @@ export default function AdminProducerPayments() {
                   <div className="text-center py-12">
                     <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <p className="text-gray-500">Não há pagamentos aprovados aguardando conciliação</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ofx-transactions" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Transações Bancárias (OFX)</span>
+                <Badge variant="secondary" className="text-sm">
+                  {unreconciled.length} não conciliadas
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {bankTransactions && bankTransactions.length > 0 ? (
+                  <>
+                    {/* Unreconciled Transactions */}
+                    {unreconciled.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-semibold text-orange-700 mb-3 flex items-center">
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Pendentes de Conciliação ({unreconciled.length})
+                        </h3>
+                        <div className="space-y-2">
+                          {unreconciled.map((transaction: any) => (
+                            <div key={transaction.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200" data-testid={`ofx-transaction-${transaction.id}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">{transaction.description}</p>
+                                  <div className="flex gap-4 mt-1">
+                                    <p className="text-xs text-gray-600">
+                                      Data: {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                    </p>
+                                    {transaction.fitId && (
+                                      <p className="text-xs text-gray-500">ID: {transaction.fitId}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-red-600">
+                                    - R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  <Badge className="bg-orange-100 text-orange-800 text-xs mt-1">
+                                    Não Conciliado
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reconciled Transactions */}
+                    {reconciled.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Conciliadas ({reconciled.length})
+                        </h3>
+                        <div className="space-y-2">
+                          {reconciled.map((transaction: any) => (
+                            <div key={transaction.id} className="p-4 bg-green-50 rounded-lg border border-green-200" data-testid={`ofx-reconciled-${transaction.id}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">{transaction.description}</p>
+                                  <div className="flex gap-4 mt-1">
+                                    <p className="text-xs text-gray-600">
+                                      Data: {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                    </p>
+                                    {transaction.matchedOrderId && (
+                                      <p className="text-xs text-green-700 font-medium">
+                                        Pedido: {transaction.matchedOrderId}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {transaction.notes && (
+                                    <p className="text-xs text-gray-600 mt-1 italic">{transaction.notes}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-red-600">
+                                    - R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  <Badge className="bg-green-100 text-green-800 text-xs mt-1">
+                                    Conciliado
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma transação OFX importada</h3>
+                    <p className="text-gray-500 mb-4">Clique no botão "Importar OFX" para carregar transações bancárias</p>
                   </div>
                 )}
               </div>

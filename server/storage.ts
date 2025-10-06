@@ -86,7 +86,8 @@ export interface IStorage {
   getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
   updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined>;
-  updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined>; // New method
+  updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined>;
+  updateProductionOrder(id: string, updates: Partial<ProductionOrder>): Promise<ProductionOrder | undefined>;
 
   // Payments
   getPayments(): Promise<Payment[]>;
@@ -1437,6 +1438,19 @@ export class MemStorage implements IStorage {
         notes,
         hasUnreadNotes,
         lastNoteAt: hasUnreadNotes ? new Date() : productionOrder.lastNoteAt
+      };
+      this.productionOrders.set(id, updatedPO);
+      return updatedPO;
+    }
+    return undefined;
+  }
+
+  async updateProductionOrder(id: string, updates: Partial<ProductionOrder>): Promise<ProductionOrder | undefined> {
+    const productionOrder = this.productionOrders.get(id);
+    if (productionOrder) {
+      const updatedPO = {
+        ...productionOrder,
+        ...updates
       };
       this.productionOrders.set(id, updatedPO);
       return updatedPO;
