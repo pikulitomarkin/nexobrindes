@@ -10,7 +10,8 @@ import {
   CreditCard,
   ArrowRight,
   FileText,
-  Users
+  Users,
+  Factory
 } from "lucide-react";
 
 export default function FinanceIndex() {
@@ -46,6 +47,14 @@ export default function FinanceIndex() {
       href: "/finance/commission-payouts",
       color: "text-green-600",
       bgColor: "bg-green-100"
+    },
+    {
+      title: "Pagamentos aos Produtores",
+      description: "Gestão e conciliação de pagamentos aos produtores",
+      icon: Factory,
+      href: "/admin/producer-payments",
+      color: "text-teal-600",
+      bgColor: "bg-teal-100"
     },
     {
       title: "Conciliação Bancária",
