@@ -176,7 +176,7 @@ export interface IStorage {
   // Budget Payment Info
   getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined>;
   createBudgetPaymentInfo(data: InsertBudgetPaymentInfo): Promise<BudgetPaymentInfo>;
-  updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined>;
+  updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo>;
 
   // Financial module - Accounts Receivable
   getAccountsReceivable(): Promise<AccountsReceivable[]>;
@@ -196,11 +196,10 @@ export interface IStorage {
   getBankImports(): Promise<BankImport[]>;
   getBankImport(id: string): Promise<BankImport | undefined>;
   createBankImport(data: InsertBankImport): Promise<BankImport>;
-  updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined>;
   getBankTransactionsByImport(importId: string): Promise<BankTransaction[]>;
   getBankTransactions(): Promise<BankTransaction[]>;
   createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction>;
-  updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined>;
+  updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined>;
   matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined>;
 
   // Financial module - Expense Notes
@@ -600,7 +599,7 @@ export class MemStorage implements IStorage {
       id: "client-2",
       userId: "client-2",
       name: "Maria Santos",
-      email: "maria@gmail.com",
+      email: "maria@gmail.com", 
       phone: "(11) 99876-5432",
       whatsapp: "(11) 99876-5432",
       cpfCnpj: "987.654.321-00",
@@ -2126,43 +2125,19 @@ export class MemStorage implements IStorage {
     return newBudgetPaymentInfo;
   }
 
-  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo | undefined> {
-    const existing = Array.from(this.budgetPaymentInfo).find(info => info.budgetId === budgetId);
-    if (!existing) {
-      // Create new if doesn't exist
-      return this.createBudgetPaymentInfo({
-        budgetId,
-        ...data
-      } as InsertBudgetPaymentInfo);
-    }
-
-    const updated: BudgetPaymentInfo = {
-      ...existing,
-      ...data,
-      updatedAt: new Date(),
-    };
-    // Since budgetPaymentInfo is an array, we need to find and update it
-    const index = this.budgetPaymentInfo.findIndex(bpi => bpi.id === existing.id);
+  async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo> {
+    const index = this.budgetPaymentInfo.findIndex(bpi => bpi.budgetId === budgetId);
     if (index !== -1) {
-      this.budgetPaymentInfo[index] = updated;
+      this.budgetPaymentInfo[index] = {
+        ...this.budgetPaymentInfo[index],
+        ...data
+      };
+      return this.budgetPaymentInfo[index];
+    } else {
+      // Create new if doesn't exist
+      return this.createBudgetPaymentInfo({ budgetId, ...data } as InsertBudgetPaymentInfo);
     }
-    return updated;
   }
-
-  // Bank Transaction methods
-  async updateBankTransaction(id: string, data: Partial<any>): Promise<any> {
-    const existing = this.bankTransactions.get(id);
-    if (!existing) return undefined;
-
-    const updated = {
-      ...existing,
-      ...data,
-      updatedAt: new Date(),
-    };
-    this.bankTransactions.set(id, updated);
-    return updated;
-  }
-
 
   // Helper method to recalculate budget total
   private async recalculateBudgetTotal(budgetId: string): Promise<void> {
@@ -2323,7 +2298,6 @@ export class MemStorage implements IStorage {
     const bankImport: BankImport = {
       id,
       ...data,
-      importType: data.importType || 'general',
       uploadedAt: new Date(),
       updatedAt: new Date()
     };
@@ -2354,13 +2328,6 @@ export class MemStorage implements IStorage {
 
   async getBankTransactions(): Promise<BankTransaction[]> {
     return this.mockData.bankTransactions || [];
-  }
-
-  async getOutgoingBankTransactions(): Promise<BankTransaction[]> {
-    return (this.mockData.bankTransactions || []).filter(txn => 
-      parseFloat(txn.amount) < 0 && // Negative amounts are outgoing
-      (txn.status === 'unmatched' || !txn.status)
-    );
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
@@ -2598,7 +2565,7 @@ export class MemStorage implements IStorage {
 
   async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
     console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
-
+    
     const productionOrder = this.productionOrders.get(id);
     if (!productionOrder) {
       console.log(`Storage: Production order not found with id: ${id}`);
