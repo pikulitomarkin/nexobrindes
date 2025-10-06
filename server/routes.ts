@@ -3715,73 +3715,84 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+        return res.status(400).json({ error: "Nenhum arquivo OFX foi enviado" });
       }
 
-      const { mimetype, size, buffer, originalname } = req.file;
+      const ofxContent = req.file.buffer.toString('utf-8');
 
-      // Validate file type
-      if (!originalname.toLowerCase().endsWith('.ofx')) {
-        return res.status(400).json({ error: "Apenas arquivos OFX são permitidos" });
+      // Simple OFX parsing - in production, use a proper OFX parser library
+      const transactions = parseOFXTransactions(ofxContent);
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
       }
-
-      if (size > 10 * 1024 * 1024) { // 10MB limit
-        return res.status(400).json({ error: "Arquivo muito grande. Limite de 10MB." });
-      }
-
-      // Parse OFX content (simplified parsing)
-      const ofxContent = buffer.toString('utf-8');
 
       // Create bank import record
       const bankImport = await storage.createBankImport({
-        fileName: originalname,
-        uploadedBy: 'current-user',
-        status: 'processing',
-        importedAt: new Date(),
-        transactionCount: 0
+        filename: req.file.originalname,
+        uploadedBy: 'admin-1', // Should get from authenticated user
+        status: 'parsed',
+        summary: JSON.stringify({
+          totalTransactions: transactions.length,
+          dateRange: {
+            from: transactions[0]?.date,
+            to: transactions[transactions.length - 1]?.date
+          }
+        })
       });
 
-      // Extract transactions from OFX (simplified extraction)
-      const transactions = extractOFXTransactions(ofxContent);
-      let importedCount = 0;
-
-      // Process each transaction
+      // Create individual bank transactions with proper type classification
+      let createdCount = 0;
       for (const transaction of transactions) {
         try {
+          // Check if transaction already exists by fitId
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+          if (existingTransaction) {
+            console.log(`Transaction with fitId ${transaction.fitId} already exists, skipping`);
+            continue;
+          }
+
+          const amount = parseFloat(transaction.amount);
+          let transactionType = 'credit';
+          let notes = '';
+
+          // Classify transaction type based on amount
+          if (amount > 0) {
+            transactionType = 'credit';
+            notes = 'Entrada - Disponível para conciliação com contas a receber';
+          } else {
+            transactionType = 'debit';
+            notes = 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores';
+          }
+
           await storage.createBankTransaction({
             importId: bankImport.id,
-            transactionId: transaction.id,
+            fitId: transaction.fitId,
             date: transaction.date,
             amount: transaction.amount,
             description: transaction.description,
-            type: transaction.type,
-            isMatched: false
+            type: transactionType,
+            bankRef: transaction.bankRef,
+            status: 'unmatched',
+            notes: notes
           });
-          importedCount++;
+          createdCount++;
         } catch (error) {
-          console.error(`Error importing transaction ${transaction.id}:`, error);
+          console.error('Error creating bank transaction:', error);
         }
       }
-
-      // Update import record
-      await storage.updateBankImport(bankImport.id, {
-        status: 'completed',
-        transactionCount: importedCount
-      });
 
       res.json({
         success: true,
         importId: bankImport.id,
-        transactionsImported: importedCount,
-        message: `${importedCount} transações importadas com sucesso`
+        message: `${createdCount} transações importadas com sucesso`,
+        transactionsImported: createdCount,
+        duplicatesSkipped: transactions.length - createdCount
       });
 
     } catch (error) {
-      console.error("OFX import error:", error);
-      res.status(500).json({ 
-        error: "Erro ao processar arquivo OFX",
-        details: (error as Error).message 
-      });
+      console.error('Error importing OFX:', error);
+      res.status(500).json({ error: "Erro ao processar arquivo OFX" });
     }
   });
 
@@ -3902,293 +3913,205 @@ Para mais detalhes, entre em contato conosco!`;
   // Producer payment association endpoint
   app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
     try {
-      const { transactionIds, productionOrderId } = req.body;
+      const { transactionId, producerPaymentId, amount } = req.body;
 
-      console.log("Associating producer payment:", {
-        transactionIdsList: transactionIds,
-        productionOrderId
+      console.log("Associating producer payment:", { transactionId, producerPaymentId, amount });
+
+      // Get the bank transaction
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      // Verify this is a debit transaction (outgoing payment)
+      if (parseFloat(transaction.amount) >= 0) {
+        return res.status(400).json({ error: "Esta transação não é uma saída (débito)" });
+      }
+
+      // Get the producer payment
+      const producerPayment = await storage.getProducerPayment(producerPaymentId);
+      if (!producerPayment) {
+        return res.status(404).json({ error: "Pagamento de produtor não encontrado" });
+      }
+
+      // Update producer payment status to paid
+      await storage.updateProducerPayment(producerPaymentId, {
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: 'bank_transfer'
       });
 
-      // Get all available bank transactions
-      const bankTransactions = await storage.getBankTransactions();
-      console.log("Available transactions:", bankTransactions.length);
-
-      // Find the specific transactions
-      console.log("Looking for transaction IDs:", transactionIds);
-      const selectedTransactions = bankTransactions.filter(txn => 
-        transactionIds.includes(txn.id) && txn.status === 'unmatched'
-      );
-      console.log("Found", selectedTransactions.length, "transactions:", selectedTransactions.map(t => ({ id: t.id, amount: t.amount })));
-
-      if (selectedTransactions.length !== transactionIds.length) {
-        return res.status(400).json({ 
-          error: "Algumas transações não foram encontradas ou já foram conciliadas" 
-        });
-      }
-
-      // Get production order
-      const productionOrder = await storage.getProductionOrder(productionOrderId);
-      if (!productionOrder) {
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
-      }
-      console.log("Found production order:", productionOrder);
-
-      // Calculate total transaction amount
-      const totalTransactionAmount = selectedTransactions.reduce((sum, txn) => 
-        sum + Math.abs(parseFloat(txn.amount)), 0
-      );
-      const paymentAmount = parseFloat(productionOrder.producerValue || '0');
-      const difference = totalTransactionAmount - paymentAmount;
-
-      console.log("Reconciliation amounts:", {
-        paymentAmount,
-        totalTransactionAmount,
-        difference
+      // Update bank transaction status
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedAt: new Date(),
+        notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
       });
-
-      // Update production order payment status to 'paid'
-      await storage.updateProductionOrder(productionOrderId, {
-        producerPaymentStatus: 'paid'
-      });
-
-      // Mark transactions as matched
-      for (const transaction of selectedTransactions) {
-        await storage.updateBankTransaction(transaction.id, {
-          status: 'matched',
-          matchedOrderId: productionOrder.orderId,
-          matchedAt: new Date(),
-          notes: `Conciliado com pagamento produtor - Ordem: ${productionOrder.orderId}`
-        });
-      }
-
-      // Create adjustment transaction if there's a difference
-      if (Math.abs(difference) > 0.01) { // Only if difference is more than 1 cent
-        const adjustmentDescription = difference > 0 
-          ? `Diferença positiva na conciliação - Pagamento ${productionOrder.orderId}` 
-          : `Diferença negativa na conciliação - Pagamento ${productionOrder.orderId}`;
-
-        await storage.createBankTransaction({
-          importId: 'manual-adjustment',
-          fitId: `ADJ-${Date.now()}-${productionOrderId}`,
-          amount: difference.toFixed(2),
-          date: new Date(),
-          description: adjustmentDescription,
-          type: difference > 0 ? 'credit' : 'debit',
-          status: 'matched',
-          matchedOrderId: productionOrder.orderId,
-          bankRef: 'ADJUSTMENT',
-          notes: `Ajuste automático de conciliação: R$ ${Math.abs(difference).toFixed(2)} ${difference > 0 ? 'a favor' : 'a pagar'}`
-        });
-
-        console.log("Created adjustment transaction:", {
-          amount: difference.toFixed(2),
-          type: difference > 0 ? 'credit' : 'debit'
-        });
-      }
-
-      // Update producer payment record to 'paid'
-      const producerPayments = await storage.getProducerPayments();
-      const paymentRecord = producerPayments.find(p => p.productionOrderId === productionOrderId);
-
-      if (paymentRecord) {
-        await storage.updateProducerPayment(paymentRecord.id, {
-          status: 'paid',
-          paidAt: new Date(),
-          paidBy: 'admin-1', // In a real app, this would be the current user
-          notes: paymentRecord.notes ? 
-            `${paymentRecord.notes} | Conciliado com ${selectedTransactions.length} transação(ões) bancária(s)` :
-            `Conciliado com ${selectedTransactions.length} transação(ões) bancária(s)`
-        });
-      }
-
-      // Get producer name for response
-      const producer = await storage.getUser(productionOrder.producerId);
-
-      console.log("Producer payment associated successfully");
-
-      let responseMessage = "Pagamento conciliado com sucesso";
-      if (Math.abs(difference) > 0.01) {
-        const diffType = difference > 0 ? "sobra" : "falta";
-        responseMessage += `. Diferença de R$ ${Math.abs(difference).toFixed(2)} (${diffType}) registrada automaticamente.`;
-      }
 
       res.json({
         success: true,
-        message: responseMessage,
-        payment: {
-          amount: paymentAmount.toFixed(2),
-          producerName: producer?.name || 'Unknown',
-          transactionsCount: selectedTransactions.length,
-          totalTransactionAmount: totalTransactionAmount.toFixed(2),
-          difference: difference.toFixed(2),
-          hasAdjustment: Math.abs(difference) > 0.01
-        }
+        message: "Pagamento de produtor conciliado com sucesso"
       });
+
     } catch (error) {
       console.error("Error associating producer payment:", error);
-      res.status(500).json({ 
-        error: "Erro interno do servidor",
-        details: error.message 
-      });
+      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
     }
   });
 
-  app.post("/api/finance/producer-payments/associate-multiple-payments", async (req, res) => {
+  // Associate multiple payments with order (for reconciliation)
+  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
     try {
-      const { transactions, productionOrderId } = req.body;
+      const { transactions, orderId, totalAmount } = req.body;
 
-      if (!transactions || transactions.length === 0) {
-        return res.status(400).json({ error: "Pelo menos uma transação deve ser fornecida" });
-      }
-
-      const productionOrder = await storage.getProductionOrder(productionOrderId);
-      if (!productionOrder) {
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
-      }
-
-      const order = await storage.getOrder(productionOrder.orderId);
-      const producer = await storage.getUser(productionOrder.producerId);
-
-      let totalAmount = 0;
-      let processedTransactions = 0;
-
-      // Processar cada transação
-      for (const txn of transactions) {
-        const transaction = await storage.getBankTransaction(txn.transactionId);
-        if (!transaction) {
-          console.warn(`Transação ${txn.transactionId} não encontrada, pulando...`);
-          continue;
-        }
-
-        await storage.updateBankTransaction(transaction.id, {
-          status: 'matched',
-          isMatched: true,
-          matchedOrderId: productionOrder.orderId,
-          notes: `Pagamento ao produtor - Ordem ${productionOrder.id} (${processedTransactions + 1}/${transactions.length})`
-        });
-
-        totalAmount += parseFloat(txn.amount);
-        processedTransactions++;
-      }
-
-      if (processedTransactions === 0) {
-        return res.status(400).json({ error: "Nenhuma transação válida foi encontrada" });
-      }
-
-      // Atualizar status do pagamento do produtor
-      await storage.updateProductionOrder(productionOrderId, {
-        producerPaymentStatus: 'paid'
+      console.log("Associating multiple payments:", {
+        transactionCount: transactions.length,
+        orderId,
+        totalAmount
       });
 
-      // Verificar se há diferença entre o valor total e o pagamento esperado
-      const expectedAmount = parseFloat(productionOrder.amount || '0');
-      const difference = totalAmount - expectedAmount;
-      let differenceNote = '';
-
-      if (Math.abs(difference) > 0.01) {
-        differenceNote = difference > 0 
-          ? `Pagamento excedeu em R$ ${difference.toFixed(2)}`
-          : `Faltou R$ ${Math.abs(difference).toFixed(2)} para completar o pagamento`;
-
-        // Criar registro da diferença no sistema
-        await storage.createFinancialNote({
-          type: 'payment_difference',
-          productionOrderId: productionOrderId,
-          amount: difference,
-          description: differenceNote,
-          createdAt: new Date()
-        });
-      }
-
-      res.json({
-        success: true,
-        message: `${processedTransactions} transação${processedTransactions !== 1 ? 'ões' : ''} associada${processedTransactions !== 1 ? 's' : ''} com sucesso`,
-        paymentsProcessed: processedTransactions,
-        totalAmount: totalAmount.toFixed(2),
-        expectedAmount: expectedAmount.toFixed(2),
-        difference: difference.toFixed(2),
-        differenceNote: differenceNote,
-        producerName: producer?.name || 'Unknown',
-        orderNumber: order?.orderNumber || 'Unknown'
-      });
-    } catch (error) {
-      console.error("Failed to associate multiple producer payments:", error);
-      res.status(500).json({ error: "Failed to associate multiple producer payments: " + error.message });
-    }
-  });
-
-  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
-      }
-
-      const ofxContent = req.file.buffer.toString('utf-8');
-
-      const bankImport = await storage.createBankImport({
-        fileName: req.file.originalname,
-        uploadedBy: 'current-user',
-        status: 'processing',
-        fileContent: ofxContent,
-        transactionCount: 0
-      });
-
-      const transactions = extractOFXTransactions(ofxContent);
-
-      let importedCount = 0;
-      let skippedCount = 0;
+      let paymentsCreated = 0;
+      const createdPayments = [];
 
       for (const transaction of transactions) {
         try {
-          const transactionAmount = parseFloat(transaction.amount);
-
-          if (transactionAmount < 0) {
-            // Verificar se já existe transação com mesmo FITID
-            const existingTransaction = await storage.getBankTransactionByFitId(transaction.id);
-
-            if (existingTransaction) {
-              console.log(`Transação ${transaction.id} já existe, pulando importação`);
-              skippedCount++;
-              continue;
-            }
-
-            await storage.createBankTransaction({
-              importId: bankImport.id,
-              transactionId: transaction.id,
-              fitId: transaction.id,
-              date: transaction.date,
-              amount: Math.abs(transactionAmount).toFixed(2),
-              description: transaction.description || 'Pagamento a produtor',
-              type: 'debit',
-              status: 'unmatched',
-              isMatched: false
-            });
-            importedCount++;
+          // Verify this is a credit transaction (incoming payment)
+          const bankTransaction = await storage.getBankTransaction(transaction.transactionId);
+          if (!bankTransaction || parseFloat(bankTransaction.amount) <= 0) {
+            console.log(`Skipping transaction ${transaction.transactionId} - not a credit transaction`);
+            continue;
           }
+
+          // Create payment record
+          const payment = await storage.createPayment({
+            orderId: orderId,
+            amount: transaction.amount,
+            method: "bank_transfer", // OFX transactions are bank transfers
+            status: "confirmed",
+            transactionId: `OFX-${transaction.transactionId}`,
+            paidAt: new Date()
+          });
+
+          createdPayments.push(payment);
+
+          // Update bank transaction status
+          await storage.updateBankTransaction(transaction.transactionId, {
+            status: 'matched',
+            matchedPaymentId: payment.id,
+            matchedOrderId: orderId,
+            matchedAt: new Date(),
+            notes: `Conciliado com pedido ${orderId} - Conta a receber`
+          });
+
+          paymentsCreated++;
         } catch (error) {
-          console.error(`Error importing transaction ${transaction.id}:`, error);
+          console.error(`Error processing transaction ${transaction.transactionId}:`, error);
         }
       }
 
-      await storage.updateBankImport(bankImport.id, {
-        status: 'completed',
-        transactionCount: importedCount
+      console.log(`Successfully processed ${paymentsCreated} payments for order ${orderId}`);
+
+      res.json({
+        success: true,
+        paymentsCreated,
+        totalAmount,
+        payments: createdPayments
+      });
+
+    } catch (error) {
+      console.error("Error associating multiple payments:", error);
+      res.status(500).json({ error: "Erro ao associar pagamentos múltiplos" });
+    }
+  });
+
+  // Associate outgoing transactions with producer payments (for payables - outgoing transactions)
+  app.post("/api/finance/associate-producer-payment", async (req, res) => {
+    try {
+      const { transactionId, producerPaymentId, amount } = req.body;
+
+      // Get the bank transaction
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      // Verify this is a debit transaction (outgoing payment)
+      if (parseFloat(transaction.amount) >= 0) {
+        return res.status(400).json({ error: "Esta transação não é uma saída (débito)" });
+      }
+
+      // Get the producer payment
+      const producerPayment = await storage.getProducerPayment(producerPaymentId);
+      if (!producerPayment) {
+        return res.status(404).json({ error: "Pagamento de produtor não encontrado" });
+      }
+
+      // Update producer payment status to paid
+      await storage.updateProducerPayment(producerPaymentId, {
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: 'bank_transfer'
+      });
+
+      // Update bank transaction status
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedAt: new Date(),
+        notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
       });
 
       res.json({
         success: true,
-        importId: bankImport.id,
-        transactionsImported: importedCount,
-        transactionsSkipped: skippedCount,
-        message: `${importedCount} novas transações importadas${skippedCount > 0 ? ` (${skippedCount} duplicadas ignoradas)` : ''}`
+        message: "Pagamento de produtor conciliado com sucesso"
       });
 
     } catch (error) {
-      console.error("Producer OFX import error:", error);
-      res.status(500).json({ 
-        error: "Erro ao processar arquivo OFX",
-        details: (error as Error).message 
-      });
+      console.error("Error associating producer payment:", error);
+      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
+    }
+  });
+
+  // Add endpoint to get pending producer payments for reconciliation
+  app.get("/api/finance/pending-producer-payments", async (req, res) => {
+    try {
+      const producerPayments = await storage.getProducerPayments();
+
+      // Filter payments that are approved or pending and have a value
+      const pendingPayments = producerPayments.filter(payment => 
+        (payment.status === 'approved' || payment.status === 'pending') && 
+        payment.amount && parseFloat(payment.amount) > 0
+      );
+
+      // Enrich with producer and order information
+      const enrichedPayments = await Promise.all(
+        pendingPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const producer = await storage.getUser(payment.producerId);
+          let order = null;
+
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+          }
+
+          return {
+            id: payment.id,
+            amount: payment.amount,
+            producerId: payment.producerId,
+            producerName: producer?.name || 'Unknown',
+            status: payment.status,
+            notes: payment.notes,
+            productionOrder: productionOrder,
+            order: order,
+            createdAt: payment.createdAt
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedPayments.length} pending producer payments for reconciliation`);
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
     }
   });
 
@@ -4232,8 +4155,9 @@ Para mais detalhes, entre em contato conosco!`;
         const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
         const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${index}`;
         const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
+        const bankRef = match.match(/<BANKREF>(.*?)</)?.[1] || null; // Capture BANKREF if available
 
-        // Parse date (format: YYYYMMDDHHMMSS)
+        // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
         let transactionDate = new Date();
         if (dtPosted && dtPosted.length >= 8) {
           const year = parseInt(dtPosted.substring(0, 4));
@@ -4243,11 +4167,13 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         transactions.push({
-          id: fitId,
+          id: fitId, // Using FITID as the primary identifier
           date: transactionDate,
           amount: trnAmt,
           description: memo,
-          type: trnType === 'CREDIT' ? 'credit' : 'debit'
+          type: trnType, // Keep original type for now, will classify later
+          fitId: fitId, // Ensure fitId is captured
+          bankRef: bankRef // Include bankRef
         });
       });
     }
@@ -4328,7 +4254,11 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { transactions, orderId, totalAmount } = req.body;
 
-      console.log("Associating multiple payments:", { transactionCount: transactions.length, orderId, totalAmount });
+      console.log("Associating multiple payments:", {
+        transactionCount: transactions.length,
+        orderId,
+        totalAmount
+      });
 
       if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
         return res.status(400).json({ error: "Lista de transações é obrigatória" });
@@ -4398,7 +4328,7 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({
         success: true,
         paymentsCreated: createdPayments.length,
-        totalAmount: totalAmount,
+        totalAmount,
         orderNumber: order.orderNumber,
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',

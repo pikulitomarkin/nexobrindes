@@ -2614,6 +2614,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async getProducerPayment(id: string): Promise<ProducerPayment | undefined> {
+    return this.producerPayments.get(id);
+  }
+
   async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
     console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
 

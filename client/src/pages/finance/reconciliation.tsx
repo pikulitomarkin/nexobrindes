@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -258,7 +257,7 @@ export default function FinanceReconciliation() {
 
   const getCompatibleTransactions = (orderValue: number) => {
     if (!bankTransactions) return [];
-    
+
     const tolerance = 0.05; // 5% de tolerância
     return bankTransactions.filter((transaction: any) => 
       transaction.status === 'unmatched' &&
@@ -267,9 +266,9 @@ export default function FinanceReconciliation() {
     );
   };
 
-  const getAllUnmatchedTransactions = () => {
+  const getAllUnmatchedIncomingTransactions = () => {
     if (!bankTransactions) return [];
-    
+
     return bankTransactions.filter((transaction: any) => 
       (transaction.status === 'unmatched' || !transaction.status) &&
       parseFloat(transaction.amount) > 0 // Apenas entradas (valores positivos)
@@ -536,24 +535,24 @@ export default function FinanceReconciliation() {
                 Aguardando Finalização ({pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0).length || 0})
               </TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="awaiting-down-payment" className="mt-6">
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') === 0).map((order: any) => {
                   const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
-                  
+
                   // Get budget down payment info if available
                   let budgetDownPayment = 0;
                   let expectedDownPayment = remainingValue; // Default to remaining value
-                  
+
                   if (order.budgetInfo && order.budgetInfo.downPayment) {
                     budgetDownPayment = parseFloat(order.budgetInfo.downPayment);
                     expectedDownPayment = budgetDownPayment;
                   }
-                  
+
                   // Get transactions that match the expected payment amount
                   const expectedCompatibleTransactions = getCompatibleTransactions(expectedDownPayment);
-                  
+
                   return (
                     <div key={order.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200 hover:border-orange-300 transition-colors">
                       <div className="flex items-center justify-between mb-2">
@@ -583,7 +582,7 @@ export default function FinanceReconciliation() {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
                           {budgetDownPayment > 0 ? (
@@ -594,7 +593,7 @@ export default function FinanceReconciliation() {
                             <span className="text-orange-600">Aguardando definição de entrada</span>
                           )}
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           {expectedCompatibleTransactions.length > 0 && (
                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
@@ -604,9 +603,9 @@ export default function FinanceReconciliation() {
                               )}
                             </Badge>
                           )}
-                          {getAllUnmatchedTransactions().length > 0 && expectedCompatibleTransactions.length === 0 && (
+                          {getAllUnmatchedIncomingTransactions().length > 0 && expectedCompatibleTransactions.length === 0 && (
                             <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
-                              {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
+                              {getAllUnmatchedIncomingTransactions().length} transação{getAllUnmatchedIncomingTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedIncomingTransactions().length !== 1 ? 'is' : ''}
                             </Badge>
                           )}
                           <Button
@@ -623,7 +622,7 @@ export default function FinanceReconciliation() {
                     </div>
                   );
                 }) || []}
-                
+
                 {(!pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') === 0) || pendingOrders.filter((order: any) => parseFloat(order.paidValue || '0') === 0).length === 0) && (
                   <div className="text-center py-8 text-gray-500">
                     <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -633,13 +632,13 @@ export default function FinanceReconciliation() {
                 )}
               </div>
             </TabsContent>
-            
+
             <TabsContent value="awaiting-final-payment" className="mt-6">
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0).map((order: any) => {
                   const remainingValue = parseFloat(order.totalValue) - parseFloat(order.paidValue || '0');
                   const compatibleTransactions = getCompatibleTransactions(remainingValue);
-                  
+
                   return (
                     <div key={order.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
                       <div className="flex items-center justify-between mb-2">
@@ -662,7 +661,7 @@ export default function FinanceReconciliation() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
                           <span className="text-green-600">
@@ -672,16 +671,16 @@ export default function FinanceReconciliation() {
                             Aguardando R$ {remainingValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para finalização
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           {compatibleTransactions.length > 0 && (
                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
                               {compatibleTransactions.length} transação{compatibleTransactions.length !== 1 ? 'ões' : ''} compatível{compatibleTransactions.length !== 1 ? 'is' : ''}
                             </Badge>
                           )}
-                          {getAllUnmatchedTransactions().length > 0 && compatibleTransactions.length === 0 && (
+                          {getAllUnmatchedIncomingTransactions().length > 0 && compatibleTransactions.length === 0 && (
                             <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-800 border-yellow-200">
-                              {getAllUnmatchedTransactions().length} transação{getAllUnmatchedTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedTransactions().length !== 1 ? 'is' : ''}
+                              {getAllUnmatchedIncomingTransactions().length} transação{getAllUnmatchedIncomingTransactions().length !== 1 ? 'ões' : ''} disponível{getAllUnmatchedIncomingTransactions().length !== 1 ? 'is' : ''}
                             </Badge>
                           )}
                           <Button
@@ -698,7 +697,7 @@ export default function FinanceReconciliation() {
                     </div>
                   );
                 }) || []}
-                
+
                 {(!pendingOrders?.filter((order: any) => parseFloat(order.paidValue || '0') > 0) || pendingOrders.filter((order: any) => parseFloat(order.paidValue || '0') > 0).length === 0) && (
                   <div className="text-center py-8 text-gray-500">
                     <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -725,7 +724,7 @@ export default function FinanceReconciliation() {
               O sistema criará automaticamente o registro de pagamento.
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedOrder && (
             <div className="space-y-6">
               {/* Order Info */}
@@ -959,7 +958,7 @@ export default function FinanceReconciliation() {
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold flex items-center gap-2">
                     <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
-                      {getAllUnmatchedTransactions().length}
+                      {getAllUnmatchedIncomingTransactions().length}
                     </span>
                     Todas as Transações Não Conciliadas
                   </h4>
@@ -967,8 +966,8 @@ export default function FinanceReconciliation() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleSelectAllCompatible(getAllUnmatchedTransactions())}
-                      disabled={getAvailableTransactions(getAllUnmatchedTransactions()).length === 0}
+                      onClick={() => handleSelectAllCompatible(getAllUnmatchedIncomingTransactions())}
+                      disabled={getAvailableTransactions(getAllUnmatchedIncomingTransactions()).length === 0}
                       className="text-xs"
                     >
                       Selecionar Todas
@@ -976,7 +975,7 @@ export default function FinanceReconciliation() {
                   </div>
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-2 bg-gray-50">
-                  {getAllUnmatchedTransactions().map((transaction: any) => (
+                  {getAllUnmatchedIncomingTransactions().map((transaction: any) => (
                     <div
                       key={transaction.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
