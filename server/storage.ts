@@ -1135,8 +1135,17 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
+    console.log(`Storage: Creating client with data:`, clientData);
+    console.log(`Storage: Final client object:`, client);
+    console.log(`Storage: VendorId being set:`, client.vendorId);
+    
     this.clients.set(id, client);
+    
+    // Log all clients to verify storage
+    const allClients = Array.from(this.clients.values());
+    console.log(`Storage: Total clients after creation: ${allClients.length}`);
+    console.log(`Storage: Clients for vendor ${client.vendorId}:`, allClients.filter(c => c.vendorId === client.vendorId).map(c => ({ id: c.id, name: c.name })));
+    
     return client;
   }
 

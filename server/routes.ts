@@ -928,6 +928,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get clients by vendor
+  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching clients for vendor: ${vendorId}`);
+
+      const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+
+      // Enrich with user data and orders count
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const user = client.userId ? await storage.getUser(client.userId) : null;
+
+          // Get orders count and total spent for this client
+          const orders = await storage.getOrdersByClient(client.id);
+          const ordersCount = orders.length;
+          const totalSpent = orders.reduce((sum, order) => sum + parseFloat(order.totalValue || '0'), 0);
+
+          return {
+            ...client,
+            username: user?.username || null,
+            userCode: user?.username || client.userCode || null,
+            ordersCount,
+            totalSpent
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedClients.length} enriched clients`);
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching clients by vendor:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
   app.put("/api/vendors/:vendorId/commission", async (req, res) => {
     try {
       const { vendorId } = req.params;
@@ -1105,7 +1142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", async (req, res) => {
     try {
       const productData = req.body;
-      
+
       // Convert empty strings to null for numeric fields
       const cleanedData = {
         ...productData,
@@ -1115,7 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         depth: productData.depth === '' ? null : productData.depth,
         availableQuantity: productData.availableQuantity === '' ? null : productData.availableQuantity,
       };
-      
+
       console.log('Creating product with data:', cleanedData);
       const newProduct = await storage.createProduct(cleanedData);
       console.log('Product created successfully:', newProduct.id);

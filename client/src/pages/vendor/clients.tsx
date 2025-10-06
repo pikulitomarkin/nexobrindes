@@ -55,14 +55,27 @@ export default function VendorClients() {
     }
   }, [isCreateDialogOpen]);
 
-  const { data: clients, isLoading } = useQuery({
+  const { data: clients, isLoading, error } = useQuery({
     queryKey: ["/api/vendor/clients", vendorId],
     queryFn: async () => {
+      console.log(`Fetching clients for vendor: ${vendorId}`);
       const response = await fetch(`/api/vendors/${vendorId}/clients`);
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
+      if (!response.ok) {
+        console.error('Failed to fetch clients:', response.status, response.statusText);
+        throw new Error('Failed to fetch clients');
+      }
+      const data = await response.json();
+      console.log('Clients fetched:', data);
+      return data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0 // Always refetch to ensure fresh data
   });
+
+  // Log any query errors
+  if (error) {
+    console.error('Query error:', error);
+  }
 
   const { data: clientOrders } = useQuery({
     queryKey: ["/api/clients", selectedClientId, "orders"],
@@ -104,9 +117,15 @@ export default function VendorClients() {
       return response.json();
     },
     onSuccess: (newClient) => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      
+      // Force refetch of the main query
+      queryClient.refetchQueries({ queryKey: ["/api/vendor/clients", vendorId] });
+      
       setIsCreateDialogOpen(false);
       form.reset();
       toast({
@@ -122,6 +141,8 @@ export default function VendorClients() {
           duration: 10000,
         });
       }, 1000);
+      
+      console.log("Cliente criado com sucesso:", newClient);
     },
   });
 
