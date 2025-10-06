@@ -362,6 +362,36 @@ export class MemStorage implements IStorage {
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      },
+      {
+        id: "pm-4",
+        name: "Dinheiro",
+        type: "cash",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "pm-5",
+        name: "Transferência Bancária",
+        type: "transfer",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "pm-6",
+        name: "Cartão de Débito",
+        type: "debit_card",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ];
   }
@@ -372,7 +402,7 @@ export class MemStorage implements IStorage {
         id: "sm-1",
         name: "Correios PAC",
         type: "calculated",
-        basePrice: "0.00",
+        basePrice: "15.00",
         freeShippingThreshold: "150.00",
         estimatedDays: 8,
         isActive: true,
@@ -381,9 +411,20 @@ export class MemStorage implements IStorage {
       },
       {
         id: "sm-2",
+        name: "Correios SEDEX",
+        type: "calculated",
+        basePrice: "25.00",
+        freeShippingThreshold: "200.00",
+        estimatedDays: 3,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-3",
         name: "Transportadora",
         type: "fixed",
-        basePrice: "25.00",
+        basePrice: "35.00",
         freeShippingThreshold: "300.00",
         estimatedDays: 5,
         isActive: true,
@@ -391,12 +432,45 @@ export class MemStorage implements IStorage {
         updatedAt: new Date().toISOString()
       },
       {
-        id: "sm-3",
+        id: "sm-4",
+        name: "Retirada no Local",
+        type: "pickup",
+        basePrice: "0.00",
+        freeShippingThreshold: "0.00",
+        estimatedDays: 1,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-5",
         name: "Frete Grátis",
         type: "free",
         basePrice: "0.00",
         freeShippingThreshold: "0.00",
         estimatedDays: 7,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-6",
+        name: "Entrega Expressa",
+        type: "fixed",
+        basePrice: "45.00",
+        freeShippingThreshold: "500.00",
+        estimatedDays: 1,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "sm-7",
+        name: "Motoboy",
+        type: "fixed",
+        basePrice: "20.00",
+        freeShippingThreshold: "0.00",
+        estimatedDays: 1,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -509,6 +583,11 @@ export class MemStorage implements IStorage {
     try {
       // Always ensure test users exist (will not duplicate if already created)
       await this.createTestUsers();
+
+      // Force reinitialize payment and shipping methods
+      this.paymentMethods = this.initializePaymentMethods();
+      this.shippingMethods = this.initializeShippingMethods();
+      console.log(`Initialized ${this.paymentMethods.length} payment methods and ${this.shippingMethods.length} shipping methods`);
 
       const users = await this.getUsers();
       if (users.length > 5) {
@@ -867,9 +946,16 @@ export class MemStorage implements IStorage {
       // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
       this.initializeFinancialIntegration();
 
-      // Initialize Payment and Shipping Methods
-      this.paymentMethods = this.initializePaymentMethods();
-      this.shippingMethods = this.initializeShippingMethods();
+      // Ensure Payment and Shipping Methods are always initialized
+      if (!this.paymentMethods || this.paymentMethods.length === 0) {
+        this.paymentMethods = this.initializePaymentMethods();
+      }
+      if (!this.shippingMethods || this.shippingMethods.length === 0) {
+        this.shippingMethods = this.initializeShippingMethods();
+      }
+      
+      console.log(`Payment methods initialized: ${this.paymentMethods.length}`);
+      console.log(`Shipping methods initialized: ${this.shippingMethods.length}`);
     } catch (error) {
       console.error("Error during initializeData:", error);
     }
@@ -1828,13 +1914,21 @@ export class MemStorage implements IStorage {
   async createBudget(budgetData: any): Promise<any> {
     const id = randomUUID();
 
-    // Ensure dates are properly formatted
+    // Ensure dates are properly formatted - handle both string dates and Date objects
     let validUntil = null;
     let deliveryDeadline = null;
 
     if (budgetData.validUntil) {
       try {
-        validUntil = typeof budgetData.validUntil === 'string' ? budgetData.validUntil : new Date(budgetData.validUntil).toISOString();
+        if (typeof budgetData.validUntil === 'string') {
+          // If it's already a string, use it directly if it's a valid date format
+          const testDate = new Date(budgetData.validUntil);
+          if (!isNaN(testDate.getTime())) {
+            validUntil = budgetData.validUntil;
+          }
+        } else if (budgetData.validUntil instanceof Date) {
+          validUntil = budgetData.validUntil.toISOString();
+        }
       } catch (e) {
         console.warn("Invalid validUntil date:", budgetData.validUntil);
       }
@@ -1842,7 +1936,15 @@ export class MemStorage implements IStorage {
 
     if (budgetData.deliveryDeadline) {
       try {
-        deliveryDeadline = typeof budgetData.deliveryDeadline === 'string' ? budgetData.deliveryDeadline : new Date(budgetData.deliveryDeadline).toISOString();
+        if (typeof budgetData.deliveryDeadline === 'string') {
+          // If it's already a string, use it directly if it's a valid date format
+          const testDate = new Date(budgetData.deliveryDeadline);
+          if (!isNaN(testDate.getTime())) {
+            deliveryDeadline = budgetData.deliveryDeadline;
+          }
+        } else if (budgetData.deliveryDeadline instanceof Date) {
+          deliveryDeadline = budgetData.deliveryDeadline.toISOString();
+        }
       } catch (e) {
         console.warn("Invalid deliveryDeadline date:", budgetData.deliveryDeadline);
       }
@@ -1851,6 +1953,7 @@ export class MemStorage implements IStorage {
     const budget = {
       ...budgetData,
       id,
+      budgetNumber: budgetData.budgetNumber || `ORC-${Date.now()}`,
       validUntil,
       deliveryDeadline,
       createdAt: new Date().toISOString(),

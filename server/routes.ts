@@ -1487,10 +1487,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate budget number
       const budgetNumber = `ORC-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
 
-      const newBudget = await storage.createBudget({
-        ...budgetData,
-        budgetNumber
-      });
+      // Process dates properly
+      let processedData = { ...budgetData, budgetNumber };
+      
+      // Handle date strings properly
+      if (processedData.validUntil && processedData.validUntil !== '') {
+        const validDate = new Date(processedData.validUntil);
+        processedData.validUntil = isNaN(validDate.getTime()) ? null : processedData.validUntil;
+      } else {
+        processedData.validUntil = null;
+      }
+      
+      if (processedData.deliveryDeadline && processedData.deliveryDeadline !== '') {
+        const deliveryDate = new Date(processedData.deliveryDeadline);
+        processedData.deliveryDeadline = isNaN(deliveryDate.getTime()) ? null : processedData.deliveryDeadline;
+      } else {
+        processedData.deliveryDeadline = null;
+      }
+
+      const newBudget = await storage.createBudget(processedData);
 
       // Process budget items
       for (const item of budgetData.items) {
