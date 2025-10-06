@@ -22,15 +22,15 @@ export default function AdminProducerPayments() {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const { toast } = useToast();
 
-  const { data: producerPayments, isLoading } = useQuery({
+  const { data: producerPayments, isLoading } = useQuery<any[]>({
     queryKey: ["/api/finance/producer-payments"],
   });
 
-  const { data: pendingPayments } = useQuery({
+  const { data: pendingPayments } = useQuery<any[]>({
     queryKey: ["/api/finance/producer-payments/pending"],
   });
 
-  const { data: bankTransactions } = useQuery({
+  const { data: bankTransactions } = useQuery<any[]>({
     queryKey: ["/api/finance/bank-transactions"],
   });
 
@@ -66,9 +66,8 @@ export default function AdminProducerPayments() {
 
   const approvePaymentMutation = useMutation({
     mutationFn: async (paymentId: string) => {
-      return await apiRequest(`/api/finance/producer-payments/${paymentId}/approve`, {
-        method: "POST",
-      });
+      const res = await apiRequest("POST", `/api/finance/producer-payments/${paymentId}/approve`);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
@@ -89,16 +88,14 @@ export default function AdminProducerPayments() {
 
   const associatePaymentMutation = useMutation({
     mutationFn: async ({ transactionId, productionOrderId, amount }: { transactionId: string; productionOrderId: string; amount: string }) => {
-      return await apiRequest("/api/finance/producer-payments/associate-payment", {
-        method: "POST",
-        body: JSON.stringify({
-          transactionId,
-          productionOrderId,
-          amount: parseFloat(amount).toFixed(2)
-        }),
+      const res = await apiRequest("POST", "/api/finance/producer-payments/associate-payment", {
+        transactionId,
+        productionOrderId,
+        amount: parseFloat(amount).toFixed(2)
       });
+      return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });

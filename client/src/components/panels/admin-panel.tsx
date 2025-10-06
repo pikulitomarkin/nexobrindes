@@ -19,11 +19,11 @@ import {
 } from "lucide-react";
 
 export default function AdminPanel() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: orders, isLoading: ordersLoading } = useQuery({
+  const { data: orders, isLoading: ordersLoading } = useQuery<any[]>({
     queryKey: ["/api/orders"],
   });
 
