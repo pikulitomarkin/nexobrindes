@@ -46,6 +46,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }
+  });
+
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
@@ -1216,12 +1222,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Failed to create product" });
     }
-  });
-
-  // Configure multer for file uploads
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
   });
 
   // Client profile endpoints
