@@ -1031,6 +1031,56 @@ export class MemStorage implements IStorage {
       this.mockData.expenseNotes.push(expense);
     });
 
+    // Create sample bank transactions for producer payments
+    const sampleBankTransactions: BankTransaction[] = [
+      {
+        id: "txn-1",
+        importId: "import-1",
+        fitId: "FIT001",
+        amount: "850.00",
+        description: "TED PAGAMENTO PRODUTOR MARCENARIA SANTOS",
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+        type: "debit",
+        status: "unmatched",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "txn-2",
+        importId: "import-1",
+        fitId: "FIT002",
+        amount: "1200.00",
+        description: "PIX PAGAMENTO PRODUTOR SILVA",
+        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        type: "debit",
+        status: "unmatched",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    sampleBankTransactions.forEach(transaction => {
+      this.mockData.bankTransactions.push(transaction);
+    });
+
+    // Create sample producer payments
+    const sampleProducerPayments: ProducerPayment[] = [
+      {
+        id: "pp-1",
+        productionOrderId: "po-1",
+        producerId: "producer-1",
+        amount: "850.00",
+        status: "pending",
+        notes: "Pagamento pela Mesa de Jantar Personalizada",
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+      }
+    ];
+
+    sampleProducerPayments.forEach(payment => {
+      this.producerPayments.set(payment.id, payment);
+    });
+
     // Create sample customization options
     const sampleCustomizationOptions = [
       {

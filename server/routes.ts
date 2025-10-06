@@ -907,6 +907,255 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Producer Payments routes
+  app.get("/api/finance/producer-payments", async (req, res) => {
+    try {
+      const payments = await storage.getProducerPayments();
+
+      // Enrich with production order and producer data
+      const enrichedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const producer = await storage.getUser(payment.producerId);
+          let order = null;
+          let product = 'Unknown';
+          let orderNumber = 'Unknown';
+          let clientName = 'Unknown';
+          
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+            if (order) {
+              product = order.product || 'Unknown';
+              orderNumber = order.orderNumber || 'Unknown';
+              
+              // Get client name
+              const client = await storage.getUser(order.clientId);
+              if (client) {
+                clientName = client.name;
+              } else {
+                const clientRecord = await storage.getClient(order.clientId);
+                if (clientRecord) {
+                  clientName = clientRecord.name;
+                }
+              }
+            }
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            product,
+            orderNumber,
+            clientName,
+            producerName: producer?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
+  app.get("/api/finance/producer-payments/pending", async (req, res) => {
+    try {
+      const payments = await storage.getProducerPayments();
+      const pendingPayments = payments.filter(payment => 
+        payment.status === 'pending' || payment.status === 'approved'
+      );
+
+      // Enrich with production order and producer data
+      const enrichedPayments = await Promise.all(
+        pendingPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const producer = await storage.getUser(payment.producerId);
+          let order = null;
+          let product = 'Unknown';
+          let orderNumber = 'Unknown';
+          let clientName = 'Unknown';
+          
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+            if (order) {
+              product = order.product || 'Unknown';
+              orderNumber = order.orderNumber || 'Unknown';
+              
+              // Get client name
+              const client = await storage.getUser(order.clientId);
+              if (client) {
+                clientName = client.name;
+              } else {
+                const clientRecord = await storage.getClient(order.clientId);
+                if (clientRecord) {
+                  clientName = clientRecord.name;
+                }
+              }
+            }
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            product,
+            orderNumber,
+            clientName,
+            producerName: producer?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
+    }
+  });
+
+  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const updated = await storage.updateProducerPayment(id, {
+        status: 'approved',
+        approvedBy: 'admin-1', // In a real app, get from auth
+        approvedAt: new Date()
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      res.json({ success: true, payment: updated });
+    } catch (error) {
+      console.error("Error approving producer payment:", error);
+      res.status(500).json({ error: "Failed to approve producer payment" });
+    }
+  });
+
+  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, productionOrderId, amount } = req.body;
+
+      console.log(`Associating payment: transactionId=${transactionId}, productionOrderId=${productionOrderId}, amount=${amount}`);
+
+      // Find the producer payment for this production order
+      const payments = await storage.getProducerPayments();
+      const producerPayment = payments.find(p => p.productionOrderId === productionOrderId && p.status === 'approved');
+
+      if (!producerPayment) {
+        return res.status(404).json({ error: "Pagamento aprovado não encontrado para esta ordem de produção" });
+      }
+
+      // Get transaction details (mock for now since we don't have full OFX implementation)
+      const transactionDetails = {
+        id: transactionId,
+        amount: amount,
+        description: `Pagamento ao produtor - Ordem ${productionOrderId}`,
+        date: new Date(),
+        status: 'matched'
+      };
+
+      // Update producer payment status to paid
+      await storage.updateProducerPayment(producerPayment.id, {
+        status: 'paid',
+        paidBy: 'admin-1', // In a real app, get from auth
+        paidAt: new Date(),
+        paymentMethod: 'transfer',
+        notes: `Pagamento confirmado via transação ${transactionId}`
+      });
+
+      // Get enriched payment data for response
+      const productionOrder = await storage.getProductionOrder(producerPayment.productionOrderId);
+      const producer = await storage.getUser(producerPayment.producerId);
+      let order = null;
+      let clientName = 'Unknown';
+      
+      if (productionOrder) {
+        order = await storage.getOrder(productionOrder.orderId);
+        if (order) {
+          const client = await storage.getUser(order.clientId);
+          if (client) {
+            clientName = client.name;
+          } else {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            }
+          }
+        }
+      }
+
+      const enrichedPayment = {
+        ...producerPayment,
+        status: 'paid',
+        paidAt: new Date(),
+        producerName: producer?.name || 'Unknown',
+        clientName,
+        orderNumber: order?.orderNumber || 'Unknown'
+      };
+
+      res.json({ 
+        success: true, 
+        payment: enrichedPayment,
+        transaction: transactionDetails
+      });
+    } catch (error) {
+      console.error("Error associating producer payment:", error);
+      res.status(500).json({ error: "Failed to associate producer payment" });
+    }
+  });
+
+  // Mock OFX import endpoint for producer payments
+  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      // Mock OFX processing - in a real implementation, you would parse the OFX file
+      const mockTransactions = [
+        {
+          id: `txn-${Date.now()}-1`,
+          amount: "850.00",
+          description: "TED PAGAMENTO PRODUTOR MARCENARIA SANTOS",
+          date: new Date(),
+          type: "debit",
+          status: "unmatched",
+          fitId: `FIT${Date.now()}001`
+        },
+        {
+          id: `txn-${Date.now()}-2`,
+          amount: "1200.00",
+          description: "PIX PAGAMENTO PRODUTOR JOAO SILVA",
+          date: new Date(),
+          type: "debit",
+          status: "unmatched",
+          fitId: `FIT${Date.now()}002`
+        }
+      ];
+
+      // Store transactions (in a real app, these would be stored in the database)
+      const bankTransactions = await storage.getBankTransactions();
+      for (const transaction of mockTransactions) {
+        await storage.createBankTransaction(transaction);
+      }
+
+      res.json({
+        success: true,
+        message: `${mockTransactions.length} transações importadas com sucesso`,
+        imported: mockTransactions.length,
+        transactions: mockTransactions
+      });
+    } catch (error) {
+      console.error("Error importing OFX for producer payments:", error);
+      res.status(500).json({ error: "Failed to import OFX file" });
+    }
+  });
+
   // Products
   app.get("/api/products", async (req, res) => {
     try {
