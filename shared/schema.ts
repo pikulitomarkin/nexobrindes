@@ -290,14 +290,20 @@ export const bankImports = pgTable("bank_imports", {
 export const bankTransactions = pgTable("bank_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   importId: varchar("import_id").references(() => bankImports.id).notNull(),
+  fitId: text("fit_id"), // Financial Institution Transaction ID
   date: timestamp("date").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description").notNull(),
+  type: text("type").notNull().default('debit'), // 'credit', 'debit'
   bankRef: text("bank_ref"), // Reference from bank
   status: text("status").notNull().default('unmatched'), // 'unmatched', 'matched'
   matchedReceivableId: varchar("matched_receivable_id").references(() => accountsReceivable.id),
   matchedPaymentId: varchar("matched_payment_id").references(() => payments.id),
+  matchedOrderId: text("matched_order_id"), // For producer payments reconciliation
+  matchedAt: timestamp("matched_at"), // When the transaction was matched
+  notes: text("notes"), // Additional notes about the transaction
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const expenseNotes = pgTable("expense_notes", {

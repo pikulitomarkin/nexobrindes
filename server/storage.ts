@@ -2363,13 +2363,17 @@ export class MemStorage implements IStorage {
   async createBankTransaction(transaction: any): Promise<BankTransaction> {
     const newTransaction: BankTransaction = {
       id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      importId: transaction.importId || 'unknown',
       fitId: transaction.fitId,
       amount: transaction.amount,
       date: transaction.date,
       description: transaction.description,
       type: transaction.type || (parseFloat(transaction.amount) > 0 ? 'credit' : 'debit'),
-      status: 'unmatched',
+      status: transaction.status || 'unmatched',
+      matchedOrderId: transaction.matchedOrderId || null,
+      matchedAt: transaction.matchedAt || null,
       bankRef: transaction.bankRef,
+      notes: transaction.notes || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -2380,6 +2384,13 @@ export class MemStorage implements IStorage {
     }
 
     this.mockData.bankTransactions.push(newTransaction);
+    console.log("Created bank transaction:", {
+      id: newTransaction.id,
+      amount: newTransaction.amount,
+      type: newTransaction.type,
+      status: newTransaction.status,
+      notes: newTransaction.notes
+    });
     return newTransaction;
   }
 

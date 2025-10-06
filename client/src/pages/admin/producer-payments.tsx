@@ -125,9 +125,23 @@ export default function AdminProducerPayments() {
       setIsAssociationDialogOpen(false);
       setSelectedPayment(null);
       setSelectedTransactions([]);
+      
+      let toastVariant: "default" | "destructive" = "default";
+      let toastTitle = "Sucesso!";
+      let toastDescription = data.message || `Pagamento de R$ ${parseFloat(data.payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado para o produtor ${data.payment.producerName}`;
+      
+      // Check if there was an adjustment due to difference
+      if (data.payment.hasAdjustment && Math.abs(parseFloat(data.payment.difference)) > 0.01) {
+        const difference = parseFloat(data.payment.difference);
+        const diffType = difference > 0 ? "sobra" : "falta";
+        toastTitle = "Conciliado com Ajuste";
+        toastDescription = `${toastDescription}\n\n⚠️ Diferença de R$ ${Math.abs(difference).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${diffType}) registrada automaticamente.`;
+      }
+      
       toast({
-        title: "Sucesso!",
-        description: `Pagamento de R$ ${parseFloat(data.payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado para o produtor ${data.payment.producerName}`,
+        title: toastTitle,
+        description: toastDescription,
+        variant: toastVariant,
       });
     },
     onError: (error: any) => {
