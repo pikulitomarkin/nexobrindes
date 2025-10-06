@@ -230,6 +230,9 @@ export interface IStorage {
   getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]>;
   createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
   updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
+
+  // Financial Notes
+  createFinancialNote(note: any): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -281,6 +284,7 @@ export class MemStorage implements IStorage {
     commissionPayouts: [] as CommissionPayout[],
     customizationOptions: [] as CustomizationOption[],
     customizationCategories: [] as string[], // Added for storing customization categories
+    financialNotes: [] as any[], // Added for financial notes
   };
 
   // Payment Methods
@@ -602,7 +606,7 @@ export class MemStorage implements IStorage {
       id: "client-2",
       userId: "client-2",
       name: "Maria Santos",
-      email: "maria@gmail.com", 
+      email: "maria@gmail.com",
       phone: "(11) 99876-5432",
       whatsapp: "(11) 99876-5432",
       cpfCnpj: "987.654.321-00",
@@ -2208,6 +2212,8 @@ export class MemStorage implements IStorage {
         return this.paymentMethods;
       case 'shippingMethods':
         return this.shippingMethods;
+      case 'financialNotes': // Added case for financialNotes
+        return this.mockData.financialNotes;
       default:
         return [];
     }
@@ -2357,16 +2363,27 @@ export class MemStorage implements IStorage {
     return this.mockData.bankTransactions.find(txn => txn.fitId === fitId);
   }
 
-  async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
-    const id = `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const transaction: BankTransaction = {
-      id,
-      ...data,
+  async createBankTransaction(transaction: any): Promise<BankTransaction> {
+    const newTransaction: BankTransaction = {
+      id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      fitId: transaction.fitId,
+      amount: transaction.amount,
+      date: transaction.date,
+      description: transaction.description,
+      type: transaction.type || (parseFloat(transaction.amount) > 0 ? 'credit' : 'debit'),
+      status: 'unmatched',
+      bankRef: transaction.bankRef,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.mockData.bankTransactions.push(transaction);
-    return transaction;
+
+    // Garantir que o array existe
+    if (!this.mockData.bankTransactions) {
+      this.mockData.bankTransactions = [];
+    }
+
+    this.mockData.bankTransactions.push(newTransaction);
+    return newTransaction;
   }
 
   async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date }>): Promise<BankTransaction | undefined> {
@@ -2592,7 +2609,7 @@ export class MemStorage implements IStorage {
 
   async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
     console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
-    
+
     const productionOrder = this.productionOrders.get(id);
     if (!productionOrder) {
       console.log(`Storage: Production order not found with id: ${id}`);
@@ -2871,6 +2888,23 @@ export class MemStorage implements IStorage {
     } catch (error) {
       console.error(`Error applying pending deductions for partner ${partnerId}:`, error);
     }
+  }
+
+  // Added method to create financial notes
+  async createFinancialNote(note: any): Promise<any> {
+    const newNote = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...note,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    if (!this.mockData.financialNotes) {
+      this.mockData.financialNotes = [];
+    }
+
+    this.mockData.financialNotes.push(newNote);
+    return newNote;
   }
 }
 

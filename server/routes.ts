@@ -3943,6 +3943,90 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  app.post("/api/finance/producer-payments/associate-multiple-payments", async (req, res) => {
+    try {
+      const { transactions, productionOrderId } = req.body;
+
+      if (!transactions || transactions.length === 0) {
+        return res.status(400).json({ error: "Pelo menos uma transação deve ser fornecida" });
+      }
+
+      const productionOrder = await storage.getProductionOrder(productionOrderId);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      const order = await storage.getOrder(productionOrder.orderId);
+      const producer = await storage.getUser(productionOrder.producerId);
+
+      let totalAmount = 0;
+      let processedTransactions = 0;
+
+      // Processar cada transação
+      for (const txn of transactions) {
+        const transaction = await storage.getBankTransaction(txn.transactionId);
+        if (!transaction) {
+          console.warn(`Transação ${txn.transactionId} não encontrada, pulando...`);
+          continue;
+        }
+
+        await storage.updateBankTransaction(txn.transactionId, {
+          status: 'matched',
+          isMatched: true,
+          matchedOrderId: productionOrder.orderId,
+          notes: `Pagamento ao produtor - Ordem ${productionOrder.id} (${processedTransactions + 1}/${transactions.length})`
+        });
+
+        totalAmount += parseFloat(txn.amount);
+        processedTransactions++;
+      }
+
+      if (processedTransactions === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida foi encontrada" });
+      }
+
+      // Atualizar status do pagamento do produtor
+      await storage.updateProductionOrder(productionOrderId, {
+        producerPaymentStatus: 'paid'
+      });
+
+      // Verificar se há diferença entre o valor total e o pagamento esperado
+      const expectedAmount = parseFloat(productionOrder.amount || '0');
+      const difference = totalAmount - expectedAmount;
+      let differenceNote = '';
+      
+      if (Math.abs(difference) > 0.01) {
+        differenceNote = difference > 0 
+          ? `Pagamento excedeu em R$ ${difference.toFixed(2)}`
+          : `Faltou R$ ${Math.abs(difference).toFixed(2)} para completar o pagamento`;
+        
+        // Criar registro da diferença no sistema
+        await storage.createFinancialNote({
+          type: 'payment_difference',
+          productionOrderId: productionOrderId,
+          amount: difference,
+          description: differenceNote,
+          createdAt: new Date()
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `${processedTransactions} transação${processedTransactions !== 1 ? 'ões' : ''} associada${processedTransactions !== 1 ? 's' : ''} com sucesso`,
+        paymentsProcessed: processedTransactions,
+        totalAmount: totalAmount.toFixed(2),
+        expectedAmount: expectedAmount.toFixed(2),
+        difference: difference.toFixed(2),
+        differenceNote: differenceNote,
+        producerName: producer?.name || 'Unknown',
+        orderNumber: order?.orderNumber || 'Unknown'
+      });
+    } catch (error) {
+      console.error("Failed to associate multiple producer payments:", error);
+      res.status(500).json({ error: "Failed to associate multiple producer payments: " + error.message });
+    }
+  });
+
   app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
