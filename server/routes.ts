@@ -3866,14 +3866,26 @@ Para mais detalhes, entre em contato conosco!`;
       const transactions = extractOFXTransactions(ofxContent);
 
       let importedCount = 0;
+      let skippedCount = 0;
+      
       for (const transaction of transactions) {
         try {
           const transactionAmount = parseFloat(transaction.amount);
           
           if (transactionAmount < 0) {
+            // Verificar se já existe transação com mesmo FITID
+            const existingTransaction = await storage.getBankTransactionByFitId(transaction.id);
+            
+            if (existingTransaction) {
+              console.log(`Transação ${transaction.id} já existe, pulando importação`);
+              skippedCount++;
+              continue;
+            }
+            
             await storage.createBankTransaction({
               importId: bankImport.id,
               transactionId: transaction.id,
+              fitId: transaction.id,
               date: transaction.date,
               amount: Math.abs(transactionAmount).toFixed(2),
               description: transaction.description || 'Pagamento a produtor',
@@ -3897,7 +3909,8 @@ Para mais detalhes, entre em contato conosco!`;
         success: true,
         importId: bankImport.id,
         transactionsImported: importedCount,
-        message: `${importedCount} transações de saída importadas com sucesso`
+        transactionsSkipped: skippedCount,
+        message: `${importedCount} novas transações importadas${skippedCount > 0 ? ` (${skippedCount} duplicadas ignoradas)` : ''}`
       });
 
     } catch (error) {

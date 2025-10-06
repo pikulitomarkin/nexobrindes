@@ -45,14 +45,14 @@ export default function AdminProducerPayments() {
       if (!response.ok) throw new Error("Erro ao importar arquivo OFX");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
       setIsUploadDialogOpen(false);
       setSelectedFile(null);
       toast({
         title: "Sucesso!",
-        description: "Arquivo OFX importado com sucesso",
+        description: data.message || "Arquivo OFX importado com sucesso",
       });
     },
     onError: () => {
@@ -69,13 +69,31 @@ export default function AdminProducerPayments() {
       const res = await apiRequest("POST", `/api/finance/producer-payments/${paymentId}/approve`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
-      toast({
-        title: "Sucesso!",
-        description: "Pagamento aprovado com sucesso",
-      });
+    onSuccess: async (data: any, paymentId: string) => {
+      // Invalidar queries para atualizar a lista
+      await queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      
+      // Aguardar um pouco para garantir que os dados foram atualizados
+      setTimeout(() => {
+        // Buscar o pagamento aprovado para abrir o modal de conciliação
+        const updatedPendingPayments = queryClient.getQueryData(["/api/finance/producer-payments/pending"]) as any[];
+        const payment = updatedPendingPayments?.find((p: any) => p.id === paymentId);
+        
+        if (payment && bankTransactions && bankTransactions.length > 0) {
+          // Abrir automaticamente o modal de conciliação
+          openAssociationDialog(payment);
+          toast({
+            title: "Pagamento Aprovado!",
+            description: "Selecione a transação bancária correspondente para conciliar",
+          });
+        } else {
+          toast({
+            title: "Sucesso!",
+            description: bankTransactions && bankTransactions.length > 0 ? "Pagamento aprovado. Clique em 'Associar Pagamento' para conciliar." : "Pagamento aprovado. Importe o OFX para fazer a conciliação.",
+          });
+        }
+      }, 300);
     },
     onError: () => {
       toast({

@@ -199,6 +199,7 @@ export interface IStorage {
   createBankImport(data: InsertBankImport): Promise<BankImport>;
   getBankTransactionsByImport(importId: string): Promise<BankTransaction[]>;
   getBankTransactions(): Promise<BankTransaction[]>;
+  getBankTransactionByFitId(fitId: string): Promise<BankTransaction | undefined>;
   createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction>;
   updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined>;
   matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined>;
@@ -2345,6 +2346,10 @@ export class MemStorage implements IStorage {
 
   async getBankTransactions(): Promise<BankTransaction[]> {
     return this.mockData.bankTransactions || [];
+  }
+
+  async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | undefined> {
+    return this.mockData.bankTransactions.find(txn => txn.fitId === fitId);
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
