@@ -1838,6 +1838,54 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  app.post("/api/settings/customization-options/bulk-import", requireAuth, async (req, res) => {
+    try {
+      const { customizations } = req.body;
+
+      if (!Array.isArray(customizations) || customizations.length === 0) {
+        return res.status(400).json({ error: "Lista de personalizações inválida" });
+      }
+
+      let importedCount = 0;
+      const errors: string[] = [];
+
+      for (const customization of customizations) {
+        try {
+          if (!customization.name || !customization.category || 
+              customization.minQuantity === undefined || customization.price === undefined) {
+            errors.push(`Linha com dados incompletos: ${customization.name || 'sem nome'}`);
+            continue;
+          }
+
+          await storage.createCustomizationOption({
+            name: customization.name,
+            description: customization.description || "",
+            category: customization.category,
+            minQuantity: parseInt(customization.minQuantity),
+            price: parseFloat(customization.price).toFixed(2),
+            isActive: customization.isActive !== undefined ? customization.isActive : true,
+            createdBy: req.user?.id || 'admin-1'
+          });
+          
+          importedCount++;
+        } catch (error) {
+          console.error(`Erro ao importar personalização ${customization.name}:`, error);
+          errors.push(`Erro ao importar: ${customization.name}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        imported: importedCount,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `${importedCount} personalizações importadas com sucesso${errors.length > 0 ? `. ${errors.length} com erro.` : ''}`
+      });
+    } catch (error) {
+      console.error('Error bulk importing customizations:', error);
+      res.status(500).json({ error: "Erro ao importar personalizações" });
+    }
+  });
+
   app.get("/api/settings/customization-options/category/:category", requireAuth, async (req, res) => {
     try {
       const { category } = req.params;

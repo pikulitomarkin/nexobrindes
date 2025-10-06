@@ -11,9 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Search, Edit, Trash2, Palette } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Palette, Upload, FileSpreadsheet, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import * as XLSX from 'xlsx';
 
 export default function AdminCustomizations() {
   const { toast } = useToast();
@@ -21,6 +22,9 @@ export default function AdminCustomizations() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomization, setEditingCustomization] = useState<any>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
 
   // Form state
   const [customizationForm, setCustomizationForm] = useState({
@@ -121,6 +125,39 @@ export default function AdminCustomizations() {
     },
   });
 
+  const importCustomizationsMutation = useMutation({
+    mutationFn: async (customizations: any[]) => {
+      const response = await fetch("/api/settings/customization-options/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customizations }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao importar personalizações");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Importação concluída!", 
+        description: `${data.imported} personalizações importadas com sucesso!` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
+      setIsImportDialogOpen(false);
+      setSelectedFile(null);
+      setImportPreview([]);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro na importação", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Helper functions
   const resetForm = () => {
     setCustomizationForm({
@@ -163,6 +200,126 @@ export default function AdminCustomizations() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+        toast({
+          title: "Arquivo inválido",
+          description: "Por favor, selecione um arquivo Excel (.xlsx ou .xls)",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+      processExcelFile(file);
+    }
+  };
+
+  const processExcelFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        const processed = jsonData.map((row: any, index: number) => {
+          const name = row['Nome'] || row['name'] || row['NOME'] || '';
+          const category = row['Categoria'] || row['category'] || row['CATEGORIA'] || '';
+          const minQuantity = parseInt(row['Quantidade Mínima'] || row['minQuantity'] || row['QUANTIDADE MINIMA'] || row['Qtd Mínima'] || '1');
+          const price = parseFloat(row['Preço'] || row['price'] || row['PRECO'] || row['Valor'] || '0');
+          const description = row['Descrição'] || row['description'] || row['DESCRICAO'] || '';
+          const isActive = row['Ativo'] !== undefined ? 
+            (row['Ativo'] === 'Sim' || row['Ativo'] === 'sim' || row['Ativo'] === true || row['Ativo'] === 'TRUE' || row['Ativo'] === 1) : 
+            true;
+
+          return {
+            name,
+            category,
+            minQuantity,
+            price,
+            description,
+            isActive,
+            valid: name && category && minQuantity > 0 && price >= 0,
+            row: index + 2
+          };
+        });
+
+        setImportPreview(processed);
+
+        const invalidRows = processed.filter((item: any) => !item.valid);
+        if (invalidRows.length > 0) {
+          toast({
+            title: "Atenção",
+            description: `${invalidRows.length} linha(s) com dados inválidos foram encontradas. Verifique o preview.`,
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao processar Excel:', error);
+        toast({
+          title: "Erro ao processar arquivo",
+          description: "Não foi possível ler o arquivo Excel. Verifique o formato.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleImport = () => {
+    const validCustomizations = importPreview
+      .filter((item: any) => item.valid)
+      .map((item: any) => ({
+        name: item.name,
+        category: item.category,
+        minQuantity: item.minQuantity,
+        price: item.price,
+        description: item.description || '',
+        isActive: item.isActive,
+      }));
+
+    if (validCustomizations.length === 0) {
+      toast({
+        title: "Nenhum dado válido",
+        description: "Não há dados válidos para importar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    importCustomizationsMutation.mutate(validCustomizations);
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      {
+        'Nome': 'Serigrafia 1 cor',
+        'Categoria': 'Camisetas',
+        'Quantidade Mínima': 50,
+        'Preço': 5.00,
+        'Descrição': 'Personalização com serigrafia de uma cor',
+        'Ativo': 'Sim'
+      },
+      {
+        'Nome': 'Bordado Simples',
+        'Categoria': 'Bonés',
+        'Quantidade Mínima': 100,
+        'Preço': 8.50,
+        'Descrição': 'Bordado simples no boné',
+        'Ativo': 'Sim'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Personalizações');
+    XLSX.writeFile(wb, 'modelo_personalizacoes.xlsx');
+  };
+
   // Data processing
   const customizations = customizationsQuery.data || [];
   const categories = categoriesQuery.data || [];
@@ -203,20 +360,132 @@ export default function AdminCustomizations() {
         <CardHeader className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-t-lg">
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-semibold">Personalizações Disponíveis</CardTitle>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                setEditingCustomization(null);
-                resetForm();
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button className="bg-white text-purple-600 hover:bg-purple-50">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Personalização
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
+            <div className="flex gap-2">
+              <Button 
+                onClick={downloadTemplate}
+                className="bg-white text-purple-600 hover:bg-purple-50"
+                data-testid="button-download-template"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Baixar Modelo
+              </Button>
+              <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-white text-purple-600 hover:bg-purple-50" data-testid="button-import-excel">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Excel
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Importar Personalizações do Excel</DialogTitle>
+                    <DialogDescription>
+                      Faça upload de um arquivo Excel (.xlsx ou .xls) com as personalizações. Use o modelo para garantir o formato correto.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="excel-file">Arquivo Excel</Label>
+                      <Input
+                        id="excel-file"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleFileChange}
+                        data-testid="input-excel-file"
+                      />
+                    </div>
+                    
+                    {selectedFile && (
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">{selectedFile.name}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {importPreview.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-lg mb-2">Preview da Importação</h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                          {importPreview.filter((item: any) => item.valid).length} de {importPreview.length} linhas válidas
+                        </p>
+                        <div className="max-h-96 overflow-y-auto border rounded-lg">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Nome</TableHead>
+                                <TableHead>Categoria</TableHead>
+                                <TableHead>Qtd Mín</TableHead>
+                                <TableHead>Preço</TableHead>
+                                <TableHead>Ativo</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importPreview.map((item: any, index: number) => (
+                                <TableRow key={index} className={!item.valid ? 'bg-red-50' : ''}>
+                                  <TableCell>
+                                    {item.valid ? (
+                                      <Badge variant="default" className="bg-green-500">Válido</Badge>
+                                    ) : (
+                                      <Badge variant="destructive">Inválido</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{item.name || '-'}</TableCell>
+                                  <TableCell>{item.category || '-'}</TableCell>
+                                  <TableCell>{item.minQuantity || '-'}</TableCell>
+                                  <TableCell>R$ {item.price?.toFixed(2) || '0.00'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={item.isActive ? "default" : "secondary"}>
+                                      {item.isActive ? "Sim" : "Não"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setIsImportDialogOpen(false);
+                          setSelectedFile(null);
+                          setImportPreview([]);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleImport}
+                        disabled={importPreview.length === 0 || importCustomizationsMutation.isPending}
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                        data-testid="button-confirm-import"
+                      >
+                        {importCustomizationsMutation.isPending ? "Importando..." : "Importar Personalizações"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setEditingCustomization(null);
+                  resetForm();
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-white text-purple-600 hover:bg-purple-50" data-testid="button-new-customization">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Personalização
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>
                     {editingCustomization ? "Editar Personalização" : "Nova Personalização"}
@@ -373,8 +642,9 @@ export default function AdminCustomizations() {
                     </Button>
                   </div>
                 </form>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </CardHeader>
 
