@@ -4,30 +4,6 @@ This is a comprehensive ERP (Enterprise Resource Planning) system designed for s
 
 The application features vendor-specific sales links, automated client and order registration upon 30% payment confirmation, production order distribution to external producers, and OFX bank file import for payment reconciliation. It's built as a modern web application with real-time updates and role-based access control.
 
-## Recent Changes (October 2025)
-
-### CRUD Operations Fix (October 3, 2025)
-- **Product Creation**: Fixed numeric field validation - empty strings now properly converted to null before database insertion
-- **Client Creation**: Created missing POST /api/clients endpoint for vendor panel client registration
-- **Budget Creation**: Implemented automatic budget_number generation (format: ORC-{timestamp}-{random})
-- **Order Creation**: Fixed accounts_receivable constraint by adding 30-day default due date when order deadline is not provided
-- All create operations now functioning correctly across the system
-
-### Product Import Enhancement
-- Added optional producer selection field to product import dialog (JSON files)
-- Removed 10,000 product limit from import functionality
-- Backend now accepts `producerId` parameter via multipart form data and applies it to all imported products
-
-### Authentication Fixes
-- Fixed producer login credentials (updated password from "123456" to "producer123")
-- Removed duplicate partner user entries in seed data
-- Test login credentials:
-  - Admin: admin / admin123
-  - Vendor: vendedor1 / vendor123
-  - Producer: produtor1 / producer123
-  - Client: cliente1 / client123
-  - Partner: partner1 / partner123
-
 # User Preferences
 
 Preferred communication style: Simple, everyday language.

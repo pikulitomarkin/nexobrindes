@@ -38,11 +38,6 @@ export default function AdminProducerPayments() {
     enabled: true, // Always fetch to show available transactions
   });
 
-  // Fetch bank imports history
-  const { data: bankImports } = useQuery({
-    queryKey: ["/api/finance/bank-imports"],
-  });
-
   const updatePaymentMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await fetch(`/api/producer-payments/${data.id}`, {
@@ -90,7 +85,6 @@ export default function AdminProducerPayments() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/producer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-imports"] });
       refetchBankTransactions(); // Refetch bank transactions
       setIsOFXDialogOpen(false);
       setSelectedFile(null);
@@ -425,10 +419,9 @@ export default function AdminProducerPayments() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="payments" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="payments">Gerenciar Pagamentos</TabsTrigger>
           <TabsTrigger value="reconciliation">Conciliação Bancária</TabsTrigger>
-          <TabsTrigger value="imports">Histórico de Importações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="payments" className="mt-6">
@@ -655,84 +648,6 @@ export default function AdminProducerPayments() {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="imports" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Histórico de Importações OFX
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!bankImports || bankImports.length === 0 ? (
-                <div className="text-center py-12">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma importação encontrada</h3>
-                  <p className="text-gray-500">Importe um arquivo OFX para começar a conciliar pagamentos de produtores.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Data
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Arquivo
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Transações
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {bankImports.map((imp: any) => (
-                        <tr key={imp.id} data-testid={`import-row-${imp.id}`}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(imp.importedAt || imp.uploadedAt).toLocaleString('pt-BR')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-gray-400" />
-                              {imp.fileName || imp.filename || 'Arquivo OFX'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <Badge className="bg-blue-100 text-blue-800 border-0">
-                              {imp.transactionCount || 0} transações
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {imp.status === 'completed' ? (
-                              <Badge className="bg-green-100 text-green-800 border-0">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Concluído
-                              </Badge>
-                            ) : imp.status === 'processing' ? (
-                              <Badge className="bg-yellow-100 text-yellow-800 border-0">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Processando
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-gray-100 text-gray-800 border-0">
-                                {imp.status}
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               )}
             </CardContent>
