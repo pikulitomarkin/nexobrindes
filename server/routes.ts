@@ -840,25 +840,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.getOrders();
       const payments = await storage.getPayments();
-      const commissions = await storage.getCommissionsByVendor("");
+      const allCommissions = await storage.getAllCommissions();
+      const productionOrders = await storage.getProductionOrders();
+      const bankTransactions = await storage.getBankTransactions();
+      const expenseNotes = await storage.getExpenseNotes();
 
+      // Contas a Receber - soma dos valores pendentes dos pedidos
       const receivables = orders
         .filter(order => order.status !== 'cancelled')
-        .reduce((total, order) => total + (parseFloat(order.totalValue) - parseFloat(order.paidValue || '0')), 0);
+        .reduce((total, order) => {
+          const totalValue = parseFloat(order.totalValue);
+          const paidValue = parseFloat(order.paidValue || '0');
+          const remaining = totalValue - paidValue;
+          return total + Math.max(0, remaining);
+        }, 0);
 
-      const payables = 12450; // Mock data for suppliers/producers
-      const balance = 89230; // Mock bank balance
-      const pendingCommissions = commissions
-        .filter(c => c.status === 'pending')
+      // Contas a Pagar - pagamentos pendentes para produtores
+      const payables = productionOrders
+        .filter(po => 
+          po.producerValue && 
+          parseFloat(po.producerValue) > 0 && 
+          (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
+        )
+        .reduce((total, po) => total + parseFloat(po.producerValue || '0'), 0);
+
+      // Saldo em Conta - transações bancárias não conciliadas (entrada - saída)
+      const bankBalance = bankTransactions.reduce((total, txn) => {
+        const amount = parseFloat(txn.amount);
+        // Assumir que valores positivos são entrada e negativos são saída
+        return total + amount;
+      }, 0);
+
+      // Comissões Pendentes
+      const pendingCommissions = allCommissions
+        .filter(c => c.status === 'pending' || c.status === 'confirmed')
         .reduce((total, c) => total + parseFloat(c.amount), 0);
 
+      // Receita Total do Mês
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const monthlyRevenue = orders
+        .filter(order => {
+          if (!order.createdAt || order.status === 'cancelled') return false;
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+        })
+        .reduce((total, order) => total + parseFloat(order.totalValue), 0);
+
+      // Despesas do Mês
+      const monthlyExpenses = expenseNotes
+        .filter(expense => {
+          if (!expense.createdAt) return false;
+          const expenseDate = new Date(expense.createdAt);
+          return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+        })
+        .reduce((total, expense) => total + parseFloat(expense.amount), 0);
+
       res.json({
-        receivables,
-        payables,
-        balance,
-        pendingCommissions
+        receivables: receivables,
+        payables: payables,
+        balance: bankBalance,
+        pendingCommissions: pendingCommissions,
+        monthlyRevenue: monthlyRevenue,
+        monthlyExpenses: monthlyExpenses
       });
     } catch (error) {
+      console.error("Error fetching financial overview:", error);
       res.status(500).json({ error: "Failed to fetch financial overview" });
     }
   });

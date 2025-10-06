@@ -1,20 +1,39 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { 
-  DollarSign, 
-  TrendingDown, 
-  Receipt, 
-  TrendingUp, 
-  Calculator, 
+import {
+  DollarSign,
+  TrendingDown,
+  Receipt,
+  TrendingUp,
+  Calculator,
   CreditCard,
   ArrowRight,
   FileText,
   Users,
   Factory
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function FinanceIndex() {
+  const { data: overview, isLoading } = useQuery({
+    queryKey: ["/api/finance/overview"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="grid grid-cols-4 gap-6 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const financeModules = [
     {
       title: "Contas a Receber",
@@ -88,7 +107,9 @@ export default function FinanceIndex() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total a Receber</p>
-                <p className="text-2xl font-bold gradient-text">R$ 15.450,00</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {(overview?.receivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-blue-600" />
@@ -102,7 +123,9 @@ export default function FinanceIndex() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total a Pagar</p>
-                <p className="text-2xl font-bold gradient-text">R$ 8.320,00</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {(overview?.payables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <TrendingDown className="h-6 w-6 text-red-600" />
@@ -116,7 +139,9 @@ export default function FinanceIndex() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Despesas do Mês</p>
-                <p className="text-2xl font-bold gradient-text">R$ 2.150,00</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {(overview?.monthlyExpenses || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <Receipt className="h-6 w-6 text-orange-600" />
@@ -130,7 +155,9 @@ export default function FinanceIndex() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Saldo Líquido</p>
-                <p className="text-2xl font-bold gradient-text text-green-600">R$ 4.980,00</p>
+                <p className="text-2xl font-bold gradient-text text-green-600">
+                  R$ {((overview?.monthlyRevenue || 0) - (overview?.payables || 0) - (overview?.monthlyExpenses || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <TrendingUp className="h-6 w-6 text-green-600" />
@@ -167,6 +194,51 @@ export default function FinanceIndex() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Resumo do Mês */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Resumo do Mês</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Receita Total</span>
+                <span className="font-semibold">
+                  R$ {(overview?.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Custos de Produção</span>
+                <span className="font-semibold">
+                  R$ {(overview?.payables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Comissões Pendentes</span>
+                <span className="font-semibold">
+                  R$ {(overview?.pendingCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Despesas do Mês</span>
+                <span className="font-semibold">
+                  R$ {(overview?.monthlyExpenses || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="border-t pt-4">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Lucro Líquido</span>
+                  <span className="gradient-text">
+                    R$ {((overview?.monthlyRevenue || 0) - (overview?.payables || 0) - (overview?.monthlyExpenses || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Activity */}
