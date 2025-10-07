@@ -302,7 +302,7 @@ function App() {
             </ProtectedRoute>
           </Route>
 
-          <Route path="/producer/accounts-to-receive">
+          <Route path="/producer/receivables">
             <ProtectedRoute>
               <MainLayout>
                 <ProducerReceivables />
