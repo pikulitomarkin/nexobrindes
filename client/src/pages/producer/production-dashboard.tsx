@@ -569,7 +569,6 @@ export default function ProductionDashboard() {
                         <DollarSign className="h-4 w-4" />
                         {order.producerValueWasSet ? 'Valor Definido' : 'Definir Valor'}
                       </Button>
-                      {getNextAction(order)}
                     </div>
                   </div>
                 </div>
