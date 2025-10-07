@@ -587,14 +587,14 @@ export default function CommissionManagement() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`status-badge ${
                             commission.status === 'paid' ? 'status-confirmed' : 
-                            commission.status === 'confirmed' ? 'status-confirmed' : 
+                            commission.status === 'confirmed' ? 'status-production' : 
                             commission.status === 'pending' ? 'status-pending' : 
                             commission.status === 'deducted' ? 'status-cancelled' :
                             commission.status === 'cancelled' ? 'status-cancelled' :
                             'status-production'
                           }`}>
                             {commission.status === 'paid' ? 'Paga' : 
-                             commission.status === 'confirmed' ? 'Confirmada' : 
+                             commission.status === 'confirmed' ? 'Confirmada (A Pagar)' : 
                              commission.status === 'pending' ? 'Pendente' : 
                              commission.status === 'deducted' ? 'Abatida' :
                              commission.status === 'cancelled' ? 'Cancelada' :
@@ -602,7 +602,7 @@ export default function CommissionManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {commission.status === 'pending' && (
+                          {commission.status === 'confirmed' && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -613,6 +613,11 @@ export default function CommissionManagement() {
                             >
                               Marcar como Paga
                             </Button>
+                          )}
+                          {commission.status === 'pending' && (
+                            <span className="text-sm text-gray-500">
+                              {commission.type === 'vendor' ? 'Aguardando pedido ficar pronto' : 'Aguardando confirmação do pedido'}
+                            </span>
                           )}
                         </td>
                       </tr>

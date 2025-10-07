@@ -2743,31 +2743,21 @@ export class MemStorage implements IStorage {
 
       const orderCommissions = Array.from(this.commissions.values()).filter(c => c.orderId === order.id);
 
-      // Check if order has received payment (for partner commissions)
-      const orderPayments = Array.from(this.payments.values()).filter(p => p.orderId === order.id && p.status === 'confirmed');
-      const totalPaid = orderPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      const hasPayment = totalPaid > 0;
-
-      // Process partner commissions (confirmed when payment is received)
-      if (hasPayment) {
+      // Process partner commissions (confirmed immediately when order is created/confirmed)
+      if (['confirmed', 'production'].includes(newStatus)) {
         const partnerCommissionsToConfirm = orderCommissions.filter(c => c.type === 'partner' && c.status === 'pending');
         for (const commission of partnerCommissionsToConfirm) {
-          // Apply pending deductions first
+          // Apply pending deductions first, then confirm
           await this.applyPendingDeductions(commission.partnerId!, commission);
         }
       }
 
-      // Process vendor commissions (confirmed when order is completed and fully paid)
-      if (['completed', 'delivered'].includes(newStatus)) {
-        const orderValue = parseFloat(order.totalValue);
-        const isFullyPaid = totalPaid >= orderValue;
-
-        if (isFullyPaid) {
-          const vendorCommissionsToConfirm = orderCommissions.filter(c => c.type === 'vendor' && c.status === 'pending');
-          for (const commission of vendorCommissionsToConfirm) {
-            await this.updateCommissionStatus(commission.id, 'confirmed');
-            console.log(`Confirmed vendor commission ${commission.id} for completed order ${order.orderNumber}`);
-          }
+      // Process vendor commissions (confirmed only when order is ready/shipped/delivered/completed)
+      if (['ready', 'shipped', 'delivered', 'completed'].includes(newStatus)) {
+        const vendorCommissionsToConfirm = orderCommissions.filter(c => c.type === 'vendor' && c.status === 'pending');
+        for (const commission of vendorCommissionsToConfirm) {
+          await this.updateCommissionStatus(commission.id, 'confirmed');
+          console.log(`Confirmed vendor commission ${commission.id} for ready order ${order.orderNumber}`);
         }
       }
 
@@ -2786,25 +2776,32 @@ export class MemStorage implements IStorage {
     try {
       console.log(`Handling cancellation for order ${order.orderNumber}`);
 
-      // Vendor commissions: Keep them if order was ready/completed (maintain commission)
+      // Vendor commissions: Cancel them since they only get paid when order is ready
       const vendorCommissions = commissions.filter(c => c.type === 'vendor');
       for (const commission of vendorCommissions) {
-        if (['production', 'ready', 'completed', 'delivered'].includes(order.status)) { // Consider if production has started as 'ready'
-          // Order was significantly processed, vendor keeps commission
-          await this.updateCommissionStatus(commission.id, 'confirmed');
-          console.log(`Vendor keeps commission for processed cancelled order ${order.orderNumber}: ${commission.id}`);
-        } else {
-          // Order was cancelled early, cancel commission
+        if (commission.status === 'confirmed') {
+          // If somehow already confirmed, mark as cancelled
           await this.updateCommissionStatus(commission.id, 'cancelled');
-          console.log(`Cancelled vendor commission for early cancelled order ${order.orderNumber}: ${commission.id}`);
+          console.log(`Cancelled confirmed vendor commission for cancelled order ${order.orderNumber}: ${commission.id}`);
+        } else {
+          // Just cancel pending commission
+          await this.updateCommissionStatus(commission.id, 'cancelled');
+          console.log(`Cancelled pending vendor commission for cancelled order ${order.orderNumber}: ${commission.id}`);
         }
       }
 
-      // Partner commissions: Create deductions for future orders
-      const partnerCommissions = commissions.filter(c => c.type === 'partner' && c.status === 'confirmed');
+      // Partner commissions: Create deductions for future orders if already confirmed
+      const partnerCommissions = commissions.filter(c => c.type === 'partner');
       for (const commission of partnerCommissions) {
-        await this.createPartnerDeduction(commission);
-        console.log(`Created deduction for partner ${commission.partnerId} from cancelled order ${order.orderNumber}`);
+        if (commission.status === 'confirmed') {
+          // Create deduction for future partner commissions
+          await this.createPartnerDeduction(commission);
+          console.log(`Created deduction for partner ${commission.partnerId} from cancelled order ${order.orderNumber}`);
+        } else {
+          // Just cancel if still pending
+          await this.updateCommissionStatus(commission.id, 'cancelled');
+          console.log(`Cancelled pending partner commission for cancelled order ${order.orderNumber}: ${commission.id}`);
+        }
       }
 
     } catch (error) {

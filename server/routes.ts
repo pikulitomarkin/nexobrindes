@@ -835,6 +835,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Commission routes
+  app.get("/api/commissions", async (req, res) => {
+    try {
+      const commissions = await storage.getAllCommissions();
+      
+      // Enrich with user names
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          let vendorName = null;
+          let partnerName = null;
+          
+          if (commission.vendorId) {
+            const vendor = await storage.getUser(commission.vendorId);
+            vendorName = vendor?.name;
+          }
+          
+          if (commission.partnerId) {
+            const partner = await storage.getUser(commission.partnerId);
+            partnerName = partner?.name;
+          }
+          
+          return {
+            ...commission,
+            vendorName,
+            partnerName
+          };
+        })
+      );
+      
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching commissions:", error);
+      res.status(500).json({ error: "Failed to fetch commissions" });
+    }
+  });
+
+  app.get("/api/commissions/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const commissions = await storage.getCommissionsByVendor(vendorId);
+      res.json(commissions);
+    } catch (error) {
+      console.error("Error fetching vendor commissions:", error);
+      res.status(500).json({ error: "Failed to fetch vendor commissions" });
+    }
+  });
+
+  app.put("/api/commissions/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      const updatedCommission = await storage.updateCommissionStatus(id, status);
+      if (!updatedCommission) {
+        return res.status(404).json({ error: "Commission not found" });
+      }
+      
+      res.json(updatedCommission);
+    } catch (error) {
+      console.error("Error updating commission status:", error);
+      res.status(500).json({ error: "Failed to update commission status" });
+    }
+  });
+
+  // Partners routes
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+      
+      // Enrich with commission data
+      const partnersWithCommissions = await Promise.all(
+        partners.map(async (partner) => {
+          const partnerProfile = await storage.getPartner(partner.id);
+          const commissions = Array.from(storage.getAllCommissions()).then(allCommissions => 
+            allCommissions.filter(c => c.partnerId === partner.id)
+          );
+          
+          const totalCommissions = (await commissions).reduce((sum, c) => sum + parseFloat(c.amount), 0);
+          
+          return {
+            ...partner,
+            commissionRate: partnerProfile?.commissionRate || '15.00',
+            totalCommissions
+          };
+        })
+      );
+      
+      res.json(partnersWithCommissions);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const partner = await storage.createPartner(req.body);
+      res.json(partner);
+    } catch (error) {
+      console.error("Error creating partner:", error);
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner commission:", error);
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
   // Financial data
   app.get("/api/finance/overview", async (req, res) => {
     try {

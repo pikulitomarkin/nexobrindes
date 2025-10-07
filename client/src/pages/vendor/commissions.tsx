@@ -133,15 +133,15 @@ export default function VendorCommissions() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`status-badge ${
-                        commission.status === 'confirmed' ? 'status-confirmed' : 
+                        commission.status === 'confirmed' ? 'status-production' : 
                         commission.status === 'paid' ? 'status-confirmed' : 
                         commission.status === 'pending' ? 'status-pending' : 
                         commission.status === 'cancelled' ? 'status-cancelled' :
                         'status-production'
                       }`}>
-                        {commission.status === 'confirmed' ? 'Confirmada' : 
+                        {commission.status === 'confirmed' ? 'Confirmada (A Receber)' : 
                          commission.status === 'paid' ? 'Paga' :
-                         commission.status === 'pending' ? 'Pendente' : 
+                         commission.status === 'pending' ? 'Aguardando Pedido Pronto' : 
                          commission.status === 'cancelled' ? 'Cancelada' :
                          commission.status}
                       </span>
