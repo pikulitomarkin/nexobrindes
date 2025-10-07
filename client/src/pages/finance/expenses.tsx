@@ -163,27 +163,28 @@ export default function FinanceExpenses() {
               Nova Despesa
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova Despesa</DialogTitle>
               <DialogDescription>
                 Registre uma nova despesa da empresa
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="expense-date">Data</Label>
+                  <Label htmlFor="expense-date">Data <span className="text-red-500">*</span></Label>
                   <Input
                     id="expense-date"
                     type="date"
                     value={expenseData.date}
                     onChange={(e) => setExpenseData(prev => ({ ...prev, date: e.target.value }))}
                     data-testid="input-expense-date"
+                    className="text-lg"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="expense-amount">Valor</Label>
+                  <Label htmlFor="expense-amount">Valor <span className="text-red-500">*</span></Label>
                   <Input
                     id="expense-amount"
                     type="number"
@@ -192,12 +193,13 @@ export default function FinanceExpenses() {
                     value={expenseData.amount}
                     onChange={(e) => setExpenseData(prev => ({ ...prev, amount: e.target.value }))}
                     data-testid="input-expense-amount"
+                    className="text-lg font-medium"
                   />
                 </div>
               </div>
               
               <div>
-                <Label htmlFor="expense-category">Categoria</Label>
+                <Label htmlFor="expense-category">Categoria <span className="text-red-500">*</span></Label>
                 <Select 
                   value={expenseData.category} 
                   onValueChange={(value) => setExpenseData(prev => ({ ...prev, category: value }))}
@@ -216,13 +218,15 @@ export default function FinanceExpenses() {
               </div>
 
               <div>
-                <Label htmlFor="expense-description">Descrição</Label>
+                <Label htmlFor="expense-description">Descrição <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="expense-description"
-                  placeholder="Descreva a despesa..."
+                  placeholder="Descreva a despesa detalhadamente..."
                   value={expenseData.description}
                   onChange={(e) => setExpenseData(prev => ({ ...prev, description: e.target.value }))}
                   data-testid="textarea-expense-description"
+                  rows={4}
+                  className="min-h-[100px]"
                 />
               </div>
 
@@ -248,30 +252,60 @@ export default function FinanceExpenses() {
                 
                 <div>
                   <Label htmlFor="expense-order">Pedido (Opcional)</Label>
-                  <Select 
-                    value={expenseData.orderId} 
-                    onValueChange={(value) => setExpenseData(prev => ({ ...prev, orderId: value }))}
-                  >
-                    <SelectTrigger data-testid="select-expense-order">
-                      <SelectValue placeholder="Selecione o pedido" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(orders || [])?.map((order: any) => (
-                        <SelectItem key={order.id} value={order.id}>
-                          {order.orderNumber}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select 
+                      value={expenseData.orderId} 
+                      onValueChange={(value) => setExpenseData(prev => ({ ...prev, orderId: value }))}
+                    >
+                      <SelectTrigger data-testid="select-expense-order">
+                        <SelectValue placeholder="Selecione o pedido" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="p-2 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
+                            <Input
+                              placeholder="Buscar pedido..."
+                              className="pl-6 text-xs"
+                              onChange={(e) => {
+                                // Filter functionality can be added here if needed
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {(orders || [])?.map((order: any) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{order.orderNumber}</span>
+                              <span className="text-xs text-gray-500">{order.clientName} - {order.product}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Vincule esta despesa a um pedido específico se aplicável
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2">
+              {/* Informações adicionais */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+                <h4 className="font-medium text-blue-900 mb-2">Informações Importantes</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Todas as despesas passam por aprovação antes de serem contabilizadas</li>
+                  <li>• Anexe comprovantes sempre que possível</li>
+                  <li>• Despesas vinculadas a pedidos facilitam o controle de custos</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Cancelar
                 </Button>
                 <Button
-                  className="gradient-bg text-white"
+                  className="gradient-bg text-white px-6"
                   onClick={handleCreateExpense}
                   disabled={!expenseData.category || !expenseData.description || !expenseData.amount || createExpenseMutation.isPending}
                   data-testid="button-save-expense"
