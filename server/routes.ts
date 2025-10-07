@@ -42,6 +42,47 @@ const requireAuth = async (req: any, res: any, next: any) => {
 };
 
 
+// Helper function to parse OFX buffer
+async function parseOFXBuffer(buffer: Buffer) {
+  const ofxContent = buffer.toString('utf-8');
+  const transactions = [];
+
+  // Simple regex-based OFX parsing
+  const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
+  const matches = ofxContent.match(transactionRegex);
+
+  if (matches) {
+    matches.forEach((match, index) => {
+      const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
+      const dtPosted = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
+      const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
+      const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${Date.now()}_${index}`;
+      const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
+      const refNum = match.match(/<REFNUM>(.*?)</)?.[1] || null;
+
+      // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
+      let transactionDate = new Date();
+      if (dtPosted && dtPosted.length >= 8) {
+        const year = parseInt(dtPosted.substring(0, 4));
+        const month = parseInt(dtPosted.substring(4, 6)) - 1; // Month is 0-based
+        const day = parseInt(dtPosted.substring(6, 8));
+        transactionDate = new Date(year, month, day);
+      }
+
+      transactions.push({
+        fitId: fitId,
+        dtPosted: transactionDate,
+        amount: trnAmt,
+        memo: memo,
+        refNum: refNum,
+        type: trnType
+      });
+    });
+  }
+
+  return { transactions };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
@@ -2204,6 +2245,29 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Producer payment approval route
+  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const updated = await storage.updateProducerPayment(id, {
+        status: 'approved',
+        approvedBy: 'admin-1',
+        approvedAt: new Date()
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      console.log(`Producer payment ${id} approved successfully`);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error approving producer payment:", error);
+      res.status(500).json({ error: "Failed to approve producer payment" });
+    }
+  });
+
   app.patch("/api/producer-payments/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -3839,46 +3903,89 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Helper function to parse OFX buffer
-  async function parseOFXBuffer(buffer: Buffer) {
-    const ofxContent = buffer.toString('utf-8');
-    const transactions = [];
+  
 
-    // Simple regex-based OFX parsing
-    const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
-    const matches = ofxContent.match(transactionRegex);
+  // Producer payment association route
+  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
+    try {
+      const { transactionIds, productionOrderId } = req.body;
 
-    if (matches) {
-      matches.forEach((match, index) => {
-        const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
-        const dtPosted = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
-        const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
-        const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${Date.now()}_${index}`;
-        const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
-        const refNum = match.match(/<REFNUM>(.*?)</)?.[1] || null;
+      if (!transactionIds || !productionOrderId) {
+        return res.status(400).json({ error: "TransactionIds e productionOrderId são obrigatórios" });
+      }
 
-        // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
-        let transactionDate = new Date();
-        if (dtPosted && dtPosted.length >= 8) {
-          const year = parseInt(dtPosted.substring(0, 4));
-          const month = parseInt(dtPosted.substring(4, 6)) - 1; // Month is 0-based
-          const day = parseInt(dtPosted.substring(6, 8));
-          transactionDate = new Date(year, month, day);
+      console.log(`Associating ${transactionIds.length} transactions to production order ${productionOrderId}`);
+
+      // Get the production order
+      const productionOrder = await storage.getProductionOrder(productionOrderId);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Get producer payment
+      const producerPayments = await storage.getProducerPaymentsByProducer(productionOrder.producerId);
+      const payment = producerPayments.find(p => p.productionOrderId === productionOrderId);
+
+      if (!payment) {
+        return res.status(404).json({ error: "Pagamento do produtor não encontrado" });
+      }
+
+      // Calculate total transaction amount
+      let totalTransactionAmount = 0;
+      const transactions = [];
+
+      for (const txnId of transactionIds) {
+        const transaction = await storage.getBankTransaction(txnId);
+        if (transaction && transaction.status === 'unmatched') {
+          transactions.push(transaction);
+          totalTransactionAmount += Math.abs(parseFloat(transaction.amount));
         }
+      }
 
-        transactions.push({
-          fitId: fitId,
-          dtPosted: transactionDate,
-          amount: trnAmt,
-          memo: memo,
-          refNum: refNum,
-          type: trnType
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida encontrada" });
+      }
+
+      const paymentAmount = parseFloat(payment.amount);
+
+      // Update transactions as matched
+      for (const transaction of transactions) {
+        await storage.updateBankTransaction(transaction.id, {
+          status: 'matched',
+          matchedAt: new Date(),
+          notes: `Pagamento ao produtor ${productionOrder.producerId} - Pedido ${productionOrderId}`
         });
-      });
-    }
+      }
 
-    return { transactions };
-  }
+      // Update payment status to paid
+      await storage.updateProducerPayment(payment.id, {
+        status: 'paid',
+        paidBy: 'admin-1',
+        paidAt: new Date(),
+        paymentMethod: 'bank_transfer'
+      });
+
+      // Get producer name for response
+      const producer = await storage.getUser(productionOrder.producerId);
+
+      console.log(`Successfully associated ${transactions.length} transactions with payment ${payment.id}`);
+
+      res.json({
+        success: true,
+        message: `Pagamento de R$ ${paymentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} conciliado com sucesso`,
+        payment: {
+          ...payment,
+          producerName: producer?.name || 'Desconhecido',
+          amount: paymentAmount.toFixed(2),
+          hasAdjustment: Math.abs(totalTransactionAmount - paymentAmount) > 0.01,
+          difference: (totalTransactionAmount - paymentAmount).toFixed(2)
+        }
+      });
+    } catch (error) {
+      console.error("Error associating producer payment:", error);
+      res.status(500).json({ error: "Failed to associate producer payment" });
+    }
+  });
 
   // Producer-specific OFX Import route
   app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
