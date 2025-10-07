@@ -1233,6 +1233,8 @@ export class MemStorage implements IStorage {
       deadline: orderData.deadline || null,
       trackingCode: orderData.trackingCode || null,
       status: orderData.status || 'pending',
+      refundAmount: orderData.refundAmount || "0.00", // Initialize refundAmount
+      refundNotes: orderData.refundNotes || null, // Initialize refundNotes
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1284,24 +1286,60 @@ export class MemStorage implements IStorage {
 
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     const order = this.orders.get(id);
-    if (order) {
-      const oldStatus = order.status;
-      const updatedOrder = {
-        ...order,
-        ...updates,
-        updatedAt: new Date(),
-        trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode
-      };
-      this.orders.set(id, updatedOrder);
+    if (!order) return undefined;
 
-      // Process commission payments if the status has changed
-      if (updates.status && updates.status !== oldStatus) {
-        await this.processCommissionPayments(updatedOrder, updates.status);
-      }
+    const oldStatus = order.status;
+    const updateData = {
+      ...order,
+      ...updates,
+      updatedAt: new Date(),
+      trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode,
+      refundAmount: updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount,
+      refundNotes: updates.refundNotes !== undefined ? updates.refundNotes : order.refundNotes,
+    };
 
-      return updatedOrder;
+    this.orders.set(id, updateData);
+
+    // Process commission payments if the status has changed
+    if (updates.status && updates.status !== oldStatus) {
+      await this.processCommissionPayments(updateData, updates.status);
     }
-    return undefined;
+
+    // Update AccountsReceivable if totalValue or refundAmount changes
+    if (updates.totalValue !== undefined || updates.refundAmount !== undefined) {
+      const receivableId = `ar-${id}`;
+      const receivable = this.accountsReceivable.get(receivableId);
+      if (receivable) {
+        const newTotalValue = parseFloat(updates.totalValue !== undefined ? updates.totalValue : order.totalValue);
+        const newRefundAmount = parseFloat(updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount);
+        const currentPaid = parseFloat(receivable.receivedAmount);
+
+        // Calculate the effective amount to be paid after refund
+        const effectiveAmount = newTotalValue - newRefundAmount;
+
+        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+        if (currentPaid >= effectiveAmount) {
+          status = 'paid';
+        } else if (currentPaid > 0) {
+          status = 'partial';
+        }
+
+        // Check if overdue
+        const dueDate = updateData.deadline ? new Date(updateData.deadline) : null;
+        if (dueDate && new Date() > dueDate && status !== 'paid') {
+          status = 'overdue';
+        }
+
+        await this.updateAccountsReceivable(receivableId, {
+          amount: newTotalValue.toFixed(2),
+          receivedAmount: currentPaid.toFixed(2), // Keep current received amount as is
+          status: status,
+          dueDate: updateData.deadline
+        });
+      }
+    }
+
+    return updateData;
   }
 
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
@@ -2452,6 +2490,13 @@ export class MemStorage implements IStorage {
       ...data,
       updatedAt: new Date()
     };
+
+    // Handle reimbursement
+    if (data.status === 'reimbursed') {
+      updated.reimbursedBy = data.reimbursedBy;
+      updated.reimbursedAt = new Date();
+    }
+
 
     const index = this.mockData.expenseNotes.findIndex(exp => exp.id === id);
     if (index !== -1) {

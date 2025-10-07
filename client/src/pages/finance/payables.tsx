@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,122 +9,63 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function FinancePayables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [selectedPayable, setSelectedPayable] = useState<any>(null);
-  const [payableData, setPayableData] = useState({
-    dueDate: "",
-    description: "",
-    amount: "",
-    category: "",
-    vendorId: "",
-    notes: "",
-  });
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [paymentData, setPaymentData] = useState({
     amount: "",
     method: "",
     transactionId: "",
     notes: "",
   });
+  const [refundData, setRefundData] = useState({
+    amount: "",
+    notes: "",
+  });
   const { toast } = useToast();
 
-  // Mock data - replace with actual API call
-  const mockPayables = [
-    {
-      id: "pay-1",
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      description: "Material para produção - Madeira Premium",
-      amount: "2500.00",
-      paidAmount: "0.00",
-      status: "pending",
-      category: "material",
-      vendorName: "Madeireira Santos",
-      createdAt: new Date()
-    },
-    {
-      id: "pay-2",
-      dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      description: "Serviços de transporte",
-      amount: "450.00",
-      paidAmount: "450.00",
-      status: "paid",
-      category: "services",
-      vendorName: "Transportes Rápidos",
-      createdAt: new Date()
-    },
-    {
-      id: "pay-3",
-      dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      description: "Energia elétrica",
-      amount: "320.00",
-      paidAmount: "0.00",
-      status: "overdue",
-      category: "utilities",
-      vendorName: "Companhia Elétrica",
-      createdAt: new Date()
-    }
-  ];
-
-  const { data: vendors } = useQuery({
-    queryKey: ["/api/vendors"],
+  // Fetch all payables data
+  const { data: overview, isLoading } = useQuery({
+    queryKey: ["/api/finance/overview"],
   });
 
-  const createPayableMutation = useMutation({
+  const { data: producerPayments = [] } = useQuery({
+    queryKey: ["/api/finance/producer-payments/pending"],
+  });
+
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["/api/finance/expenses"],
+  });
+
+  const { data: commissions = [] } = useQuery({
+    queryKey: ["/api/commissions"],
+  });
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ["/api/orders"],
+  });
+
+  // Mutation for paying producer
+  const payProducerMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { id: Date.now(), ...data };
-    },
-    onSuccess: () => {
-      setIsAddDialogOpen(false);
-      setPayableData({
-        dueDate: "",
-        description: "",
-        amount: "",
-        category: "",
-        vendorId: "",
-        notes: "",
-      });
-      toast({
-        title: "Sucesso!",
-        description: "Conta a pagar criada com sucesso",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/payables"] });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Não foi possível criar a conta a pagar",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const payPayableMutation = useMutation({
-    mutationFn: async (data: { payableId: string; payment: any }) => {
-      // Criar uma despesa/pagamento via API
-      const response = await fetch('/api/finance/expenses', {
+      const response = await fetch(`/api/finance/producer-payments/${data.payableId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          description: `Pagamento manual - ${selectedPayable?.description || 'Conta a pagar'}`,
-          amount: data.payment.amount,
-          category: selectedPayable?.category || 'other',
-          status: 'approved',
-          vendorId: 'vendor-1', // Default vendor for manual payments
-          orderId: null,
-          notes: data.payment.notes
+          paidBy: 'current-user-id',
+          paymentMethod: data.method,
+          notes: data.notes
         })
       });
       
@@ -145,7 +87,8 @@ export default function FinancePayables() {
         title: "Sucesso!",
         description: "Pagamento registrado com sucesso",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
     },
     onError: (error: any) => {
       toast({
@@ -156,13 +99,119 @@ export default function FinancePayables() {
     },
   });
 
-  const getStatusBadge = (status: string) => {
+  // Mutation for setting refund amount
+  const setRefundMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/orders/${data.orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          refundAmount: data.amount,
+          refundNotes: data.notes
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao definir valor de estorno');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsRefundDialogOpen(false);
+      setRefundData({
+        amount: "",
+        notes: "",
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Valor de estorno definido com sucesso",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível definir valor de estorno",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Combine all payables
+  const allPayables = [
+    // Producer payments
+    ...producerPayments.map((payment: any) => ({
+      id: `producer-${payment.id}`,
+      type: 'producer',
+      dueDate: payment.deadline || payment.createdAt,
+      description: `Pagamento Produtor - ${payment.product}`,
+      amount: payment.amount,
+      status: payment.status,
+      beneficiary: payment.producerName,
+      orderNumber: payment.orderNumber,
+      category: 'Produção'
+    })),
+
+    // Approved expenses not reimbursed
+    ...expenses
+      .filter((expense: any) => expense.status === 'approved' && !expense.reimbursedAt)
+      .map((expense: any) => ({
+        id: `expense-${expense.id}`,
+        type: 'expense',
+        dueDate: expense.date,
+        description: expense.description,
+        amount: expense.amount,
+        status: 'approved',
+        beneficiary: expense.vendorName || 'Despesa Geral',
+        category: expense.category,
+        orderNumber: expense.orderNumber || '-'
+      })),
+
+    // Confirmed commissions not paid
+    ...commissions
+      .filter((commission: any) => commission.status === 'confirmed' && !commission.paidAt)
+      .map((commission: any) => ({
+        id: `commission-${commission.id}`,
+        type: 'commission',
+        dueDate: commission.createdAt,
+        description: `Comissão - Pedido ${commission.orderNumber}`,
+        amount: commission.amount,
+        status: 'confirmed',
+        beneficiary: commission.vendorName || commission.partnerName,
+        category: commission.type === 'vendor' ? 'Comissão Vendedor' : 'Comissão Parceiro',
+        orderNumber: commission.orderNumber
+      })),
+
+    // Cancelled orders with payments (refunds)
+    ...orders
+      .filter((order: any) => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+      .map((order: any) => ({
+        id: `refund-${order.id}`,
+        type: 'refund',
+        dueDate: order.updatedAt,
+        description: `Estorno - ${order.product}`,
+        amount: order.refundAmount || order.paidValue,
+        status: order.refundAmount ? 'defined' : 'pending_definition',
+        beneficiary: order.clientName,
+        category: 'Estorno',
+        orderNumber: order.orderNumber,
+        originalOrder: order
+      }))
+  ];
+
+  const getStatusBadge = (status: string, type: string) => {
     const statusMap = {
       pending: { label: "Pendente", variant: "secondary" as const },
-      partial: { label: "Parcial", variant: "outline" as const },
+      approved: { label: "Aprovado", variant: "outline" as const },
+      confirmed: { label: "Confirmado", variant: "outline" as const },
+      pending_definition: { label: "Aguardando Valor", variant: "destructive" as const },
+      defined: { label: "Valor Definido", variant: "secondary" as const },
       paid: { label: "Pago", variant: "default" as const },
-      overdue: { label: "Vencido", variant: "destructive" as const },
-      cancelled: { label: "Cancelado", variant: "secondary" as const },
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
@@ -174,175 +223,81 @@ export default function FinancePayables() {
     );
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getTypeIcon = (type: string) => {
     const iconMap = {
-      material: <DollarSign className="h-4 w-4" />,
-      services: <CreditCard className="h-4 w-4" />,
-      utilities: <AlertTriangle className="h-4 w-4" />,
-      rent: <Clock className="h-4 w-4" />,
-      other: <TrendingDown className="h-4 w-4" />,
+      producer: <Factory className="h-4 w-4" />,
+      expense: <Receipt className="h-4 w-4" />,
+      commission: <Users className="h-4 w-4" />,
+      refund: <RefreshCw className="h-4 w-4" />,
     };
 
-    return iconMap[category as keyof typeof iconMap] || iconMap.other;
+    return iconMap[type as keyof typeof iconMap] || iconMap.expense;
   };
 
-  const filteredPayables = mockPayables.filter((payable: any) => {
+  const filteredPayables = allPayables.filter((payable: any) => {
     const matchesStatus = statusFilter === "all" || payable.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || payable.category === categoryFilter;
+    const matchesType = typeFilter === "all" || payable.type === typeFilter;
     const matchesSearch = searchTerm === "" || 
       payable.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payable.vendorName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesCategory && matchesSearch;
+      payable.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payable.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesType && matchesSearch;
   });
 
-  const handleCreatePayable = () => {
-    if (payableData.description && payableData.amount && payableData.dueDate) {
-      createPayableMutation.mutate({
-        ...payableData,
-        amount: parseFloat(payableData.amount).toFixed(2),
-        dueDate: new Date(payableData.dueDate),
-        status: 'pending',
-        paidAmount: '0.00'
-      });
-    }
-  };
-
-  const handlePayPayable = () => {
+  const handlePay = () => {
     if (selectedPayable && paymentData.amount) {
-      payPayableMutation.mutate({
-        payableId: selectedPayable.id,
-        payment: {
-          ...paymentData,
-          amount: parseFloat(paymentData.amount).toFixed(2),
-          date: new Date(),
-        }
+      payProducerMutation.mutate({
+        payableId: selectedPayable.id.replace('producer-', ''),
+        amount: parseFloat(paymentData.amount).toFixed(2),
+        method: paymentData.method,
+        transactionId: paymentData.transactionId,
+        notes: paymentData.notes
       });
     }
   };
 
-  const totalPayables = mockPayables.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-  const totalPaid = mockPayables.reduce((sum, p) => sum + parseFloat(p.paidAmount), 0);
-  const overdueCount = mockPayables.filter(p => p.status === 'overdue').length;
-  const pendingCount = mockPayables.filter(p => p.status === 'pending').length;
+  const handleSetRefund = () => {
+    if (selectedPayable && refundData.amount) {
+      setRefundMutation.mutate({
+        orderId: selectedPayable.originalOrder.id,
+        amount: parseFloat(refundData.amount).toFixed(2),
+        notes: refundData.notes
+      });
+    }
+  };
+
+  const breakdown = overview?.payablesBreakdown || {
+    producers: 0,
+    expenses: 0,
+    commissions: 0,
+    refunds: 0
+  };
+
+  const totalPayables = breakdown.producers + breakdown.expenses + breakdown.commissions + breakdown.refunds;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="grid grid-cols-4 gap-6 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
+            ))}
+          </div>
+          <div className="h-64 bg-gray-200 rounded-xl"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Contas a Pagar</h1>
-          <p className="text-gray-600">Controle de valores a pagar para fornecedores</p>
+          <p className="text-gray-600">Controle de valores a pagar: produtores, despesas, comissões e estornos</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-bg text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Conta a Pagar
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nova Conta a Pagar</DialogTitle>
-              <DialogDescription>
-                Registre uma nova conta a pagar
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="payable-due-date">Data Vencimento</Label>
-                  <Input
-                    id="payable-due-date"
-                    type="date"
-                    value={payableData.dueDate}
-                    onChange={(e) => setPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="payable-amount">Valor</Label>
-                  <Input
-                    id="payable-amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={payableData.amount}
-                    onChange={(e) => setPayableData(prev => ({ ...prev, amount: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="payable-description">Descrição</Label>
-                <Textarea
-                  id="payable-description"
-                  placeholder="Descreva a conta a pagar..."
-                  value={payableData.description}
-                  onChange={(e) => setPayableData(prev => ({ ...prev, description: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="payable-category">Categoria</Label>
-                <Select 
-                  value={payableData.category} 
-                  onValueChange={(value) => setPayableData(prev => ({ ...prev, category: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="material">Material</SelectItem>
-                    <SelectItem value="services">Serviços</SelectItem>
-                    <SelectItem value="utilities">Utilidades</SelectItem>
-                    <SelectItem value="rent">Aluguel</SelectItem>
-                    <SelectItem value="other">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="payable-vendor">Fornecedor (Opcional)</Label>
-                <Select 
-                  value={payableData.vendorId} 
-                  onValueChange={(value) => setPayableData(prev => ({ ...prev, vendorId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o fornecedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(vendors || [])?.map((vendor: any) => (
-                      <SelectItem key={vendor.id} value={vendor.id}>
-                        {vendor.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="payable-notes">Observações</Label>
-                <Textarea
-                  id="payable-notes"
-                  placeholder="Observações adicionais..."
-                  value={payableData.notes}
-                  onChange={(e) => setPayableData(prev => ({ ...prev, notes: e.target.value }))}
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="gradient-bg text-white"
-                  onClick={handleCreatePayable}
-                  disabled={!payableData.description || !payableData.amount || !payableData.dueDate || createPayableMutation.isPending}
-                >
-                  {createPayableMutation.isPending ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Summary Cards */}
@@ -367,13 +322,29 @@ export default function FinancePayables() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-600">Já Pago</p>
+                <p className="text-xs font-medium text-gray-600">Produtores</p>
                 <p className="text-xl font-bold gradient-text">
-                  R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {breakdown.producers.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Factory className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600">Despesas</p>
+                <p className="text-xl font-bold gradient-text">
+                  R$ {breakdown.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-green-600" />
+                <Receipt className="h-5 w-5 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -383,29 +354,13 @@ export default function FinancePayables() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-600">Pendentes</p>
+                <p className="text-xs font-medium text-gray-600">Comissões + Estornos</p>
                 <p className="text-xl font-bold gradient-text">
-                  {pendingCount}
+                  R$ {(breakdown.commissions + breakdown.refunds).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-5 w-5 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Vencidos</p>
-                <p className="text-xl font-bold gradient-text">
-                  {overdueCount}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-orange-600" />
               </div>
             </div>
           </CardContent>
@@ -420,7 +375,7 @@ export default function FinancePayables() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Buscar por descrição ou fornecedor..."
+                  placeholder="Buscar por descrição, beneficiário ou pedido..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
@@ -435,23 +390,23 @@ export default function FinancePayables() {
                 <SelectContent>
                   <SelectItem value="all">Todos Status</SelectItem>
                   <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="partial">Parcial</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="overdue">Vencido</SelectItem>
+                  <SelectItem value="approved">Aprovado</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="pending_definition">Aguardando Valor</SelectItem>
+                  <SelectItem value="defined">Valor Definido</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas Categorias</SelectItem>
-                  <SelectItem value="material">Material</SelectItem>
-                  <SelectItem value="services">Serviços</SelectItem>
-                  <SelectItem value="utilities">Utilidades</SelectItem>
-                  <SelectItem value="rent">Aluguel</SelectItem>
-                  <SelectItem value="other">Outros</SelectItem>
+                  <SelectItem value="all">Todos Tipos</SelectItem>
+                  <SelectItem value="producer">Produtores</SelectItem>
+                  <SelectItem value="expense">Despesas</SelectItem>
+                  <SelectItem value="commission">Comissões</SelectItem>
+                  <SelectItem value="refund">Estornos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -470,25 +425,22 @@ export default function FinancePayables() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vencimento
+                    Data
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoria
+                    Tipo
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Descrição
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fornecedor
+                    Beneficiário
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Total
+                    Pedido
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pago
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Saldo
+                    Valor
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -506,7 +458,7 @@ export default function FinancePayables() {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                       <div className="flex items-center">
-                        {getCategoryIcon(payable.category)}
+                        {getTypeIcon(payable.type)}
                         <span className="ml-2 capitalize">{payable.category}</span>
                       </div>
                     </td>
@@ -514,19 +466,16 @@ export default function FinancePayables() {
                       {payable.description}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {payable.vendorName}
+                      {payable.beneficiary}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {payable.orderNumber}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(payable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
-                      R$ {parseFloat(payable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
-                      R$ {(parseFloat(payable.amount) - parseFloat(payable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
                     <td className="px-4 py-2 whitespace-nowrap">
-                      {getStatusBadge(payable.status)}
+                      {getStatusBadge(payable.status, payable.type)}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-xs font-medium">
                       <div className="flex space-x-1">
@@ -534,17 +483,32 @@ export default function FinancePayables() {
                           <Eye className="h-3 w-3 mr-0.5" />
                           Ver
                         </Button>
-                        {payable.status !== 'paid' && (
+                        {payable.type === 'producer' && payable.status === 'approved' && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => {
                               setSelectedPayable(payable);
+                              setPaymentData(prev => ({ ...prev, amount: payable.amount }));
                               setIsPayDialogOpen(true);
                             }}
                           >
                             <CreditCard className="h-3 w-3 mr-0.5" />
                             Pagar
+                          </Button>
+                        )}
+                        {payable.type === 'refund' && payable.status === 'pending_definition' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setRefundData(prev => ({ ...prev, amount: payable.amount }));
+                              setIsRefundDialogOpen(true);
+                            }}
+                          >
+                            <DollarSign className="h-3 w-3 mr-0.5" />
+                            Definir Valor
                           </Button>
                         )}
                       </div>
@@ -557,19 +521,19 @@ export default function FinancePayables() {
         </CardContent>
       </Card>
 
-      {/* Pay Payment Dialog */}
+      {/* Pay Dialog */}
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Registrar Pagamento</DialogTitle>
             <DialogDescription>
-              Registre o pagamento para {selectedPayable?.description}
+              Registre o pagamento para {selectedPayable?.beneficiary}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="payment-amount">Valor Pago</Label>
+                <Label htmlFor="payment-amount">Valor</Label>
                 <Input
                   id="payment-amount"
                   type="number"
@@ -590,9 +554,8 @@ export default function FinancePayables() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="credit_card">Cartão</SelectItem>
                     <SelectItem value="bank_transfer">TED/DOC</SelectItem>
-                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="check">Cheque</SelectItem>
                     <SelectItem value="cash">Dinheiro</SelectItem>
                   </SelectContent>
                 </Select>
@@ -611,7 +574,7 @@ export default function FinancePayables() {
 
             <div>
               <Label htmlFor="payment-notes">Observações</Label>
-              <Input
+              <Textarea
                 id="payment-notes"
                 placeholder="Observações sobre o pagamento"
                 value={paymentData.notes}
@@ -625,10 +588,64 @@ export default function FinancePayables() {
               </Button>
               <Button
                 className="gradient-bg text-white"
-                onClick={handlePayPayable}
-                disabled={!paymentData.amount || payPayableMutation.isPending}
+                onClick={handlePay}
+                disabled={!paymentData.amount || payProducerMutation.isPending}
               >
-                {payPayableMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
+                {payProducerMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refund Dialog */}
+      <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Definir Valor de Estorno</DialogTitle>
+            <DialogDescription>
+              Defina o valor a ser restituído para {selectedPayable?.beneficiary}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+              <p className="text-sm text-yellow-800">
+                <strong>Valor Original Pago:</strong> R$ {selectedPayable?.originalOrder?.paidValue ? parseFloat(selectedPayable.originalOrder.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="refund-amount">Valor a ser Restituído</Label>
+              <Input
+                id="refund-amount"
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={refundData.amount}
+                onChange={(e) => setRefundData(prev => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="refund-notes">Motivo/Observações</Label>
+              <Textarea
+                id="refund-notes"
+                placeholder="Descreva o motivo do estorno..."
+                value={refundData.notes}
+                onChange={(e) => setRefundData(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsRefundDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="gradient-bg text-white"
+                onClick={handleSetRefund}
+                disabled={!refundData.amount || setRefundMutation.isPending}
+              >
+                {setRefundMutation.isPending ? "Salvando..." : "Definir Valor"}
               </Button>
             </div>
           </div>

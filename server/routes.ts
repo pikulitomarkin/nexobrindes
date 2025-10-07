@@ -839,23 +839,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/commissions", async (req, res) => {
     try {
       const commissions = await storage.getAllCommissions();
-      
+
       // Enrich with user names
       const enrichedCommissions = await Promise.all(
         commissions.map(async (commission) => {
           let vendorName = null;
           let partnerName = null;
-          
+
           if (commission.vendorId) {
             const vendor = await storage.getUser(commission.vendorId);
             vendorName = vendor?.name;
           }
-          
+
           if (commission.partnerId) {
             const partner = await storage.getUser(commission.partnerId);
             partnerName = partner?.name;
           }
-          
+
           return {
             ...commission,
             vendorName,
@@ -863,7 +863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(enrichedCommissions);
     } catch (error) {
       console.error("Error fetching commissions:", error);
@@ -886,12 +886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      
+
       const updatedCommission = await storage.updateCommissionStatus(id, status);
       if (!updatedCommission) {
         return res.status(404).json({ error: "Commission not found" });
       }
-      
+
       res.json(updatedCommission);
     } catch (error) {
       console.error("Error updating commission status:", error);
@@ -903,7 +903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/partners", async (req, res) => {
     try {
       const partners = await storage.getPartners();
-      
+
       // Enrich with commission data
       const partnersWithCommissions = await Promise.all(
         partners.map(async (partner) => {
@@ -911,9 +911,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const commissions = Array.from(storage.getAllCommissions()).then(allCommissions => 
             allCommissions.filter(c => c.partnerId === partner.id)
           );
-          
+
           const totalCommissions = (await commissions).reduce((sum, c) => sum + parseFloat(c.amount), 0);
-          
+
           return {
             ...partner,
             commissionRate: partnerProfile?.commissionRate || '15.00',
@@ -921,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(partnersWithCommissions);
     } catch (error) {
       console.error("Error fetching partners:", error);
@@ -3837,8 +3837,8 @@ Para mais detalhes, entre em contato conosco!`;
 
       const ofxContent = req.file.buffer.toString('utf-8');
 
-      // Simple OFX parsing - in production, use a proper OFX parser library
-      const transactions = parseOFXTransactions(ofxContent);
+      // Simple regex-based OFX parsing (in production, use a proper OFX parser library)
+      const transactions = extractOFXTransactions(ofxContent);
 
       if (transactions.length === 0) {
         return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
@@ -4061,7 +4061,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Update bank transaction status
       await storage.updateBankTransaction(transactionId, {
         status: 'matched',
-        matchedAt: new Date(),
+        paidAt: new Date(),
         notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
       });
 
@@ -4103,8 +4103,8 @@ Para mais detalhes, entre em contato conosco!`;
           const payment = await storage.createPayment({
             orderId: orderId,
             amount: transaction.amount,
-            method: "bank_transfer", // OFX transactions are bank transfers
-            status: "confirmed",
+            method: 'bank_transfer', // OFX transactions are bank transfers
+            status: 'confirmed',
             transactionId: `OFX-${transaction.transactionId}`,
             paidAt: new Date()
           });
@@ -4115,15 +4115,17 @@ Para mais detalhes, entre em contato conosco!`;
           await storage.updateBankTransaction(transaction.transactionId, {
             status: 'matched',
             matchedPaymentId: payment.id,
-            matchedOrderId: orderId,
-            matchedAt: new Date(),
-            notes: `Conciliado com pedido ${orderId} - Conta a receber`
+            matchedOrderId: orderId
           });
 
           paymentsCreated++;
         } catch (error) {
           console.error(`Error processing transaction ${transaction.transactionId}:`, error);
         }
+      }
+
+      if (paymentsCreated === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
       }
 
       console.log(`Successfully processed ${paymentsCreated} payments for order ${orderId}`);
@@ -4173,7 +4175,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Update bank transaction status
       await storage.updateBankTransaction(transactionId, {
         status: 'matched',
-        matchedAt: new Date(),
+        paidAt: new Date(),
         notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
       });
 

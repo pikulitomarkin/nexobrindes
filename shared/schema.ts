@@ -44,6 +44,7 @@ export const orders = pgTable("orders", {
   description: text("description"),
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
   paidValue: decimal("paid_value", { precision: 10, scale: 2 }).default('0'),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).default('0'), // Valor a ser restituído em caso de cancelamento
   status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'delivered', 'cancelled'
   deadline: timestamp("deadline"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -318,6 +319,8 @@ export const expenseNotes = pgTable("expense_notes", {
   status: text("status").notNull().default('recorded'), // 'recorded', 'approved', 'reimbursed'
   approvedBy: varchar("approved_by").references(() => users.id),
   approvedAt: timestamp("approved_at"),
+  reimbursedBy: varchar("reimbursed_by").references(() => users.id),
+  reimbursedAt: timestamp("reimbursed_at"),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
