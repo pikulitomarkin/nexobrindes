@@ -1050,15 +1050,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { producerId } = req.params;
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
 
       const activeOrders = productionOrders.filter(po => po.status === 'production' || po.status === 'accepted').length;
       const pendingOrders = productionOrders.filter(po => po.status === 'pending').length;
       const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
+      
+      const pendingPayments = producerPayments
+        .filter(p => p.status === 'pending' || p.status === 'approved')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
       res.json({
         activeOrders,
         pendingOrders,
-        completedOrders
+        completedOrders,
+        pendingPayments
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch producer stats" });

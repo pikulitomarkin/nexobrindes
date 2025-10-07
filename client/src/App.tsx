@@ -43,7 +43,8 @@ import ClientDashboard from "@/pages/dashboards/client-dashboard";
 import ProducerOrders from "@/pages/producer/orders";
 import ProductionDashboard from "@/pages/producer/production-dashboard";
 import ProducerOrderDetails from "./pages/producer/order-details";
-import ProducerProfileSettings from "./pages/producer/profile-settings";
+import ProducerProfileSettings from "@/pages/producer/profile-settings";
+import ProducerReceivables from "@/pages/producer/receivables";
 import ClientOrderTimeline from "./pages/client/order-timeline";
 
 // Finance pages
@@ -297,6 +298,14 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ProducerProfileSettings />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/producer/accounts-to-receive">
+            <ProtectedRoute>
+              <MainLayout>
+                <ProducerReceivables />
               </MainLayout>
             </ProtectedRoute>
           </Route>
