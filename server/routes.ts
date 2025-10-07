@@ -2173,8 +2173,20 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Valor deve ser um número válido maior que zero" });
       }
 
+      // Verificar se o valor já foi definido e está bloqueado
+      const productionOrder = await storage.getProductionOrder(id);
+      if (!productionOrder) {
+        console.log("API: Production order not found");
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      if (productionOrder.producerValueLocked) {
+        console.log("API: Producer value is locked");
+        return res.status(400).json({ error: "O valor já foi definido e não pode ser alterado" });
+      }
+
       console.log("API: Calling storage.updateProductionOrderValue...");
-      const updated = await storage.updateProductionOrderValue(id, numericValue.toFixed(2), notes);
+      const updated = await storage.updateProductionOrderValue(id, numericValue.toFixed(2), notes, true); // true para bloquear valor
 
       if (!updated) {
         console.log("API: Production order not found");

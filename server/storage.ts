@@ -86,7 +86,7 @@ export interface IStorage {
   getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]>;
   createProductionOrder(productionOrder: InsertProductionOrder): Promise<ProductionOrder>;
   updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined>;
-  updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined>;
+  updateProductionOrderValue(id: string, value: string, notes?: string, lockValue?: boolean): Promise<ProductionOrder | undefined>;
   updateProductionOrder(id: string, updates: Partial<ProductionOrder>): Promise<ProductionOrder | undefined>;
 
   // Payments
@@ -230,6 +230,7 @@ export interface IStorage {
   getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]>;
   createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
   updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
+  getProducerPayment(id: string): Promise<ProducerPayment | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -669,7 +670,8 @@ export class MemStorage implements IStorage {
       notes: "Produção iniciada conforme especificações",
       producerValue: "850.00",
       producerPaymentStatus: "pending",
-      producerNotes: "Valor inclui material e mão de obra"
+      producerNotes: "Valor inclui material e mão de obra",
+      producerValueLocked: false, // Added producerValueLocked
     };
     this.productionOrders.set(productionOrder.id, productionOrder);
 
@@ -1434,7 +1436,9 @@ export class MemStorage implements IStorage {
       hasUnreadNotes: insertProductionOrder.hasUnreadNotes || false,
       lastNoteAt: insertProductionOrder.lastNoteAt || null,
       trackingCode: insertProductionOrder.trackingCode || null,
-      shippingAddress: insertProductionOrder.shippingAddress || null
+      shippingAddress: insertProductionOrder.shippingAddress || null,
+      producerValue: insertProductionOrder.producerValue || '0.00', // Default value
+      producerValueLocked: insertProductionOrder.producerValueLocked || false, // Default locked status
     };
     this.productionOrders.set(id, productionOrder);
     return productionOrder;
@@ -2663,8 +2667,8 @@ export class MemStorage implements IStorage {
     return this.producerPayments.get(id);
   }
 
-  async updateProductionOrderValue(id: string, value: string, notes?: string): Promise<ProductionOrder | undefined> {
-    console.log(`Storage: updateProductionOrderValue called with id: ${id}, value: ${value}, notes: ${notes}`);
+  async updateProductionOrderValue(id: string, value: string, notes?: string, lockValue: boolean = false): Promise<ProductionOrder | undefined> {
+    console.log(`Storage: Updating production order ${id} with value ${value}, notes: ${notes}, lockValue: ${lockValue}`);
 
     const productionOrder = this.productionOrders.get(id);
     if (!productionOrder) {
@@ -2672,11 +2676,18 @@ export class MemStorage implements IStorage {
       return undefined;
     }
 
+    // Prevent update if the value is already locked and we are trying to change it
+    if (productionOrder.producerValueLocked && productionOrder.producerValue !== value) {
+      console.log(`Storage: Cannot update value for production order ${id} because it is locked.`);
+      return productionOrder; // Return current state without updating
+    }
+
     const updated = {
       ...productionOrder,
       producerValue: value,
       producerNotes: notes || productionOrder.producerNotes || null,
-      producerPaymentStatus: 'pending' as const
+      producerPaymentStatus: 'pending' as const,
+      producerValueLocked: lockValue // Apply the lockValue flag
     };
 
     this.productionOrders.set(id, updated);

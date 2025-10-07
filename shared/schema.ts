@@ -68,6 +68,7 @@ export const productionOrders = pgTable("production_orders", {
   
   // Campos financeiros para pagamento do produtor
   producerValue: decimal("producer_value", { precision: 10, scale: 2 }), // Valor que o produtor cobrará
+  producerValueLocked: boolean("producer_value_locked").default(false), // Se true, valor não pode ser alterado
   producerPaymentStatus: text("producer_payment_status").default('pending'), // 'pending', 'approved', 'paid'
   producerNotes: text("producer_notes"), // Observações do produtor sobre o valor
 });
