@@ -3839,6 +3839,47 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Helper function to parse OFX buffer
+  async function parseOFXBuffer(buffer: Buffer) {
+    const ofxContent = buffer.toString('utf-8');
+    const transactions = [];
+
+    // Simple regex-based OFX parsing
+    const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
+    const matches = ofxContent.match(transactionRegex);
+
+    if (matches) {
+      matches.forEach((match, index) => {
+        const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
+        const dtPosted = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
+        const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
+        const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${Date.now()}_${index}`;
+        const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
+        const refNum = match.match(/<REFNUM>(.*?)</)?.[1] || null;
+
+        // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
+        let transactionDate = new Date();
+        if (dtPosted && dtPosted.length >= 8) {
+          const year = parseInt(dtPosted.substring(0, 4));
+          const month = parseInt(dtPosted.substring(4, 6)) - 1; // Month is 0-based
+          const day = parseInt(dtPosted.substring(6, 8));
+          transactionDate = new Date(year, month, day);
+        }
+
+        transactions.push({
+          fitId: fitId,
+          dtPosted: transactionDate,
+          amount: trnAmt,
+          memo: memo,
+          refNum: refNum,
+          type: trnType
+        });
+      });
+    }
+
+    return { transactions };
+  }
+
   // Producer-specific OFX Import route
   app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
     try {
@@ -3885,7 +3926,7 @@ Para mais detalhes, entre em contato conosco!`;
           await storage.createBankTransaction({
             importId: bankImport.id,
             fitId: transactionData.fitId,
-            amount: absoluteAmount.toFixed(2), // Store as positive amount
+            amount: originalAmount.toFixed(2), // Keep original sign for proper classification
             date: new Date(transactionData.dtPosted),
             description: transactionData.memo,
             type: isDebit ? 'debit' : 'credit',
@@ -4106,18 +4147,27 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { id } = req.params;
 
-      const updated = await storage.updateProductionOrder(id, {
-        producerPaymentStatus: 'approved'
+      // Buscar o pagamento de produtor
+      const producerPayment = await storage.getProducerPayment(id);
+      if (!producerPayment) {
+        return res.status(404).json({ error: "Producer payment not found" });
+      }
+
+      // Atualizar status para aprovado
+      const updated = await storage.updateProducerPayment(id, {
+        status: 'approved',
+        approvedAt: new Date(),
+        approvedBy: 'admin' // Em produção, usar req.user.id
       });
 
       if (!updated) {
-        return res.status(404).json({ error: "Production order not found" });
+        return res.status(404).json({ error: "Failed to update producer payment" });
       }
 
       res.json({
         success: true,
         message: "Pagamento aprovado com sucesso",
-        productionOrder: updated
+        payment: updated
       });
     } catch (error) {
       console.error("Failed to approve producer payment:", error);

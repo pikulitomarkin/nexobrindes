@@ -69,31 +69,17 @@ export default function AdminProducerPayments() {
       const res = await apiRequest("POST", `/api/finance/producer-payments/${paymentId}/approve`);
       return res.json();
     },
-    onSuccess: async (data: any, paymentId: string) => {
+    onSuccess: (data: any, paymentId: string) => {
       // Invalidar queries para atualizar a lista
-      await queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
 
-      // Aguardar um pouco para garantir que os dados foram atualizados
-      setTimeout(() => {
-        // Buscar o pagamento aprovado para abrir o modal de conciliação
-        const updatedPendingPayments = queryClient.getQueryData(["/api/finance/producer-payments/pending"]) as any[];
-        const payment = updatedPendingPayments?.find((p: any) => p.id === paymentId);
-
-        if (payment && bankTransactions && bankTransactions.length > 0) {
-          // Abrir automaticamente o modal de conciliação
-          openAssociationDialog(payment);
-          toast({
-            title: "Pagamento Aprovado!",
-            description: "Selecione a transação bancária correspondente para conciliar",
-          });
-        } else {
-          toast({
-            title: "Sucesso!",
-            description: bankTransactions && bankTransactions.length > 0 ? "Pagamento aprovado. Clique em 'Associar Pagamento' para conciliar." : "Pagamento aprovado. Importe o OFX para fazer a conciliação.",
-          });
-        }
-      }, 300);
+      toast({
+        title: "Sucesso!",
+        description: bankTransactions && bankTransactions.length > 0 
+          ? "Pagamento aprovado. Clique em 'Associar Pagamento' para conciliar." 
+          : "Pagamento aprovado. Importe o OFX para fazer a conciliação.",
+      });
     },
     onError: () => {
       toast({
@@ -229,12 +215,16 @@ export default function AdminProducerPayments() {
     if (!bankTransactions) return [];
 
     const tolerance = 0.05; // 5% tolerance
-    return bankTransactions.filter((transaction: any) => 
-      transaction.status === 'unmatched' &&
-      transaction.type === 'debit' &&
-      parseFloat(transaction.amount) > 0 &&
-      Math.abs(parseFloat(transaction.amount) - paymentAmount) <= (paymentAmount * tolerance)
-    );
+    return bankTransactions.filter((transaction: any) => {
+      const transactionAmount = Math.abs(parseFloat(transaction.amount)); // Usar valor absoluto para comparação
+      return transaction.status === 'unmatched' &&
+        transaction.type === 'debit' &&
+        parseFloat(transaction.amount) < 0 && // Garantir que é débito (valor negativo)
+        Math.abs(transactionAmount - paymentAmount) <= (paymentAmount * tolerance);
+    }).map(transaction => ({
+      ...transaction,
+      amount: Math.abs(parseFloat(transaction.amount)).toString() // Mostrar valor absoluto no frontend
+    }));
   };
 
   const getAllUnmatchedDebitTransactions = () => {
@@ -243,8 +233,11 @@ export default function AdminProducerPayments() {
     return bankTransactions.filter((transaction: any) => 
       (transaction.status === 'unmatched' || !transaction.status) &&
       transaction.type === 'debit' &&
-      parseFloat(transaction.amount) > 0
-    );
+      parseFloat(transaction.amount) < 0 // Débitos são valores negativos
+    ).map(transaction => ({
+      ...transaction,
+      amount: Math.abs(parseFloat(transaction.amount)).toString() // Mostrar valor absoluto no frontend
+    }));
   };
 
   const getStatusBadge = (status: string) => {
