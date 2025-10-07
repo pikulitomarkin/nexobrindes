@@ -4,13 +4,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, Clock, CheckCircle, Package, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Eye, DollarSign, Clock, CheckCircle, Package, Calendar, User, Phone, Mail, MapPin } from "lucide-react";
 
 export default function ProducerReceivables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any>(null);
 
   // Get producer ID from localStorage (set during login)
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -265,7 +268,11 @@ export default function ProducerReceivables() {
                   )}
 
                   <div className="flex justify-end">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedPaymentForDetails(payment)}
+                    >
                       <Eye className="h-4 w-4 mr-1" />
                       Ver Detalhes
                     </Button>
@@ -276,6 +283,197 @@ export default function ProducerReceivables() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Detalhes do Pedido */}
+      <Dialog open={!!selectedPaymentForDetails} onOpenChange={() => setSelectedPaymentForDetails(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogDescription>
+              Informações completas sobre o pedido e pagamentos
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPaymentForDetails && (
+            <div className="space-y-6">
+              {/* Informações Básicas do Pedido */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
+                      <p className="text-lg font-bold">
+                        {selectedPaymentForDetails.order?.orderNumber || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Produto</label>
+                      <p className="font-medium">
+                        {selectedPaymentForDetails.productionOrder?.product || selectedPaymentForDetails.order?.product || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Descrição</label>
+                      <p className="text-gray-700">
+                        {selectedPaymentForDetails.order?.description || 'Sem descrição'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Status do Pagamento</label>
+                      <div className="mt-1">
+                        {getStatusBadge(selectedPaymentForDetails.status)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Valores e Datas</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Meu Serviço</label>
+                      <p className="text-2xl font-bold text-green-600">
+                        R$ {parseFloat(selectedPaymentForDetails.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Data de Criação</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <p className="text-sm">
+                          {new Date(selectedPaymentForDetails.createdAt).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedPaymentForDetails.approvedAt && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Aprovado em</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <CheckCircle className="h-4 w-4 text-blue-400" />
+                          <p className="text-sm">
+                            {new Date(selectedPaymentForDetails.approvedAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedPaymentForDetails.paidAt && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Pago em</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <DollarSign className="h-4 w-4 text-green-400" />
+                          <p className="text-sm">
+                            {new Date(selectedPaymentForDetails.paidAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações do Cliente */}
+              {selectedPaymentForDetails.order && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Informações do Cliente</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <Label className="text-sm text-gray-500">Nome</Label>
+                        <p className="font-medium">
+                          {selectedPaymentForDetails.order.clientName || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedPaymentForDetails.order.clientPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <Label className="text-sm text-gray-500">Telefone</Label>
+                          <p className="font-medium">{selectedPaymentForDetails.order.clientPhone}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedPaymentForDetails.order.clientEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <Label className="text-sm text-gray-500">E-mail</Label>
+                          <p className="font-medium">{selectedPaymentForDetails.order.clientEmail}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedPaymentForDetails.order.shippingAddress && (
+                      <div className="flex items-center gap-2 md:col-span-2 lg:col-span-3">
+                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <Label className="text-sm text-gray-500">Endereço de Entrega</Label>
+                          <p className="font-medium">{selectedPaymentForDetails.order.shippingAddress}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Método de Pagamento */}
+              {selectedPaymentForDetails.paymentMethod && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Informações de Pagamento</h3>
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div>
+                      <Label className="text-sm text-gray-600">Método de Pagamento</Label>
+                      <p className="font-medium text-blue-800 capitalize">
+                        {selectedPaymentForDetails.paymentMethod}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Observações */}
+              {selectedPaymentForDetails.notes && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Observações</h3>
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <p className="text-gray-800">{selectedPaymentForDetails.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Status e Progresso */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Progresso do Pagamento</h3>
+                <div className="space-y-3">
+                  {[
+                    { status: 'pending', label: 'Pendente', completed: true },
+                    { status: 'approved', label: 'Aprovado', completed: selectedPaymentForDetails.status === 'approved' || selectedPaymentForDetails.status === 'paid' },
+                    { status: 'paid', label: 'Pago', completed: selectedPaymentForDetails.status === 'paid' }
+                  ].map((step, index) => (
+                    <div key={step.status} className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className={`text-sm ${step.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedPaymentForDetails(null)}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
