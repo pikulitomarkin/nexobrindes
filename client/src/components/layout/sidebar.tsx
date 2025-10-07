@@ -135,6 +135,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 isActive={pathname === '/admin/producers'}
               />
               <SidebarItem 
+                icon={UserCheck} 
+                label="Sócios" 
+                href="/admin/partners" 
+                isActive={pathname === '/admin/partners'}
+              />
+              <SidebarItem 
                 icon={Package} 
                 label="Produtos" 
                 href="/admin/products" 

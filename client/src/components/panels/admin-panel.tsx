@@ -156,6 +156,12 @@ export default function AdminPanel() {
                 Gerenciar Clientes ({stats?.totalClients || 0})
               </Button>
             </Link>
+            <Link href="/admin/partners">
+              <Button variant="outline" className="w-full justify-start">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Gerenciar Sócios
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 

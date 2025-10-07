@@ -900,29 +900,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Partners routes
+  // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
-      const partners = await storage.getPartners();
+      const partners = await db.select().from(users).where(eq(users.role, "partner"));
 
-      // Enrich with commission data
-      const partnersWithCommissions = await Promise.all(
-        partners.map(async (partner) => {
-          const partnerProfile = await storage.getPartner(partner.id);
-          const commissions = Array.from(storage.getAllCommissions()).then(allCommissions => 
-            allCommissions.filter(c => c.partnerId === partner.id)
-          );
+      const partnersWithDetails = partners.map((partner) => ({
+        id: partner.id,
+        name: partner.username,
+        email: partner.email || "",
+        accessCode: partner.accessCode || "",
+        phone: partner.phone || "",
+        createdAt: partner.createdAt,
+        isActive: true
+      }));
 
-          const totalCommissions = (await commissions).reduce((sum, c) => sum + parseFloat(c.amount), 0);
-
-          return {
-            ...partner,
-            commissionRate: partnerProfile?.commissionRate || '15.00',
-            totalCommissions
-          };
-        })
-      );
-
-      res.json(partnersWithCommissions);
+      res.json(partnersWithDetails);
     } catch (error) {
       console.error("Error fetching partners:", error);
       res.status(500).json({ error: "Failed to fetch partners" });
@@ -4092,24 +4085,34 @@ Para mais detalhes, entre em contato conosco!`;
 
       for (const transaction of transactions) {
         try {
-          // Verify this is a credit transaction (incoming payment)
+          // Get the bank transaction
           const bankTransaction = await storage.getBankTransaction(transaction.transactionId);
-          if (!bankTransaction || parseFloat(bankTransaction.amount) <= 0) {
-            console.log(`Skipping transaction ${transaction.transactionId} - not a credit transaction`);
+          if (!bankTransaction) {
+            console.warn(`Transaction ${transaction.transactionId} not found, skipping`);
+            continue;
+          }
+
+          // Verify this is a credit transaction (incoming payment)
+          if (parseFloat(bankTransaction.amount) <= 0) {
+            console.warn(`Transaction ${transaction.transactionId} is not a credit transaction, skipping`);
+            continue;
+          }
+
+          // Check if transaction has already been matched
+          if (bankTransaction.status === 'matched') {
+            console.warn(`Transaction ${transaction.transactionId} is already matched, skipping`);
             continue;
           }
 
           // Create payment record
           const payment = await storage.createPayment({
             orderId: orderId,
-            amount: transaction.amount,
+            amount: parseFloat(transaction.amount).toFixed(2), // Use amount from transaction
             method: 'bank_transfer', // OFX transactions are bank transfers
             status: 'confirmed',
-            transactionId: `OFX-${transaction.transactionId}`,
-            paidAt: new Date()
+            transactionId: transaction.transactionId,
+            paidAt: bankTransaction.date ? new Date(bankTransaction.date) : new Date()
           });
-
-          createdPayments.push(payment);
 
           // Update bank transaction status
           await storage.updateBankTransaction(transaction.transactionId, {
@@ -4118,9 +4121,11 @@ Para mais detalhes, entre em contato conosco!`;
             matchedOrderId: orderId
           });
 
+          createdPayments.push(payment);
           paymentsCreated++;
         } catch (error) {
           console.error(`Error processing transaction ${transaction.transactionId}:`, error);
+          // Continue processing other transactions even if one fails
         }
       }
 
@@ -4139,7 +4144,7 @@ Para mais detalhes, entre em contato conosco!`;
 
     } catch (error) {
       console.error("Error associating multiple payments:", error);
-      res.status(500).json({ error: "Erro ao associar pagamentos múltiplos" });
+      res.status(500).json({ error: "Erro ao associar pagamentos múltiplos: " + error.message });
     }
   });
 
