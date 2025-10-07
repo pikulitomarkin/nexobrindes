@@ -111,7 +111,7 @@ export default function AdminProducerPayments() {
         productionOrderId,
         transactionCount: transactions.length
       });
-      
+
       const res = await apiRequest("POST", "/api/finance/producer-payments/associate-payment", {
         transactionIds: transactions.map((t: any) => t.id),
         productionOrderId,
@@ -125,11 +125,11 @@ export default function AdminProducerPayments() {
       setIsAssociationDialogOpen(false);
       setSelectedPayment(null);
       setSelectedTransactions([]);
-      
+
       let toastVariant: "default" | "destructive" = "default";
       let toastTitle = "Sucesso!";
       let toastDescription = data.message || `Pagamento de R$ ${parseFloat(data.payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado para o produtor ${data.payment.producerName}`;
-      
+
       // Check if there was an adjustment due to difference
       if (data.payment.hasAdjustment && Math.abs(parseFloat(data.payment.difference)) > 0.01) {
         const difference = parseFloat(data.payment.difference);
@@ -137,7 +137,7 @@ export default function AdminProducerPayments() {
         toastTitle = "Conciliado com Ajuste";
         toastDescription = `${toastDescription}\n\n⚠️ Diferença de R$ ${Math.abs(difference).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${diffType}) registrada automaticamente.`;
       }
-      
+
       toast({
         title: toastTitle,
         description: toastDescription,
@@ -598,7 +598,7 @@ export default function AdminProducerPayments() {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-lg font-bold text-red-600">
+                                  <p className="font-bold text-red-600">
                                     - R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </p>
                                   <Badge className="bg-orange-100 text-orange-800 text-xs mt-1">
@@ -967,8 +967,9 @@ export default function AdminProducerPayments() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-red-600">
-                            R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            - R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
+                          <p className="text-xs text-orange-600">Débito/Saída</p>
                           {transaction.bankRef && (
                             <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
                           )}

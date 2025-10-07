@@ -410,7 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Remove duplicates
-      const uniqueOrders = orders.filter((order, index, self) => 
+      const uniqueOrders = orders.filter((order, index, self) =>
         index === self.findIndex(o => o.id === order.id)
       );
 
@@ -566,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               clientAddress: clientAddress,
               clientPhone: clientPhone,
               clientEmail: clientEmail,
-              shippingAddress: order.deliveryType === 'pickup' 
+              shippingAddress: order.deliveryType === 'pickup'
                 ? 'Sede Principal - Retirada no Local'
                 : (clientAddress || 'Endereço não informado'),
               deliveryType: order.deliveryType || 'delivery'
@@ -701,9 +701,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         commissionRate: commissionRate || '10.00'
       });
 
-      res.json({ 
-        success: true, 
-        user: { 
+      res.json({
+        success: true,
+        user: {
           id: user.id,
           name: user.name,
           email: user.email,
@@ -804,8 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor info
-  app.get("/api/vendor/:userId", async (req, res) => {
+  app.get("/api/vendor/:userId/info", async (req, res) => {
     try {
       const { userId } = req.params;
       const vendor = await storage.getVendor(userId);
@@ -968,9 +967,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Contas a Pagar - pagamentos pendentes para produtores
       const payables = productionOrders
-        .filter(po => 
-          po.producerValue && 
-          parseFloat(po.producerValue) > 0 && 
+        .filter(po =>
+          po.producerValue &&
+          parseFloat(po.producerValue) > 0 &&
           (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
         )
         .reduce((total, po) => total + parseFloat(po.producerValue || '0'), 0);
@@ -1056,7 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeOrders = productionOrders.filter(po => po.status === 'production' || po.status === 'accepted').length;
       const pendingOrders = productionOrders.filter(po => po.status === 'pending').length;
       const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
-      
+
       const pendingPayments = producerPayments
         .filter(p => p.status === 'pending' || p.status === 'approved')
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
@@ -1264,8 +1263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orders = await storage.getOrders();
 
       // Delete test orders (you can adjust the criteria)
-      const testOrders = orders.filter(order => 
-        order.orderNumber?.includes('TEST') || 
+      const testOrders = orders.filter(order =>
+        order.orderNumber?.includes('TEST') ||
         order.product?.toLowerCase().includes('test') ||
         order.description?.toLowerCase().includes('test')
       );
@@ -1281,8 +1280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.deleteOrder(order.id);
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         deletedCount: testOrders.length,
         message: `${testOrders.length} pedidos de teste foram removidos`
       });
@@ -2016,8 +2015,8 @@ Para mais detalhes, entre em contato conosco!`;
 
       for (const customization of customizations) {
         try {
-          if (!customization.name || !customization.category || 
-              customization.minQuantity === undefined || customization.price === undefined) {
+          if (!customization.name || !customization.category ||
+            customization.minQuantity === undefined || customization.price === undefined) {
             errors.push(`Linha com dados incompletos: ${customization.name || 'sem nome'}`);
             continue;
           }
@@ -2057,8 +2056,8 @@ Para mais detalhes, entre em contato conosco!`;
       const { minQuantity } = req.query;
 
       let customizations = await storage.getCustomizationOptions();
-      let filtered = customizations.filter(c => 
-        c.category === category && 
+      let filtered = customizations.filter(c =>
+        c.category === category &&
         c.isActive === true
       );
 
@@ -2081,7 +2080,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       if (category && quantity) {
         const options = await storage.getCustomizationOptionsByCategory(
-          category as string, 
+          category as string,
           parseInt(quantity as string)
         );
         res.json(options);
@@ -2186,9 +2185,9 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({ success: true, productionOrder: updated });
     } catch (error) {
       console.error("API Error setting production order value:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to set production order value",
-        details: error.message 
+        details: error.message
       });
     }
   });
@@ -2286,7 +2285,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/vendor/:vendorId/budgets", async (req, res) => {
+  app.get("/api/vendors/:vendorId/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
 
@@ -2498,12 +2497,12 @@ Para mais detalhes, entre em contato conosco!`;
 
           // Combine and deduplicate orders
           const allOrders = [...ordersByUserId, ...ordersByClientId];
-          const uniqueOrders = allOrders.filter((order, index, self) => 
+          const uniqueOrders = allOrders.filter((order, index, self) =>
             index === self.findIndex(o => o.id === order.id)
           );
 
           const ordersCount = uniqueOrders.length;
-          const totalSpent = uniqueOrders.reduce((sum, order) => 
+          const totalSpent = uniqueOrders.reduce((sum, order) =>
             sum + parseFloat(order.totalValue || '0'), 0
           );
 
@@ -2580,8 +2579,8 @@ Para mais detalhes, entre em contato conosco!`;
       });
 
       // Return enriched client data
-      res.json({ 
-        ...newClient, 
+      res.json({
+        ...newClient,
         userCode: userCode,
         username: userCode,
         userId: user.id,
@@ -2712,7 +2711,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         // Atualizar o pedido principal com o novo status
-        await storage.updateOrder(productionOrder.orderId, { 
+        await storage.updateOrder(productionOrder.orderId, {
           status: orderStatus,
           trackingCode: trackingCode || null
         });
@@ -2965,7 +2964,7 @@ Para mais detalhes, entre em contato conosco!`;
           clientAddress: clientAddress,
           clientPhone: clientPhone,
           clientEmail: clientEmail,
-          shippingAddress: order.deliveryType === 'pickup' 
+          shippingAddress: order.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
             : clientAddress,
           deliveryType: order.deliveryType || 'delivery'
@@ -3059,7 +3058,7 @@ Para mais detalhes, entre em contato conosco!`;
         },
         {
           id: 'confirmed',
-          status: 'confirmed', 
+          status: 'confirmed',
           title: 'Pedido Confirmado',
           description: 'Pedido foi confirmado e enviado para produção',
           date: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
@@ -3452,7 +3451,7 @@ Para mais detalhes, entre em contato conosco!`;
       const receivableId = req.params.id;
 
       // Get the receivable to find the actual order ID
-      const receivable = await storage.getAccountsReceivable().then(receivables => 
+      const receivable = await storage.getAccountsReceivable().then(receivables =>
         receivables.find(r => r.id === receivableId)
       );
 
@@ -3685,17 +3684,17 @@ Para mais detalhes, entre em contato conosco!`;
         orderPaidValue: updatedOrder?.paidValue
       });
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         payment,
         order: updatedOrder,
         message: "Pagamento confirmado e associado ao pedido com sucesso"
       });
     } catch (error) {
       console.error("Failed to associate payment:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Erro ao associar pagamento",
-        details: (error as Error).message 
+        details: (error as Error).message
       });
     }
   });
@@ -3835,71 +3834,78 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Nenhum arquivo OFX foi enviado" });
       }
 
-      const ofxContent = req.file.buffer.toString('utf-8');
-      const transactions = extractOFXTransactions(ofxContent);
+      console.log("Processing producer OFX import:", req.file.originalname);
 
-      if (transactions.length === 0) {
-        return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
-      }
+      const fileBuffer = req.file.buffer;
+      const importData = await parseOFXBuffer(fileBuffer);
 
       // Create bank import record
       const bankImport = await storage.createBankImport({
-        filename: req.file.originalname,
-        uploadedBy: 'admin-1',
-        status: 'parsed',
-        summary: JSON.stringify({
-          totalTransactions: transactions.length,
-          dateRange: {
-            from: transactions[0]?.date,
-            to: transactions[transactions.length - 1]?.date
-          },
-          type: 'producer_payments'
-        })
+        fileName: req.file.originalname,
+        fileSize: req.file.size.toString(),
+        fileType: 'ofx',
+        status: 'processed',
+        processedTransactions: importData.transactions.length,
+        totalAmount: importData.transactions.reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount)), 0).toFixed(2),
+        importedBy: 'system'
       });
 
-      // Create individual bank transactions, focusing on debit transactions for producer payments
-      let createdCount = 0;
-      for (const transaction of transactions) {
+      console.log(`Processing ${importData.transactions.length} transactions from OFX for producer payments`);
+
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      for (const transactionData of importData.transactions) {
         try {
-          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+          // Check if transaction already exists
+          const existingTransaction = await storage.getBankTransactionByFitId(transactionData.fitId);
           if (existingTransaction) {
+            console.log(`Transaction with fitId ${transactionData.fitId} already exists, skipping`);
+            skippedCount++;
             continue;
           }
 
-          const amount = parseFloat(transaction.amount);
-          let transactionType = amount > 0 ? 'credit' : 'debit';
-          let notes = amount > 0 
-            ? 'Entrada - Disponível para conciliação' 
-            : 'Saída - Disponível para conciliação com pagamentos de produtores';
+          // Create new transaction - focus on DEBIT transactions (outgoing payments to producers)
+          const originalAmount = parseFloat(transactionData.amount);
+          const isDebit = originalAmount < 0; // Negative amounts are debits (outgoing payments)
+          const absoluteAmount = Math.abs(originalAmount);
 
           await storage.createBankTransaction({
             importId: bankImport.id,
-            fitId: transaction.fitId,
-            date: transaction.date,
-            amount: transaction.amount,
-            description: transaction.description,
-            type: transactionType,
-            bankRef: transaction.bankRef,
+            fitId: transactionData.fitId,
+            amount: absoluteAmount.toFixed(2), // Store as positive amount
+            date: new Date(transactionData.dtPosted),
+            description: transactionData.memo,
+            type: isDebit ? 'debit' : 'credit',
             status: 'unmatched',
-            notes: notes
+            bankRef: transactionData.refNum || null,
+            notes: isDebit ? `Saída: ${transactionData.memo}` : `Entrada: ${transactionData.memo}`
           });
-          createdCount++;
+
+          importedCount++;
+          console.log(`Imported ${isDebit ? 'DEBIT' : 'CREDIT'} transaction: ${absoluteAmount.toFixed(2)} - ${transactionData.memo}`);
         } catch (error) {
-          console.error('Error creating bank transaction:', error);
+          console.error("Error processing transaction:", error);
         }
       }
+
+      console.log(`Producer OFX import completed: ${importedCount} imported, ${skippedCount} skipped`);
 
       res.json({
         success: true,
         importId: bankImport.id,
-        message: `${createdCount} transações importadas com sucesso`,
-        transactionsImported: createdCount,
-        duplicatesSkipped: transactions.length - createdCount
+        imported: importedCount,
+        skipped: skippedCount,
+        total: importData.transactions.length,
+        message: `Importação OFX concluída: ${importedCount} transações importadas (${importData.transactions.filter(t => parseFloat(t.amount) < 0).length} débitos para pagamentos)`
       });
 
     } catch (error) {
-      console.error('Error importing producer OFX:', error);
-      res.status(500).json({ error: "Erro ao processar arquivo OFX" });
+      console.error('Producer OFX import error:', error);
+      res.status(500).json({
+        error: "Erro ao processar arquivo OFX",
+        details: error.message
+      });
     }
   });
 
@@ -3921,16 +3927,13 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Create bank import record
       const bankImport = await storage.createBankImport({
-        filename: req.file.originalname,
-        uploadedBy: 'admin-1', // Should get from authenticated user
-        status: 'parsed',
-        summary: JSON.stringify({
-          totalTransactions: transactions.length,
-          dateRange: {
-            from: transactions[0]?.date,
-            to: transactions[transactions.length - 1]?.date
-          }
-        })
+        fileName: req.file.originalname,
+        fileSize: req.file.size.toString(),
+        fileType: 'ofx',
+        status: 'processed',
+        processedTransactions: transactions.length,
+        totalAmount: transactions.reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount)), 0).toFixed(2),
+        importedBy: 'system'
       });
 
       // Create individual bank transactions with proper type classification
@@ -3964,8 +3967,8 @@ Para mais detalhes, entre em contato conosco!`;
             amount: transaction.amount,
             description: transaction.description,
             type: transactionType,
-            bankRef: transaction.bankRef,
             status: 'unmatched',
+            bankRef: transaction.bankRef,
             notes: notes
           });
           createdCount++;
@@ -4034,47 +4037,55 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.get("/api/finance/producer-payments/pending", async (req, res) => {
     try {
-      const productionOrders = await storage.getProductionOrders();
+      const producerPayments = await storage.getProducerPayments();
 
-      const pendingPayments = await Promise.all(
-        productionOrders
-          .filter(po => 
-            po.producerValue && 
-            parseFloat(po.producerValue) > 0 && 
-            (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
-          )
-          .map(async (po) => {
-            const order = await storage.getOrder(po.orderId);
-            const producer = await storage.getUser(po.producerId);
-
+      // Enrich with production order and producer data
+      const enrichedPayments = await Promise.all(
+        producerPayments
+          .filter(payment => payment.status === 'approved' || payment.status === 'pending')
+          .map(async (payment) => {
+            const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+            const producer = await storage.getUser(payment.producerId);
+            let order = null;
             let clientName = 'Unknown';
-            if (order) {
-              const client = await storage.getClient(order.clientId);
-              if (client) {
-                clientName = client.name;
+
+            if (productionOrder) {
+              order = await storage.getOrder(productionOrder.orderId);
+
+              if (order) {
+                // Get client name
+                const clientRecord = await storage.getClient(order.clientId);
+                if (clientRecord) {
+                  clientName = clientRecord.name;
+                } else {
+                  const clientByUserId = await storage.getClientByUserId(order.clientId);
+                  if (clientByUserId) {
+                    clientName = clientByUserId.name;
+                  } else {
+                    const clientUser = await storage.getUser(order.clientId);
+                    if (clientUser) {
+                      clientName = clientUser.name;
+                    }
+                  }
+                }
               }
             }
 
             return {
-              id: po.id,
-              productionOrderId: po.id,
-              producerId: po.producerId,
+              ...payment,
+              productionOrder,
+              order,
               producerName: producer?.name || 'Unknown',
-              amount: po.producerValue,
-              status: po.producerPaymentStatus || 'pending',
               orderNumber: order?.orderNumber || 'Unknown',
-              product: order?.product || po.product || 'Unknown',
-              clientName: clientName,
-              deadline: po.deadline,
-              notes: po.producerNotes,
-              createdAt: po.acceptedAt || new Date()
+              product: order?.product || 'Unknown',
+              clientName: clientName
             };
           })
       );
 
-      res.json(pendingPayments);
+      res.json(enrichedPayments);
     } catch (error) {
-      console.error("Failed to fetch pending producer payments:", error);
+      console.error("Error fetching pending producer payments:", error);
       res.status(500).json({ error: "Failed to fetch pending producer payments" });
     }
   });
@@ -4304,10 +4315,10 @@ Para mais detalhes, entre em contato conosco!`;
       // Check for differences between transaction total and production order value
       const productionOrderValue = parseFloat(productionOrder.producerValue || '0');
       difference = totalTransactionAmount - productionOrderValue;
-      
+
       if (Math.abs(difference) > 0.01) { // More than 1 cent difference
         hasAdjustment = true;
-        
+
         // Create adjustment record if needed
         if (difference !== 0) {
           await storage.createExpenseNote({
@@ -4392,8 +4403,8 @@ Para mais detalhes, entre em contato conosco!`;
       const producerPayments = await storage.getProducerPayments();
 
       // Filter payments that are approved or pending and have a value
-      const pendingPayments = producerPayments.filter(payment => 
-        (payment.status === 'approved' || payment.status === 'pending') && 
+      const pendingPayments = producerPayments.filter(payment =>
+        (payment.status === 'approved' || payment.status === 'pending') &&
         payment.amount && parseFloat(payment.amount) > 0
       );
 
@@ -4554,8 +4565,8 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log("Payment associated successfully:", enrichedPayment);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         payment: enrichedPayment
       });
     } catch (error) {
