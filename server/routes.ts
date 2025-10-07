@@ -903,13 +903,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
-      const partners = await db.select().from(users).where(eq(users.role, "partner"));
+      const users = await storage.getUsers();
+      const partners = users.filter(user => user.role === 'partner');
 
       const partnersWithDetails = partners.map((partner) => ({
         id: partner.id,
-        name: partner.username,
+        name: partner.name,
         email: partner.email || "",
-        accessCode: partner.accessCode || "",
+        accessCode: partner.username || "",
         phone: partner.phone || "",
         createdAt: partner.createdAt,
         isActive: true
@@ -3827,6 +3828,81 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Producer-specific OFX Import route
+  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo OFX foi enviado" });
+      }
+
+      const ofxContent = req.file.buffer.toString('utf-8');
+      const transactions = extractOFXTransactions(ofxContent);
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
+      }
+
+      // Create bank import record
+      const bankImport = await storage.createBankImport({
+        filename: req.file.originalname,
+        uploadedBy: 'admin-1',
+        status: 'parsed',
+        summary: JSON.stringify({
+          totalTransactions: transactions.length,
+          dateRange: {
+            from: transactions[0]?.date,
+            to: transactions[transactions.length - 1]?.date
+          },
+          type: 'producer_payments'
+        })
+      });
+
+      // Create individual bank transactions, focusing on debit transactions for producer payments
+      let createdCount = 0;
+      for (const transaction of transactions) {
+        try {
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+          if (existingTransaction) {
+            continue;
+          }
+
+          const amount = parseFloat(transaction.amount);
+          let transactionType = amount > 0 ? 'credit' : 'debit';
+          let notes = amount > 0 
+            ? 'Entrada - Disponível para conciliação' 
+            : 'Saída - Disponível para conciliação com pagamentos de produtores';
+
+          await storage.createBankTransaction({
+            importId: bankImport.id,
+            fitId: transaction.fitId,
+            date: transaction.date,
+            amount: transaction.amount,
+            description: transaction.description,
+            type: transactionType,
+            bankRef: transaction.bankRef,
+            status: 'unmatched',
+            notes: notes
+          });
+          createdCount++;
+        } catch (error) {
+          console.error('Error creating bank transaction:', error);
+        }
+      }
+
+      res.json({
+        success: true,
+        importId: bankImport.id,
+        message: `${createdCount} transações importadas com sucesso`,
+        transactionsImported: createdCount,
+        duplicatesSkipped: transactions.length - createdCount
+      });
+
+    } catch (error) {
+      console.error('Error importing producer OFX:', error);
+      res.status(500).json({ error: "Erro ao processar arquivo OFX" });
+    }
+  });
+
   // OFX Import route with file processing
   app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
     try {
@@ -4151,6 +4227,115 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error associating multiple payments:", error);
       res.status(500).json({ error: "Erro ao associar pagamentos múltiplos: " + error.message });
+    }
+  });
+
+  // Producer payment association endpoint (new format expected by frontend)
+  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
+    try {
+      const { transactionIds, productionOrderId } = req.body;
+
+      console.log("Associating producer payment:", { transactionIds, productionOrderId });
+
+      if (!transactionIds || !Array.isArray(transactionIds) || !productionOrderId) {
+        return res.status(400).json({ error: "Transaction IDs e Production Order ID são obrigatórios" });
+      }
+
+      // Get the production order
+      const productionOrder = await storage.getProductionOrder(productionOrderId);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Get producer info
+      const producer = await storage.getUser(productionOrder.producerId);
+      if (!producer) {
+        return res.status(404).json({ error: "Produtor não encontrado" });
+      }
+
+      let totalTransactionAmount = 0;
+      let processedTransactions = 0;
+      let hasAdjustment = false;
+      let difference = 0;
+
+      // Process each transaction
+      for (const transactionId of transactionIds) {
+        const transaction = await storage.getBankTransaction(transactionId);
+        if (!transaction) {
+          console.warn(`Transaction ${transactionId} not found, skipping`);
+          continue;
+        }
+
+        // Verify this is a debit transaction (outgoing payment)
+        const transactionAmount = parseFloat(transaction.amount);
+        if (transactionAmount >= 0) {
+          console.warn(`Transaction ${transactionId} is not a debit, skipping`);
+          continue;
+        }
+
+        // Check if already matched
+        if (transaction.status === 'matched') {
+          console.warn(`Transaction ${transactionId} already matched, skipping`);
+          continue;
+        }
+
+        // Update bank transaction status
+        await storage.updateBankTransaction(transactionId, {
+          status: 'matched',
+          matchedAt: new Date(),
+          matchedOrderId: productionOrder.orderId,
+          notes: `Conciliado com pagamento de produtor ${producer.name} - Ordem ${productionOrder.id}`
+        });
+
+        totalTransactionAmount += Math.abs(transactionAmount); // Convert to positive for comparison
+        processedTransactions++;
+      }
+
+      if (processedTransactions === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
+      }
+
+      // Update production order payment status
+      await storage.updateProductionOrder(productionOrderId, {
+        producerPaymentStatus: 'paid',
+        paidAt: new Date()
+      });
+
+      // Check for differences between transaction total and production order value
+      const productionOrderValue = parseFloat(productionOrder.producerValue || '0');
+      difference = totalTransactionAmount - productionOrderValue;
+      
+      if (Math.abs(difference) > 0.01) { // More than 1 cent difference
+        hasAdjustment = true;
+        
+        // Create adjustment record if needed
+        if (difference !== 0) {
+          await storage.createExpenseNote({
+            type: difference > 0 ? 'adjustment_surplus' : 'adjustment_shortage',
+            vendorId: producer.id,
+            amount: Math.abs(difference).toFixed(2),
+            description: `Ajuste de conciliação - ${difference > 0 ? 'sobra' : 'falta'} na conciliação do pagamento do produtor ${producer.name}`,
+            status: 'pending',
+            date: new Date()
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Pagamento conciliado com sucesso`,
+        payment: {
+          producerName: producer.name,
+          amount: productionOrderValue.toFixed(2),
+          transactionsProcessed: processedTransactions,
+          hasAdjustment,
+          difference: difference.toFixed(2)
+        }
+      });
+
+    } catch (error) {
+      console.error("Error associating producer payment:", error);
+      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor: " + error.message });
     }
   });
 
