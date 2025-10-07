@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +28,7 @@ export default function FinancePayables() {
   const [refundData, setRefundData] = useState({
     amount: "",
     notes: "",
+    method: "", // Added method for refund
   });
   const { toast } = useToast();
 
@@ -68,11 +68,11 @@ export default function FinancePayables() {
           notes: data.notes
         })
       });
-      
+
       if (!response.ok) {
         throw new Error('Erro ao registrar pagamento');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -110,14 +110,15 @@ export default function FinancePayables() {
         },
         body: JSON.stringify({
           refundAmount: data.amount,
-          refundNotes: data.notes
+          refundNotes: data.notes,
+          refundMethod: data.method // Include refund method
         })
       });
-      
+
       if (!response.ok) {
         throw new Error('Erro ao definir valor de estorno');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -125,6 +126,7 @@ export default function FinancePayables() {
       setRefundData({
         amount: "",
         notes: "",
+        method: "", // Reset method
       });
       toast({
         title: "Sucesso!",
@@ -261,7 +263,8 @@ export default function FinancePayables() {
       setRefundMutation.mutate({
         orderId: selectedPayable.originalOrder.id,
         amount: parseFloat(refundData.amount).toFixed(2),
-        notes: refundData.notes
+        notes: refundData.notes,
+        method: refundData.method, // Pass refund method
       });
     }
   };
@@ -523,17 +526,41 @@ export default function FinancePayables() {
 
       {/* Pay Dialog */}
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Pagamento</DialogTitle>
+            <DialogTitle>Registrar Pagamento para Produtor</DialogTitle>
             <DialogDescription>
               Registre o pagamento para {selectedPayable?.beneficiary}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Informações do serviço */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-blue-50 rounded border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Informações do Serviço</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Produtor:</strong> {selectedPayable?.beneficiary}</div>
+                  <div><strong>Produto:</strong> {selectedPayable?.description?.replace('Pagamento Produtor - ', '') || 'N/A'}</div>
+                  <div><strong>Pedido:</strong> {selectedPayable?.orderNumber || 'N/A'}</div>
+                  <div><strong>Categoria:</strong> {selectedPayable?.category}</div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-green-50 rounded border border-green-200">
+                <h4 className="font-medium text-green-900 mb-2">Valor do Pagamento</h4>
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-green-700">
+                    R$ {parseFloat(selectedPayable?.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm text-green-600">Valor acordado com o produtor</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Campos de pagamento */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="payment-amount">Valor</Label>
+                <Label htmlFor="payment-amount">Valor a Pagar <span className="text-red-500">*</span></Label>
                 <Input
                   id="payment-amount"
                   type="number"
@@ -541,32 +568,35 @@ export default function FinancePayables() {
                   placeholder="0,00"
                   value={paymentData.amount}
                   onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+                  className="text-lg font-medium"
                 />
               </div>
+
               <div>
-                <Label htmlFor="payment-method">Método</Label>
+                <Label htmlFor="payment-method">Método de Pagamento <span className="text-red-500">*</span></Label>
                 <Select 
                   value={paymentData.method} 
                   onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder="Selecione o método" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pix">PIX</SelectItem>
                     <SelectItem value="bank_transfer">TED/DOC</SelectItem>
                     <SelectItem value="check">Cheque</SelectItem>
                     <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="transaction-id">ID da Transação</Label>
+              <Label htmlFor="transaction-id">ID da Transação/Comprovante</Label>
               <Input
                 id="transaction-id"
-                placeholder="ID ou referência do pagamento"
+                placeholder="Número do comprovante, ID da transação ou referência do pagamento"
                 value={paymentData.transactionId}
                 onChange={(e) => setPaymentData(prev => ({ ...prev, transactionId: e.target.value }))}
               />
@@ -576,22 +606,34 @@ export default function FinancePayables() {
               <Label htmlFor="payment-notes">Observações</Label>
               <Textarea
                 id="payment-notes"
-                placeholder="Observações sobre o pagamento"
+                placeholder="Adicione observações sobre o pagamento, dados bancários utilizados, ou outras informações relevantes..."
                 value={paymentData.notes}
                 onChange={(e) => setPaymentData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={3}
               />
             </div>
 
-            <div className="flex justify-end space-x-2">
+            {/* Alerta de confirmação */}
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+              <div className="flex items-start">
+                <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
+                <div className="text-sm text-yellow-700">
+                  <strong>Confirmação:</strong> Certifique-se de que o pagamento foi efetivamente realizado antes de registrar. 
+                  Esta ação marcará o pagamento como concluído no sistema.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button
-                className="gradient-bg text-white"
+                className="gradient-bg text-white px-6"
                 onClick={handlePay}
-                disabled={!paymentData.amount || payProducerMutation.isPending}
+                disabled={!paymentData.amount || !paymentData.method || payProducerMutation.isPending}
               >
-                {payProducerMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
+                {payProducerMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
               </Button>
             </div>
           </div>
@@ -600,52 +642,129 @@ export default function FinancePayables() {
 
       {/* Refund Dialog */}
       <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Definir Valor de Estorno</DialogTitle>
             <DialogDescription>
               Defina o valor a ser restituído para {selectedPayable?.beneficiary}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-              <p className="text-sm text-yellow-800">
-                <strong>Valor Original Pago:</strong> R$ {selectedPayable?.originalOrder?.paidValue ? parseFloat(selectedPayable.originalOrder.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
-              </p>
+          <div className="space-y-6">
+            {/* Informações do pedido original */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-blue-50 rounded border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Informações do Pedido</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Pedido:</strong> {selectedPayable?.orderNumber || 'N/A'}</div>
+                  <div><strong>Cliente:</strong> {selectedPayable?.beneficiary}</div>
+                  <div><strong>Produto:</strong> {selectedPayable?.description?.replace('Estorno - ', '') || 'N/A'}</div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-yellow-50 rounded border border-yellow-200">
+                <h4 className="font-medium text-yellow-900 mb-2">Valores</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Valor Total:</strong> R$ {selectedPayable?.originalOrder?.totalValue ? parseFloat(selectedPayable.originalOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
+                  <div><strong>Valor Pago:</strong> R$ {selectedPayable?.originalOrder?.paidValue ? parseFloat(selectedPayable.originalOrder.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</div>
+                  <div><strong>Status:</strong> <Badge variant="secondary">{selectedPayable?.originalOrder?.status}</Badge></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Campos de estorno */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="refund-amount">Valor a ser Restituído <span className="text-red-500">*</span></Label>
+                <Input
+                  id="refund-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={refundData.amount}
+                  onChange={(e) => setRefundData(prev => ({ ...prev, amount: e.target.value }))}
+                  className="text-lg font-medium"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Máximo: R$ {selectedPayable?.originalOrder?.paidValue ? parseFloat(selectedPayable.originalOrder.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="refund-method">Método de Estorno</Label>
+                <Select 
+                  value={refundData.method || ''} 
+                  onValueChange={(value) => setRefundData(prev => ({ ...prev, method: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
+                    <SelectItem value="credit_reversal">Estorno no Cartão</SelectItem>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="credit">Crédito para Compra</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
-              <Label htmlFor="refund-amount">Valor a ser Restituído</Label>
-              <Input
-                id="refund-amount"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={refundData.amount}
-                onChange={(e) => setRefundData(prev => ({ ...prev, amount: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="refund-notes">Motivo/Observações</Label>
+              <Label htmlFor="refund-notes">Motivo/Observações <span className="text-red-500">*</span></Label>
               <Textarea
                 id="refund-notes"
-                placeholder="Descreva o motivo do estorno..."
+                placeholder="Descreva detalhadamente o motivo do estorno, incluindo justificativa e informações relevantes..."
                 value={refundData.notes}
                 onChange={(e) => setRefundData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={4}
+                className="min-h-[100px]"
               />
             </div>
 
-            <div className="flex justify-end space-x-2">
+            {/* Histórico de pagamentos (se disponível) */}
+            {selectedPayable?.originalOrder && (
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3">Histórico de Pagamentos</h4>
+                <div className="bg-gray-50 rounded p-3">
+                  <div className="text-sm space-y-2">
+                    <div className="flex justify-between">
+                      <span>Data do Pedido:</span>
+                      <span>{selectedPayable.originalOrder.createdAt ? new Date(selectedPayable.originalOrder.createdAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Data de Cancelamento:</span>
+                      <span>{selectedPayable.originalOrder.updatedAt ? new Date(selectedPayable.originalOrder.updatedAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span>Valor Elegível para Estorno:</span>
+                      <span className="text-green-600">R$ {selectedPayable?.originalOrder?.paidValue ? parseFloat(selectedPayable.originalOrder.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Alerta importante */}
+            <div className="p-4 bg-red-50 border border-red-200 rounded">
+              <div className="flex items-start">
+                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
+                <div className="text-sm text-red-700">
+                  <strong>Atenção:</strong> O valor de estorno será adicionado às contas a pagar e deverá ser processado pelo departamento financeiro. 
+                  Certifique-se de que todas as informações estão corretas antes de confirmar.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsRefundDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button
-                className="gradient-bg text-white"
+                className="gradient-bg text-white px-6"
                 onClick={handleSetRefund}
-                disabled={!refundData.amount || setRefundMutation.isPending}
+                disabled={!refundData.amount || !refundData.notes || setRefundMutation.isPending}
               >
-                {setRefundMutation.isPending ? "Salvando..." : "Definir Valor"}
+                {setRefundMutation.isPending ? "Salvando..." : "Definir Valor de Estorno"}
               </Button>
             </div>
           </div>
