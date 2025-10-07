@@ -85,9 +85,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "producer":
         return [
           { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
-          { href: "/producer/orders", icon: ShoppingCart, label: "Ordens de Produção" },
-          // Added Settings link for producers
-          { href: "/producer/settings", icon: Settings, label: "Configurações" }, 
+          { href: "/producer/orders", icon: Package, label: "Ordens" },
+          { href: "/producer/receivables", icon: CreditCard, label: "Contas a Receber" },
         ];
       case "finance":
         return [
