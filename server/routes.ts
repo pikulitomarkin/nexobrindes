@@ -903,16 +903,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
-      const partners = await storage.getPartners();
+      const partners = await db.select().from(users).where(eq(users.role, "partner"));
 
       const partnersWithDetails = partners.map((partner) => ({
         id: partner.id,
-        name: partner.name,
+        name: partner.username,
         email: partner.email || "",
-        accessCode: partner.username,
+        accessCode: partner.accessCode || "",
         phone: partner.phone || "",
-        createdAt: partner.createdAt || new Date(),
-        isActive: partner.isActive
+        createdAt: partner.createdAt,
+        isActive: true
       }));
 
       res.json(partnersWithDetails);
@@ -924,84 +924,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/partners", async (req, res) => {
     try {
-      const { name, email, phone, accessCode, password } = req.body;
-
-      // Check if accessCode already exists
-      const existingUser = await storage.getUserByUsername(accessCode);
-      if (existingUser) {
-        return res.status(400).json({ error: "Código de acesso já existe" });
-      }
-
-      const partnerData = {
-        name,
-        email,
-        phone,
-        username: accessCode,
-        password: password || "123456"
-      };
-
-      const partner = await storage.createPartner(partnerData);
-      res.json({
-        id: partner.id,
-        name: partner.name,
-        email: partner.email,
-        accessCode: partner.username,
-        phone: partner.phone,
-        createdAt: partner.createdAt || new Date(),
-        isActive: partner.isActive
-      });
+      const partner = await storage.createPartner(req.body);
+      res.json(partner);
     } catch (error) {
       console.error("Error creating partner:", error);
       res.status(500).json({ error: "Failed to create partner" });
-    }
-  });
-
-  app.put("/api/partners/:partnerId", async (req, res) => {
-    try {
-      const { partnerId } = req.params;
-      const { name, email, phone, accessCode } = req.body;
-
-      const updatedUser = await storage.updateUser(partnerId, {
-        name,
-        email,
-        phone,
-        username: accessCode
-      });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Partner not found" });
-      }
-
-      res.json({
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        accessCode: updatedUser.username,
-        phone: updatedUser.phone,
-        createdAt: updatedUser.createdAt || new Date(),
-        isActive: updatedUser.isActive
-      });
-    } catch (error) {
-      console.error("Error updating partner:", error);
-      res.status(500).json({ error: "Failed to update partner" });
-    }
-  });
-
-  app.delete("/api/partners/:partnerId", async (req, res) => {
-    try {
-      const { partnerId } = req.params;
-
-      // Deactivate user instead of deleting
-      const updatedUser = await storage.updateUser(partnerId, { isActive: false });
-      
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Partner not found" });
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting partner:", error);
-      res.status(500).json({ error: "Failed to delete partner" });
     }
   });
 
