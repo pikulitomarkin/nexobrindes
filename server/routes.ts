@@ -1,3 +1,4 @@
+replit_final_file>
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from 'multer';
@@ -4431,6 +4432,133 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Corrected route for associating multiple payments with better validation and error handling
+  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
+    try {
+      const { transactions, orderId, totalAmount } = req.body;
+
+      console.log("Associate multiple payments request:", { transactions, orderId, totalAmount });
+
+      // Validação detalhada
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        console.error("Invalid transactions:", transactions);
+        return res.status(400).json({ error: "Transações são obrigatórias e devem ser um array" });
+      }
+
+      if (!orderId || typeof orderId !== 'string') {
+        console.error("Invalid orderId:", orderId);
+        return res.status(400).json({ error: "ID do pedido é obrigatório" });
+      }
+
+      // Validate transactions structure
+      for (let i = 0; i < transactions.length; i++) {
+        const transaction = transactions[i];
+        if (!transaction || typeof transaction !== 'object') {
+          console.error(`Transaction ${i} is not an object:`, transaction);
+          return res.status(400).json({ error: `Transação ${i + 1} tem formato inválido` });
+        }
+        if (!transaction.transactionId) {
+          console.error(`Transaction ${i} missing transactionId:`, transaction);
+          return res.status(400).json({ error: `Transação ${i + 1} deve ter transactionId` });
+        }
+        if (transaction.amount === undefined || transaction.amount === null) {
+          console.error(`Transaction ${i} missing amount:`, transaction);
+          return res.status(400).json({ error: `Transação ${i + 1} deve ter amount` });
+        }
+      }
+
+      // Get the order
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        console.error("Order not found:", orderId);
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      let paymentsCreated = 0;
+      let totalProcessed = 0;
+      const errors = [];
+
+      // Process each transaction
+      for (let i = 0; i < transactions.length; i++) {
+        const transaction = transactions[i];
+        try {
+          const amount = parseFloat(transaction.amount);
+          if (isNaN(amount) || amount <= 0) {
+            errors.push(`Transação ${i + 1}: valor inválido (${transaction.amount})`);
+            continue;
+          }
+
+          // Verificar se a transação existe
+          const bankTransaction = await storage.getBankTransaction(transaction.transactionId);
+          if (!bankTransaction) {
+            errors.push(`Transação ${i + 1}: não encontrada no sistema bancário`);
+            continue;
+          }
+
+          // Create payment record
+          const payment = await storage.createPayment({
+            orderId: orderId,
+            amount: amount.toFixed(2),
+            method: "bank_transfer", // Default for bank reconciliation
+            status: "confirmed",
+            transactionId: transaction.transactionId,
+            paidAt: new Date()
+          });
+
+          // Update transaction status
+          await storage.updateBankTransaction(transaction.transactionId, {
+            status: 'matched',
+            matchedOrderId: orderId,
+            matchedPaymentId: payment.id,
+            matchedAt: new Date()
+          });
+
+          paymentsCreated++;
+          totalProcessed += amount;
+
+          console.log(`Successfully processed transaction ${i + 1}:`, {
+            transactionId: transaction.transactionId,
+            amount: amount,
+            paymentId: payment.id
+          });
+
+        } catch (transactionError) {
+          console.error(`Error processing transaction ${i + 1}:`, transactionError);
+          errors.push(`Transação ${i + 1}: erro ao processar (${transactionError.message})`);
+        }
+      }
+
+      const response = {
+        success: paymentsCreated > 0,
+        paymentsCreated,
+        totalAmount: totalProcessed.toFixed(2),
+        message: `${paymentsCreated} pagamentos processados com sucesso`,
+        errors: errors.length > 0 ? errors : undefined
+      };
+
+      console.log("Multiple payments association response:", response);
+
+      // Retornar status 200 mesmo se houve alguns erros, mas pelo menos um pagamento foi processado
+      if (paymentsCreated > 0) {
+        res.status(200).json(response);
+      } else {
+        res.status(400).json({
+          success: false,
+          error: "Nenhum pagamento pôde ser processado",
+          errors: errors
+        });
+      }
+    } catch (error) {
+      console.error("Error associating multiple payments:", error);
+      res.status(500).json({
+        success: false,
+        error: "Erro interno do servidor",
+        details: error.message
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
+</replit_final_file>

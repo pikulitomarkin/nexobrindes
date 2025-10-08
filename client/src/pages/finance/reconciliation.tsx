@@ -153,54 +153,102 @@ export default function FinanceReconciliation() {
 
   const associateMultiplePaymentsMutation = useMutation({
     mutationFn: async ({ transactions, orderId, totalAmount }: { transactions: any[]; orderId: string; totalAmount: string }) => {
+      // Validar dados antes de enviar
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        throw new Error("Nenhuma transação selecionada");
+      }
+
+      if (!orderId) {
+        throw new Error("ID do pedido não informado");
+      }
+
       const payload = {
-        transactions: transactions.map(txn => ({
-          transactionId: txn.id,
-          amount: parseFloat(txn.amount)
-        })),
-        orderId,
-        totalAmount: parseFloat(totalAmount)
+        transactions: transactions.map((txn, index) => {
+          if (!txn || !txn.id) {
+            throw new Error(`Transação ${index + 1} não tem ID válido`);
+          }
+          if (!txn.amount && txn.amount !== 0) {
+            throw new Error(`Transação ${index + 1} não tem valor válido`);
+          }
+          const amount = parseFloat(txn.amount.toString());
+          if (isNaN(amount)) {
+            throw new Error(`Transação ${index + 1} tem valor inválido: ${txn.amount}`);
+          }
+          return {
+            transactionId: txn.id,
+            amount: amount
+          };
+        }),
+        orderId: orderId,
+        totalAmount: parseFloat(totalAmount.toString())
       };
       
-      console.log("Sending payload to API:", payload);
+      console.log("Sending payload to API:", JSON.stringify(payload, null, 2));
       
       const response = await fetch("/api/finance/associate-multiple-payments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify(payload),
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error response:", errorText);
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || "Erro ao associar pagamentos múltiplos");
-        } catch (e) {
-          throw new Error(`Erro de comunicação com servidor: ${response.status}`);
-        }
+      console.log("API response status:", response.status);
+      console.log("API response headers:", Object.fromEntries(response.headers.entries()));
+      
+      const responseText = await response.text();
+      console.log("API response text:", responseText);
+      
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError);
+        throw new Error(`Resposta inválida do servidor: ${responseText.substring(0, 100)}...`);
       }
       
-      return response.json();
+      if (!response.ok) {
+        console.error("API error response data:", responseData);
+        const errorMessage = responseData?.error || responseData?.message || `Erro HTTP ${response.status}`;
+        throw new Error(errorMessage);
+      }
+      
+      if (!responseData.success) {
+        throw new Error(responseData.error || "Falha na operação");
+      }
+      
+      return responseData;
     },
     onSuccess: (data) => {
+      console.log("Success response:", data);
+      
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/reconciliation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      
       setIsAssociationDialogOpen(false);
       setSelectedOrder(null);
       setSelectedTransactions([]);
+      
+      let description = `${data.paymentsCreated} pagamentos totalizando R$ ${parseFloat(data.totalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmados para o pedido ${selectedOrder?.orderNumber}`;
+      
+      if (data.errors && data.errors.length > 0) {
+        description += `\n\nAvisos: ${data.errors.join('; ')}`;
+      }
+      
       toast({
-        title: "Sucesso!",
-        description: `${data.paymentsCreated} pagamentos totalizando R$ ${parseFloat(data.totalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmados para o pedido ${selectedOrder?.orderNumber}`,
+        title: "Conciliação Realizada!",
+        description: description,
       });
     },
     onError: (error: any) => {
+      console.error("Mutation error:", error);
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível associar os pagamentos",
+        title: "Erro na Conciliação",
+        description: error.message || "Não foi possível associar os pagamentos. Verifique os dados e tente novamente.",
         variant: "destructive",
       });
     },
@@ -238,16 +286,44 @@ export default function FinanceReconciliation() {
   };
 
   const handleAssociatePayment = () => {
+    // Validações básicas
     if (!selectedOrder || selectedTransactions.length === 0) {
       toast({
-        title: "Erro",
+        title: "Erro de Validação",
         description: "Selecione um pedido e pelo menos uma transação para confirmar o pagamento",
         variant: "destructive",
       });
       return;
     }
 
-    const totalTransactionAmount = selectedTransactions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
+    // Validar se todas as transações têm dados válidos
+    const invalidTransactions = selectedTransactions.filter(txn => 
+      !txn || !txn.id || !txn.amount || isNaN(parseFloat(txn.amount))
+    );
+
+    if (invalidTransactions.length > 0) {
+      toast({
+        title: "Erro de Validação", 
+        description: `${invalidTransactions.length} transação(ões) com dados inválidos. Verifique as transações selecionadas.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalTransactionAmount = selectedTransactions.reduce((sum, txn) => {
+      const amount = parseFloat(txn.amount);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
+
+    if (totalTransactionAmount <= 0) {
+      toast({
+        title: "Erro de Validação",
+        description: "O valor total das transações deve ser maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const remainingBalance = parseFloat(selectedOrder.totalValue) - parseFloat(selectedOrder.paidValue || '0');
 
     if (totalTransactionAmount > remainingBalance + (remainingBalance * 0.05)) { // 5% de tolerância
@@ -259,7 +335,13 @@ export default function FinanceReconciliation() {
       // Continua mesmo assim, mas alerta o usuário
     }
 
-    // Processar múltiplas transações sequencialmente
+    console.log("Starting payment association with:", {
+      selectedOrder: selectedOrder.id,
+      transactionsCount: selectedTransactions.length,
+      totalAmount: totalTransactionAmount
+    });
+
+    // Processar múltiplas transações
     associateMultiplePaymentsMutation.mutate({
       transactions: selectedTransactions,
       orderId: selectedOrder.id,
