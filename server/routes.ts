@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           producerValue: productionOrdersTable.producerValue,
           deliveryDate: productionOrdersTable.deliveryDate,
           notes: productionOrdersTable.notes,
-          producerName: sql`p.name`.as('producerName'),
+          producerName: sql`${usersTable.name}`.as('producerName'),
           lastNoteAt: productionOrdersTable.lastNoteAt,
         })
         .from(productionOrdersTable)
