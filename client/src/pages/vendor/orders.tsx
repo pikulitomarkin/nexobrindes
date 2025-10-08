@@ -114,6 +114,24 @@ export default function VendorOrders() {
     },
   });
 
+  // Buscar status de produção para pedidos em produção
+  const { data: productionStatuses } = useQuery({
+    queryKey: ["/api/production-orders/status", vendorId],
+    queryFn: async () => {
+      const response = await fetch(`/api/production-orders/vendor/${vendorId}/status`);
+      if (!response.ok) return {};
+      const data = await response.json();
+      // Converter para um objeto para facilitar lookup
+      const statusMap: { [key: string]: any } = {};
+      data.forEach((po: any) => {
+        if (po.orderId) {
+          statusMap[po.orderId] = po;
+        }
+      });
+      return statusMap;
+    },
+  });
+
   const { data: clients } = useQuery({
     queryKey: ["/api/vendors", vendorId, "clients"],
     queryFn: async () => {
@@ -581,16 +599,45 @@ export default function VendorOrders() {
     return matchesSearch && matchesCategory;
   });
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, productionStatus?: any) => {
+    // Se houver status de produção, usar ele como prioridade
+    if (productionStatus && status === 'production') {
+      const productionStatusClasses = {
+        pending: "bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium",
+        accepted: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
+        production: "bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium",
+        ready: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+        shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
+        completed: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+        rejected: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
+      };
+
+      const productionStatusLabels = {
+        pending: "Aguardando Produtor",
+        accepted: "Aceito pelo Produtor",
+        production: "Em Produção",
+        ready: "Pronto para Envio",
+        shipped: "Enviado",
+        completed: "Finalizado",
+        rejected: "Rejeitado",
+      };
+
+      return (
+        <span className={productionStatusClasses[productionStatus.status as keyof typeof productionStatusClasses] || "bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium"}>
+          {productionStatusLabels[productionStatus.status as keyof typeof productionStatusLabels] || productionStatus.status}
+        </span>
+      );
+    }
+
     const statusClasses = {
-      pending: "status-badge status-pending",
-      confirmed: "status-badge status-confirmed",
-      production: "status-badge status-production",
-      delayed: "status-badge status-cancelled",
-      ready: "status-badge status-pending",
-      shipped: "status-badge status-confirmed",
-      delivered: "status-badge status-completed",
-      cancelled: "status-badge status-cancelled",
+      pending: "bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium",
+      confirmed: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
+      production: "bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium",
+      delayed: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
+      ready: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
+      delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      cancelled: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
     };
 
     const statusLabels = {
@@ -605,7 +652,7 @@ export default function VendorOrders() {
     };
 
     return (
-      <span className={statusClasses[status as keyof typeof statusClasses] || "status-badge"}>
+      <span className={statusClasses[status as keyof typeof statusClasses] || "bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium"}>
         {statusLabels[status as keyof typeof statusLabels] || status}
       </span>
     );
@@ -1632,28 +1679,53 @@ export default function VendorOrders() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(order.status)}
+                          {getStatusBadge(order.status, productionStatuses?.[order.id])}
                           {order.hasUnreadNotes && (
                             <div className="relative">
-                              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                               <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-600 rounded-full"></div>
                             </div>
                           )}
                         </div>
+                        
+                        {/* Mostrar informações adicionais do produtor se em produção */}
+                        {order.status === 'production' && productionStatuses?.[order.id] && (
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>Produtor: {productionStatuses[order.id].producerName}</div>
+                            {productionStatuses[order.id].producerValue && (
+                              <div>Valor: R$ {parseFloat(productionStatuses[order.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                            )}
+                            {productionStatuses[order.id].deliveryDate && (
+                              <div>Entrega: {new Date(productionStatuses[order.id].deliveryDate).toLocaleDateString('pt-BR')}</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Barra de progresso simples sem animação */}
                         {(order.status === 'production' || order.status === 'delayed' || order.status === 'ready' || order.status === 'shipped' || order.status === 'delivered') && (
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full transition-all duration-500 ${
+                              className={`h-2 rounded-full ${
                                 order.status === 'delayed' ? 'bg-red-500' :
                                 order.status === 'ready' ? 'bg-yellow-500' :
                                 order.status === 'shipped' ? 'bg-blue-500' :
                                 order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
                               }`}
                               style={{
-                                width: order.status === 'production' ? '25%' :
-                                       order.status === 'delayed' ? '25%' :
-                                       order.status === 'ready' ? '50%' :
-                                       order.status === 'shipped' ? '75%' : '100%'
+                                width: productionStatuses?.[order.id] ? (() => {
+                                  const pStatus = productionStatuses[order.id].status;
+                                  if (pStatus === 'pending' || pStatus === 'accepted') return '15%';
+                                  if (pStatus === 'production') return '40%';
+                                  if (pStatus === 'ready') return '70%';
+                                  if (pStatus === 'shipped') return '85%';
+                                  if (pStatus === 'completed') return '100%';
+                                  return '25%';
+                                })() : (
+                                  order.status === 'production' ? '25%' :
+                                  order.status === 'delayed' ? '25%' :
+                                  order.status === 'ready' ? '50%' :
+                                  order.status === 'shipped' ? '75%' : '100%'
+                                )
                               }}
                             ></div>
                           </div>
@@ -1880,21 +1952,87 @@ export default function VendorOrders() {
                 </div>
               )}
 
-              {/* Progress Bar for Production Status */}
-              {(selectedOrder.status === 'production' || selectedOrder.status === 'delayed' || selectedOrder.status === 'ready' || selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered') && (
+              {/* Status de Produção Detalhado */}
+              {selectedOrder.status === 'production' && productionStatuses?.[selectedOrder.id] && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Informações da Produção</Label>
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Status atual:</span>
+                        {getStatusBadge('production', productionStatuses[selectedOrder.id])}
+                      </div>
+                      <div className="text-sm">
+                        <strong>Produtor:</strong> {productionStatuses[selectedOrder.id].producerName}
+                      </div>
+                      {productionStatuses[selectedOrder.id].producerValue && (
+                        <div className="text-sm">
+                          <strong>Valor da Produção:</strong> R$ {parseFloat(productionStatuses[selectedOrder.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </div>
+                      )}
+                      {productionStatuses[selectedOrder.id].deliveryDate && (
+                        <div className="text-sm">
+                          <strong>Prazo de Entrega:</strong> {new Date(productionStatuses[selectedOrder.id].deliveryDate).toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
+                      {productionStatuses[selectedOrder.id].notes && (
+                        <div className="text-sm">
+                          <strong>Observações:</strong> {productionStatuses[selectedOrder.id].notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Progresso da Produção</Label>
+                    <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
+                      <div
+                        className={`h-4 rounded-full ${
+                          productionStatuses[selectedOrder.id].status === 'pending' ? 'bg-yellow-500' :
+                          productionStatuses[selectedOrder.id].status === 'accepted' ? 'bg-blue-500' :
+                          productionStatuses[selectedOrder.id].status === 'production' ? 'bg-purple-500' :
+                          productionStatuses[selectedOrder.id].status === 'ready' ? 'bg-green-500' :
+                          productionStatuses[selectedOrder.id].status === 'shipped' ? 'bg-cyan-500' : 'bg-green-600'
+                        }`}
+                        style={{
+                          width: (() => {
+                            const pStatus = productionStatuses[selectedOrder.id].status;
+                            if (pStatus === 'pending') return '10%';
+                            if (pStatus === 'accepted') return '25%';
+                            if (pStatus === 'production') return '50%';
+                            if (pStatus === 'ready') return '75%';
+                            if (pStatus === 'shipped') return '90%';
+                            if (pStatus === 'completed') return '100%';
+                            return '25%';
+                          })()
+                        }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>Pendente</span>
+                      <span>Aceito</span>
+                      <span>Produzindo</span>
+                      <span>Pronto</span>
+                      <span>Finalizado</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Progress Bar for Other Statuses */}
+              {(selectedOrder.status === 'delayed' || selectedOrder.status === 'ready' || selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered') && !productionStatuses?.[selectedOrder.id] && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Progresso da Produção</Label>
+                  <Label className="text-sm font-medium text-gray-600">Progresso da Entrega</Label>
                   <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
                     <div
-                      className={`h-4 rounded-full transition-all duration-500 ${
+                      className={`h-4 rounded-full ${
                         selectedOrder.status === 'delayed' ? 'bg-red-500' :
                         selectedOrder.status === 'ready' ? 'bg-yellow-500' :
                         selectedOrder.status === 'shipped' ? 'bg-blue-500' :
                         selectedOrder.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
                       }`}
                       style={{
-                        width: selectedOrder.status === 'production' ? '25%' :
-                               selectedOrder.status === 'delayed' ? '25%' :
+                        width: selectedOrder.status === 'delayed' ? '25%' :
                                selectedOrder.status === 'ready' ? '50%' :
                                selectedOrder.status === 'shipped' ? '75%' : '100%'
                       }}
