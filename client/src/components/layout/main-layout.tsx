@@ -1,18 +1,19 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  Users, 
-  ShoppingCart, 
-  Package, 
-  Factory, 
-  CreditCard, 
+import {
+  Users,
+  ShoppingCart,
+  Package,
+  Factory,
+  CreditCard,
   FileText,
   DollarSign,
   Menu,
   X,
   Home,
   Settings, // Added Settings icon import
-  LogOut
+  LogOut,
+  ClipboardList // Import ClipboardList if it was intended to be used elsewhere
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -85,7 +86,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "producer":
         return [
           { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
-          { href: "/producer/orders", icon: Package, label: "Ordens" },
           { href: "/producer/receivables", icon: CreditCard, label: "Contas a Receber" },
         ];
       case "finance":
@@ -107,7 +107,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Define role labels
   const roleLabels = {
     admin: "Administrador",
-    vendor: "Vendedor", 
+    vendor: "Vendedor",
     client: "Cliente",
     producer: "Produtor",
     partner: "Sócio",
@@ -118,7 +118,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <div className="flex h-screen bg-gray-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
