@@ -2399,21 +2399,29 @@ export class MemStorage implements IStorage {
       const parsedDate = new Date(transaction.date);
       if (!isNaN(parsedDate.getTime())) {
         validDate = parsedDate;
+      } else {
+        console.warn('Invalid date provided:', transaction.date, 'using current date');
       }
+    }
+
+    // Validar valor da transação
+    const amount = parseFloat(transaction.amount);
+    if (isNaN(amount)) {
+      throw new Error(`Invalid amount: ${transaction.amount}`);
     }
 
     const newTransaction: BankTransaction = {
       id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       importId: transaction.importId || 'unknown',
-      fitId: transaction.fitId,
+      fitId: transaction.fitId || `fit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       amount: transaction.amount,
       date: validDate,
-      description: transaction.description,
-      type: transaction.type || (parseFloat(transaction.amount) > 0 ? 'credit' : 'debit'),
+      description: transaction.description || 'Transação sem descrição',
+      type: transaction.type || (amount > 0 ? 'credit' : 'debit'),
       status: transaction.status || 'unmatched',
       matchedOrderId: transaction.matchedOrderId || null,
       matchedAt: transaction.matchedAt || null,
-      bankRef: transaction.bankRef,
+      bankRef: transaction.bankRef || null,
       notes: transaction.notes || null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -2431,6 +2439,7 @@ export class MemStorage implements IStorage {
       type: newTransaction.type,
       status: newTransaction.status,
       date: validDate.toISOString(),
+      fitId: newTransaction.fitId,
       notes: newTransaction.notes
     });
     return newTransaction;

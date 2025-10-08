@@ -771,7 +771,12 @@ export default function FinanceReconciliation() {
                     {selectedTransactions.map((transaction, index) => (
                       <div key={transaction.id} className="grid grid-cols-2 gap-4 text-sm p-3 bg-white rounded border">
                         <div>
-                          <span className="text-green-700 font-medium">#{index + 1} Data:</span> {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          <span className="text-green-700 font-medium">#{index + 1} Data:</span> {(() => {
+                            if (!transaction.date) return 'Data não informada';
+                            const date = new Date(transaction.date);
+                            if (isNaN(date.getTime())) return 'Data inválida';
+                            return date.toLocaleDateString('pt-BR');
+                          })()}
                         </div>
                         <div>
                           <span className="text-green-700 font-medium">Valor:</span> 
@@ -859,11 +864,12 @@ export default function FinanceReconciliation() {
                                 className="h-4 w-4 text-green-600 rounded"
                               />
                               <div>
-                                <p className="font-medium">{
-                                  transaction.date && !isNaN(new Date(transaction.date).getTime()) 
-                                    ? new Date(transaction.date).toLocaleDateString('pt-BR')
-                                    : 'Data inválida'
-                                }</p>
+                                <p className="font-medium">{(() => {
+                                  if (!transaction.date) return 'Data não informada';
+                                  const date = new Date(transaction.date);
+                                  if (isNaN(date.getTime())) return 'Data inválida';
+                                  return date.toLocaleDateString('pt-BR');
+                                })()}</p>
                                 <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
                                 <div className="text-xs text-green-600 font-medium mt-1">
                                   ✓ Corresponde à entrada esperada
@@ -934,11 +940,12 @@ export default function FinanceReconciliation() {
                                 className="h-4 w-4 text-blue-600 rounded"
                               />
                               <div>
-                                <p className="font-medium">{
-                                  transaction.date && !isNaN(new Date(transaction.date).getTime()) 
-                                    ? new Date(transaction.date).toLocaleDateString('pt-BR')
-                                    : 'Data inválida'
-                                }</p>
+                                <p className="font-medium">{(() => {
+                                  if (!transaction.date) return 'Data não informada';
+                                  const date = new Date(transaction.date);
+                                  if (isNaN(date.getTime())) return 'Data inválida';
+                                  return date.toLocaleDateString('pt-BR');
+                                })()}</p>
                                 <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
                               </div>
                             </div>
@@ -1009,11 +1016,12 @@ export default function FinanceReconciliation() {
                             className="h-4 w-4 text-blue-600 rounded"
                           />
                           <div>
-                            <p className="font-medium">{
-                              transaction.date && !isNaN(new Date(transaction.date).getTime()) 
-                                ? new Date(transaction.date).toLocaleDateString('pt-BR')
-                                : 'Data inválida'
-                            }</p>
+                            <p className="font-medium">{(() => {
+                              if (!transaction.date) return 'Data não informada';
+                              const date = new Date(transaction.date);
+                              if (isNaN(date.getTime())) return 'Data inválida';
+                              return date.toLocaleDateString('pt-BR');
+                            })()}</p>
                             <p className="text-sm text-gray-600 truncate max-w-[250px]">{transaction.description}</p>
                           </div>
                         </div>
@@ -1074,11 +1082,12 @@ export default function FinanceReconciliation() {
               {(bankTransactions || [])?.slice(0, 5).map((transaction: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="font-medium">{
-                      transaction.date && !isNaN(new Date(transaction.date).getTime()) 
-                        ? new Date(transaction.date).toLocaleDateString('pt-BR')
-                        : 'Data inválida'
-                    }</p>
+                    <p className="font-medium">{(() => {
+                      if (!transaction.date) return 'Data não informada';
+                      const date = new Date(transaction.date);
+                      if (isNaN(date.getTime())) return 'Data inválida';
+                      return date.toLocaleDateString('pt-BR');
+                    })()}</p>
                     <p className="text-sm text-gray-600">{transaction.description}</p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -1108,11 +1117,12 @@ export default function FinanceReconciliation() {
                   <div>
                     <p className="font-medium text-gray-900">{expense.description}</p>
                     <p className="text-sm text-gray-600">
-                      {
-                        expense.date && !isNaN(new Date(expense.date).getTime()) 
-                          ? new Date(expense.date).toLocaleDateString('pt-BR')
-                          : 'Data inválida'
-                      } • {expense.category}
+                      {(() => {
+                        if (!expense.date) return 'Data não informada';
+                        const date = new Date(expense.date);
+                        if (isNaN(date.getTime())) return 'Data inválida';
+                        return date.toLocaleDateString('pt-BR');
+                      })()} • {expense.category}
                     </p>
                   </div>
                   <div className="text-right">

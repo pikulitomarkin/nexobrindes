@@ -4056,82 +4056,99 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo OFX foi enviado" });
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
       }
 
-      console.log("Processing OFX import:", req.file.originalname);
+      console.log("Processing OFX file:", req.file.originalname, "Size:", req.file.size);
 
-      const fileBuffer = req.file.buffer;
-      const importData = await parseOFXBuffer(fileBuffer);
-      const transactions = importData.transactions;
-
-      if (transactions.length === 0) {
-        return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
+      // Validate file type
+      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: "Apenas arquivos .ofx são aceitos" });
       }
+
+      // Validate file size (max 10MB)
+      if (req.file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({ error: "Arquivo muito grande. Máximo 10MB." });
+      }
+
+      const { transactions } = await parseOFXBuffer(req.file.buffer);
+
+      if (!transactions || transactions.length === 0) {
+        return res.status(400).json({
+          error: "Nenhuma transação encontrada no arquivo OFX"
+        });
+      }
+
+      console.log(`Parsed ${transactions.length} transactions from OFX`);
 
       // Create bank import record
       const bankImport = await storage.createBankImport({
         fileName: req.file.originalname,
-        fileSize: req.file.size.toString(),
-        fileType: 'ofx',
-        status: 'processed',
-        processedTransactions: transactions.length,
-        totalAmount: transactions.reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount)), 0).toFixed(2),
-        importedBy: 'system'
+        fileSize: req.file.size,
+        totalTransactions: transactions.length,
+        importedBy: 'admin-1', // In production, get from authenticated user
+        status: 'completed'
       });
 
-      // Create individual bank transactions with proper type classification
-      let createdCount = 0;
+      // Create bank transactions
+      let successCount = 0;
+      let duplicateCount = 0;
+      let errorCount = 0;
+
       for (const transaction of transactions) {
         try {
           // Check if transaction already exists by fitId
-          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
-          if (existingTransaction) {
-            console.log(`Transaction with fitId ${transaction.fitId} already exists, skipping`);
+          const existing = await storage.getBankTransactionByFitId(transaction.fitId);
+          if (existing) {
+            duplicateCount++;
             continue;
           }
 
-          const amount = parseFloat(transaction.amount);
-          let transactionType = 'credit';
-          let notes = '';
-
-          // Classify transaction type based on amount
-          if (amount > 0) {
-            transactionType = 'credit';
-            notes = 'Entrada - Disponível para conciliação com contas a receber';
-          } else {
-            transactionType = 'debit';
-            notes = 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores';
+          // Validate transaction data
+          if (!transaction.amount || isNaN(parseFloat(transaction.amount))) {
+            console.log('Invalid transaction amount:', transaction.amount);
+            errorCount++;
+            continue;
           }
 
           await storage.createBankTransaction({
             importId: bankImport.id,
             fitId: transaction.fitId,
-            date: new Date(transaction.dtPosted),
             amount: transaction.amount,
-            description: transaction.memo || 'Transação bancária',
-            type: amount > 0 ? 'credit' : 'debit',
+            date: transaction.dtPosted,
+            description: transaction.memo || 'Transação sem descrição',
+            type: transaction.type,
             status: 'unmatched',
             bankRef: transaction.refNum,
-            notes: notes
+            notes: parseFloat(transaction.amount) > 0
+              ? 'Entrada - Disponível para conciliação com contas a receber'
+              : 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores'
           });
-          createdCount++;
+          successCount++;
         } catch (error) {
-          console.error('Error creating bank transaction:', error);
+          console.error('Error creating transaction:', error);
+          errorCount++;
         }
       }
+
+      console.log(`Import completed: ${successCount} new transactions, ${duplicateCount} duplicates, ${errorCount} errors`);
 
       res.json({
         success: true,
         importId: bankImport.id,
-        message: `${createdCount} transações importadas com sucesso`,
-        transactionsImported: createdCount,
-        duplicatesSkipped: transactions.length - createdCount
+        message: `Importadas ${successCount} transações com sucesso. ${duplicateCount > 0 ? `${duplicateCount} duplicatas ignoradas. ` : ''}${errorCount > 0 ? `${errorCount} transações com erro.` : ''}`,
+        totalTransactions: transactions.length,
+        newTransactions: successCount,
+        duplicates: duplicateCount,
+        errors: errorCount
       });
 
     } catch (error) {
-      console.error('Error importing OFX:', error);
-      res.status(500).json({ error: "Erro ao processar arquivo OFX" });
+      console.error("Error importing OFX:", error);
+      res.status(500).json({
+        error: "Erro ao processar arquivo OFX",
+        details: error.message
+      });
     }
   });
 
