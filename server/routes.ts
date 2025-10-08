@@ -892,49 +892,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          let clientName = 'Unknown';
-
-          console.log(`Processing order ${order.orderNumber}, clientId: ${order.clientId}`);
-
-          // Try multiple approaches to find the client name
-          // Method 1: Try to get client record directly by ID
-          const clientRecord = await storage.getClient(order.clientId);
-          if (clientRecord) {
-            console.log(`Found client record for order ${order.orderNumber}:`, { id: clientRecord.id, name: clientRecord.name });
-            clientName = clientRecord.name;
-          } else {
-            // Method 2: Try to find client record by userId
-            const clientByUserId = await storage.getClientByUserId(order.clientId);
-            if (clientByUserId) {
-              console.log(`Found client by userId for order ${order.orderNumber}:`, { id: clientByUserId.id, name: clientByUserId.name });
-              clientName = clientByUserId.name;
-            } else {
-              // Method 3: Fallback to user table
-              const clientUser = await storage.getUser(order.clientId);
-              if (clientUser) {
-                console.log(`Found user record for order ${order.orderNumber}:`, { id: clientUser.id, name: clientUser.name });
-                clientName = clientUser.name;
-              } else {
-                console.log(`No client found for order ${order.orderNumber}, clientId: ${order.clientId}`);
-                // Method 4: Search all clients for a match
-                const allClients = await storage.getClients();
-                const matchingClient = allClients.find(c => c.userId === order.clientId || c.id === order.clientId);
-                if (matchingClient) {
-                  console.log(`Found matching client in all clients for order ${order.orderNumber}:`, { id: matchingClient.id, name: matchingClient.name });
-                  clientName = matchingClient.name;
-                }
-              }
-            }
-          }
-
+          const client = await storage.getUser(order.clientId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
-          // Check if there are unread production notes
-          let hasUnreadNotes = false;
-          if (order.producerId) {
-            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-            hasUnreadNotes = productionOrders.some(po => po.hasUnreadNotes);
-          }
 
           // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
@@ -962,9 +921,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
 
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            hasUnreadNotes = productionOrders.some(po => po.hasUnreadNotes);
+          }
+
           return {
             ...order,
-            clientName: clientName,
+            clientName: client?.name || 'Unknown',
             producerName: producer?.name || null,
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
@@ -2489,38 +2455,39 @@ Para mais detalhes, entre em contato conosco!`;
   // Routes by role
   app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
     try {
-      const budgets = await storage.getBudgetsByVendor(req.params.vendorId);
+      const { vendorId } = req.params;
+      const budgets = await storage.getBudgetsByVendor(vendorId);
 
       // Enrich with client names and items
       const enrichedBudgets = await Promise.all(
         budgets.map(async (budget) => {
-          let clientName = budget.contactName;
-          if (budget.clientId) {
-            const client = await storage.getUser(budget.clientId);
-            clientName = client?.name || budget.contactName;
-          }
+          const client = budget.clientId ? await storage.getUser(budget.clientId) : null;
+          const vendor = await storage.getUser(budget.vendorId);
 
+          // Get budget items with product details
           const items = await storage.getBudgetItems(budget.id);
-          const photos = await storage.getBudgetPhotos(budget.id);
-          const paymentInfo = await storage.getBudgetPaymentInfo(budget.id);
+          const enrichedItems = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              return {
+                ...item,
+                productName: product?.name || 'Produto não encontrado'
+              };
+            })
+          );
 
           return {
             ...budget,
-            clientName: clientName,
-            items: items,
-            photos: photos.map(photo => photo.photoUrl),
-            paymentMethodId: paymentInfo?.paymentMethodId || "",
-            shippingMethodId: paymentInfo?.shippingMethodId || "",
-            installments: paymentInfo?.installments || 1,
-            downPayment: paymentInfo?.downPayment || "0.00",
-            remainingAmount: paymentInfo?.remainingAmount || "0.00",
-            shippingCost: paymentInfo?.shippingCost || "0.00"
+            clientName: client?.name || null,
+            vendorName: vendor?.name || 'Unknown',
+            items: enrichedItems
           };
         })
       );
 
       res.json(enrichedBudgets);
     } catch (error) {
+      console.error("Error fetching vendor budgets:", error);
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
   });
@@ -2650,10 +2617,6 @@ Para mais detalhes, entre em contato conosco!`;
 
           // Check if there are unread production notes
           let hasUnreadNotes = false;
-          let productionNotes = null;
-          let productionDeadline = null;
-          let lastNoteAt = null;
-
           if (order.producerId) {
             const productionOrders = await storage.getProductionOrdersByOrder(order.id);
             if (productionOrders.length > 0) {

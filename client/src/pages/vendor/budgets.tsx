@@ -1726,6 +1726,58 @@ export default function VendorBudgets() {
                 </div>
               </div>
 
+              {/* Budget Items */}
+              {budgetToView.items && budgetToView.items.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
+                  <div className="space-y-3">
+                    {budgetToView.items.map((item: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4 bg-white">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">
+                              {item.productName || 'Produto não encontrado'}
+                            </h4>
+                            <div className="grid grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+                              <div>
+                                <span className="font-medium">Quantidade:</span> {item.quantity}
+                              </div>
+                              <div>
+                                <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div>
+                                <span className="font-medium">Subtotal:</span> R$ {(parseFloat(item.unitPrice || 0) * parseInt(item.quantity || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div>
+                                <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                            {item.hasItemCustomization && (
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                                <span className="font-medium text-blue-800">Personalização:</span> {item.itemCustomizationDescription || 'Personalização aplicada'}
+                                {item.itemCustomizationValue && (
+                                  <span className="ml-2 text-blue-600">
+                                    (+R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {(item.productWidth || item.productHeight || item.productDepth) && (
+                              <div className="mt-2 text-sm text-gray-500">
+                                <span className="font-medium">Dimensões:</span>
+                                {item.productWidth && ` L: ${item.productWidth}cm`}
+                                {item.productHeight && ` A: ${item.productHeight}cm`}
+                                {item.productDepth && ` P: ${item.productDepth}cm`}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Budget Details */}
               <div>
                 <Label className="font-semibold">Título</Label>
