@@ -4382,36 +4382,71 @@ Para mais detalhes, entre em contato conosco!`;
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
       const orders = await storage.getOrders();
       const clients = await storage.getClients();
+      const users = await storage.getUsers();
 
       // Enrich production orders with order and client data
-      const productionOrdersList = productionOrders
-        .map(po => {
-          const order = orders.find(o => o.id === po.orderId);
-          if (!order) return null;
+      const productionOrdersList = await Promise.all(
+        productionOrders
+          .map(async po => {
+            const order = orders.find(o => o.id === po.orderId);
+            if (!order) return null;
 
-          const client = clients.find(c => c.id === order.clientId);
+            // Try multiple approaches to find the client name
+            let clientName = 'Cliente não encontrado';
+            
+            console.log(`Looking for client with ID: ${order.clientId}`);
 
-          return {
-            id: po.id,
-            orderId: po.orderId,
-            status: po.status,
-            deadline: po.deadline,
-            acceptedAt: po.acceptedAt,
-            completedAt: po.completedAt,
-            notes: po.notes,
-            deliveryDeadline: po.deliveryDeadline,
-            hasUnreadNotes: po.hasUnreadNotes,
-            lastNoteAt: po.lastNoteAt,
-            producerValue: po.producerValue,
-            // Order data
-            orderNumber: order.orderNumber,
-            product: order.product,
-            description: order.description,
-            totalValue: order.totalValue,
-            // Client data
-            clientName: client?.name || null,
-          };
-        })
+            // Method 1: Try to get client record directly by ID
+            const clientRecord = clients.find(c => c.id === order.clientId);
+            if (clientRecord) {
+              console.log(`Found client record:`, clientRecord);
+              clientName = clientRecord.name;
+            } else {
+              // Method 2: Try to find client record by userId
+              const clientByUserId = clients.find(c => c.userId === order.clientId);
+              if (clientByUserId) {
+                console.log(`Found client by userId:`, clientByUserId);
+                clientName = clientByUserId.name;
+              } else {
+                // Method 3: Fallback to user table
+                const clientUser = users.find(u => u.id === order.clientId);
+                if (clientUser) {
+                  console.log(`Found user record:`, clientUser);
+                  clientName = clientUser.name;
+                } else {
+                  console.log(`No client found for ID: ${order.clientId}`);
+                }
+              }
+            }
+
+            return {
+              id: po.id,
+              orderId: po.orderId,
+              status: po.status,
+              deadline: po.deadline,
+              acceptedAt: po.acceptedAt,
+              completedAt: po.completedAt,
+              notes: po.notes,
+              deliveryDeadline: po.deliveryDeadline,
+              hasUnreadNotes: po.hasUnreadNotes,
+              lastNoteAt: po.lastNoteAt,
+              producerValue: po.producerValue,
+              // Order data
+              orderNumber: order.orderNumber,
+              product: order.product,
+              description: order.description,
+              totalValue: order.totalValue,
+              // Client data
+              clientName: clientName,
+              order: {
+                ...order,
+                clientName: clientName
+              }
+            };
+          })
+      );
+
+      const filteredOrders = productionOrdersList
         .filter(po => po !== null)
         .sort((a, b) => {
           // Sort by acceptedAt descending
@@ -4421,10 +4456,10 @@ Para mais detalhes, entre em contato conosco!`;
           return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime();
         });
 
-      console.log(`Producer orders for ${producerId}:`, productionOrdersList.length, 'orders found');
-      console.log('Orders data:', JSON.stringify(productionOrdersList, null, 2));
+      console.log(`Producer orders for ${producerId}:`, filteredOrders.length, 'orders found');
+      console.log('Orders data:', JSON.stringify(filteredOrders, null, 2));
 
-      res.json(productionOrdersList);
+      res.json(filteredOrders);
     } catch (error) {
       console.error("Error fetching producer production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });

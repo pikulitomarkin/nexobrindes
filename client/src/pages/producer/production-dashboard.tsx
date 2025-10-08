@@ -525,7 +525,7 @@ export default function ProductionDashboard() {
                               #{order.id.slice(-6)}
                             </h3>
                             <span className="text-sm text-gray-600">
-                              {order.order?.clientName || 'Cliente N/A'}
+                              {order.clientName || order.order?.clientName || 'Cliente N/A'}
                             </span>
                           </div>
                         </div>
@@ -576,7 +576,7 @@ export default function ProductionDashboard() {
                       <Label className="text-sm font-medium text-gray-500">Cliente</Label>
                       <div className="flex items-center gap-2 mt-1">
                         <User className="h-4 w-4 text-gray-400" />
-                        <p className="font-medium">{order.order?.clientName || 'N/A'}</p>
+                        <p className="font-medium">{order.clientName || order.order?.clientName || 'N/A'}</p>
                       </div>
                     </div>
 
