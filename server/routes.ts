@@ -329,18 +329,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.getOrders();
 
-      // Enrich with user data and budget photos
+      // Enrich with user data and budget photos/items
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           const client = await storage.getUser(order.clientId);
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
-          // Get budget photos if order was converted from budget
+          // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
+          let budgetItems = [];
           if (order.budgetId) {
             const photos = await storage.getBudgetPhotos(order.budgetId);
-            budgetPhotos = photos.map(photo => photo.imageUrl);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
           }
 
           // Check if there are unread production notes
@@ -356,6 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems,
             hasUnreadNotes: hasUnreadNotes
           };
         })
@@ -402,9 +421,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          // Get budget photos and items if order was converted from budget
+          let budgetPhotos = [];
+          let budgetItems = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
+          }
+
           return {
             ...order,
-            clientName: clientName
+            clientName: clientName,
+            budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems
           };
         })
       );
@@ -484,11 +530,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productionOrder = productionOrders[0] || null;
           }
 
-          // Get budget photos if order was converted from budget
+          // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
+          let budgetItems = [];
           if (order.budgetId) {
             const photos = await storage.getBudgetPhotos(order.budgetId);
             budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
           }
 
           // Get payments for this order to calculate correct paid value
@@ -532,6 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vendorName: vendor?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems,
             trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
             estimatedDelivery: productionOrder?.deliveryDelivery || null,
             payments: payments.filter(p => p.status === 'confirmed'), // Include payment details
@@ -871,11 +936,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hasUnreadNotes = productionOrders.some(po => po.hasUnreadNotes);
           }
 
+          // Get budget photos and items if order was converted from budget
+          let budgetPhotos = [];
+          let budgetItems = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
+          }
+
+
           return {
             ...order,
             clientName: clientName,
             producerName: producer?.name || null,
-            hasUnreadNotes: hasUnreadNotes
+            hasUnreadNotes: hasUnreadNotes,
+            budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems
           };
         })
       );
@@ -1685,11 +1778,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendor = await storage.getUser(order.vendorId);
       const producer = producerId ? await storage.getUser(producerId) : null;
 
+      // Get budget photos and items if order was converted from budget
+      let budgetPhotos = [];
+      let budgetItems = [];
+      if (order.budgetId) {
+        const photos = await storage.getBudgetPhotos(order.budgetId);
+        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+        // Get budget items with product details
+        const items = await storage.getBudgetItems(order.budgetId);
+        budgetItems = await Promise.all(
+          items.map(async (item) => {
+            const product = await storage.getProduct(item.productId);
+            return {
+              ...item,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
+        );
+      }
+
+
       const enrichedOrder = {
         ...order,
         clientName: clientName,
         vendorName: vendor?.name || 'Unknown',
-        producerName: producer?.name || null
+        producerName: producer?.name || null,
+        budgetPhotos: budgetPhotos,
+        budgetItems: budgetItems
       };
 
       res.json(enrichedOrder);
@@ -2502,11 +2623,29 @@ Para mais detalhes, entre em contato conosco!`;
           const client = await storage.getUser(order.clientId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
-          // Get budget photos if order was converted from budget
+          // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
+          let budgetItems = [];
           if (order.budgetId) {
             const photos = await storage.getBudgetPhotos(order.budgetId);
             budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
           }
 
           // Check if there are unread production notes
@@ -2531,6 +2670,7 @@ Para mais detalhes, entre em contato conosco!`;
             clientName: client?.name || 'Unknown',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems,
             hasUnreadNotes: hasUnreadNotes,
             productionNotes: productionNotes,
             productionDeadline: productionDeadline,
@@ -4393,7 +4533,7 @@ Para mais detalhes, entre em contato conosco!`;
 
             // Try multiple approaches to find the client name
             let clientName = 'Cliente não encontrado';
-            
+
             console.log(`Looking for client with ID: ${order.clientId}`);
 
             // Method 1: Try to get client record directly by ID

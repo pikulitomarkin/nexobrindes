@@ -2106,6 +2106,102 @@ export default function VendorOrders() {
                 </div>
               )}
 
+              {/* Budget Items */}
+              {selectedOrder?.budgetItems && selectedOrder.budgetItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Produtos do Orçamento</h3>
+                  <div className="space-y-4">
+                    {selectedOrder.budgetItems.map((item: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-start gap-4">
+                          {item.product?.imageLink && (
+                            <img
+                              src={item.product.imageLink}
+                              alt={item.product.name}
+                              className="w-16 h-16 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">
+                              {item.product?.name || 'Produto'}
+                            </h4>
+                            {item.product?.description && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                {item.product.description}
+                              </p>
+                            )}
+                            <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
+                              <div>
+                                <span className="text-gray-500">Quantidade:</span>
+                                <span className="ml-1 font-medium">{item.quantity}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Preço Unit.:</span>
+                                <span className="ml-1 font-medium">
+                                  R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Total:</span>
+                                <span className="ml-1 font-medium text-green-600">
+                                  R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Product dimensions */}
+                            {(item.productWidth || item.productHeight || item.productDepth) && (
+                              <div className="mt-2 text-sm">
+                                <span className="text-gray-500">Dimensões: </span>
+                                <span className="font-medium">
+                                  {[
+                                    item.productWidth && `L: ${item.productWidth}cm`,
+                                    item.productHeight && `A: ${item.productHeight}cm`,
+                                    item.productDepth && `P: ${item.productDepth}cm`
+                                  ].filter(Boolean).join(' × ')}
+                                </span>
+                              </div>
+                            )}
+                            {/* Customization info */}
+                            {item.hasItemCustomization && (
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                                <div className="font-medium text-blue-800">Personalização:</div>
+                                {item.itemCustomizationDescription && (
+                                  <div className="text-blue-700">{item.itemCustomizationDescription}</div>
+                                )}
+                                {parseFloat(item.itemCustomizationValue || '0') > 0 && (
+                                  <div className="text-blue-700">
+                                    Valor: R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Budget Photos */}
+              {selectedOrder?.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {selectedOrder.budgetPhotos.map((photo: string, index: number) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={photo}
+                          alt={`Foto ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-75 transition-opacity"
+                          onClick={() => window.open(photo, '_blank')}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Production Status */}
               {selectedOrder.status === 'production' && productionStatuses?.[selectedOrder.id] && (
                 <div>

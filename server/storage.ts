@@ -1197,7 +1197,19 @@ export class MemStorage implements IStorage {
       refundAmount: orderData.refundAmount || "0.00", // Initialize refundAmount
       refundNotes: orderData.refundNotes || null, // Initialize refundNotes
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      // Order items and payment info
+      items: orderData.items || [],
+      paymentMethodId: orderData.paymentMethodId || "",
+      shippingMethodId: orderData.shippingMethodId || "",
+      installments: orderData.installments || 1,
+      downPayment: orderData.downPayment !== undefined ? orderData.downPayment.toString() : '0.00',
+      remainingAmount: orderData.remainingAmount !== undefined ? orderData.remainingAmount.toString() : '0.00',
+      shippingCost: orderData.shippingCost !== undefined ? orderData.shippingCost.toString() : '0.00',
+      hasDiscount: orderData.hasDiscount || false,
+      discountType: orderData.discountType || "percentage",
+      discountPercentage: orderData.discountPercentage !== undefined ? orderData.discountPercentage.toString() : '0.00',
+      discountValue: orderData.discountValue !== undefined ? orderData.discountValue.toString() : '0.00'
     };
     this.orders.set(id, order);
 
@@ -1257,6 +1269,18 @@ export class MemStorage implements IStorage {
       trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode,
       refundAmount: updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount,
       refundNotes: updates.refundNotes !== undefined ? updates.refundNotes : order.refundNotes,
+      // Ensure other fields are preserved if not being updated
+      items: updates.items !== undefined ? updates.items : order.items,
+      paymentMethodId: updates.paymentMethodId !== undefined ? updates.paymentMethodId : order.paymentMethodId,
+      shippingMethodId: updates.shippingMethodId !== undefined ? updates.shippingMethodId : order.shippingMethodId,
+      installments: updates.installments !== undefined ? updates.installments : order.installments,
+      downPayment: updates.downPayment !== undefined ? updates.downPayment.toString() : order.downPayment,
+      remainingAmount: updates.remainingAmount !== undefined ? updates.remainingAmount.toString() : order.remainingAmount,
+      shippingCost: updates.shippingCost !== undefined ? updates.shippingCost.toString() : order.shippingCost,
+      hasDiscount: updates.hasDiscount !== undefined ? updates.hasDiscount : order.hasDiscount,
+      discountType: updates.discountType !== undefined ? updates.discountType : order.discountType,
+      discountPercentage: updates.discountPercentage !== undefined ? updates.discountPercentage.toString() : order.discountPercentage,
+      discountValue: updates.discountValue !== undefined ? updates.discountValue.toString() : order.discountValue,
     };
 
     this.orders.set(id, updateData);
@@ -1946,10 +1970,16 @@ export class MemStorage implements IStorage {
   }
 
   async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
-    const budget = await this.getBudget(budgetId);
+    const budget = this.budgets.get(budgetId); // Use .get() for Map
     if (!budget) {
       throw new Error("Budget not found");
     }
+
+    // Get budget items to include in order
+    const budgetItems = this.getBudgetItems(budgetId);
+
+    // Get budget payment info if available
+    const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
 
     // Determine shipping address based on delivery type
     let shippingAddress = budget.shippingAddress || null;
@@ -1959,8 +1989,10 @@ export class MemStorage implements IStorage {
       shippingAddress = null;
     }
 
-    // Create order from budget
+    // Generate order number
     const orderNumber = `PED-${Date.now()}`;
+
+    // Create order from budget
     const order = await this.createOrder({
       orderNumber,
       clientId: budget.clientId,
@@ -1971,9 +2003,22 @@ export class MemStorage implements IStorage {
       description: budget.description,
       totalValue: budget.totalValue,
       status: 'confirmed', // Default status for a new order from budget
-      deadline: budget.validUntil,
+      deadline: budget.validUntil, // Use validUntil as deadline for the order
       shippingAddress: shippingAddress, // Include shipping address
-      deliveryType: budget.deliveryType
+      deliveryType: budget.deliveryType,
+      // Include budget items as JSON
+      items: budgetItems,
+      // Payment information
+      paymentMethodId: budgetPaymentInfo?.paymentMethodId || "",
+      shippingMethodId: budgetPaymentInfo?.shippingMethodId || "",
+      installments: budgetPaymentInfo?.installments || 1,
+      downPayment: parseFloat(budgetPaymentInfo?.downPayment || '0'),
+      remainingAmount: parseFloat(budgetPaymentInfo?.remainingAmount || '0'),
+      shippingCost: parseFloat(budgetPaymentInfo?.shippingCost || '0'),
+      hasDiscount: budget.hasDiscount || false,
+      discountType: budget.discountType || "percentage",
+      discountPercentage: parseFloat(budget.discountPercentage || '0'),
+      discountValue: parseFloat(budget.discountValue || '0')
     });
 
     // Update budget status
@@ -1981,6 +2026,7 @@ export class MemStorage implements IStorage {
 
     return order;
   }
+
 
   // Budget Items methods
   async getBudgetItems(budgetId: string): Promise<any[]> {
