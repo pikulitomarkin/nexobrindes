@@ -12,6 +12,9 @@ export default function ProducerPanel() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const producerId = user.id;
 
+  console.log('ProducerPanel - User:', user);
+  console.log('ProducerPanel - Producer ID:', producerId);
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/producer", producerId, "stats"],
   });
@@ -156,6 +159,13 @@ export default function ProducerPanel() {
               <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma ordem encontrada</h3>
               <p className="text-gray-500">Aguardando novas ordens de produção.</p>
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 text-xs text-gray-400">
+                  <p>Debug - Producer ID: {producerId}</p>
+                  <p>Debug - Orders loading: {ordersLoading ? 'Sim' : 'Não'}</p>
+                  <p>Debug - Orders data: {JSON.stringify(productionOrders)}</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

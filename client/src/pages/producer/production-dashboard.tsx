@@ -28,7 +28,9 @@ export default function ProductionDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const producerId = "producer-1";
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const producerId = user.id;
+  
   const { data: productionOrders, isLoading } = useQuery({
     queryKey: ["/api/production-orders/producer", producerId],
   });
@@ -320,7 +322,7 @@ export default function ProductionDashboard() {
 
   const filteredOrders = productionOrders?.filter((order: any) => {
     if (statusFilter !== "all" && order.status !== statusFilter) return false;
-    if (periodFilter !== "all") {
+    if (periodFilter !== "all" && order.deadline) {
       const orderDate = new Date(order.deadline);
       const now = new Date();
       const daysDiff = Math.ceil((orderDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
@@ -459,13 +461,27 @@ export default function ProductionDashboard() {
         </Select>
       </div>
 
+      {/* Debug info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mb-4 p-4 bg-gray-100 rounded">
+          <p>Debug - Total ordens: {productionOrders?.length || 0}</p>
+          <p>Debug - Ordens filtradas: {filteredOrders.length}</p>
+          <p>Debug - Producer ID: {producerId}</p>
+          <p>Debug - Loading: {isLoading ? 'Sim' : 'Não'}</p>
+        </div>
+      )}
+
       {/* Orders List with Accordion */}
       <Card>
         <CardHeader>
-          <CardTitle>Ordens de Produção</CardTitle>
+          <CardTitle>Ordens de Produção ({filteredOrders.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredOrders.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p>Carregando ordens...</p>
+            </div>
+          ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12">
               <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma ordem encontrada</h3>
