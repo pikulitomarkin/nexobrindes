@@ -853,7 +853,7 @@ export class MemStorage implements IStorage {
     };
     this.mockData.commissionSettings.push(defaultCommissionSettings);
 
-    // Create sample customization options
+    // Create sample customization options - apenas 3 diferentes
     const sampleCustomizations: CustomizationOption[] = [
       {
         id: "custom-1",
@@ -869,30 +869,6 @@ export class MemStorage implements IStorage {
       },
       {
         id: "custom-2",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 100,
-        price: "4.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-3",
-        name: "Serigrafia 1 cor",
-        description: "Personalização com serigrafia em uma cor",
-        category: "Mochila",
-        minQuantity: 200,
-        price: "3.50",
-        isActive: true,
-        createdBy: adminUser.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: "custom-4",
         name: "Bordado",
         description: "Personalização com bordado",
         category: "Mochila",
@@ -904,7 +880,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date(),
       },
       {
-        id: "custom-5",
+        id: "custom-3",
         name: "Gravação a laser",
         description: "Personalização com gravação a laser",
         category: "Copo",
@@ -1041,7 +1017,7 @@ export class MemStorage implements IStorage {
       this.mockData.expenseNotes.push(expense);
     });
 
-    // Create sample customization options
+    // Create sample customization options - apenas 3 diferentes
     const sampleCustomizationOptions = [
       {
         id: "custom-1",
@@ -1057,30 +1033,6 @@ export class MemStorage implements IStorage {
       },
       {
         id: "custom-2",
-        name: "Serigrafia 1 cor",
-        description: "Impressão serigrafica em 1 cor (quantidade maior)",
-        category: "mochila",
-        minQuantity: 100,
-        price: "45.00",
-        isActive: true,
-        createdBy: "admin-1",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: "custom-3",
-        name: "Serigrafia 1 cor",
-        description: "Impressão serigrafica em 1 cor (quantidade alta)",
-        category: "mochila",
-        minQuantity: 200,
-        price: "35.00",
-        isActive: true,
-        createdBy: "admin-1",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: "custom-4",
         name: "Bordado",
         description: "Bordado personalizado",
         category: "mochila",
@@ -1092,7 +1044,7 @@ export class MemStorage implements IStorage {
         updatedAt: new Date()
       },
       {
-        id: "custom-5",
+        id: "custom-3",
         name: "Gravação Laser",
         description: "Gravação a laser em madeira",
         category: "móveis",
