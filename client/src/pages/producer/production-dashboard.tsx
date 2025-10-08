@@ -147,11 +147,21 @@ export default function ProductionDashboard() {
     }
     setProducerNotes(order.producerNotes || "");
 
-    // If the value is already set, do not show the confirmation modal, just open the dialog to edit
-    if (order.producerValueWasSet) {
-        setIsValueDialogOpen(true);
+    // If the value is already set and locked, don't allow editing
+    if (order.producerValueLocked) {
+      toast({
+        title: "Valor já definido",
+        description: "O valor já foi definido e não pode ser alterado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If value already exists, go directly to edit dialog
+    if (order.producerValue && parseFloat(order.producerValue) > 0) {
+      setIsValueDialogOpen(true);
     } else {
-        setIsValueConfirmationDialogOpen(true); // Show confirmation modal
+      setIsValueDialogOpen(true);
     }
   };
 
@@ -190,14 +200,22 @@ export default function ProductionDashboard() {
       notes: producerNotes.trim() || null
     });
 
-    // Close confirmation modal and open value dialog
-    setIsValueConfirmationDialogOpen(false);
-    setIsValueDialogOpen(true);
+    // Show confirmation modal before saving
+    setIsValueConfirmationDialogOpen(true);
   };
 
   const confirmAndSaveValue = () => {
     if (!selectedOrder) return;
+
     const numericValue = parseFloat(producerValue.replace(',', '.'));
+    if (isNaN(numericValue) || numericValue <= 0) {
+      toast({
+        title: "Erro",
+        description: "Valor inválido",
+        variant: "destructive",
+      });
+      return;
+    }
 
     updateValueMutation.mutate({
       id: selectedOrder.id,
@@ -706,18 +724,7 @@ export default function ProductionDashboard() {
               Cancelar
             </Button>
             <Button
-              onClick={() => {
-                if (!producerValue || parseFloat(producerValue) <= 0) {
-                  toast({
-                    title: "Erro",
-                    description: "Digite um valor válido maior que zero",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                setIsValueConfirmationDialogOpen(true);
-                setIsValueDialogOpen(false);
-              }}
+              onClick={handleSaveValue}
               disabled={!producerValue || parseFloat(producerValue) <= 0}
             >
               Continuar
@@ -784,15 +791,7 @@ export default function ProductionDashboard() {
             </Button>
             <Button
               className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => {
-                if (selectedOrder) {
-                  updateValueMutation.mutate({
-                    id: selectedOrder.id,
-                    value: producerValue,
-                    notes: producerNotes
-                  });
-                }
-              }}
+              onClick={confirmAndSaveValue}
               disabled={updateValueMutation.isPending}
             >
               {updateValueMutation.isPending ? "Confirmando..." : "Confirmar Valor"}
