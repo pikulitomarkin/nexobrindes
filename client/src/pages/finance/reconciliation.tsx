@@ -1104,7 +1104,7 @@ export default function FinanceReconciliation() {
                         if (isNaN(date.getTime())) return 'Data inválida';
                         return date.toLocaleDateString('pt-BR');
                       } catch (error) {
-                        return 'Data inválida';
+                        return 'Erro ao processar data';
                       }
                     })()}</p>
                     <p className="text-sm text-gray-600">{transaction.description}</p>
@@ -1143,7 +1143,7 @@ export default function FinanceReconciliation() {
                           if (isNaN(date.getTime())) return 'Data inválida';
                           return date.toLocaleDateString('pt-BR');
                         } catch (error) {
-                          return 'Data inválida';
+                          return 'Erro ao processar data';
                         }
                       })()} • {expense.category}
                     </p>

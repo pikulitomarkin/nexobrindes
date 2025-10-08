@@ -2393,15 +2393,17 @@ export class MemStorage implements IStorage {
   }
 
   async createBankTransaction(transaction: any): Promise<BankTransaction> {
-    // Validar e corrigir a data
-    let validDate = new Date();
+    // Validar a data sem usar fallback para data atual
+    let validDate = null;
     if (transaction.date) {
       const parsedDate = new Date(transaction.date);
       if (!isNaN(parsedDate.getTime())) {
         validDate = parsedDate;
       } else {
-        console.warn('Invalid date provided:', transaction.date, 'using current date');
+        console.error('Invalid date provided:', transaction.date, 'transaction will have null date');
       }
+    } else {
+      console.error('No date provided for transaction, date will be null');
     }
 
     // Validar valor da transação

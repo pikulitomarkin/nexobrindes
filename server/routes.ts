@@ -61,7 +61,7 @@ async function parseOFXBuffer(buffer: Buffer) {
       const refNum = match.match(/<REFNUM>(.*?)</)?.[1] || null;
 
       // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
-      let transactionDate = new Date();
+      let transactionDate = null;
       let hasValidDate = false;
       if (dtPostedRaw && dtPostedRaw.length >= 8) {
         try {
@@ -71,9 +71,10 @@ async function parseOFXBuffer(buffer: Buffer) {
           
           // Check if date components are valid numbers before creating date
           if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-            transactionDate = new Date(year, month, day);
+            const parsedDate = new Date(year, month, day);
             // Further validate if the created date is reasonable
-            if (transactionDate.getFullYear() === year && transactionDate.getMonth() === month && transactionDate.getDate() === day) {
+            if (parsedDate.getFullYear() === year && parsedDate.getMonth() === month && parsedDate.getDate() === day) {
+              transactionDate = parsedDate;
               hasValidDate = true;
             }
           }
