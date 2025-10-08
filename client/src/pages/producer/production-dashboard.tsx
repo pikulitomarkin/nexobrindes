@@ -244,16 +244,18 @@ export default function ProductionDashboard() {
           </div>
         );
       case 'accepted':
-        return (
-          <Button
-            size="sm"
-            className="bg-purple-600 hover:bg-purple-700"
-            onClick={() => handleStatusUpdate(order, 'production')}
-          >
-            <Clock className="h-4 w-4 mr-1" />
-            Iniciar Produção
-          </Button>
-        );
+          return (
+            <Button 
+              size="sm" 
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => handleStatusUpdate(order, 'production')}
+              disabled={updateStatusMutation.isPending || !order.producerValue}
+              title={!order.producerValue ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
+            >
+              <Clock className="h-4 w-4 mr-1" />
+              Iniciar Produção
+            </Button>
+          );
       case 'production':
         return (
           <Button 

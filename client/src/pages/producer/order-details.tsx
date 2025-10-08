@@ -8,12 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  Clock, 
-  Package, 
-  Truck, 
+import {
+  ArrowLeft,
+  CheckCircle,
+  Clock,
+  Package,
+  Truck,
   AlertTriangle,
   FileText,
   Calendar,
@@ -44,8 +44,8 @@ export default function ProducerOrderDetails() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ status, notes, deliveryDate, trackingCode }: { 
-      status: string; 
+    mutationFn: async ({ status, notes, deliveryDate, trackingCode }: {
+      status: string;
       notes?: string;
       deliveryDate?: string;
       trackingCode?: string;
@@ -106,8 +106,8 @@ export default function ProducerOrderDetails() {
       });
       return;
     }
-    updateStatusMutation.mutate({ 
-      status: selectedStatus, 
+    updateStatusMutation.mutate({
+      status: selectedStatus,
       notes: updateNotes,
       deliveryDate: deliveryDate || undefined,
       trackingCode: trackingCode || undefined
@@ -115,7 +115,7 @@ export default function ProducerOrderDetails() {
   };
 
   const handleDeadlineUpdate = () => {
-    updateStatusMutation.mutate({ 
+    updateStatusMutation.mutate({
       status: productionOrder?.status,
       notes: updateNotes,
       deliveryDate: deliveryDate
@@ -134,7 +134,7 @@ export default function ProducerOrderDetails() {
       rejected: { label: "Rejeitado", className: "bg-red-100 text-red-800" },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || 
+    const config = statusConfig[status as keyof typeof statusConfig] ||
                    { label: status, className: "bg-gray-100 text-gray-800" };
 
     return (
@@ -169,8 +169,8 @@ export default function ProducerOrderDetails() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => setLocation('/producer/production-dashboard')}
           className="mb-4"
         >
@@ -234,8 +234,8 @@ export default function ProducerOrderDetails() {
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Prazo Atualizado</Label>
                   <p className={productionOrder.deliveryDeadline ? "font-semibold text-blue-600" : ""}>
-                    {productionOrder.deliveryDeadline ? 
-                      new Date(productionOrder.deliveryDeadline).toLocaleDateString('pt-BR') : 
+                    {productionOrder.deliveryDeadline ?
+                      new Date(productionOrder.deliveryDeadline).toLocaleDateString('pt-BR') :
                       'Não definido'
                     }
                   </p>
@@ -393,7 +393,7 @@ export default function ProducerOrderDetails() {
               <div>
                 <Label className="text-sm font-medium text-gray-600">Endereço de Envio</Label>
                 <p className="font-medium text-gray-900">
-                  {productionOrder.order?.deliveryType === 'pickup' 
+                  {productionOrder.order?.deliveryType === 'pickup'
                     ? 'Sede Principal - Retirada no Local'
                     : (productionOrder.order?.shippingAddress || productionOrder.order?.clientAddress || 'Endereço não informado')
                   }
@@ -444,16 +444,17 @@ export default function ProducerOrderDetails() {
             <CardContent className="space-y-3">
               {productionOrder.status === 'pending' && (
                 <>
-                  <Button 
+                  <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleStatusUpdate('accepted')}
-                    disabled={updateStatusMutation.isPending}
+                    disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
+                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de aceitar a ordem" : ""}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Aceitar Ordem
                   </Button>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     className="w-full"
                     onClick={() => handleStatusUpdate('rejected')}
                     disabled={updateStatusMutation.isPending}
@@ -465,10 +466,11 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'accepted' && (
-                <Button 
+                <Button
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   onClick={() => handleStatusUpdate('production')}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={!productionOrder.producerValue}
+                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
                 >
                   <Clock className="h-4 w-4 mr-2" />
                   Iniciar Produção
@@ -476,7 +478,7 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'production' && (
-                <Button 
+                <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => {
                     if (!productionOrder.producerValue) {
@@ -498,13 +500,11 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'ready' && (
-                <Button 
+                <Button
                   className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                  onClick={() => {
-                    setSelectedStatus('shipped');
-                    setIsUpdateDialogOpen(true);
-                  }}
-                  disabled={updateStatusMutation.isPending}
+                  onClick={() => handleStatusUpdate('shipped')}
+                  disabled={!productionOrder.producerValue}
+                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como enviado" : ""}
                 >
                   <Truck className="h-4 w-4 mr-2" />
                   Marcar Enviado
@@ -512,39 +512,29 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'shipped' && (
-                <>
-                  <Button 
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                <div className="space-y-2">
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={() => handleStatusUpdate('delivered')}
-                    disabled={updateStatusMutation.isPending}
+                    disabled={!productionOrder.producerValue}
+                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como entregue" : ""}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Marcar Entregue
                   </Button>
-                  <Button 
+                  <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => {
-                      if (!productionOrder.producerValue) {
-                        toast({
-                          title: "Valor não definido",
-                          description: "Você deve definir o valor do serviço antes de finalizar a ordem",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      handleStatusUpdate('completed');
-                    }}
-                    disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
-                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar a ordem" : ""}
+                    onClick={() => handleStatusUpdate('completed')}
+                    disabled={!productionOrder.producerValue}
+                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar" : ""}
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
                     Finalizar Ordem
                   </Button>
-                </>
+                </div>
               )}
 
               {(productionOrder.status === 'delivered') && (
-                <Button 
+                <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => {
                     if (!productionOrder.producerValue) {
@@ -567,21 +557,21 @@ export default function ProducerOrderDetails() {
 
               {/* Action Buttons */}
               <div className="border-t pt-3 space-y-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => {
                     setIsDeadlineDialogOpen(true);
-                    setDeliveryDate(productionOrder.deliveryDeadline ? 
-                      new Date(productionOrder.deliveryDeadline).toISOString().split('T')[0] : 
+                    setDeliveryDate(productionOrder.deliveryDeadline ?
+                      new Date(productionOrder.deliveryDeadline).toISOString().split('T')[0] :
                       '');
                   }}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Alterar Prazo
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => {
                     setIsUpdateDialogOpen(true);
@@ -602,7 +592,7 @@ export default function ProducerOrderDetails() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedStatus === 'completed' ? 'Finalizar Ordem' : 
+              {selectedStatus === 'completed' ? 'Finalizar Ordem' :
                selectedStatus === 'rejected' ? 'Rejeitar Ordem' : 'Adicionar Observação'}
             </DialogTitle>
             <DialogDescription>
@@ -650,12 +640,12 @@ export default function ProducerOrderDetails() {
             <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleStatusUpdateWithNotes}
               disabled={updateStatusMutation.isPending}
               className={selectedStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
             >
-              {updateStatusMutation.isPending ? "Salvando..." : 
+              {updateStatusMutation.isPending ? "Salvando..." :
                selectedStatus === 'completed' ? 'Finalizar' :
                selectedStatus === 'rejected' ? 'Rejeitar' : 'Salvar'}
             </Button>
@@ -697,7 +687,7 @@ export default function ProducerOrderDetails() {
             <Button variant="outline" onClick={() => setIsDeadlineDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleDeadlineUpdate}
               disabled={updateStatusMutation.isPending || !deliveryDate}
             >

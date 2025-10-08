@@ -292,12 +292,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             isActive={location === "/producer/production-dashboard"}
           />
           <SidebarItem 
-            icon={Package} 
-            label="Ordens" 
-            href="/producer/orders"
-            isActive={location === "/producer/orders"}
-          />
-          <SidebarItem 
             icon={CreditCard} 
             label="Contas a Receber" 
             href="/producer/receivables"
