@@ -1,3 +1,4 @@
+replit_final_file>
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
@@ -29,7 +30,7 @@ export default function ProducerOrderDetails() {
   const [match, params] = useRoute("/producer/order/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const id = params?.id;
 
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -74,6 +75,18 @@ export default function ProducerOrderDetails() {
   });
 
   const handleStatusUpdate = (status: string) => {
+    // Check if the producerValue exists before allowing status change to 'ready' or 'completed'
+    if (status === 'ready' || status === 'completed') {
+      if (!productionOrder?.producerValue) {
+        toast({
+          title: "Valor do serviço não definido",
+          description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     if (status === 'completed' || status === 'rejected') {
       setSelectedStatus(status);
       setIsUpdateDialogOpen(true);
@@ -85,6 +98,15 @@ export default function ProducerOrderDetails() {
   const [trackingCode, setTrackingCode] = useState("");
 
   const handleStatusUpdateWithNotes = () => {
+    // Check if the producerValue exists before allowing status change to 'ready' or 'completed'
+    if ((selectedStatus === 'ready' || selectedStatus === 'completed') && !productionOrder?.producerValue) {
+      toast({
+        title: "Valor do serviço não definido",
+        description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateStatusMutation.mutate({ 
       status: selectedStatus, 
       notes: updateNotes,
@@ -368,7 +390,7 @@ export default function ProducerOrderDetails() {
                   {productionOrder.order?.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
                 </p>
               </div>
-              
+
               <div>
                 <Label className="text-sm font-medium text-gray-600">Endereço de Envio</Label>
                 <p className="font-medium text-gray-900">
@@ -457,8 +479,19 @@ export default function ProducerOrderDetails() {
               {productionOrder.status === 'production' && (
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handleStatusUpdate('ready')}
-                  disabled={updateStatusMutation.isPending}
+                  onClick={() => {
+                    if (!productionOrder.producerValue) {
+                      toast({
+                        title: "Valor não definido",
+                        description: "Você deve definir o valor do serviço antes de marcar como pronto",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    handleStatusUpdate('ready');
+                  }}
+                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
+                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
                 >
                   <Package className="h-4 w-4 mr-2" />
                   Marcar Pronto
@@ -491,8 +524,19 @@ export default function ProducerOrderDetails() {
                   </Button>
                   <Button 
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => handleStatusUpdate('completed')}
-                    disabled={updateStatusMutation.isPending}
+                    onClick={() => {
+                      if (!productionOrder.producerValue) {
+                        toast({
+                          title: "Valor não definido",
+                          description: "Você deve definir o valor do serviço antes de finalizar a ordem",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      handleStatusUpdate('completed');
+                    }}
+                    disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
+                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar a ordem" : ""}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Finalizar Ordem
@@ -503,8 +547,19 @@ export default function ProducerOrderDetails() {
               {(productionOrder.status === 'delivered') && (
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handleStatusUpdate('completed')}
-                  disabled={updateStatusMutation.isPending}
+                  onClick={() => {
+                    if (!productionOrder.producerValue) {
+                      toast({
+                        title: "Valor não definido",
+                        description: "Você deve definir o valor do serviço antes de finalizar a ordem",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    handleStatusUpdate('completed');
+                  }}
+                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
+                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar a ordem" : ""}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Finalizar Ordem
@@ -579,7 +634,7 @@ export default function ProducerOrderDetails() {
                 />
               </div>
             )}
-            
+
             {(selectedStatus === 'completed' || selectedStatus === 'rejected' || selectedStatus === 'shipped') && (
               <div>
                 <Label htmlFor="delivery-date">Data de Entrega (Opcional)</Label>
@@ -655,3 +710,4 @@ export default function ProducerOrderDetails() {
     </div>
   );
 }
+</replit_final_file>

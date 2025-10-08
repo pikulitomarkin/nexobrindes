@@ -97,6 +97,16 @@ export default function ProductionDashboard() {
   });
 
   const handleStatusUpdate = (order: any, newStatus: string) => {
+    // New validation: Prevent moving to 'ready' if producerValue is not set
+    if (newStatus === 'ready' && !order.producerValue) {
+      toast({
+        title: "Ação não permitida",
+        description: "Você deve definir o valor do serviço antes de marcar o pedido como pronto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (newStatus === 'shipped') {
       setSelectedOrder(order);
       setIsUpdateDialogOpen(true);
@@ -125,7 +135,7 @@ export default function ProductionDashboard() {
       setProducerValue("");
     }
     setProducerNotes(order.producerNotes || "");
-    
+
     // If the value is already set, do not show the confirmation modal, just open the dialog to edit
     if (order.producerValueWasSet) {
         setIsValueDialogOpen(true);
@@ -246,10 +256,12 @@ export default function ProductionDashboard() {
         );
       case 'production':
         return (
-          <Button
-            size="sm"
+          <Button 
+            size="sm" 
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'ready')}
+            disabled={updateStatusMutation.isPending || !order.producerValue}
+            title={!order.producerValue ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
           >
             <Package className="h-4 w-4 mr-1" />
             Marcar Pronto
