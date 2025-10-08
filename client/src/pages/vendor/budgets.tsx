@@ -495,6 +495,8 @@ export default function VendorBudgets() {
   };
 
   const handleEditBudget = (budget: any) => {
+    console.log('Editing budget:', budget);
+    
     // Pre-populate form with existing budget data
     setVendorBudgetForm({
       title: budget.title,
@@ -507,26 +509,32 @@ export default function VendorBudgets() {
       validUntil: budget.validUntil || "",
       deliveryDeadline: budget.deliveryDeadline || "",
       deliveryType: budget.deliveryType || "delivery",
-      items: budget.items.map((item: any) => ({
+      items: (budget.items || []).map((item: any) => ({
         productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: parseFloat(item.unitPrice),
-        totalPrice: parseFloat(item.totalPrice),
-        hasItemCustomization: item.hasItemCustomization,
+        productName: item.productName || item.product?.name || 'Produto não encontrado',
+        quantity: parseInt(item.quantity) || 1,
+        unitPrice: parseFloat(item.unitPrice) || 0,
+        totalPrice: parseFloat(item.totalPrice) || 0,
+        hasItemCustomization: item.hasItemCustomization || false,
+        selectedCustomizationId: item.selectedCustomizationId || "",
         itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
         itemCustomizationDescription: item.itemCustomizationDescription || "",
+        additionalCustomizationNotes: item.additionalCustomizationNotes || "",
         customizationPhoto: item.customizationPhoto || "",
         productWidth: item.productWidth || "",
         productHeight: item.productHeight || "",
-        productDepth: item.productDepth || ""
+        productDepth: item.productDepth || "",
+        hasItemDiscount: item.hasItemDiscount || false,
+        itemDiscountType: item.itemDiscountType || "percentage",
+        itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+        itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
       })),
       paymentMethodId: budget.paymentMethodId || "",
       shippingMethodId: budget.shippingMethodId || "",
       installments: budget.installments || 1,
-      downPayment: budget.downPayment || 0,
-      remainingAmount: budget.remainingAmount || 0,
-      shippingCost: budget.shippingCost || 0,
+      downPayment: parseFloat(budget.downPayment || 0),
+      remainingAmount: parseFloat(budget.remainingAmount || 0),
+      shippingCost: parseFloat(budget.shippingCost || 0),
       hasDiscount: budget.hasDiscount || false,
       discountType: budget.discountType || "percentage",
       discountPercentage: parseFloat(budget.discountPercentage || 0),
@@ -1327,15 +1335,15 @@ export default function VendorBudgets() {
                         <p className="text-lg font-semibold text-orange-600 mt-2">
                           R$ {(() => {
                             const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                              const basePrice = item.unitPrice * item.quantity;
-                              const customizationValue = item.hasItemCustomization ? (item.customizationQuantity || 0) * (item.itemCustomizationValue || 0) : 0;
+                              const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                              const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
                               return total + basePrice + customizationValue;
                             }, 0);
 
                             if (vendorBudgetForm.discountType === 'percentage') {
-                              return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              return ((itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             } else {
-                              return vendorBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              return (parseFloat(vendorBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             }
                           })()}
                         </p>
@@ -1352,8 +1360,8 @@ export default function VendorBudgets() {
                     <span>Subtotal dos Produtos:</span>
                     <span>R$ {(() => {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                        const basePrice = item.unitPrice * item.quantity;
-                        const customizationValue = item.hasItemCustomization ? (item.customizationQuantity || 0) * (item.itemCustomizationValue || 0) : 0;
+                        const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                        const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
                         return total + basePrice + customizationValue;
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -1364,15 +1372,15 @@ export default function VendorBudgets() {
                       <span>Desconto:</span>
                       <span>- R$ {(() => {
                         const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                          const basePrice = item.unitPrice * item.quantity;
-                          const customizationValue = item.hasItemCustomization ? (item.customizationQuantity || 0) * (item.itemCustomizationValue || 0) : 0;
+                          const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                          const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
                           return total + basePrice + customizationValue;
                         }, 0);
 
                         if (vendorBudgetForm.discountType === 'percentage') {
-                          return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                          return ((itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         } else {
-                          return vendorBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                          return (parseFloat(vendorBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         }
                       })()}</span>
                     </div>
@@ -1382,7 +1390,7 @@ export default function VendorBudgets() {
                     <span>
                       {vendorBudgetForm.deliveryType === "pickup" ? 
                         "Retirada no local" : 
-                        `R$ ${(vendorBudgetForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
