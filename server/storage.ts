@@ -1198,6 +1198,11 @@ export class MemStorage implements IStorage {
       refundNotes: orderData.refundNotes || null, // Initialize refundNotes
       createdAt: new Date(),
       updatedAt: new Date(),
+      // Contact information - always store this
+      contactName: orderData.contactName || "",
+      contactPhone: orderData.contactPhone || "",
+      contactEmail: orderData.contactEmail || "",
+      deliveryType: orderData.deliveryType || "delivery",
       // Order items and payment info
       items: orderData.items || [],
       paymentMethodId: orderData.paymentMethodId || "",

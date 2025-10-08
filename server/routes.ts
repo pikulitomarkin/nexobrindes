@@ -275,8 +275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Received order data:", orderData);
 
       // Validate required fields
-      if (!orderData.clientId) {
-        return res.status(400).json({ error: "Cliente é obrigatório" });
+      if (!orderData.contactName) {
+        return res.status(400).json({ error: "Nome de contato é obrigatório" });
       }
 
       if (!orderData.vendorId) {
@@ -290,35 +290,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
-      // Validate that we have a contact name
-      if (!orderData.contactName) {
-        return res.status(400).json({ error: "Nome de contato é obrigatório" });
-      }
-
-      // Ensure we have the correct clientId - if it's a client record ID, get the userId
-      let finalClientId = orderData.clientId;
-      console.log("Original clientId:", finalClientId);
-
-      // Check if clientId is a client record - if so, we might need to use the userId instead
-      const clientRecord = await storage.getClient(orderData.clientId);
-      if (clientRecord && clientRecord.userId) {
-        console.log("Found client record, using userId for order:", clientRecord.userId);
-        finalClientId = clientRecord.userId;
-      } else {
-        // Check if it's a userId that has a client record
-        const clientByUserId = await storage.getClientByUserId(orderData.clientId);
-        if (clientByUserId) {
-          console.log("Found client by userId, keeping original clientId:", orderData.clientId);
-          finalClientId = orderData.clientId;
+      // Handle clientId - use the provided clientId if exists, otherwise create order without client link
+      let finalClientId = null;
+      if (orderData.clientId && orderData.clientId !== "") {
+        // Verify client exists
+        const clientRecord = await storage.getClient(orderData.clientId);
+        if (clientRecord) {
+          finalClientId = clientRecord.userId || orderData.clientId;
+          console.log("Using client record:", clientRecord.name);
+        } else {
+          // Try finding by userId
+          const clientByUserId = await storage.getClientByUserId(orderData.clientId);
+          if (clientByUserId) {
+            finalClientId = orderData.clientId;
+            console.log("Using client by userId:", clientByUserId.name);
+          }
         }
       }
 
       console.log("Final clientId for order:", finalClientId);
 
-      // Create order with all provided data
+      // Create order with contact name as primary identifier
       const newOrder = await storage.createOrder({
         orderNumber,
-        clientId: finalClientId,
+        clientId: finalClientId, // Can be null if no client selected
         vendorId: orderData.vendorId,
         product: orderData.product || orderData.title,
         description: orderData.description || "",
@@ -326,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: orderData.status || "confirmed",
         deadline: orderData.deadline ? new Date(orderData.deadline) : null,
         deliveryDeadline: orderData.deliveryDeadline ? new Date(orderData.deliveryDeadline) : null,
-        // Additional fields - contactName is required and will be used as client name
+        // Contact information is required and primary
         contactName: orderData.contactName,
         contactPhone: orderData.contactPhone || "",
         contactEmail: orderData.contactEmail || "",
@@ -344,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: orderData.items || []
       });
 
-      console.log("Created order with final clientId:", newOrder.clientId);
+      console.log("Created order with contact name:", newOrder.contactName);
       res.json(newOrder);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -359,7 +354,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with user data and budget photos/items
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
+          // Always use contactName as primary client name, no fallback to 'Unknown'
+          let clientName = order.contactName;
+          
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
@@ -397,8 +412,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: client?.name || 'Unknown',
-            vendorName: vendor?.name || 'Unknown',
+            clientName: clientName, // Use contactName or found client name, never 'Unknown'
+            vendorName: vendor?.name || vendor?.username || 'Vendedor',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
@@ -420,30 +435,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          let clientName = 'Unknown';
+          // Always use contactName as primary client name - it's required on order creation
+          let clientName = order.contactName;
 
-          // Try multiple approaches to find the client name
-          console.log(`Looking for client name for order ${order.orderNumber}, clientId: ${order.clientId}`);
+          // Only try other methods if contactName is somehow missing
+          if (!clientName && order.clientId) {
+            console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
 
-          // Method 1: Try to get client record directly by ID
-          const clientRecord = await storage.getClient(order.clientId);
-          if (clientRecord) {
-            console.log(`Found client record:`, clientRecord);
-            clientName = clientRecord.name;
-          } else {
-            // Method 2: Try to find client record by userId
-            const clientByUserId = await storage.getClientByUserId(order.clientId);
-            if (clientByUserId) {
-              console.log(`Found client by userId:`, clientByUserId);
-              clientName = clientByUserId.name;
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              console.log(`Found client record:`, clientRecord);
+              clientName = clientRecord.name;
             } else {
-              // Method 3: Fallback to user table
-              const clientUser = await storage.getUser(order.clientId);
-              if (clientUser) {
-                console.log(`Found user record:`, clientUser);
-                clientName = clientUser.name;
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                console.log(`Found client by userId:`, clientByUserId);
+                clientName = clientByUserId.name;
               } else {
-                console.log(`No client found for ID: ${order.clientId}`);
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  console.log(`Found user record:`, clientUser);
+                  clientName = clientUser.name;
+                }
               }
             }
           }
@@ -475,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: clientName,
+            clientName: clientName, // Never use fallback 'Unknown'
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems
           };
@@ -649,50 +662,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          // Get client details - try multiple approaches to find the client
-          let clientName = 'Unknown';
+          // Always use contactName from order as primary client identifier
+          let clientName = order?.contactName;
           let clientAddress = null;
-          let clientPhone = null;
-          let clientEmail = null;
+          let clientPhone = order?.contactPhone;
+          let clientEmail = order?.contactEmail;
 
-          console.log(`Looking for client with ID: ${order?.clientId}`);
+          // Only try other methods if contactName is missing
+          if (!clientName && order?.clientId) {
+            console.log(`Contact name missing, looking for client with ID: ${order.clientId}`);
 
-          if (order) {
-            // Method 1: Try to get client record directly by ID
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               console.log(`Found client record:`, clientRecord);
               clientName = clientRecord.name;
               clientAddress = clientRecord.address;
-              clientPhone = clientRecord.phone;
-              clientEmail = clientRecord.email;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
             } else {
-              // Method 2: Try to find client record by userId
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 console.log(`Found client by userId:`, clientByUserId);
                 clientName = clientByUserId.name;
                 clientAddress = clientByUserId.address;
-                clientPhone = clientByUserId.phone;
-                clientEmail = clientByUserId.email;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
               } else {
-                // Method 3: Fallback to user table
                 const clientUser = await storage.getUser(order.clientId);
                 if (clientUser) {
                   console.log(`Found user record:`, clientUser);
                   clientName = clientUser.name;
-                  clientPhone = clientUser.phone;
-                  clientEmail = clientUser.email;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
                   clientAddress = clientUser.address;
-                } else {
-                  console.log(`No client found for ID: ${order.clientId}`);
-                  // Method 4: Use contactName from order if no client found
-                  if (order.contactName) {
-                    console.log(`Using contactName from order: ${order.contactName}`);
-                    clientName = order.contactName;
-                    clientPhone = order.contactPhone;
-                    clientEmail = order.contactEmail;
-                  }
                 }
               }
             }
@@ -700,9 +702,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...po,
-            orderNumber: order?.orderNumber || 'Unknown',
-            product: order?.product || 'Unknown',
-            clientName: clientName,
+            orderNumber: order?.orderNumber || `PO-${po.id}`,
+            product: order?.product || 'Produto não informado',
+            clientName: clientName, // Always use contactName, never fallback
             clientAddress: clientAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
