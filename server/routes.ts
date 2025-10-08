@@ -4311,69 +4311,40 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { producerId } = req.params;
       console.log(`API: Fetching production orders for producer: ${producerId}`);
-      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      console.log(`API: Found ${productionOrders.length} production orders for producer ${producerId}`);
-
-      const enrichedOrders = await Promise.all(
-        productionOrders.map(async (po) => {
-          const order = await storage.getOrder(po.orderId);
-          const producer = await storage.getUser(po.producerId);
-
-          // Get client details
-          let clientName = 'Unknown';
-          let clientAddress = 'Address not available';
-          let clientPhone = null;
-          let clientEmail = null;
-
-          if (order) {
-            // Try to get client record by userId
-            const clientByUserId = await storage.getClientByUserId(order.clientId);
-            if (clientByUserId) {
-              clientName = clientByUserId.name;
-              clientAddress = clientByUserId.address || clientAddress;
-              clientPhone = clientByUserId.phone;
-              clientEmail = clientByUserId.email;
-            } else {
-              // Fallback to user table
-              const clientUser = await storage.getUser(order.clientId);
-              if (clientUser) {
-                clientName = clientUser.name;
-                clientPhone = clientUser.phone;
-                clientEmail = clientUser.email;
-                clientAddress = clientUser.address || clientAddress;
-              }
-            }
-          }
-
-          return {
-            ...po,
-            orderNumber: order?.orderNumber || 'Unknown',
-            product: order?.product || 'Unknown',
-            clientName: clientName,
-            clientAddress: clientAddress,
-            clientPhone: clientPhone,
-            clientEmail: clientEmail,
-            producerName: producer?.name || null,
-            order: {
-              ...order,
-              clientName: clientName,
-              clientAddress: clientAddress,
-              clientPhone: clientPhone,
-              clientEmail: clientEmail,
-              shippingAddress: order.deliveryType === 'pickup'
-                ? 'Sede Principal - Retirada no Local'
-                : clientAddress,
-              deliveryType: order.deliveryType || 'delivery'
-            }
-          };
+      const productionOrdersList = await db
+        .select({
+          id: productionOrdersTable.id,
+          orderId: productionOrdersTable.orderId,
+          status: productionOrdersTable.status,
+          deadline: productionOrdersTable.deadline,
+          acceptedAt: productionOrdersTable.acceptedAt,
+          completedAt: productionOrdersTable.completedAt,
+          notes: productionOrdersTable.notes,
+          deliveryDeadline: productionOrdersTable.deliveryDeadline,
+          hasUnreadNotes: productionOrdersTable.hasUnreadNotes,
+          lastNoteAt: productionOrdersTable.lastNoteAt,
+          producerValue: productionOrdersTable.producerValue,
+          // Order data
+          orderNumber: ordersTable.orderNumber,
+          product: ordersTable.product,
+          description: ordersTable.description,
+          totalValue: ordersTable.totalValue,
+          // Client data
+          clientName: sql`${clientsTable.name}`.as('clientName'),
         })
-      );
+        .from(productionOrdersTable)
+        .innerJoin(ordersTable, eq(productionOrdersTable.orderId, ordersTable.id))
+        .leftJoin(clientsTable, eq(ordersTable.clientId, clientsTable.id))
+        .where(eq(productionOrdersTable.producerId, producerId))
+        .orderBy(desc(productionOrdersTable.acceptedAt));
 
-      console.log(`API: Returning ${enrichedOrders.length} enriched production orders for producer ${producerId}`);
-      res.json(enrichedOrders);
+      console.log(`Producer orders for ${producerId}:`, productionOrdersList.length, 'orders found');
+      console.log('Orders data:', JSON.stringify(productionOrdersList, null, 2));
+
+      res.json(productionOrdersList);
     } catch (error) {
-      console.error("Error fetching producer orders:", error);
-      res.status(500).json({ error: "Failed to fetch producer orders" });
+      console.error("Error fetching producer production orders:", error);
+      res.status(500).json({ error: "Failed to fetch production orders" });
     }
   });
 

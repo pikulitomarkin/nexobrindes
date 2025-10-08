@@ -65,6 +65,7 @@ export default function ProducerPanel() {
   }
 
   console.log('ProducerPanel - Production Orders Data:', productionOrders);
+  console.log('ProducerPanel - Raw data structure:', JSON.stringify(productionOrders, null, 2));
 
   const activeOrders = productionOrders?.filter((order: any) => 
     !['completed', 'rejected'].includes(order.status)
@@ -87,7 +88,7 @@ export default function ProducerPanel() {
     active: activeOrders.length,
     urgent: urgentOrders.length,
     readyToShip: readyToShip.length
-  });
+  }));
 
   return (
     <div className="space-y-6">
