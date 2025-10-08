@@ -21,6 +21,7 @@ export default function ProducerPanel() {
 
   const { data: productionOrders, isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/production-orders/producer", producerId],
+    enabled: !!producerId,
   });
 
   const getStatusBadge = (status: string) => {
@@ -63,6 +64,8 @@ export default function ProducerPanel() {
     );
   }
 
+  console.log('ProducerPanel - Production Orders Data:', productionOrders);
+
   const activeOrders = productionOrders?.filter((order: any) => 
     !['completed', 'rejected'].includes(order.status)
   ) || [];
@@ -78,6 +81,13 @@ export default function ProducerPanel() {
   const readyToShip = productionOrders?.filter((order: any) => 
     ['ready', 'preparing_shipment'].includes(order.status)
   ) || [];
+
+  console.log('ProducerPanel - Filtered Orders:', {
+    total: productionOrders?.length || 0,
+    active: activeOrders.length,
+    urgent: urgentOrders.length,
+    readyToShip: readyToShip.length
+  });
 
   return (
     <div className="space-y-6">
@@ -160,10 +170,15 @@ export default function ProducerPanel() {
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma ordem encontrada</h3>
               <p className="text-gray-500">Aguardando novas ordens de produção.</p>
               {process.env.NODE_ENV === 'development' && (
-                <div className="mt-4 text-xs text-gray-400">
-                  <p>Debug - Producer ID: {producerId}</p>
-                  <p>Debug - Orders loading: {ordersLoading ? 'Sim' : 'Não'}</p>
-                  <p>Debug - Orders data: {JSON.stringify(productionOrders)}</p>
+                <div className="mt-4 p-2 text-xs text-gray-400 bg-gray-50 rounded">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Producer ID: {producerId}</p>
+                  <p>Orders loading: {ordersLoading ? 'Sim' : 'Não'}</p>
+                  <p>Orders count: {productionOrders?.length || 0}</p>
+                  <p>Query key: /api/production-orders/producer/{producerId}</p>
+                  {productionOrders && (
+                    <p>First order status: {productionOrders[0]?.status}</p>
+                  )}
                 </div>
               )}
             </div>

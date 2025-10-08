@@ -4310,8 +4310,9 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/production-orders/producer/:producerId", async (req, res) => {
     try {
       const { producerId } = req.params;
-      console.log(`API: Getting production orders for producer: ${producerId}`);
+      console.log(`API: Fetching production orders for producer: ${producerId}`);
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      console.log(`API: Found ${productionOrders.length} production orders for producer ${producerId}`);
 
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
