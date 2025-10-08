@@ -4134,10 +4134,11 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Nenhum arquivo OFX foi enviado" });
       }
 
-      const ofxContent = req.file.buffer.toString('utf-8');
+      console.log("Processing OFX import:", req.file.originalname);
 
-      // Simple regex-based OFX parsing (in production, use a proper OFX parser library)
-      const transactions = extractOFXTransactions(ofxContent);
+      const fileBuffer = req.file.buffer;
+      const importData = await parseOFXBuffer(fileBuffer);
+      const transactions = importData.transactions;
 
       if (transactions.length === 0) {
         return res.status(400).json({ error: "Nenhuma transação encontrada no arquivo OFX" });
