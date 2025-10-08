@@ -1984,7 +1984,7 @@ export class MemStorage implements IStorage {
     // Determine shipping address based on delivery type
     let shippingAddress = budget.shippingAddress || null;
     if (budget.deliveryType === 'pickup') {
-      // If pickup, find the main company address or a default pickup point address
+      // If pickup, find the main company address or a default pickup location
       // For now, setting to null, but ideally this would be a specific pickup point address
       shippingAddress = null;
     }
@@ -2850,39 +2850,37 @@ export class MemStorage implements IStorage {
   }
 
   // Process commission payments based on order status and payments
-  private async processCommissionPayments(order: Order, status: string): Promise<void> {
-    // Process vendor commissions when order is completed/delivered
-    if (status === 'completed' || status === 'delivered') {
-      const commissions = Array.from(this.commissions.values()).filter(c => c.orderId === order.id);
+  async processCommissionPayments(order: Order, newStatus: string): Promise<void> {
+    try {
+      console.log(`Processing commission payments for order ${order.orderNumber}, status: ${newStatus}`);
 
-      for (const commission of commissions) {
-        if (commission.type === 'vendor' && commission.status === 'confirmed') {
-          await this.updateCommissionStatus(commission.id, 'paid');
+      const orderCommissions = Array.from(this.commissions.values()).filter(c => c.orderId === order.id);
+
+      // Process partner commissions (confirmed immediately when order is created/confirmed)
+      if (['confirmed', 'production'].includes(newStatus)) {
+        const partnerCommissionsToConfirm = orderCommissions.filter(c => c.type === 'partner' && c.status === 'pending');
+        for (const commission of partnerCommissionsToConfirm) {
+          // Apply pending deductions first, then confirm
+          await this.applyPendingDeductions(commission.partnerId!, commission);
         }
       }
-    }
 
-    // Cancel commissions when order is cancelled
-    if (status === 'cancelled') {
-      const commissions = Array.from(this.commissions.values()).filter(c => c.orderId === order.id);
-
-      for (const commission of commissions) {
-        if (commission.status !== 'paid') {
-          await this.updateCommissionStatus(commission.id, 'cancelled');
+      // Process vendor commissions (confirmed only when order is ready/shipped/delivered/completed)
+      if (['ready', 'shipped', 'delivered', 'completed'].includes(newStatus)) {
+        const vendorCommissionsToConfirm = orderCommissions.filter(c => c.type === 'vendor' && c.status === 'pending');
+        for (const commission of vendorCommissionsToConfirm) {
+          await this.updateCommissionStatus(commission.id, 'confirmed');
+          console.log(`Confirmed vendor commission ${commission.id} for ready order ${order.orderNumber}`);
         }
       }
-    }
 
-    // Process partner commission deduction when order starts
-    if (status === 'production' && order.producerId) {
-      // Find if there's a partner commission to deduct
-      const orderValue = parseFloat(order.totalValue);
-      const commissionSettings = await this.getCommissionSettings();
-      const partnerCommissionRate = parseFloat(commissionSettings?.partnerCommissionRate || '15.00');
-      const deductionAmount = (orderValue * partnerCommissionRate / 100).toFixed(2);
+      // Handle cancellations
+      if (newStatus === 'cancelled') {
+        await this.handleOrderCancellation(order, orderCommissions);
+      }
 
-      // Deduct from partner commission pool
-      await this.deductPartnerCommission('partner-1', deductionAmount);
+    } catch (error) {
+      console.error(`Error processing commission payments for order ${order.orderNumber}:`, error);
     }
   }
 

@@ -103,22 +103,6 @@ export default function AdminOrders() {
     },
   });
 
-  const cancelOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "cancelled" }),
-      });
-      if (!response.ok) throw new Error("Failed to cancel order");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ title: "Sucesso", description: "Pedido cancelado com sucesso!" });
-    },
-  });
-
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const response = await fetch(`/api/orders/${orderId}`, {
@@ -428,29 +412,6 @@ export default function AdminOrders() {
                             >
                               <Package className="h-4 w-4" />
                             </Button>
-                          )}
-                          {order.status !== 'cancelled' && order.status !== 'completed' && order.status !== 'delivered' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800" title="Cancelar pedido">
-                                  <AlertCircle className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Cancelar Pedido</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja cancelar este pedido? O status será alterado para "Cancelado" e as comissões serão canceladas.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Voltar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => cancelOrderMutation.mutate(order.id)} className="bg-red-600 hover:bg-red-700">
-                                    Cancelar Pedido
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

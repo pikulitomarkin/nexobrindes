@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign, AlertTriangle } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
@@ -513,31 +513,6 @@ export default function VendorOrders() {
         description: "As observações da produção foram marcadas como lidas",
       });
     },
-  });
-
-  const cancelOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}/cancel`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error("Erro ao cancelar pedido");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
-      toast({
-        title: "Sucesso!",
-        description: "Pedido cancelado com sucesso",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao cancelar pedido",
-        variant: "destructive"
-      });
-    }
   });
 
   const handleSendToProductionClick = (orderId: string) => {
@@ -1786,70 +1761,70 @@ export default function VendorOrders() {
                       {new Date(order.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex space-x-1">
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedOrder(order);
                             setShowOrderDetailsModal(true);
                           }}
+                          data-testid={`button-view-${order.id}`}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          Ver Detalhes
+                          Ver
                         </Button>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditOrder(order)}
-                          disabled={order.status === 'completed' || order.status === 'shipped' || order.status === 'delivered' || order.status === 'cancelled'}
-                          title={order.status === 'completed' || order.status === 'shipped' || order.status === 'delivered' || order.status === 'cancelled' ? "Não é possível editar pedidos finalizados ou cancelados" : ""}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Editar
-                        </Button>
-
+                        {order.status !== 'production' && order.status !== 'shipped' && order.status !== 'delivered' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditOrder(order)}
+                            data-testid={`button-edit-${order.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
                         {order.hasUnreadNotes && (
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
+                            className="text-red-600 hover:text-red-900"
                             onClick={() => markNotesReadMutation.mutate(order.id)}
                             disabled={markNotesReadMutation.isPending}
-                            className="text-green-600 hover:text-green-800 border-green-300"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Ler Observações
+                            Ciente
                           </Button>
                         )}
-
-                        {order.status !== 'cancelled' && order.status !== 'completed' && order.status !== 'delivered' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (confirm('Tem certeza que deseja cancelar este pedido?')) {
-                                cancelOrderMutation.mutate(order.id);
-                              }
-                            }}
-                            disabled={cancelOrderMutation.isPending}
-                            className="text-red-600 hover:text-red-800 border-red-300"
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        )}
-
-                        {order.status === 'confirmed' && !order.producerName && (
-                          <Button
-                            size="sm"
-                            className="gradient-bg text-white"
-                            onClick={() => handleSendToProductionClick(order.id)}
-                            disabled={sendToProductionMutation.isPending}
-                          >
-                            <Send className="h-4 w-4 mr-1" />
-                            Enviar para Produção
-                          </Button>
+                        {(order.status === 'confirmed' || order.status === 'pending') && (
+                          <>
+                            {parseFloat(order.paidValue || '0') > 0 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-blue-600 hover:text-blue-900"
+                                onClick={() => handleSendToProductionClick(order.id)}
+                                disabled={sendToProductionMutation.isPending}
+                                data-testid={`button-production-${order.id}`}
+                              >
+                                <Send className="h-4 w-4 mr-1" />
+                                {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-orange-600 hover:text-orange-900"
+                                disabled
+                                data-testid={`button-waiting-payment-${order.id}`}
+                              >
+                                <Clock className="h-4 w-4 mr-1" />
+                                Aguardando Pagamento
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
