@@ -30,7 +30,7 @@ export default function ProductionDashboard() {
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const producerId = user.id;
-  
+
   const { data: productionOrders, isLoading } = useQuery({
     queryKey: ["/api/production-orders/producer", producerId],
   });
@@ -98,24 +98,22 @@ export default function ProductionDashboard() {
     },
   });
 
-  const handleStatusUpdate = (order: any, newStatus: string) => {
-    // Validation: Prevent moving to any advanced status without producerValue
-    const statusesThatRequireValue = ['accepted', 'production', 'ready', 'shipped', 'delivered', 'completed'];
-    
-    if (statusesThatRequireValue.includes(newStatus) && (!order.producerValue || parseFloat(order.producerValue) <= 0)) {
+  const handleStatusUpdate = (order: any, status: string) => {
+    // Verificar se o valor está definido antes de permitir mudanças de status críticas
+    if ((status === 'ready' || status === 'completed' || status === 'shipped') && (!order.producerValue || parseFloat(order.producerValue || '0') <= 0)) {
       toast({
-        title: "Valor do serviço obrigatório",
-        description: "Você deve definir um valor válido para o serviço antes de aceitar ou avançar com o pedido.",
+        title: "Valor não definido",
+        description: "Você deve definir o valor do serviço antes de marcar como pronto, enviado ou finalizado.",
         variant: "destructive",
       });
       return;
     }
 
-    if (newStatus === 'shipped') {
+    if (status === 'completed' || status === 'shipped') {
       setSelectedOrder(order);
       setIsUpdateDialogOpen(true);
     } else {
-      updateStatusMutation.mutate({ id: order.id, status: newStatus });
+      updateStatusMutation.mutate({ id: order.id, status });
     }
   };
 
@@ -197,7 +195,7 @@ export default function ProductionDashboard() {
       value: numericValue.toFixed(2),
       notes: producerNotes.trim() || null,
       // Add a flag to indicate the value has been set by the producer
-      producerValueWasSet: true 
+      producerValueWasSet: true
     });
   };
 
@@ -249,8 +247,8 @@ export default function ProductionDashboard() {
         );
       case 'accepted':
           return (
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="bg-purple-600 hover:bg-purple-700"
               onClick={() => handleStatusUpdate(order, 'production')}
               disabled={updateStatusMutation.isPending || !order.producerValue || parseFloat(order.producerValue) <= 0}
@@ -262,8 +260,8 @@ export default function ProductionDashboard() {
           );
       case 'production':
         return (
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'ready')}
             disabled={updateStatusMutation.isPending || !order.producerValue}
@@ -476,7 +474,7 @@ export default function ProductionDashboard() {
         </Select>
       </div>
 
-      
+
 
       {/* Orders List with Accordion */}
       <Card className="shadow-lg border-0">
@@ -507,7 +505,7 @@ export default function ProductionDashboard() {
               {filteredOrders.map((order: any) => (
                 <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
                   {/* Accordion Header - Always Visible */}
-                  <div 
+                  <div
                     className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
                     onClick={() => {
                       const element = document.getElementById(`order-${order.id}`);

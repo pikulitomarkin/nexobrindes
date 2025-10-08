@@ -74,9 +74,9 @@ export default function ProducerOrderDetails() {
   });
 
   const handleStatusUpdate = (status: string) => {
-    // Check if the producerValue exists before allowing status change to 'ready' or 'completed'
+    // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
     if (status === 'ready' || status === 'completed') {
-      if (!productionOrder?.producerValue) {
+      if (!productionOrder?.producerValue || parseFloat(productionOrder.producerValue || '0') <= 0) {
         toast({
           title: "Valor do serviço não definido",
           description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
@@ -97,8 +97,8 @@ export default function ProducerOrderDetails() {
   const [trackingCode, setTrackingCode] = useState("");
 
   const handleStatusUpdateWithNotes = () => {
-    // Check if the producerValue exists before allowing status change to 'ready' or 'completed'
-    if ((selectedStatus === 'ready' || selectedStatus === 'completed') && !productionOrder?.producerValue) {
+    // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
+    if ((selectedStatus === 'ready' || selectedStatus === 'completed') && (!productionOrder?.producerValue || parseFloat(productionOrder.producerValue || '0') <= 0)) {
       toast({
         title: "Valor do serviço não definido",
         description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
