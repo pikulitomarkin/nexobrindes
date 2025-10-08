@@ -1,4 +1,3 @@
-replit_final_file>
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
@@ -710,4 +709,3 @@ export default function ProducerOrderDetails() {
     </div>
   );
 }
-</replit_final_file>
