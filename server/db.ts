@@ -23,8 +23,8 @@ export type {
   BudgetPaymentInfo
 } from "../shared/schema";
 
-// Export schema tables for compatibility (these will reference the storage interface)
-export const {
+// Export schema tables from shared/schema
+export {
   users,
   clients,
   orders,
@@ -41,4 +41,4 @@ export const {
   paymentMethods,
   shippingMethods,
   budgetPaymentInfo
-} = {} as any; // Placeholder for schema compatibility
+} from "../shared/schema";

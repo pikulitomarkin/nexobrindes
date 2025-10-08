@@ -621,21 +621,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
 
-      const productionStatuses = await db
-        .select({
-          id: productionOrdersTable.id,
-          orderId: productionOrdersTable.orderId,
-          status: productionOrdersTable.status,
-          producerValue: productionOrdersTable.producerValue,
-          deliveryDate: productionOrdersTable.deliveryDate,
-          notes: productionOrdersTable.notes,
-          producerName: sql`${usersTable.name}`.as('producerName'),
-          lastNoteAt: productionOrdersTable.lastNoteAt,
-        })
-        .from(productionOrdersTable)
-        .leftJoin(ordersTable, eq(productionOrdersTable.orderId, ordersTable.id))
-        .leftJoin(usersTable, eq(productionOrdersTable.producerId, usersTable.id))
-        .where(eq(ordersTable.vendorId, vendorId));
+      // Get all production orders
+      const allProductionOrders = await storage.getProductionOrders();
+      const orders = await storage.getOrders();
+      const users = await storage.getUsers();
+
+      // Filter production orders for this vendor's orders
+      const vendorOrders = orders.filter(o => o.vendorId === vendorId);
+      const vendorOrderIds = vendorOrders.map(o => o.id);
+      
+      const productionStatuses = allProductionOrders
+        .filter(po => vendorOrderIds.includes(po.orderId))
+        .map(po => {
+          const producer = users.find(u => u.id === po.producerId);
+          return {
+            id: po.id,
+            orderId: po.orderId,
+            status: po.status,
+            producerValue: po.producerValue,
+            deliveryDate: po.deliveryDeadline,
+            notes: po.notes,
+            producerName: producer?.name || null,
+            lastNoteAt: po.lastNoteAt,
+          };
+        });
 
       console.log(`Found ${productionStatuses.length} production statuses for vendor ${vendorId}`);
       res.json(productionStatuses);
@@ -4311,32 +4320,49 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { producerId } = req.params;
       console.log(`API: Fetching production orders for producer: ${producerId}`);
-      const productionOrdersList = await db
-        .select({
-          id: productionOrdersTable.id,
-          orderId: productionOrdersTable.orderId,
-          status: productionOrdersTable.status,
-          deadline: productionOrdersTable.deadline,
-          acceptedAt: productionOrdersTable.acceptedAt,
-          completedAt: productionOrdersTable.completedAt,
-          notes: productionOrdersTable.notes,
-          deliveryDeadline: productionOrdersTable.deliveryDeadline,
-          hasUnreadNotes: productionOrdersTable.hasUnreadNotes,
-          lastNoteAt: productionOrdersTable.lastNoteAt,
-          producerValue: productionOrdersTable.producerValue,
-          // Order data
-          orderNumber: ordersTable.orderNumber,
-          product: ordersTable.product,
-          description: ordersTable.description,
-          totalValue: ordersTable.totalValue,
-          // Client data
-          clientName: sql`${clientsTable.name}`.as('clientName'),
+      
+      // Get production orders for this producer
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      const orders = await storage.getOrders();
+      const clients = await storage.getClients();
+      
+      // Enrich production orders with order and client data
+      const productionOrdersList = productionOrders
+        .map(po => {
+          const order = orders.find(o => o.id === po.orderId);
+          if (!order) return null;
+          
+          const client = clients.find(c => c.id === order.clientId);
+          
+          return {
+            id: po.id,
+            orderId: po.orderId,
+            status: po.status,
+            deadline: po.deadline,
+            acceptedAt: po.acceptedAt,
+            completedAt: po.completedAt,
+            notes: po.notes,
+            deliveryDeadline: po.deliveryDeadline,
+            hasUnreadNotes: po.hasUnreadNotes,
+            lastNoteAt: po.lastNoteAt,
+            producerValue: po.producerValue,
+            // Order data
+            orderNumber: order.orderNumber,
+            product: order.product,
+            description: order.description,
+            totalValue: order.totalValue,
+            // Client data
+            clientName: client?.name || null,
+          };
         })
-        .from(productionOrdersTable)
-        .innerJoin(ordersTable, eq(productionOrdersTable.orderId, ordersTable.id))
-        .leftJoin(clientsTable, eq(ordersTable.clientId, clientsTable.id))
-        .where(eq(productionOrdersTable.producerId, producerId))
-        .orderBy(desc(productionOrdersTable.acceptedAt));
+        .filter(po => po !== null)
+        .sort((a, b) => {
+          // Sort by acceptedAt descending
+          if (!a.acceptedAt && !b.acceptedAt) return 0;
+          if (!a.acceptedAt) return 1;
+          if (!b.acceptedAt) return -1;
+          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime();
+        });
 
       console.log(`Producer orders for ${producerId}:`, productionOrdersList.length, 'orders found');
       console.log('Orders data:', JSON.stringify(productionOrdersList, null, 2));
