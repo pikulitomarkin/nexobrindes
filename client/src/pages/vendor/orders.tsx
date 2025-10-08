@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -338,7 +337,7 @@ export default function VendorOrders() {
     mutationFn: async (data: any) => {
       // Ensure we're using the userId for clientId to match the order structure
       const selectedClient = clients?.find(c => c.id === data.clientId);
-      
+
       // Create proper order structure
       const orderData = {
         clientId: selectedClient?.userId || data.clientId, // Use userId for proper client linking
@@ -370,9 +369,9 @@ export default function VendorOrders() {
         // Items
         items: data.items || []
       };
-      
+
       console.log("Creating order with data:", orderData);
-      
+
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -401,7 +400,7 @@ export default function VendorOrders() {
   const updateOrderMutation = useMutation({
     mutationFn: async (data: any) => {
       const selectedClient = clients?.find(c => c.id === data.clientId);
-      
+
       // Create proper order structure for update
       const orderData = {
         clientId: selectedClient?.userId || data.clientId,
@@ -432,9 +431,9 @@ export default function VendorOrders() {
         // Items
         items: data.items || []
       };
-      
+
       console.log("Updating order with data:", orderData);
-      
+
       const response = await fetch(`/api/orders/${editingOrderId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1687,7 +1686,7 @@ export default function VendorOrders() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Mostrar informações adicionais do produtor se em produção */}
                         {order.status === 'production' && productionStatuses?.[order.id] && (
                           <div className="text-xs text-gray-600 space-y-1">
@@ -1862,232 +1861,281 @@ export default function VendorOrders() {
 
       {/* Order Details Modal */}
       <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Pedido {selectedOrder?.orderNumber}</DialogTitle>
+            <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogDescription>
+              Informações completas do pedido
+            </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-6">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Order Header */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Cliente</Label>
-                  <p className="text-sm text-gray-900">{selectedOrder.clientName || 'N/A'}</p>
+                  <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
+                      <p className="text-lg font-bold">{selectedOrder.orderNumber}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Cliente</label>
+                      <p>{selectedOrder.clientName}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Produto</label>
+                      <p>{selectedOrder.product}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Descrição</label>
+                      <p className="text-gray-700">{selectedOrder.description}</p>
+                    </div>
+                  </div>
                 </div>
+
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Status</Label>
-                  <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Valor Total</Label>
-                  <p className="text-sm text-gray-900">
-                    R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Data de Criação</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}
-                  </p>
+                  <h3 className="text-lg font-semibold mb-4">Status e Valores</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Status Atual</label>
+                      <div className="mt-1">
+                        {getStatusBadge(selectedOrder.status, productionStatuses?.[selectedOrder.id])}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Valor Total</label>
+                      <p className="text-2xl font-bold text-green-600">
+                        R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Valor Pago</label>
+                      <p className="text-lg">
+                        R$ {parseFloat(selectedOrder.paidValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Prazo de Entrega</label>
+                      <p>{selectedOrder.deadline ? new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Data de Criação</label>
+                      <p>{new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {selectedOrder.description && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Descrição</Label>
-                  <p className="text-sm text-gray-900 mt-1">{selectedOrder.description}</p>
-                </div>
-              )}
-
-              {selectedOrder.deadline && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Prazo de Entrega</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(selectedOrder.deadline).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              )}
-
-              {selectedOrder.productionDeadline && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Prazo de Entrega (Atualizado pela Produção)</Label>
-                  <p className="text-sm text-gray-900 font-semibold">
-                    {new Date(selectedOrder.productionDeadline).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              )}
-
-              {selectedOrder.productionNotes && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Observações da Produção</Label>
-                  <div className="mt-1 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p className="text-sm text-orange-800">{selectedOrder.productionNotes}</p>
-                    {selectedOrder.lastNoteAt && (
-                      <p className="text-xs text-orange-600 mt-2">
-                        Atualizado em: {new Date(selectedOrder.lastNoteAt).toLocaleString('pt-BR')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {selectedOrder.trackingCode && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Código de Rastreamento</Label>
-                  <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800 font-mono font-semibold">{selectedOrder.trackingCode}</p>
-                    <p className="text-xs text-blue-600 mt-2">
-                      Cliente pode usar este código para rastrear o pedido
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {selectedOrder.deliveryType && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Tipo de Entrega</Label>
-                  <p className="text-sm text-gray-900 mt-1">
-                    {selectedOrder.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
-                  </p>
-                </div>
-              )}
-
-              {/* Status de Produção Detalhado */}
-              {selectedOrder.status === 'production' && productionStatuses?.[selectedOrder.id] && (
-                <div className="space-y-4">
+              {/* Contact Information */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Informações de Contato</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Informações da Produção</Label>
-                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Status atual:</span>
-                        {getStatusBadge('production', productionStatuses[selectedOrder.id])}
-                      </div>
-                      <div className="text-sm">
-                        <strong>Produtor:</strong> {productionStatuses[selectedOrder.id].producerName}
-                      </div>
-                      {productionStatuses[selectedOrder.id].producerValue && (
-                        <div className="text-sm">
-                          <strong>Valor da Produção:</strong> R$ {parseFloat(productionStatuses[selectedOrder.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </div>
-                      )}
-                      {productionStatuses[selectedOrder.id].deliveryDate && (
-                        <div className="text-sm">
-                          <strong>Prazo de Entrega:</strong> {new Date(productionStatuses[selectedOrder.id].deliveryDate).toLocaleDateString('pt-BR')}
-                        </div>
-                      )}
-                      {productionStatuses[selectedOrder.id].notes && (
-                        <div className="text-sm">
-                          <strong>Observações:</strong> {productionStatuses[selectedOrder.id].notes}
-                        </div>
-                      )}
-                    </div>
+                    <label className="text-sm font-medium text-gray-500">Nome de Contato</label>
+                    <p className="font-medium">{selectedOrder.contactName || 'Não informado'}</p>
                   </div>
-
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Progresso da Produção</Label>
-                    <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
-                      <div
-                        className={`h-4 rounded-full ${
-                          productionStatuses[selectedOrder.id].status === 'pending' ? 'bg-yellow-500' :
-                          productionStatuses[selectedOrder.id].status === 'accepted' ? 'bg-blue-500' :
-                          productionStatuses[selectedOrder.id].status === 'production' ? 'bg-purple-500' :
-                          productionStatuses[selectedOrder.id].status === 'ready' ? 'bg-green-500' :
-                          productionStatuses[selectedOrder.id].status === 'shipped' ? 'bg-cyan-500' : 'bg-green-600'
-                        }`}
-                        style={{
-                          width: (() => {
-                            const pStatus = productionStatuses[selectedOrder.id].status;
-                            if (pStatus === 'pending') return '10%';
-                            if (pStatus === 'accepted') return '25%';
-                            if (pStatus === 'production') return '50%';
-                            if (pStatus === 'ready') return '75%';
-                            if (pStatus === 'shipped') return '90%';
-                            if (pStatus === 'completed') return '100%';
-                            return '25%';
-                          })()
-                        }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>Pendente</span>
-                      <span>Aceito</span>
-                      <span>Produzindo</span>
-                      <span>Pronto</span>
-                      <span>Finalizado</span>
-                    </div>
+                    <label className="text-sm font-medium text-gray-500">Telefone</label>
+                    <p>{selectedOrder.contactPhone || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Email</label>
+                    <p>{selectedOrder.contactEmail || 'Não informado'}</p>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Progress Bar for Other Statuses */}
-              {(selectedOrder.status === 'delayed' || selectedOrder.status === 'ready' || selectedOrder.status === 'shipped' || selectedOrder.status === 'delivered') && !productionStatuses?.[selectedOrder.id] && (
+              {/* Products List */}
+              {selectedOrder.items && selectedOrder.items.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Progresso da Entrega</Label>
-                  <div className="w-full bg-gray-200 rounded-full h-4 mt-2">
-                    <div
-                      className={`h-4 rounded-full ${
-                        selectedOrder.status === 'delayed' ? 'bg-red-500' :
-                        selectedOrder.status === 'ready' ? 'bg-yellow-500' :
-                        selectedOrder.status === 'shipped' ? 'bg-blue-500' :
-                        selectedOrder.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
-                      }`}
-                      style={{
-                        width: selectedOrder.status === 'delayed' ? '25%' :
-                               selectedOrder.status === 'ready' ? '50%' :
-                               selectedOrder.status === 'shipped' ? '75%' : '100%'
-                      }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>Produção</span>
-                    <span>Pronto</span>
-                    <span>Enviado</span>
-                    <span>Entregue</span>
-                  </div>
-                </div>
-              )}
+                  <h3 className="text-lg font-semibold mb-4">Produtos do Pedido ({selectedOrder.items.length})</h3>
+                  <div className="space-y-4">
+                    {selectedOrder.items.map((item, index) => (
+                      <Card key={index} className="border border-gray-200">
+                        <CardContent className="p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Product Image */}
+                            <div className="flex items-center justify-center">
+                              {item.customizationPhoto ? (
+                                <img 
+                                  src={item.customizationPhoto} 
+                                  alt={`Personalização ${item.productName}`} 
+                                  className="w-24 h-24 object-cover rounded-lg border"
+                                />
+                              ) : (
+                                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
+                                  <Package className="h-8 w-8 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
 
-              {/* Photos from Order */}
-              {selectedOrder.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedOrder.budgetPhotos.map((photo: string, index: number) => (
-                      <div key={index} className="border rounded-lg overflow-hidden">
-                        <img
-                          src={photo}
-                          alt={`Personalização ${index + 1}`}
-                          className="w-full h-32 object-cover"
-                        />
-                      </div>
+                            {/* Product Details */}
+                            <div className="space-y-2">
+                              <h4 className="font-semibold text-lg">{item.productName}</h4>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Quantidade:</span>
+                                  <span className="ml-1 font-medium">{item.quantity}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Preço Unit.:</span>
+                                  <span className="ml-1 font-medium">R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                {item.productWidth && (
+                                  <div>
+                                    <span className="text-gray-500">Largura:</span>
+                                    <span className="ml-1">{item.productWidth} cm</span>
+                                  </div>
+                                )}
+                                {item.productHeight && (
+                                  <div>
+                                    <span className="text-gray-500">Altura:</span>
+                                    <span className="ml-1">{item.productHeight} cm</span>
+                                  </div>
+                                )}
+                                {item.productDepth && (
+                                  <div>
+                                    <span className="text-gray-500">Profundidade:</span>
+                                    <span className="ml-1">{item.productDepth} cm</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Customization Info */}
+                              {item.hasItemCustomization && (
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                  <h5 className="font-medium text-blue-800 mb-2">Personalização</h5>
+                                  {item.itemCustomizationDescription && (
+                                    <p className="text-sm text-blue-700 mb-1">{item.itemCustomizationDescription}</p>
+                                  )}
+                                  <p className="text-sm">
+                                    <span className="text-blue-600">Valor da personalização:</span>
+                                    <span className="ml-1 font-medium">R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  </p>
+                                  {item.additionalCustomizationNotes && (
+                                    <p className="text-sm text-blue-700 mt-1">
+                                      <strong>Observações:</strong> {item.additionalCustomizationNotes}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Discount Info */}
+                              {item.hasItemDiscount && (
+                                <div className="bg-orange-50 p-2 rounded-lg border border-orange-200">
+                                  <p className="text-sm">
+                                    <span className="text-orange-600">Desconto aplicado:</span>
+                                    <span className="ml-1 font-medium">
+                                      {item.itemDiscountType === 'percentage' 
+                                        ? `${item.itemDiscountPercentage}%` 
+                                        : `R$ ${parseFloat(item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    </span>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Pricing Summary */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                              <h5 className="font-semibold mb-3">Resumo do Item</h5>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span>Subtotal ({item.quantity}x):</span>
+                                  <span>R$ {(parseFloat(item.unitPrice) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                {item.hasItemCustomization && parseFloat(item.itemCustomizationValue || 0) > 0 && (
+                                  <div className="flex justify-between text-blue-600">
+                                    <span>Personalização:</span>
+                                    <span>+ R$ {(parseFloat(item.itemCustomizationValue) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                )}
+                                {item.hasItemDiscount && (
+                                  <div className="flex justify-between text-orange-600">
+                                    <span>Desconto:</span>
+                                    <span>
+                                      - R$ {(() => {
+                                        const basePrice = parseFloat(item.unitPrice) * item.quantity;
+                                        if (item.itemDiscountType === 'percentage') {
+                                          return ((basePrice * parseFloat(item.itemDiscountPercentage || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                        } else {
+                                          return parseFloat(item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                        }
+                                      })()}
+                                    </span>
+                                  </div>
+                                )}
+                                <Separator />
+                                <div className="flex justify-between font-semibold text-lg">
+                                  <span>Total do Item:</span>
+                                  <span className="text-green-600">R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div className="flex space-x-2">
-                  {(selectedOrder.status === 'confirmed' || selectedOrder.status === 'pending') && (
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => {
-                        setShowOrderDetailsModal(false);
-                        handleSendToProductionClick(selectedOrder.id);
-                      }}
-                    >
-                      <Send className="h-4 w-4 mr-1" />
-                      Enviar para Produção
-                    </Button>
-                  )}
+              {/* Production Status */}
+              {selectedOrder.status === 'production' && productionStatuses?.[selectedOrder.id] && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Status de Produção</h3>
+                  <Card className="bg-purple-50 border-purple-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-purple-600" />
+                          <span className="font-medium">Produtor: {productionStatuses[selectedOrder.id]?.producerName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge('', productionStatuses[selectedOrder.id])}
+                        </div>
+                      </div>
+
+                      {productionStatuses[selectedOrder.id]?.notes && (
+                        <div className="mt-3 p-3 bg-white border border-purple-200 rounded-lg">
+                          <label className="text-sm font-medium text-purple-700">Observações da Produção:</label>
+                          <p className="text-gray-800 mt-1">{productionStatuses[selectedOrder.id].notes}</p>
+                          {productionStatuses[selectedOrder.id]?.lastNoteAt && (
+                            <p className="text-xs text-purple-600 mt-2">
+                              Última atualização: {new Date(productionStatuses[selectedOrder.id].lastNoteAt).toLocaleString('pt-BR')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {productionStatuses[selectedOrder.id]?.producerValue && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <label className="text-sm font-medium text-green-700">Valor da Produção:</label>
+                          <p className="text-green-800 text-lg font-bold mt-1">
+                            R$ {parseFloat(productionStatuses[selectedOrder.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                        <div>
+                          <label className="text-purple-600">Prazo de Entrega:</label>
+                          <p>{productionStatuses[selectedOrder.id]?.deliveryDate ? 
+                            new Date(productionStatuses[selectedOrder.id].deliveryDate).toLocaleDateString('pt-BR') : 
+                            'Não definido'}</p>
+                        </div>
+                        <div>
+                          <label className="text-purple-600">Status:</label>
+                          <p className="font-medium">{productionStatuses[selectedOrder.id]?.status === 'production' ? 'Em Produção' : 
+                            productionStatuses[selectedOrder.id]?.status === 'ready' ? 'Pronto' : 
+                            productionStatuses[selectedOrder.id]?.status === 'shipped' ? 'Enviado' : 
+                            productionStatuses[selectedOrder.id]?.status}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowOrderDetailsModal(false)}
-                >
-                  Fechar
-                </Button>
-              </div>
+              )}
             </div>
           )}
         </DialogContent>
