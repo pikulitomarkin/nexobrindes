@@ -183,8 +183,6 @@ export default function FinanceReconciliation() {
         totalAmount: parseFloat(totalAmount.toString())
       };
       
-      console.log("Sending payload to API:", JSON.stringify(payload, null, 2));
-      
       const response = await fetch("/api/finance/associate-multiple-payments", {
         method: "POST",
         headers: { 
@@ -194,22 +192,16 @@ export default function FinanceReconciliation() {
         body: JSON.stringify(payload),
       });
       
-      console.log("API response status:", response.status);
-      console.log("API response headers:", Object.fromEntries(response.headers.entries()));
-      
       const responseText = await response.text();
-      console.log("API response text:", responseText);
       
       let responseData;
       try {
         responseData = JSON.parse(responseText);
       } catch (parseError) {
-        console.error("Failed to parse response as JSON:", parseError);
         throw new Error(`Resposta inválida do servidor: ${responseText.substring(0, 100)}...`);
       }
       
       if (!response.ok) {
-        console.error("API error response data:", responseData);
         const errorMessage = responseData?.error || responseData?.message || `Erro HTTP ${response.status}`;
         throw new Error(errorMessage);
       }
@@ -221,8 +213,6 @@ export default function FinanceReconciliation() {
       return responseData;
     },
     onSuccess: (data) => {
-      console.log("Success response:", data);
-      
       queryClient.invalidateQueries({ queryKey: ["/api/finance/bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -245,7 +235,6 @@ export default function FinanceReconciliation() {
       });
     },
     onError: (error: any) => {
-      console.error("Mutation error:", error);
       toast({
         title: "Erro na Conciliação",
         description: error.message || "Não foi possível associar os pagamentos. Verifique os dados e tente novamente.",
@@ -334,12 +323,6 @@ export default function FinanceReconciliation() {
       });
       // Continua mesmo assim, mas alerta o usuário
     }
-
-    console.log("Starting payment association with:", {
-      selectedOrder: selectedOrder.id,
-      transactionsCount: selectedTransactions.length,
-      totalAmount: totalTransactionAmount
-    });
 
     // Processar múltiplas transações
     associateMultiplePaymentsMutation.mutate({
