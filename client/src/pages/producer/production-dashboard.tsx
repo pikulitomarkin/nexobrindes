@@ -358,73 +358,88 @@ export default function ProductionDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Ordens Ativas</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-blue-700">Ordens Ativas</p>
+                <p className="text-3xl font-bold text-blue-900 mt-2">
                   {stats?.activeOrders || filteredOrders.filter(o => !['completed', 'rejected'].includes(o.status)).length}
                 </p>
+                <p className="text-xs text-blue-600 mt-1">Total em andamento</p>
               </div>
-              <Package className="h-8 w-8 text-blue-600" />
+              <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                <Package className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aguardando</p>
-                <p className="text-2xl font-bold text-yellow-600">
+                <p className="text-sm font-medium text-yellow-700">Aguardando</p>
+                <p className="text-3xl font-bold text-yellow-900 mt-2">
                   {filteredOrders.filter(o => o.status === 'pending').length}
                 </p>
+                <p className="text-xs text-yellow-600 mt-1">Pendentes de aceite</p>
               </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <div className="h-12 w-12 bg-yellow-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Em Produção</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-sm font-medium text-purple-700">Em Produção</p>
+                <p className="text-3xl font-bold text-purple-900 mt-2">
                   {filteredOrders.filter(o => ['accepted', 'production'].includes(o.status)).length}
                 </p>
+                <p className="text-xs text-purple-600 mt-1">Sendo produzidas</p>
               </div>
-              <RefreshCw className="h-8 w-8 text-purple-600" />
+              <div className="h-12 w-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                <RefreshCw className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Enviados</p>
-                <p className="text-2xl font-bold text-cyan-600">
+                <p className="text-sm font-medium text-cyan-700">Enviados</p>
+                <p className="text-3xl font-bold text-cyan-900 mt-2">
                   {filteredOrders.filter(o => ['shipped', 'delivered'].includes(o.status)).length}
                 </p>
+                <p className="text-xs text-cyan-600 mt-1">Em transporte</p>
               </div>
-              <Truck className="h-8 w-8 text-cyan-600" />
+              <div className="h-12 w-12 bg-cyan-600 rounded-xl flex items-center justify-center">
+                <Truck className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">A Receber</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm font-medium text-green-700">A Receber</p>
+                <p className="text-2xl font-bold text-green-900 mt-2">
                   R$ {(producerPayments?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
+                <p className="text-xs text-green-600 mt-1">Pagamentos pendentes</p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
+              <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -461,22 +476,22 @@ export default function ProductionDashboard() {
         </Select>
       </div>
 
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-4 p-4 bg-gray-100 rounded">
-          <p>Debug - Total ordens: {productionOrders?.length || 0}</p>
-          <p>Debug - Ordens filtradas: {filteredOrders.length}</p>
-          <p>Debug - Producer ID: {producerId}</p>
-          <p>Debug - Loading: {isLoading ? 'Sim' : 'Não'}</p>
-        </div>
-      )}
+      
 
       {/* Orders List with Accordion */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ordens de Produção ({filteredOrders.length})</CardTitle>
+      <Card className="shadow-lg border-0">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Ordens de Produção
+              <Badge variant="outline" className="ml-2">
+                {filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
+              </Badge>
+            </CardTitle>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {isLoading ? (
             <div className="text-center py-8">
               <p>Carregando ordens...</p>
@@ -488,12 +503,12 @@ export default function ProductionDashboard() {
               <p className="text-gray-500">Não há ordens de produção que correspondam aos filtros selecionados.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               {filteredOrders.map((order: any) => (
-                <div key={order.id} className="border rounded-lg overflow-hidden">
+                <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
                   {/* Accordion Header - Always Visible */}
                   <div 
-                    className="p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                    className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
                     onClick={() => {
                       const element = document.getElementById(`order-${order.id}`);
                       if (element) {
@@ -503,26 +518,39 @@ export default function ProductionDashboard() {
                   >
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Ordem #{order.id.slice(-6)}
-                        </h3>
-                        <span className="text-sm text-gray-600">
-                          {order.order?.clientName || 'Cliente N/A'}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Package className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              #{order.id.slice(-6)}
+                            </h3>
+                            <span className="text-sm text-gray-600">
+                              {order.order?.clientName || 'Cliente N/A'}
+                            </span>
+                          </div>
+                        </div>
                         {getStatusBadge(order.status)}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {order.producerValue && (
-                          <span className="text-sm font-medium text-green-600">
-                            R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-gray-500">Valor definido</p>
+                          </div>
                         )}
                         {!order.producerValue && (
-                          <span className="text-sm text-orange-600 font-medium">
-                            Sem valor
-                          </span>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-orange-600">Valor não definido</p>
+                            <p className="text-xs text-gray-500">Defina o valor</p>
+                          </div>
                         )}
-                        <Package className="h-4 w-4 text-gray-400" />
+                        <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-gray-600">▼</span>
+                        </div>
                       </div>
                     </div>
                   </div>
