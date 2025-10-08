@@ -73,21 +73,23 @@ export default function ProductionDashboard() {
     },
   });
 
-  const setValueMutation = useMutation({
+  const updateValueMutation = useMutation({
     mutationFn: async ({ id, value, notes }: { id: string; value: string; notes?: string }) => {
-      const response = await fetch(`/api/production-orders/${id}/set-value`, {
-        method: "POST",
+      const response = await fetch(`/api/production-orders/${id}/value`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value, notes }),
       });
-      if (!response.ok) throw new Error("Erro ao definir valor");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Erro ao definir valor");
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer", producerId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/producer-payments/producer", producerId] });
       setIsValueDialogOpen(false);
-      setIsValueConfirmationDialogOpen(false); // Close confirmation modal
+      setIsValueConfirmationDialogOpen(false);
       setProducerValue("");
       setProducerNotes("");
       setSelectedOrder(null);
@@ -96,6 +98,13 @@ export default function ProductionDashboard() {
         description: "Valor definido com sucesso",
       });
     },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao definir valor",
+        variant: "destructive",
+      });
+    }
   });
 
   const handleStatusUpdate = (order: any, status: string) => {
@@ -190,12 +199,10 @@ export default function ProductionDashboard() {
     if (!selectedOrder) return;
     const numericValue = parseFloat(producerValue.replace(',', '.'));
 
-    setValueMutation.mutate({
+    updateValueMutation.mutate({
       id: selectedOrder.id,
       value: numericValue.toFixed(2),
       notes: producerNotes.trim() || null,
-      // Add a flag to indicate the value has been set by the producer
-      producerValueWasSet: true
     });
   };
 
@@ -660,113 +667,135 @@ export default function ProductionDashboard() {
         </CardContent>
       </Card>
 
-      {/* Value Setting Dialog */}
-      <Dialog open={isValueDialogOpen} onOpenChange={(isOpen) => {
-          setIsValueDialogOpen(isOpen);
-          // If dialog is closed and value wasn't confirmed, reset values
-          if (!isOpen && !selectedOrder?.producerValueWasSet) {
-              setProducerValue("");
-              setProducerNotes("");
-          }
-      }}>
+      {/* Value Setting Dialog - Step 1: Input Value */}
+      <Dialog open={isValueDialogOpen} onOpenChange={setIsValueDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Definir Valor do Serviço</DialogTitle>
             <DialogDescription>
-              Defina o valor que você cobrará por este serviço de produção
+              Defina o valor que você cobrará pela produção deste pedido
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="producer-value">Valor do Seu Serviço (R$) *</Label>
+              <Label htmlFor="producer-value">Valor do Serviço (R$)</Label>
               <Input
                 id="producer-value"
                 type="number"
                 step="0.01"
                 min="0.01"
-                placeholder="Digite o valor do seu serviço"
                 value={producerValue}
                 onChange={(e) => setProducerValue(e.target.value)}
+                placeholder="0,00"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Este é o valor que você cobrará pela produção deste item
-              </p>
             </div>
-
             <div>
-              <Label htmlFor="producer-notes">Observações sobre o Serviço (Opcional)</Label>
+              <Label htmlFor="producer-notes">Observações (Opcional)</Label>
               <Textarea
                 id="producer-notes"
-                placeholder="Ex: Materiais inclusos, tempo de produção, detalhes técnicos..."
+                placeholder="Descreva o que está incluído no valor (material, mão de obra, etc.)"
                 value={producerNotes}
                 onChange={(e) => setProducerNotes(e.target.value)}
                 rows={3}
               />
             </div>
-
-            {selectedOrder && (
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-800 mb-1">
-                  Produto: {selectedOrder.order?.product || 'Não especificado'}
-                </p>
-                <p className="text-xs text-blue-600">
-                  Pedido #{selectedOrder.order?.orderNumber || selectedOrder.id?.slice(-6)}
-                </p>
-              </div>
-            )}
           </div>
           <div className="flex justify-end space-x-2 mt-6">
-            <Button variant="outline" onClick={() => {
-                setIsValueDialogOpen(false);
-                if (!selectedOrder?.producerValueWasSet) {
-                    setIsValueConfirmationDialogOpen(true); // Re-open confirmation if not confirmed
-                }
-            }}>
+            <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
               Cancelar
             </Button>
             <Button
-              onClick={selectedOrder?.producerValueWasSet ? () => setIsValueDialogOpen(false) : handleSaveValue}
-              disabled={setValueMutation.isPending || (!producerValue && !selectedOrder?.producerValueWasSet) || (parseFloat(producerValue?.replace(',', '.') || '0') <= 0 && !selectedOrder?.producerValueWasSet)}
+              onClick={() => {
+                if (!producerValue || parseFloat(producerValue) <= 0) {
+                  toast({
+                    title: "Erro",
+                    description: "Digite um valor válido maior que zero",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                setIsValueConfirmationDialogOpen(true);
+                setIsValueDialogOpen(false);
+              }}
+              disabled={!producerValue || parseFloat(producerValue) <= 0}
             >
-              {selectedOrder?.producerValueWasSet ? "Fechar" : (setValueMutation.isPending ? "Salvando..." : "Confirmar Valor")}
+              Continuar
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Value Confirmation Dialog */}
+      {/* Value Confirmation Dialog - Step 2: Confirm Value */}
       <Dialog open={isValueConfirmationDialogOpen} onOpenChange={setIsValueConfirmationDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmação de Valor</DialogTitle>
+            <DialogTitle>Confirmar Valor do Serviço</DialogTitle>
             <DialogDescription>
-              Após confirmar o valor, ele não poderá mais ser alterado.
+              Verifique se o valor está correto antes de confirmar
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
-              Você está prestes a definir o valor do serviço para a ordem #{selectedOrder?.id?.slice(-6)} como
-              <span className="font-bold text-green-600"> R$ {parseFloat(producerValue.replace(',', '.'))?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>.
-              Deseja prosseguir?
-            </p>
-            {producerNotes && (
-              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <p className="text-sm font-medium text-yellow-800 mb-1">Observações:</p>
-                <p className="text-xs text-yellow-600">{producerNotes}</p>
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-gray-600">Produto</Label>
+                  <p className="font-medium">{selectedOrder?.order?.product || selectedOrder?.product}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-600">Cliente</Label>
+                  <p className="font-medium">{selectedOrder?.clientName || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-600">Valor Total do Pedido</Label>
+                  <p className="text-lg font-bold text-green-600">
+                    R$ {parseFloat(selectedOrder?.order?.totalValue || selectedOrder?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-600">Seu Valor</Label>
+                  <p className="text-xl font-bold text-blue-600">
+                    R$ {parseFloat(producerValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
-            )}
+              {producerNotes && (
+                <div className="mt-3">
+                  <Label className="text-sm text-gray-600">Suas Observações</Label>
+                  <p className="text-gray-800 bg-white p-2 rounded mt-1">{producerNotes}</p>
+                </div>
+              )}
+            </div>
+            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <p className="text-sm text-amber-800">
+                <strong>Atenção:</strong> Após confirmar, este valor ficará registrado no sistema e será usado para controle financeiro.
+              </p>
+            </div>
           </div>
           <div className="flex justify-end space-x-2 mt-6">
-            <Button variant="outline" onClick={() => {
+            <Button
+              variant="outline"
+              onClick={() => {
                 setIsValueConfirmationDialogOpen(false);
-                setProducerValue(""); // Reset value input
-                setProducerNotes(""); // Reset notes input
-            }}>
-              Cancelar
+                setIsValueDialogOpen(true);
+              }}
+            >
+              Voltar
             </Button>
-            <Button onClick={confirmAndSaveValue}>
-              Confirmar e Salvar
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => {
+                if (selectedOrder) {
+                  updateValueMutation.mutate({
+                    id: selectedOrder.id,
+                    value: producerValue,
+                    notes: producerNotes
+                  });
+                }
+              }}
+              disabled={updateValueMutation.isPending}
+            >
+              {updateValueMutation.isPending ? "Confirmando..." : "Confirmar Valor"}
             </Button>
           </div>
         </DialogContent>

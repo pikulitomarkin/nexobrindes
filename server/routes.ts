@@ -134,6 +134,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update producer value for production order
+  app.patch("/api/production-orders/:id/value", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { value, notes } = req.body;
+
+      if (!value || parseFloat(value) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      const updatedPO = await storage.updateProductionOrderValue(id, value, notes, false);
+      if (!updatedPO) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      res.json(updatedPO);
+    } catch (error) {
+      console.error("Error updating producer value:", error);
+      res.status(500).json({ error: "Erro ao atualizar valor do produtor" });
+    }
+  });
+
   // Verify Token (middleware for protected routes)
   app.get("/api/auth/verify", async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -268,6 +290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
+      // Validate that we have a contact name
+      if (!orderData.contactName) {
+        return res.status(400).json({ error: "Nome de contato é obrigatório" });
+      }
+
       // Ensure we have the correct clientId - if it's a client record ID, get the userId
       let finalClientId = orderData.clientId;
       console.log("Original clientId:", finalClientId);
@@ -299,8 +326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: orderData.status || "confirmed",
         deadline: orderData.deadline ? new Date(orderData.deadline) : null,
         deliveryDeadline: orderData.deliveryDeadline ? new Date(orderData.deliveryDeadline) : null,
-        // Additional fields
-        contactName: orderData.contactName || "",
+        // Additional fields - contactName is required and will be used as client name
+        contactName: orderData.contactName,
         contactPhone: orderData.contactPhone || "",
         contactEmail: orderData.contactEmail || "",
         deliveryType: orderData.deliveryType || "delivery",
@@ -659,6 +686,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   clientAddress = clientUser.address;
                 } else {
                   console.log(`No client found for ID: ${order.clientId}`);
+                  // Method 4: Use contactName from order if no client found
+                  if (order.contactName) {
+                    console.log(`Using contactName from order: ${order.contactName}`);
+                    clientName = order.contactName;
+                    clientPhone = order.contactPhone;
+                    clientEmail = order.contactEmail;
+                  }
                 }
               }
             }

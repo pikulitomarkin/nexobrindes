@@ -1492,6 +1492,59 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async updateProductionOrderValue(id: string, value: string, notes?: string, lockValue: boolean = false): Promise<ProductionOrder | undefined> {
+    console.log(`Storage: Updating production order ${id} with value ${value}, notes: ${notes}, lockValue: ${lockValue}`);
+
+    const productionOrder = this.productionOrders.get(id);
+    if (!productionOrder) {
+      console.log(`Storage: Production order not found with id: ${id}`);
+      return undefined;
+    }
+
+    // Prevent update if the value is already locked and we are trying to change it
+    if (productionOrder.producerValueLocked && productionOrder.producerValue !== value) {
+      console.log(`Storage: Cannot update value for production order ${id} because it is locked.`);
+      return productionOrder; // Return current state without updating
+    }
+
+    const updated = {
+      ...productionOrder,
+      producerValue: value,
+      producerNotes: notes || productionOrder.producerNotes || null,
+      producerPaymentStatus: 'pending' as const,
+      producerValueLocked: lockValue // Apply the lockValue flag
+    };
+
+    this.productionOrders.set(id, updated);
+    console.log(`Storage: Updated production order:`, updated);
+
+    // Verificar se já existe um pagamento pendente para esta ordem
+    const existingPayments = Array.from(this.producerPayments.values())
+      .filter(payment => payment.productionOrderId === id);
+
+    if (existingPayments.length === 0) {
+      // Criar automaticamente um registro de pagamento pendente apenas se não existir
+      await this.createProducerPayment({
+        productionOrderId: id,
+        producerId: productionOrder.producerId,
+        amount: value,
+        status: 'pending',
+        notes: notes || null
+      });
+      console.log(`Storage: Created new producer payment for order ${id}`);
+    } else {
+      // Atualizar o pagamento existente
+      const existingPayment = existingPayments[0];
+      await this.updateProducerPayment(existingPayment.id, {
+        amount: value,
+        notes: notes || existingPayment.notes
+      });
+      console.log(`Storage: Updated existing producer payment ${existingPayment.id}`);
+    }
+
+    return updated;
+  }
+
   async getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
     return this.productionOrders.get(id);
   }
@@ -2722,59 +2775,6 @@ export class MemStorage implements IStorage {
 
   async getProducerPayment(id: string): Promise<ProducerPayment | undefined> {
     return this.producerPayments.get(id);
-  }
-
-  async updateProductionOrderValue(id: string, value: string, notes?: string, lockValue: boolean = false): Promise<ProductionOrder | undefined> {
-    console.log(`Storage: Updating production order ${id} with value ${value}, notes: ${notes}, lockValue: ${lockValue}`);
-
-    const productionOrder = this.productionOrders.get(id);
-    if (!productionOrder) {
-      console.log(`Storage: Production order not found with id: ${id}`);
-      return undefined;
-    }
-
-    // Prevent update if the value is already locked and we are trying to change it
-    if (productionOrder.producerValueLocked && productionOrder.producerValue !== value) {
-      console.log(`Storage: Cannot update value for production order ${id} because it is locked.`);
-      return productionOrder; // Return current state without updating
-    }
-
-    const updated = {
-      ...productionOrder,
-      producerValue: value,
-      producerNotes: notes || productionOrder.producerNotes || null,
-      producerPaymentStatus: 'pending' as const,
-      producerValueLocked: lockValue // Apply the lockValue flag
-    };
-
-    this.productionOrders.set(id, updated);
-    console.log(`Storage: Updated production order:`, updated);
-
-    // Verificar se já existe um pagamento pendente para esta ordem
-    const existingPayments = Array.from(this.producerPayments.values())
-      .filter(payment => payment.productionOrderId === id);
-
-    if (existingPayments.length === 0) {
-      // Criar automaticamente um registro de pagamento pendente apenas se não existir
-      await this.createProducerPayment({
-        productionOrderId: id,
-        producerId: productionOrder.producerId,
-        amount: value,
-        status: 'pending',
-        notes: notes || null
-      });
-      console.log(`Storage: Created new producer payment for order ${id}`);
-    } else {
-      // Atualizar o pagamento existente
-      const existingPayment = existingPayments[0];
-      await this.updateProducerPayment(existingPayment.id, {
-        amount: value,
-        notes: notes || existingPayment.notes
-      });
-      console.log(`Storage: Updated existing producer payment ${existingPayment.id}`);
-    }
-
-    return updated;
   }
 
   // Automatic commission calculation and processing methods
