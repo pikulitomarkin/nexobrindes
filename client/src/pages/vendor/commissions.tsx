@@ -23,7 +23,7 @@ export default function VendorCommissions() {
     );
   }
 
-  const totalCommissions = (commissions as any[])?.reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
+  const totalCommissions = (commissions as any[])?.filter((c: any) => c.status !== 'cancelled').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
   const confirmedCommissions = (commissions as any[])?.filter((c: any) => c.status === 'confirmed').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
   const pendingCommissions = (commissions as any[])?.filter((c: any) => c.status === 'pending').reduce((total: number, comm: any) => total + parseFloat(comm.amount), 0) || 0;
 
@@ -142,7 +142,7 @@ export default function VendorCommissions() {
                         {commission.status === 'confirmed' ? 'Confirmada (A Receber)' : 
                          commission.status === 'paid' ? 'Paga' :
                          commission.status === 'pending' ? 'Aguardando Pedido Pronto' : 
-                         commission.status === 'cancelled' ? 'Cancelada' :
+                         commission.status === 'cancelled' ? 'Pedido Cancelado' :
                          commission.status}
                       </span>
                     </td>

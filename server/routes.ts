@@ -2812,6 +2812,9 @@ Para mais detalhes, entre em contato conosco!`;
           status: orderStatus,
           trackingCode: trackingCode || null
         });
+
+        // Atualizar comissões baseado no novo status
+        await storage.updateCommissionsByOrderStatus(productionOrder.orderId, orderStatus);
       }
 
       res.json({ success: true, productionOrder: result });

@@ -100,6 +100,7 @@ export interface IStorage {
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
   deductPartnerCommission(partnerId: string, amount: string): Promise<void>;
+  updateCommissionsByOrderStatus(orderId: string, orderStatus: string): Promise<void>;
 
   // Partners
   getPartners(): Promise<User[]>;
@@ -1353,6 +1354,9 @@ export class MemStorage implements IStorage {
       // Process commission payments
       await this.processCommissionPayments(updatedOrder, status);
 
+      // Update commissions based on order status
+      await this.updateCommissionsByOrderStatus(id, status);
+
       return updatedOrder;
     }
     return undefined;
@@ -1604,19 +1608,44 @@ export class MemStorage implements IStorage {
     return commission;
   }
 
-  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
+  // Update commission status
+  async updateCommissionStatus(id: string, status: string) {
     const commission = this.commissions.get(id);
-    if (commission) {
-      const updatedCommission = {
-        ...commission,
-        status,
-        paidAt: status === 'paid' ? new Date() : commission.paidAt,
-        deductedAt: status === 'deducted' ? new Date() : commission.deductedAt
-      };
-      this.commissions.set(id, updatedCommission);
-      return updatedCommission;
+    if (!commission) return null;
+
+    commission.status = status;
+    if (status === 'paid') {
+      commission.paidAt = new Date();
     }
-    return undefined;
+
+    this.commissions.set(id, commission);
+    return commission;
+  }
+
+  // Update commissions based on order status
+  async updateCommissionsByOrderStatus(orderId: string, orderStatus: string) {
+    const allCommissions = Array.from(this.commissions.values());
+    const orderCommissions = allCommissions.filter(c => c.orderId === orderId);
+
+    for (const commission of orderCommissions) {
+      let newStatus = commission.status;
+
+      if (orderStatus === 'ready' || orderStatus === 'shipped' || orderStatus === 'delivered' || orderStatus === 'completed') {
+        // Quando pedido fica pronto, comissão do vendedor vira "confirmed"
+        if (commission.type === 'vendor' && commission.status === 'pending') {
+          newStatus = 'confirmed';
+        }
+      } else if (orderStatus === 'cancelled') {
+        // Quando pedido é cancelado, comissão vira "cancelled"
+        newStatus = 'cancelled';
+      }
+
+      if (newStatus !== commission.status) {
+        commission.status = newStatus;
+        this.commissions.set(commission.id, commission);
+        console.log(`Updated commission ${commission.id} from ${commission.status} to ${newStatus} due to order status: ${orderStatus}`);
+      }
+    }
   }
 
   async deductPartnerCommission(partnerId: string, amount: string): Promise<void> {

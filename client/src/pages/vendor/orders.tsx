@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
@@ -109,6 +109,15 @@ export default function VendorOrders() {
     queryFn: async () => {
       const response = await fetch(`/api/vendors/${vendorId}/orders`);
       if (!response.ok) throw new Error('Failed to fetch vendor orders');
+      return response.json();
+    },
+  });
+
+  const { data: vendorCommissions } = useQuery({
+    queryKey: ["/api/commissions/vendor", vendorId],
+    queryFn: async () => {
+      const response = await fetch(`/api/commissions/vendor/${vendorId}`);
+      if (!response.ok) throw new Error('Failed to fetch vendor commissions');
       return response.json();
     },
   });
@@ -1518,7 +1527,7 @@ export default function VendorOrders() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -1571,9 +1580,26 @@ export default function VendorOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm font-medium text-gray-600">Comissões</p>
+                <p className="text-lg font-bold text-green-600">
+                  R$ {vendorCommissions?.filter((c: any) => c.status === 'confirmed').reduce((total: number, c: any) => total + parseFloat(c.amount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                </p>
+                <p className="text-xs text-gray-500">A Receber</p>
+              </div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm font-medium text-gray-600">Valor Total</p>
                 <p className="text-lg font-bold gradient-text">
-                  R$ {orders?.reduce((total: number, o: any) => total + parseFloat(o.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  R$ {orders?.filter((o: any) => o.status !== 'cancelled').reduce((total: number, o: any) => total + parseFloat(o.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                 </p>
               </div>
               <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
