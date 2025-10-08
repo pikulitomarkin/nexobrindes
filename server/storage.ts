@@ -672,9 +672,15 @@ export class MemStorage implements IStorage {
       producerValue: "850.00",
       producerPaymentStatus: "pending",
       producerNotes: "Valor inclui material e mão de obra",
-      producerValueLocked: false, // Added producerValueLocked
+      producerValueLocked: false,
+      deliveryDeadline: new Date("2024-11-22"),
+      hasUnreadNotes: false,
+      lastNoteAt: null,
+      trackingCode: null,
+      shippingAddress: null
     };
     this.productionOrders.set(productionOrder.id, productionOrder);
+    console.log("Initialized production order:", productionOrder.id, "for producer:", productionOrder.producerId);
 
     // Create sample payment
     const payment: Payment = {
@@ -1419,7 +1425,10 @@ export class MemStorage implements IStorage {
   }
 
   async getProductionOrdersByProducer(producerId: string): Promise<ProductionOrder[]> {
-    return Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
+    console.log(`Storage: Getting production orders for producer: ${producerId}`);
+    const orders = Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
+    console.log(`Storage: Found ${orders.length} production orders for producer ${producerId}:`, orders.map(o => ({ id: o.id, orderId: o.orderId, status: o.status })));
+    return orders;
   }
 
   async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {

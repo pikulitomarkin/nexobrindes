@@ -796,10 +796,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint específico para pedidos do vendedor (usado na página de pedidos do vendedor)
   app.get("/api/vendors/:vendorId/orders", async (req, res) => {
+    const { vendorId } = req.params;
     try {
-      const { vendorId } = req.params;
-      console.log(`Fetching orders for vendor: ${vendorId}`);
-
       const orders = await storage.getOrdersByVendor(vendorId);
       console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
 
@@ -2182,7 +2180,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       res.json(enrichedPayments);
     } catch (error) {
-      console.error("Error fetching producer payments:", error);
+      console.error("Failed to fetch producer payments:", error);
       res.status(500).json({ error: "Failed to fetch producer payments" });
     }
   });
@@ -4305,216 +4303,6 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error associating producer payment:", error);
       res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
-    }
-  });
-
-  // Associate multiple payments with order (for reconciliation)
-  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
-    try {
-      const { transactions, orderId, totalAmount } = req.body;
-
-      console.log("Associating multiple payments:", {
-        transactionCount: transactions.length,
-        orderId,
-        totalAmount
-      });
-
-      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
-        return res.status(400).json({ error: "Lista de transações é obrigatória" });
-      }
-
-      if (!orderId || !totalAmount) {
-        return res.status(400).json({ error: "Order ID e valor total são obrigatórios" });
-      }
-
-      // Get order details
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Pedido não encontrado" });
-      }
-
-      const createdPayments = [];
-      const processedTransactions = [];
-
-      // Process each transaction
-      for (const txn of transactions) {
-        const { transactionId, amount } = txn;
-
-        // Get transaction details
-        const bankTransaction = await storage.getBankTransaction(transactionId);
-        if (!bankTransaction) {
-          console.warn(`Transaction ${transactionId} not found, skipping`);
-          continue;
-        }
-
-        // Verify this is a credit transaction (incoming payment)
-        if (parseFloat(bankTransaction.amount) <= 0) {
-          console.warn(`Transaction ${transactionId} is not a credit transaction, skipping`);
-          continue;
-        }
-
-        // Check if transaction has already been matched
-        if (bankTransaction.status === 'matched') {
-          console.warn(`Transaction ${transactionId} already matched, skipping`);
-          continue;
-        }
-
-        // Create payment record
-        const payment = await storage.createPayment({
-          orderId: orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: "bank_transfer",
-          status: "confirmed",
-          transactionId: transactionId,
-          paidAt: bankTransaction.date ? new Date(bankTransaction.date) : new Date()
-        });
-
-        // Update bank transaction status
-        await storage.updateBankTransaction(transactionId, {
-          status: 'matched',
-          matchedPaymentId: payment.id,
-          matchedOrderId: orderId
-        });
-
-        createdPayments.push(payment);
-        processedTransactions.push({ transactionId, amount });
-      }
-
-      if (createdPayments.length === 0) {
-        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
-      }
-
-      // Get enriched data for response
-      const client = await storage.getUser(order.clientId);
-      const vendor = await storage.getUser(order.vendorId);
-
-      console.log(`Successfully processed ${createdPayments.length} payments for order ${order.orderNumber}`);
-
-      res.json({
-        success: true,
-        paymentsCreated: createdPayments.length,
-        totalAmount,
-        orderNumber: order.orderNumber,
-        clientName: client?.name || 'Unknown',
-        vendorName: vendor?.name || 'Unknown',
-        payments: createdPayments,
-        processedTransactions: processedTransactions
-      });
-
-    } catch (error) {
-      console.error("Error associating multiple payments:", error);
-      res.status(500).json({ error: "Failed to associate multiple payments: " + error.message });
-    }
-  });
-
-  // Producer payment association endpoint (new format expected by frontend)
-  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
-    try {
-      const { transactionIds, productionOrderId } = req.body;
-
-      console.log("Associating producer payment:", { transactionIds, productionOrderId });
-
-      if (!transactionIds || !Array.isArray(transactionIds) || !productionOrderId) {
-        return res.status(400).json({ error: "Transaction IDs e Production Order ID são obrigatórios" });
-      }
-
-      // Get the production order
-      const productionOrder = await storage.getProductionOrder(productionOrderId);
-      if (!productionOrder) {
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
-      }
-
-      // Get producer info
-      const producer = await storage.getUser(productionOrder.producerId);
-      if (!producer) {
-        return res.status(404).json({ error: "Produtor não encontrado" });
-      }
-
-      let totalTransactionAmount = 0;
-      let processedTransactions = 0;
-      let hasAdjustment = false;
-      let difference = 0;
-
-      // Process each transaction
-      for (const transactionId of transactionIds) {
-        const transaction = await storage.getBankTransaction(transactionId);
-        if (!transaction) {
-          console.warn(`Transaction ${transactionId} not found, skipping`);
-          continue;
-        }
-
-        // Verify this is a debit transaction (outgoing payment)
-        const transactionAmount = parseFloat(transaction.amount);
-        if (transactionAmount >= 0) {
-          console.warn(`Transaction ${transactionId} is not a debit, skipping`);
-          continue;
-        }
-
-        // Check if already matched
-        if (transaction.status === 'matched') {
-          console.warn(`Transaction ${transactionId} already matched, skipping`);
-          continue;
-        }
-
-        // Update bank transaction status
-        await storage.updateBankTransaction(transactionId, {
-          status: 'matched',
-          matchedAt: new Date(),
-          matchedOrderId: productionOrder.orderId, // Link to the main order for reference
-          notes: `Conciliado com pagamento de produtor ${producer.name} - Ordem ${productionOrder.id}`
-        });
-
-        totalTransactionAmount += Math.abs(transactionAmount); // Convert to positive for comparison
-        processedTransactions++;
-      }
-
-      if (processedTransactions === 0) {
-        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
-      }
-
-      // Update production order payment status
-      await storage.updateProductionOrder(productionOrderId, {
-        producerPaymentStatus: 'paid',
-        paidAt: new Date()
-      });
-
-      // Check for differences between transaction total and production order value
-      const productionOrderValue = parseFloat(productionOrder.producerValue || '0');
-      difference = totalTransactionAmount - productionOrderValue;
-
-      if (Math.abs(difference) > 0.01) { // More than 1 cent difference
-        hasAdjustment = true;
-
-        // Create adjustment record if needed
-        if (difference !== 0) {
-          await storage.createExpenseNote({
-            type: difference > 0 ? 'adjustment_surplus' : 'adjustment_shortage',
-            vendorId: producer.id, // Use producer ID for the adjustment
-            amount: Math.abs(difference).toFixed(2),
-            description: `Ajuste de conciliação - ${difference > 0 ? 'sobra' : 'falta'} na conciliação do pagamento do produtor ${producer.name}`,
-            status: 'pending', // Needs review
-            date: new Date()
-          });
-        }
-      }
-
-      console.log(`Successfully associated ${processedTransactions} transactions with payment for producer ${producer.name || productionOrder.producerId}`);
-
-      res.json({
-        success: true,
-        message: `Pagamento conciliado com sucesso`,
-        payment: {
-          producerName: producer.name,
-          amount: productionOrderValue.toFixed(2),
-          transactionsProcessed: processedTransactions,
-          hasAdjustment,
-          difference: difference.toFixed(2)
-        }
-      });
-
-    } catch (error) {
-      console.error("Error associating producer payment:", error);
-      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor: " + error.message });
     }
   });
 
