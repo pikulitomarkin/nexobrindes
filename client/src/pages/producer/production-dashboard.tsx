@@ -97,11 +97,13 @@ export default function ProductionDashboard() {
   });
 
   const handleStatusUpdate = (order: any, newStatus: string) => {
-    // New validation: Prevent moving to 'ready' if producerValue is not set
-    if (newStatus === 'ready' && !order.producerValue) {
+    // Validation: Prevent moving to any advanced status without producerValue
+    const statusesThatRequireValue = ['accepted', 'production', 'ready', 'shipped', 'delivered', 'completed'];
+    
+    if (statusesThatRequireValue.includes(newStatus) && (!order.producerValue || parseFloat(order.producerValue) <= 0)) {
       toast({
-        title: "Ação não permitida",
-        description: "Você deve definir o valor do serviço antes de marcar o pedido como pronto.",
+        title: "Valor do serviço obrigatório",
+        description: "Você deve definir um valor válido para o serviço antes de aceitar ou avançar com o pedido.",
         variant: "destructive",
       });
       return;
@@ -249,8 +251,8 @@ export default function ProductionDashboard() {
               size="sm" 
               className="bg-purple-600 hover:bg-purple-700"
               onClick={() => handleStatusUpdate(order, 'production')}
-              disabled={updateStatusMutation.isPending || !order.producerValue}
-              title={!order.producerValue ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
+              disabled={updateStatusMutation.isPending || !order.producerValue || parseFloat(order.producerValue) <= 0}
+              title={(!order.producerValue || parseFloat(order.producerValue) <= 0) ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
             >
               <Clock className="h-4 w-4 mr-1" />
               Iniciar Produção
@@ -457,7 +459,7 @@ export default function ProductionDashboard() {
         </Select>
       </div>
 
-      {/* Orders List */}
+      {/* Orders List with Accordion */}
       <Card>
         <CardHeader>
           <CardTitle>Ordens de Produção</CardTitle>
@@ -470,30 +472,62 @@ export default function ProductionDashboard() {
               <p className="text-gray-500">Não há ordens de produção que correspondam aos filtros selecionados.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {filteredOrders.map((order: any) => (
-                <div key={order.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                        Ordem #{order.id.slice(-6)}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Pedido: {order.order?.orderNumber || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {getStatusBadge(order.status)}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setLocation(`/producer/order/${order.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver Detalhes
-                      </Button>
+                <div key={order.id} className="border rounded-lg overflow-hidden">
+                  {/* Accordion Header - Always Visible */}
+                  <div 
+                    className="p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                    onClick={() => {
+                      const element = document.getElementById(`order-${order.id}`);
+                      if (element) {
+                        element.style.display = element.style.display === 'none' ? 'block' : 'none';
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Ordem #{order.id.slice(-6)}
+                        </h3>
+                        <span className="text-sm text-gray-600">
+                          {order.order?.clientName || 'Cliente N/A'}
+                        </span>
+                        {getStatusBadge(order.status)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {order.producerValue && (
+                          <span className="text-sm font-medium text-green-600">
+                            R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        {!order.producerValue && (
+                          <span className="text-sm text-orange-600 font-medium">
+                            Sem valor
+                          </span>
+                        )}
+                        <Package className="h-4 w-4 text-gray-400" />
+                      </div>
                     </div>
                   </div>
+
+                  {/* Accordion Content - Collapsible */}
+                  <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Pedido: {order.order?.orderNumber || 'N/A'}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setLocation(`/producer/order/${order.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Detalhes Completos
+                        </Button>
+                      </div>
+                    </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
@@ -559,30 +593,22 @@ export default function ProductionDashboard() {
                   )}
 
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>Produto: {order.order?.product || 'N/A'}</span>
-                      {order.producerValue && (
-                        <span className="font-semibold text-green-600">
-                          Meu Serviço: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
-                      {!order.producerValue && (
-                        <span className="text-orange-600 font-medium">
-                          Valor do serviço não definido
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSetValue(order)}
-                        className="flex items-center gap-1"
-                        disabled={order.producerValueWasSet} // Disable button if value was already set
-                      >
-                        <DollarSign className="h-4 w-4" />
-                        {order.producerValueWasSet ? 'Valor Definido' : 'Definir Valor'}
-                      </Button>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span>Produto: {order.order?.product || 'N/A'}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSetValue(order)}
+                          className="flex items-center gap-1"
+                          disabled={order.producerValue && parseFloat(order.producerValue) > 0}
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          {order.producerValue ? 'Valor Definido' : 'Definir Valor'}
+                        </Button>
+                        {getNextAction(order)}
+                      </div>
                     </div>
                   </div>
                 </div>

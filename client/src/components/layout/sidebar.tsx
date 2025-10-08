@@ -286,7 +286,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             </p>
           </div>
           <SidebarItem 
-            icon={BarChart3} 
+            icon={Factory} 
             label="Painel de Produção" 
             href="/producer/production-dashboard"
             isActive={location === "/producer/production-dashboard"}
