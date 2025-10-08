@@ -2441,12 +2441,21 @@ export class MemStorage implements IStorage {
   }
 
   async createBankTransaction(transaction: any): Promise<BankTransaction> {
+    // Validar e corrigir a data
+    let validDate = new Date();
+    if (transaction.date) {
+      const parsedDate = new Date(transaction.date);
+      if (!isNaN(parsedDate.getTime())) {
+        validDate = parsedDate;
+      }
+    }
+
     const newTransaction: BankTransaction = {
       id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       importId: transaction.importId || 'unknown',
       fitId: transaction.fitId,
       amount: transaction.amount,
-      date: transaction.date,
+      date: validDate,
       description: transaction.description,
       type: transaction.type || (parseFloat(transaction.amount) > 0 ? 'credit' : 'debit'),
       status: transaction.status || 'unmatched',
@@ -2469,6 +2478,7 @@ export class MemStorage implements IStorage {
       amount: newTransaction.amount,
       type: newTransaction.type,
       status: newTransaction.status,
+      date: validDate.toISOString(),
       notes: newTransaction.notes
     });
     return newTransaction;

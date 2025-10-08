@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter production orders for this vendor's orders
       const vendorOrders = orders.filter(o => o.vendorId === vendorId);
       const vendorOrderIds = vendorOrders.map(o => o.id);
-      
+
       const productionStatuses = allProductionOrders
         .filter(po => vendorOrderIds.includes(po.orderId))
         .map(po => {
@@ -4107,12 +4107,12 @@ Para mais detalhes, entre em contato conosco!`;
           await storage.createBankTransaction({
             importId: bankImport.id,
             fitId: transaction.fitId,
-            date: transaction.date,
+            date: new Date(transaction.dtPosted),
             amount: transaction.amount,
-            description: transaction.description,
-            type: transactionType,
+            description: transaction.memo || 'Transação bancária',
+            type: amount > 0 ? 'credit' : 'debit',
             status: 'unmatched',
-            bankRef: transaction.bankRef,
+            bankRef: transaction.refNum,
             notes: notes
           });
           createdCount++;
@@ -4320,20 +4320,20 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { producerId } = req.params;
       console.log(`API: Fetching production orders for producer: ${producerId}`);
-      
+
       // Get production orders for this producer
       const productionOrders = await storage.getProductionOrdersByProducer(producerId);
       const orders = await storage.getOrders();
       const clients = await storage.getClients();
-      
+
       // Enrich production orders with order and client data
       const productionOrdersList = productionOrders
         .map(po => {
           const order = orders.find(o => o.id === po.orderId);
           if (!order) return null;
-          
+
           const client = clients.find(c => c.id === order.clientId);
-          
+
           return {
             id: po.id,
             orderId: po.orderId,
