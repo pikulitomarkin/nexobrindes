@@ -688,7 +688,6 @@ export default function ProductionDashboard() {
                 value={producerValue}
                 onChange={(e) => setProducerValue(e.target.value)}
                 required
-                disabled={selectedOrder?.producerValueWasSet} // Disable input if value was already set
               />
               <p className="text-xs text-gray-500 mt-1">
                 Este é o valor que você cobrará pela produção deste item
@@ -703,7 +702,6 @@ export default function ProductionDashboard() {
                 value={producerNotes}
                 onChange={(e) => setProducerNotes(e.target.value)}
                 rows={3}
-                disabled={selectedOrder?.producerValueWasSet} // Disable input if value was already set
               />
             </div>
 
@@ -728,7 +726,7 @@ export default function ProductionDashboard() {
               Cancelar
             </Button>
             <Button
-              onClick={selectedOrder?.producerValueWasSet ? () => setIsValueDialogOpen(false) : handleSaveValue} // If value set, just close; otherwise, proceed to save.
+              onClick={selectedOrder?.producerValueWasSet ? () => setIsValueDialogOpen(false) : handleSaveValue}
               disabled={setValueMutation.isPending || (!producerValue && !selectedOrder?.producerValueWasSet) || (parseFloat(producerValue?.replace(',', '.') || '0') <= 0 && !selectedOrder?.producerValueWasSet)}
             >
               {selectedOrder?.producerValueWasSet ? "Fechar" : (setValueMutation.isPending ? "Salvando..." : "Confirmar Valor")}
