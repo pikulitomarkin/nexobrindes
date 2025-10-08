@@ -153,22 +153,34 @@ export default function FinanceReconciliation() {
 
   const associateMultiplePaymentsMutation = useMutation({
     mutationFn: async ({ transactions, orderId, totalAmount }: { transactions: any[]; orderId: string; totalAmount: string }) => {
+      const payload = {
+        transactions: transactions.map(txn => ({
+          transactionId: txn.id,
+          amount: parseFloat(txn.amount)
+        })),
+        orderId,
+        totalAmount: parseFloat(totalAmount)
+      };
+      
+      console.log("Sending payload to API:", payload);
+      
       const response = await fetch("/api/finance/associate-multiple-payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactions: transactions.map(txn => ({
-            transactionId: txn.id,
-            amount: parseFloat(txn.amount).toFixed(2)
-          })),
-          orderId,
-          totalAmount
-        }),
+        body: JSON.stringify(payload),
       });
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao associar pagamentos múltiplos");
+        const errorText = await response.text();
+        console.error("API error response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || "Erro ao associar pagamentos múltiplos");
+        } catch (e) {
+          throw new Error(`Erro de comunicação com servidor: ${response.status}`);
+        }
       }
+      
       return response.json();
     },
     onSuccess: (data) => {

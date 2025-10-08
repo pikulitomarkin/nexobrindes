@@ -2416,7 +2416,7 @@ export class MemStorage implements IStorage {
       id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       importId: transaction.importId || 'unknown',
       fitId: transaction.fitId || `fit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      amount: transaction.amount,
+      amount: transaction.amount.toString(),
       date: validDate,
       description: transaction.description || 'Transação sem descrição',
       type: transaction.type || (amount > 0 ? 'credit' : 'debit'),

@@ -68,7 +68,7 @@ async function parseOFXBuffer(buffer: Buffer) {
           const year = parseInt(dtPostedRaw.substring(0, 4));
           const month = parseInt(dtPostedRaw.substring(4, 6)) - 1; // Month is 0-based
           const day = parseInt(dtPostedRaw.substring(6, 8));
-          
+
           // Check if date components are valid numbers before creating date
           if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
             const parsedDate = new Date(year, month, day);
@@ -3615,7 +3615,6 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Receive Payment Dialog
   // Payment allocation routes
   app.post("/api/finance/receivables/:id/allocate-payment", async (req, res) => {
     try {
