@@ -54,7 +54,7 @@ async function parseOFXBuffer(buffer: Buffer) {
   if (matches) {
     matches.forEach((match, index) => {
       const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
-      const dtPosted = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
+      const dtPostedRaw = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
       const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
       const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${Date.now()}_${index}`;
       const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
@@ -62,16 +62,30 @@ async function parseOFXBuffer(buffer: Buffer) {
 
       // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
       let transactionDate = new Date();
-      if (dtPosted && dtPosted.length >= 8) {
-        const year = parseInt(dtPosted.substring(0, 4));
-        const month = parseInt(dtPosted.substring(4, 6)) - 1; // Month is 0-based
-        const day = parseInt(dtPosted.substring(6, 8));
-        transactionDate = new Date(year, month, day);
+      let hasValidDate = false;
+      if (dtPostedRaw && dtPostedRaw.length >= 8) {
+        try {
+          const year = parseInt(dtPostedRaw.substring(0, 4));
+          const month = parseInt(dtPostedRaw.substring(4, 6)) - 1; // Month is 0-based
+          const day = parseInt(dtPostedRaw.substring(6, 8));
+          
+          // Check if date components are valid numbers before creating date
+          if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+            transactionDate = new Date(year, month, day);
+            // Further validate if the created date is reasonable
+            if (transactionDate.getFullYear() === year && transactionDate.getMonth() === month && transactionDate.getDate() === day) {
+              hasValidDate = true;
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing date from DTPOSTED:", dtPostedRaw, e);
+        }
       }
 
       transactions.push({
         fitId: fitId,
         dtPosted: transactionDate,
+        hasValidDate: hasValidDate,
         amount: trnAmt,
         memo: memo,
         refNum: refNum,
@@ -3764,7 +3778,7 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Esta transação já foi conciliada com outro pagamento" });
       }
 
-      // Mark transaction as matched
+      // Update transaction as matched
       await storage.updateBankTransaction(transactionId, {
         status: 'matched',
         matchedOrderId: orderId,
@@ -3990,8 +4004,8 @@ Para mais detalhes, entre em contato conosco!`;
         // Update bank transaction status
         await storage.updateBankTransaction(transactionId, {
           status: 'matched',
-          matchedAt: new Date(),
           matchedOrderId: productionOrder.orderId, // Link to the main order for reference
+          matchedAt: new Date(),
           notes: `Conciliado com pagamento de produtor ${productionOrder.producerId} - Ordem ${productionOrder.id}`
         });
 
@@ -4094,6 +4108,7 @@ Para mais detalhes, entre em contato conosco!`;
       let successCount = 0;
       let duplicateCount = 0;
       let errorCount = 0;
+      const dateWarnings = [];
 
       for (const transaction of transactions) {
         try {
@@ -4104,11 +4119,25 @@ Para mais detalhes, entre em contato conosco!`;
             continue;
           }
 
+          // Track date warnings
+          if (!transaction.hasValidDate) {
+            dateWarnings.push(transaction.fitId);
+          }
+
           // Validate transaction data
           if (!transaction.amount || isNaN(parseFloat(transaction.amount))) {
             console.log('Invalid transaction amount:', transaction.amount);
             errorCount++;
             continue;
+          }
+
+          let notes = parseFloat(transaction.amount) > 0
+            ? 'Entrada - Disponível para conciliação com contas a receber'
+            : 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores';
+
+          // Add date warning to notes if applicable
+          if (!transaction.hasValidDate) {
+            notes += ' (Data gerada automaticamente - não encontrada no OFX)';
           }
 
           await storage.createBankTransaction({
@@ -4120,9 +4149,7 @@ Para mais detalhes, entre em contato conosco!`;
             type: transaction.type,
             status: 'unmatched',
             bankRef: transaction.refNum,
-            notes: parseFloat(transaction.amount) > 0
-              ? 'Entrada - Disponível para conciliação com contas a receber'
-              : 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores'
+            notes: notes
           });
           successCount++;
         } catch (error) {
@@ -4133,14 +4160,27 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Import completed: ${successCount} new transactions, ${duplicateCount} duplicates, ${errorCount} errors`);
 
+      let message = `Importadas ${successCount} transações com sucesso.`;
+      if (duplicateCount > 0) {
+        message += ` ${duplicateCount} duplicatas ignoradas.`;
+      }
+      if (errorCount > 0) {
+        message += ` ${errorCount} transações com erro.`;
+      }
+      if (dateWarnings.length > 0) {
+        message += ` ${dateWarnings.length} com data gerada automaticamente.`;
+      }
+
+
       res.json({
         success: true,
         importId: bankImport.id,
-        message: `Importadas ${successCount} transações com sucesso. ${duplicateCount > 0 ? `${duplicateCount} duplicatas ignoradas. ` : ''}${errorCount > 0 ? `${errorCount} transações com erro.` : ''}`,
+        message: message,
         totalTransactions: transactions.length,
         newTransactions: successCount,
         duplicates: duplicateCount,
-        errors: errorCount
+        errors: errorCount,
+        dateWarnings: dateWarnings.length
       });
 
     } catch (error) {
