@@ -711,13 +711,49 @@ export default function AdminReports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-          <TabsTrigger value="vendas">Vendas</TabsTrigger>
-          <TabsTrigger value="producao">Produção</TabsTrigger>
-          <TabsTrigger value="comissoes">Comissões</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6 bg-gradient-to-r from-blue-50 to-purple-50 p-1 rounded-xl border border-gray-200 shadow-sm">
+          <TabsTrigger 
+            value="overview" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-blue-100 text-gray-700"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger 
+            value="financeiro" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 text-gray-700"
+          >
+            <DollarSign className="h-4 w-4" />
+            Financeiro
+          </TabsTrigger>
+          <TabsTrigger 
+            value="vendas" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-purple-100 text-gray-700"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Vendas
+          </TabsTrigger>
+          <TabsTrigger 
+            value="producao" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-orange-100 text-gray-700"
+          >
+            <Factory className="h-4 w-4" />
+            Produção
+          </TabsTrigger>
+          <TabsTrigger 
+            value="comissoes" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-teal-100 text-gray-700"
+          >
+            <Percent className="h-4 w-4" />
+            Comissões
+          </TabsTrigger>
+          <TabsTrigger 
+            value="analytics" 
+            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-indigo-100 text-gray-700"
+          >
+            <Activity className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
         </TabsList>
 
         {/* Aba Overview */}
