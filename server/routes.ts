@@ -287,6 +287,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Produto/título é obrigatório" });
       }
 
+      // Validar personalizações antes de criar o pedido
+      if (req.body.items && req.body.items.length > 0) {
+        for (const item of req.body.items) {
+          if (item.hasItemCustomization && item.selectedCustomizationId) {
+            const customizations = await storage.getCustomizationOptions();
+            const customization = customizations.find(c => c.id === item.selectedCustomizationId);
+
+            if (customization && item.quantity < customization.minQuantity) {
+              return res.status(400).json({
+                error: `A personalização "${customization.name}" requer no mínimo ${customization.minQuantity} unidades. Item atual tem ${item.quantity} unidades.`
+              });
+            }
+          }
+        }
+      }
+
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
@@ -356,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orders.map(async (order) => {
           // Always use contactName as primary client name, no fallback to 'Unknown'
           let clientName = order.contactName;
-          
+
           // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
@@ -1621,17 +1637,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      const budgetData = req.body;
+      // Validar personalizações antes de criar o orçamento
+      if (req.body.items && req.body.items.length > 0) {
+        for (const item of req.body.items) {
+          if (item.hasItemCustomization && item.selectedCustomizationId) {
+            const customizations = await storage.getCustomizationOptions();
+            const customization = customizations.find(c => c.id === item.selectedCustomizationId);
+
+            if (customization && item.quantity < customization.minQuantity) {
+              return res.status(400).json({
+                error: `A personalização "${customization.name}" requer no mínimo ${customization.minQuantity} unidades. Item atual tem ${item.quantity} unidades.`
+              });
+            }
+          }
+        }
+      }
 
       // Validate that contactName is provided
-      if (!budgetData.contactName) {
+      if (!req.body.contactName) {
         return res.status(400).json({ error: "Nome de contato é obrigatório" });
       }
 
-      const newBudget = await storage.createBudget(budgetData);
+      const newBudget = await storage.createBudget(req.body);
 
       // Process budget items
-      for (const item of budgetData.items) {
+      for (const item of req.body.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const customizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
@@ -1649,21 +1679,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Save payment and shipping information
-      if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
+      if (req.body.paymentMethodId || req.body.shippingMethodId) {
         await storage.createBudgetPaymentInfo({
           budgetId: newBudget.id,
-          paymentMethodId: budgetData.paymentMethodId || null,
-          shippingMethodId: budgetData.shippingMethodId || null,
-          installments: budgetData.installments || 1,
-          downPayment: budgetData.downPayment?.toString() || "0.00",
-          remainingAmount: budgetData.remainingAmount?.toString() || "0.00",
-          shippingCost: budgetData.shippingCost?.toString() || "0.00"
+          paymentMethodId: req.body.paymentMethodId || null,
+          shippingMethodId: req.body.shippingMethodId || null,
+          installments: req.body.installments || 1,
+          downPayment: req.body.downPayment?.toString() || "0.00",
+          remainingAmount: req.body.remainingAmount?.toString() || "0.00",
+          shippingCost: req.body.shippingCost?.toString() || "0.00"
         });
       }
 
       // Process budget photos
-      if (budgetData.photos && budgetData.photos.length > 0) {
-        for (const photoUrl of budgetData.photos) {
+      if (req.body.photos && req.body.photos.length > 0) {
+        for (const photoUrl of req.body.photos) {
           await storage.createBudgetPhoto(newBudget.id, {
             imageUrl: photoUrl,
             description: "Imagem de personalização"
@@ -2653,6 +2683,9 @@ Para mais detalhes, entre em contato conosco!`;
 
           // Check if there are unread production notes
           let hasUnreadNotes = false;
+          let productionNotes = null;
+          let productionDeadline = null;
+          let lastNoteAt = null;
           if (order.producerId) {
             const productionOrders = await storage.getProductionOrdersByOrder(order.id);
             if (productionOrders.length > 0) {

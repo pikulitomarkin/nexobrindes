@@ -481,10 +481,10 @@ export default function VendorBudgets() {
 
   const handleConfirmConvert = () => {
     if (budgetToConvert && convertClientId && convertProducerId) {
-      convertToOrderMutation.mutate({ 
-        budgetId: budgetToConvert, 
-        clientId: convertClientId, 
-        producerId: convertProducerId 
+      convertToOrderMutation.mutate({
+        budgetId: budgetToConvert,
+        clientId: convertClientId,
+        producerId: convertProducerId
       });
     }
   };
@@ -496,7 +496,7 @@ export default function VendorBudgets() {
 
   const handleEditBudget = (budget: any) => {
     console.log('Editing budget:', budget);
-    
+
     // Pre-populate form with existing budget data
     setVendorBudgetForm({
       title: budget.title,
@@ -566,12 +566,12 @@ export default function VendorBudgets() {
 
   // Filter products for budget creation
   const filteredBudgetProducts = products.filter((product: any) => {
-    const matchesSearch = !budgetProductSearch || 
+    const matchesSearch = !budgetProductSearch ||
       product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
       product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
 
-    const matchesCategory = budgetCategoryFilter === "all" || 
+    const matchesCategory = budgetCategoryFilter === "all" ||
       product.category === budgetCategoryFilter;
 
     return matchesSearch && matchesCategory;
@@ -603,7 +603,7 @@ export default function VendorBudgets() {
 
   const filteredBudgets = budgets?.filter((budget: any) => {
     const matchesStatus = statusFilter === "all" || budget.status === statusFilter;
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       budget.budgetNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       budget.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       budget.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -638,7 +638,7 @@ export default function VendorBudgets() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               className="gradient-bg text-white"
               onClick={() => {
                 // Ensure we're in create mode when clicking new budget
@@ -691,8 +691,8 @@ export default function VendorBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="budget-delivery-type">Tipo de Entrega</Label>
-                  <Select 
-                    value={vendorBudgetForm.deliveryType} 
+                  <Select
+                    value={vendorBudgetForm.deliveryType}
                     onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryType: value })}
                   >
                     <SelectTrigger>
@@ -750,8 +750,8 @@ export default function VendorBudgets() {
 
               <div>
                 <Label htmlFor="budget-client">Cliente Cadastrado (Opcional)</Label>
-                <Select 
-                  value={vendorBudgetForm.clientId || "none"} 
+                <Select
+                  value={vendorBudgetForm.clientId || "none"}
                   onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, clientId: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
@@ -872,27 +872,27 @@ export default function VendorBudgets() {
 
                         {item.hasItemCustomization && (
                           <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
-                            <CustomizationSelector 
+                            <CustomizationSelector
                               productCategory={products.find((p: any) => p.id === item.productId)?.category}
                               quantity={item.quantity}
-                              selectedCustomization={item.selectedCustomizationId}
+                              selectedCustomization={item.selectedCustomizationId || ''}
                               onCustomizationChange={(customization) => {
                                 if (customization) {
                                   updateBudgetItem(index, 'selectedCustomizationId', customization.id);
                                   updateBudgetItem(index, 'itemCustomizationValue', customization.price);
                                   updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
                                 } else {
-                                  // Limpar todos os dados de personalização
                                   updateBudgetItem(index, 'selectedCustomizationId', '');
-                                  updateBudgetItem(index, 'itemCustomizationValue', 0);
-                                  updateBudgetItem(index, 'itemCustomizationDescription', '');
-                                  updateBudgetItem(index, 'additionalCustomizationNotes', '');
+                                  // Não limpar os valores manuais
                                 }
                               }}
-                              customizationValue={item.itemCustomizationValue || 0}
-                              onCustomizationValueChange={(value) => updateBudgetItem(index, 'itemCustomizationValue', value)}
-                              customizationDescription={item.itemCustomizationDescription || ''}
-                              onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
+                              onValidationError={(error) => {
+                                toast({
+                                  title: "Quantidade Insuficiente",
+                                  description: error,
+                                  variant: "destructive"
+                                });
+                              }}
                             />
 
                             <div className="grid grid-cols-1 gap-3">
@@ -925,13 +925,13 @@ export default function VendorBudgets() {
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                                     <div className="flex flex-col items-center justify-center pt-2 pb-2">
                                       <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                                       </svg>
                                       <p className="text-xs text-gray-500">Clique para enviar imagem</p>
                                     </div>
-                                    <input 
-                                      type="file" 
-                                      className="hidden" 
+                                    <input
+                                      type="file"
+                                      className="hidden"
                                       accept="image/*"
                                       onChange={(e) => handleProductImageUpload(e, index)}
                                     />
@@ -940,9 +940,9 @@ export default function VendorBudgets() {
 
                                 {item.customizationPhoto && (
                                   <div className="relative inline-block">
-                                    <img 
-                                      src={item.customizationPhoto} 
-                                      alt={`Personalização ${item.productName}`} 
+                                    <img
+                                      src={item.customizationPhoto}
+                                      alt={`Personalização ${item.productName}`}
                                       className="w-24 h-24 object-cover rounded-lg"
                                       onError={(e) => {
                                         console.error('Erro ao carregar imagem:', item.customizationPhoto);
@@ -1085,9 +1085,9 @@ export default function VendorBudgets() {
                       <div className="flex items-center justify-between text-sm text-gray-500">
                         <span>{filteredBudgetProducts.length} produtos encontrados</span>
                         {(budgetProductSearch || budgetCategoryFilter !== "all") && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setBudgetProductSearch("");
                               setBudgetCategoryFilter("all");
@@ -1103,15 +1103,15 @@ export default function VendorBudgets() {
                         <div className="col-span-full text-center py-8">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500">
-                            {budgetProductSearch || budgetCategoryFilter !== "all" ? 
-                              "Nenhum produto encontrado com os filtros aplicados" : 
+                            {budgetProductSearch || budgetCategoryFilter !== "all" ?
+                              "Nenhum produto encontrado com os filtros aplicados" :
                               "Nenhum produto disponível"}
                           </p>
                         </div>
                       ) : (
                         filteredBudgetProducts.map((product: any) => (
-                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer" 
-                               onClick={() => addProductToBudget(product)}>
+                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
+                            onClick={() => addProductToBudget(product)}>
                             <div className="flex items-center gap-2">
                               {product.imageLink ? (
                                 <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
@@ -1206,8 +1206,8 @@ export default function VendorBudgets() {
                           onChange={(e) => {
                             const downPayment = parseFloat(e.target.value) || 0;
                             const total = calculateTotalWithShipping();
-                            setVendorBudgetForm({ 
-                              ...vendorBudgetForm, 
+                            setVendorBudgetForm({
+                              ...vendorBudgetForm,
                               downPayment,
                               remainingAmount: Math.max(0, total - downPayment)
                             });
@@ -1250,8 +1250,8 @@ export default function VendorBudgets() {
                           onChange={(e) => {
                             const shippingCost = parseFloat(e.target.value) || 0;
                             const total = calculateTotalWithShipping();
-                            setVendorBudgetForm({ 
-                              ...vendorBudgetForm, 
+                            setVendorBudgetForm({
+                              ...vendorBudgetForm,
                               shippingCost,
                               remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
                             });
@@ -1388,8 +1388,8 @@ export default function VendorBudgets() {
                   <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>
-                      {vendorBudgetForm.deliveryType === "pickup" ? 
-                        "Retirada no local" : 
+                      {vendorBudgetForm.deliveryType === "pickup" ?
+                        "Retirada no local" :
                         `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
@@ -1405,9 +1405,9 @@ export default function VendorBudgets() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button 
-                  variant="outline" 
-                  type="button" 
+                <Button
+                  variant="outline"
+                  type="button"
                   onClick={() => {
                     setIsBudgetDialogOpen(false);
                     resetBudgetForm();
@@ -1417,8 +1417,8 @@ export default function VendorBudgets() {
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={(isEditMode ? updateBudgetMutation.isPending : createBudgetMutation.isPending) || vendorBudgetForm.items.length === 0}
                 >
                   {isEditMode
@@ -1589,8 +1589,8 @@ export default function VendorBudgets() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-1">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleViewBudget(budget)}
                           data-testid={`button-view-${budget.id}`}
@@ -1599,8 +1599,8 @@ export default function VendorBudgets() {
                           Ver
                         </Button>
                         {budget.status !== 'production' && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             className="text-orange-600 hover:text-orange-900"
                             onClick={() => handleEditBudget(budget)}
@@ -1610,8 +1610,8 @@ export default function VendorBudgets() {
                             Editar
                           </Button>
                         )}
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => generatePDFMutation.mutate(budget.id)}
                           disabled={generatePDFMutation.isPending}
@@ -1621,9 +1621,9 @@ export default function VendorBudgets() {
                           PDF
                         </Button>
                         {(budget.status === 'draft' || budget.status === 'sent') && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
                             disabled={sendToWhatsAppMutation.isPending}
@@ -1634,9 +1634,9 @@ export default function VendorBudgets() {
                           </Button>
                         )}
                         {(budget.status === 'sent' || budget.status === 'approved') && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-green-600 hover:text-green-900"
                             onClick={() => handleConvertClick(budget.id)}
                             disabled={convertToOrderMutation.isPending}
@@ -1929,7 +1929,7 @@ export default function VendorBudgets() {
                     <div>
                       <Label className="font-medium">Valor do Desconto</Label>
                       <p className="text-orange-600 font-semibold">
-                        {budgetToView.discountType === 'percentage' 
+                        {budgetToView.discountType === 'percentage'
                           ? `${budgetToView.discountPercentage}%`
                           : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                         }
@@ -1969,9 +1969,9 @@ export default function VendorBudgets() {
                       <div key={index} className="border rounded-lg p-4">
                         <h4 className="font-medium text-lg mb-3">{item.productName}</h4>
                         <div className="flex flex-col items-center">
-                          <img 
-                            src={item.customizationPhoto} 
-                            alt={`Personalização ${item.productName}`} 
+                          <img
+                            src={item.customizationPhoto}
+                            alt={`Personalização ${item.productName}`}
                             className="w-full max-w-sm h-64 object-contain rounded-lg border"
                             onError={(e) => {
                               console.error('Erro ao carregar imagem:', item.customizationPhoto);
@@ -1990,8 +1990,8 @@ export default function VendorBudgets() {
 
               {/* Actions */}
               <div className="flex gap-2 pt-4 border-t">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => generatePDFMutation.mutate(budgetToView.id)}
                   disabled={generatePDFMutation.isPending}
                 >
@@ -2000,7 +2000,7 @@ export default function VendorBudgets() {
                 </Button>
 
                 {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
-                  <Button 
+                  <Button
                     variant="outline"
                     className="text-blue-600 hover:text-blue-900"
                     onClick={() => {
@@ -2015,7 +2015,7 @@ export default function VendorBudgets() {
                 )}
 
                 {(budgetToView.status === 'sent' || budgetToView.status === 'approved') && (
-                  <Button 
+                  <Button
                     className="text-green-600 hover:text-green-900"
                     onClick={() => {
                       setViewBudgetDialogOpen(false);
@@ -2027,8 +2027,8 @@ export default function VendorBudgets() {
                   </Button>
                 )}
 
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setViewBudgetDialogOpen(false);
                     setBudgetToView(null);
@@ -2083,8 +2083,8 @@ export default function VendorBudgets() {
             </div>
           </div>
           <div className="flex gap-2 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setConvertDialogOpen(false);
                 setBudgetToConvert(null);
@@ -2095,7 +2095,7 @@ export default function VendorBudgets() {
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleConfirmConvert}
               disabled={convertToOrderMutation.isPending || !convertClientId || !convertProducerId}
               className="flex-1"

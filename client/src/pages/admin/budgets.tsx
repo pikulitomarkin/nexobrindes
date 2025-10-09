@@ -658,6 +658,13 @@ export default function AdminBudgets() {
                                   // Não limpar os valores manuais
                                 }
                               }}
+                              onValidationError={(error) => {
+                                toast({
+                                  title: "Quantidade Insuficiente",
+                                  description: error,
+                                  variant: "destructive"
+                                });
+                              }}
                             />
                             
                             {/* Campos manuais sempre visíveis */}

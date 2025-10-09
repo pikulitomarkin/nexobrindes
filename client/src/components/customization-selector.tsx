@@ -13,6 +13,7 @@ interface CustomizationSelectorProps {
   onCustomizationValueChange?: (value: number) => void;
   customizationDescription?: string;
   onCustomizationDescriptionChange?: (description: string) => void;
+  onValidationError?: (error: string) => void;
 }
 
 export function CustomizationSelector({ 
@@ -23,7 +24,8 @@ export function CustomizationSelector({
   customizationValue = 0,
   onCustomizationValueChange,
   customizationDescription = '',
-  onCustomizationDescriptionChange
+  onCustomizationDescriptionChange,
+  onValidationError
 }: CustomizationSelectorProps) {
   const [categoryFilter, setCategoryFilter] = useState("");
 
@@ -92,11 +94,30 @@ export function CustomizationSelector({
                   if (onCustomizationDescriptionChange) {
                     onCustomizationDescriptionChange("");
                   }
+                  // Limpar erro de validação se deselecionar
+                  if (onValidationError) {
+                    onValidationError("");
+                  }
                   return;
                 }
-                
+
                 const customization = filteredCustomizations.find((c: any) => c.id === value);
                 if (customization) {
+                  // Validar quantidade mínima
+                  if (quantity < customization.minQuantity) {
+                    const errorMessage = `Esta personalização requer no mínimo ${customization.minQuantity} unidades. Quantidade atual: ${quantity}`;
+                    if (onValidationError) {
+                      onValidationError(errorMessage);
+                    }
+                    // Não permite selecionar se não atender à quantidade mínima, mas mantém a seleção visualmente
+                    // A lógica de "não permitir" fica com o disabled no SelectItem
+                  } else {
+                    // Limpar erro de validação se a nova seleção for válida
+                    if (onValidationError) {
+                      onValidationError("");
+                    }
+                  }
+
                   onCustomizationChange(customization);
                   // Auto-preenche os valores
                   if (onCustomizationValueChange) {
@@ -116,12 +137,25 @@ export function CustomizationSelector({
                   <span className="text-gray-500 italic">Nenhuma personalização</span>
                 </SelectItem>
                 {filteredCustomizations.map((customization: any) => (
-                  <SelectItem key={customization.id} value={customization.id}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{customization.name}</span>
-                      <span className="text-xs text-gray-500">
-                        {customization.description && `${customization.description} • `}
-                        Min: {customization.minQuantity} un. • R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <SelectItem 
+                    key={customization.id} 
+                    value={customization.id}
+                    disabled={quantity < customization.minQuantity}
+                  >
+                    <div className="flex justify-between items-center w-full">
+                      <div className="flex flex-col">
+                        <span className={quantity < customization.minQuantity ? "text-gray-400" : ""}>
+                          {customization.name}
+                        </span>
+                        {quantity < customization.minQuantity && (
+                          <span className="text-xs text-red-500">
+                            Requer mín. {customization.minQuantity} unidades
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-sm ${quantity < customization.minQuantity ? "text-gray-400" : "text-gray-500"}`}>
+                        R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {customization.minQuantity > 1 && ` (mín. ${customization.minQuantity})`}
                       </span>
                     </div>
                   </SelectItem>
@@ -156,7 +190,7 @@ export function CustomizationSelector({
           <h4 className="text-base font-semibold text-blue-900 mb-3">
             ✅ {selectedCustomizationData.name}
           </h4>
-          
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Categoria:</span>
