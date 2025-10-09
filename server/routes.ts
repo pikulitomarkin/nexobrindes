@@ -3663,7 +3663,7 @@ Para mais detalhes, entre em contato conosco!`;
   // Get comprehensive reports data
   app.get("/api/reports/dashboard", async (req, res) => {
     try {
-      const { period = '30' } = req.query;
+      const { period = '30', status, vendorId, producerId } = req.query;
       
       // Calculate date filter
       const filterDate = period === 'all' ? null : new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
@@ -3674,10 +3674,28 @@ Para mais detalhes, entre em contato conosco!`;
       const receivables = await storage.getAccountsReceivable();
       const expenses = await storage.getExpenseNotes();
       
-      // Filter by period
-      const filteredOrders = filterDate 
-        ? orders.filter(o => o.createdAt && new Date(o.createdAt) >= filterDate)
-        : orders;
+      // Apply filters
+      let filteredOrders = orders;
+      
+      // Date filter
+      if (filterDate) {
+        filteredOrders = filteredOrders.filter(o => o.createdAt && new Date(o.createdAt) >= filterDate);
+      }
+      
+      // Status filter
+      if (status && status !== 'all') {
+        filteredOrders = filteredOrders.filter(o => o.status === status);
+      }
+      
+      // Vendor filter
+      if (vendorId && vendorId !== 'all') {
+        filteredOrders = filteredOrders.filter(o => o.vendorId === vendorId);
+      }
+      
+      // Producer filter
+      if (producerId && producerId !== 'all') {
+        filteredOrders = filteredOrders.filter(o => o.producerId === producerId);
+      }
       
       const filteredCommissions = filterDate
         ? commissions.filter(c => new Date(c.createdAt) >= filterDate)
@@ -3703,10 +3721,11 @@ Para mais detalhes, entre em contato conosco!`;
       const ordersEvolution = filteredOrders.reduce((acc, order) => {
         const month = new Date(order.createdAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' });
         if (!acc[month]) {
-          acc[month] = { mes: month, pedidos: 0, valor: 0 };
+          acc[month] = { mes: month, pedidos: 0, valor: 0, receita: 0 };
         }
         acc[month].pedidos += 1;
         acc[month].valor += parseFloat(order.totalValue);
+        acc[month].receita += parseFloat(order.paidValue || '0');
         return acc;
       }, {} as any);
       
@@ -3716,16 +3735,61 @@ Para mais detalhes, entre em contato conosco!`;
         return acc;
       }, {} as any);
       
+      // Vendor performance
+      const vendorPerformance = filteredOrders.reduce((acc, order) => {
+        const vendorId = order.vendorId;
+        if (!acc[vendorId]) {
+          acc[vendorId] = { vendorId, pedidos: 0, valor: 0 };
+        }
+        acc[vendorId].pedidos += 1;
+        acc[vendorId].valor += parseFloat(order.totalValue);
+        return acc;
+      }, {} as any);
+      
+      // Client analysis
+      const clientAnalysis = filteredOrders.reduce((acc, order) => {
+        const clientName = order.clientName || 'Cliente Não Identificado';
+        if (!acc[clientName]) {
+          acc[clientName] = { cliente: clientName, pedidos: 0, valor: 0 };
+        }
+        acc[clientName].pedidos += 1;
+        acc[clientName].valor += parseFloat(order.totalValue);
+        return acc;
+      }, {} as any);
+      
+      // Product analysis
+      const productAnalysis = filteredOrders.reduce((acc, order) => {
+        const product = order.product || 'Produto Não Identificado';
+        if (!acc[product]) {
+          acc[product] = { produto: product, pedidos: 0, valor: 0 };
+        }
+        acc[product].pedidos += 1;
+        acc[product].valor += parseFloat(order.totalValue);
+        return acc;
+      }, {} as any);
+      
       res.json({
         summary: {
           totalReceivables,
           totalPayables,
           totalCommissionsPending,
           totalOrders: filteredOrders.length,
-          totalRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0)
+          totalRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0),
+          totalPaidValue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.paidValue || '0'), 0),
+          averageTicket: filteredOrders.length > 0 ? 
+            filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0) / filteredOrders.length : 0,
+          conversionRate: orders.length > 0 ? 
+            (filteredOrders.filter(o => o.status !== 'cancelled').length / orders.length) * 100 : 0
         },
-        ordersEvolution: Object.values(ordersEvolution),
-        statusDistribution,
+        ordersEvolution: Object.values(ordersEvolution).sort((a: any, b: any) => 
+          new Date(a.mes + ' 2024').getTime() - new Date(b.mes + ' 2024').getTime()
+        ),
+        statusDistribution: Object.entries(statusDistribution).map(([status, count]) => ({
+          status, quantidade: count
+        })),
+        vendorPerformance: Object.values(vendorPerformance),
+        clientAnalysis: Object.values(clientAnalysis).sort((a: any, b: any) => b.valor - a.valor),
+        productAnalysis: Object.values(productAnalysis).sort((a: any, b: any) => b.valor - a.valor),
         receivables: receivables.filter(r => r.status !== 'paid'),
         payables: producerPayments.filter(p => ['pending', 'approved'].includes(p.status)),
         commissionsPending: commissions.filter(c => ['pending', 'confirmed'].includes(c.status)),
@@ -3736,6 +3800,52 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching reports data:", error);
       res.status(500).json({ error: "Failed to fetch reports data" });
+    }
+  });
+
+  // Export reports data
+  app.get("/api/reports/export/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      const { format = 'json', period = '30' } = req.query;
+      
+      // Get data based on type
+      let data: any = [];
+      
+      switch (type) {
+        case 'orders':
+          data = await storage.getOrders();
+          break;
+        case 'receivables':
+          data = await storage.getAccountsReceivable();
+          break;
+        case 'payables':
+          data = await storage.getProducerPayments();
+          break;
+        case 'commissions':
+          data = await storage.getAllCommissions();
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid report type" });
+      }
+      
+      // Apply date filter
+      if (period !== 'all') {
+        const filterDate = new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
+        data = data.filter((item: any) => 
+          item.createdAt && new Date(item.createdAt) >= filterDate
+        );
+      }
+      
+      if (format === 'json') {
+        res.json(data);
+      } else {
+        // For CSV or Excel export, you would implement the conversion here
+        res.json({ message: `Export in ${format} format not yet implemented`, data });
+      }
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      res.status(500).json({ error: "Failed to export report" });
     }
   });
 
