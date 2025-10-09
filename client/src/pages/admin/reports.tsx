@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, ComposedChart 
@@ -17,7 +20,8 @@ import {
   Filter, Download, Eye, ArrowUpRight, ArrowDownRight, 
   CreditCard, Receipt, Banknote, UserCheck, Clock, CheckCircle2,
   Search, RefreshCw, BarChart3, Target, Percent, AlertCircle,
-  TrendingDown, Activity, ShoppingCart, Package, Award
+  TrendingDown, Activity, ShoppingCart, Package, Award, FileSpreadsheet,
+  FileDown, Printer
 } from "lucide-react";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
@@ -28,6 +32,7 @@ interface DateRange {
 }
 
 export default function AdminReports() {
+  const { toast } = useToast();
   const [dateFilter, setDateFilter] = useState('30');
   const [statusFilter, setStatusFilter] = useState('all');
   const [vendorFilter, setVendorFilter] = useState('all');
@@ -304,9 +309,232 @@ export default function AdminReports() {
   };
 
   const handleExport = (reportType: string, format: string = 'excel') => {
-    console.log(`Exportando relatório: ${reportType} em formato ${format}`);
-    // TODO: Implementar exportação real
-    alert(`Exportando ${reportType} em ${format}...`);
+    try {
+      let data: any[] = [];
+      let filename = '';
+      let headers: string[] = [];
+
+      switch (reportType) {
+        case 'evolucao-pedidos':
+          data = getOrdersByMonth();
+          filename = 'evolucao_pedidos';
+          headers = ['Mês', 'Quantidade de Pedidos', 'Valor Total', 'Receita Recebida'];
+          break;
+        
+        case 'pedidos-status':
+          data = getOrdersByStatus();
+          filename = 'pedidos_por_status';
+          headers = ['Status', 'Quantidade', 'Valor Total'];
+          break;
+        
+        case 'top-vendedores':
+          data = getTopVendors();
+          filename = 'top_vendedores';
+          headers = ['Vendedor', 'Quantidade de Pedidos', 'Valor Total'];
+          break;
+        
+        case 'top-clientes':
+          data = getTopClients();
+          filename = 'top_clientes';
+          headers = ['Cliente', 'Quantidade de Pedidos', 'Valor Total'];
+          break;
+        
+        case 'top-produtos':
+          data = getProductPerformance();
+          filename = 'top_produtos';
+          headers = ['Produto', 'Quantidade de Vendas', 'Valor Total'];
+          break;
+        
+        case 'receivables':
+          data = receivables.filter((r: any) => r.status !== 'paid').map((r: any) => ({
+            pedido: r.orderNumber,
+            cliente: r.clientName,
+            valor: parseFloat(r.amount) - parseFloat(r.receivedAmount),
+            vencimento: r.dueDate ? new Date(r.dueDate).toLocaleDateString('pt-BR') : '',
+            status: r.status === 'pending' ? 'Pendente' : 
+                   r.status === 'partial' ? 'Parcial' : 
+                   r.status === 'overdue' ? 'Vencido' : r.status
+          }));
+          filename = 'contas_a_receber';
+          headers = ['Pedido', 'Cliente', 'Valor', 'Vencimento', 'Status'];
+          break;
+        
+        case 'payables':
+          data = producerPayments.filter((p: any) => ['pending', 'approved'].includes(p.status)).map((p: any) => ({
+            produtor: p.producerName,
+            pedido: p.orderNumber,
+            produto: p.product,
+            valor: parseFloat(p.amount),
+            status: p.status === 'pending' ? 'Pendente' : 'Aprovado'
+          }));
+          filename = 'contas_a_pagar';
+          headers = ['Produtor', 'Pedido', 'Produto', 'Valor', 'Status'];
+          break;
+        
+        case 'comissoes-pagar':
+          data = commissions.filter((c: any) => ['pending', 'confirmed'].includes(c.status)).map((c: any) => ({
+            vendedor: vendors.find((v: any) => v.id === c.vendorId)?.name || 'N/A',
+            pedido: c.orderNumber,
+            valor: parseFloat(c.amount),
+            percentual: c.percentage,
+            status: c.status === 'pending' ? 'Pendente' : 'Confirmado'
+          }));
+          filename = 'comissoes_a_pagar';
+          headers = ['Vendedor', 'Pedido', 'Valor', 'Percentual', 'Status'];
+          break;
+        
+        case 'comissoes-pagas':
+          data = commissions.filter((c: any) => c.status === 'paid').map((c: any) => ({
+            vendedor: vendors.find((v: any) => v.id === c.vendorId)?.name || 'N/A',
+            pedido: c.orderNumber,
+            valor: parseFloat(c.amount),
+            percentual: c.percentage,
+            dataPagamento: new Date(c.updatedAt).toLocaleDateString('pt-BR')
+          }));
+          filename = 'comissoes_pagas';
+          headers = ['Vendedor', 'Pedido', 'Valor', 'Percentual', 'Data Pagamento'];
+          break;
+        
+        case 'fluxo-caixa':
+          data = getOrdersByMonth().map((item: any) => ({
+            mes: item.mes,
+            vendido: item.valor,
+            recebido: item.receita,
+            diferenca: item.valor - item.receita
+          }));
+          filename = 'fluxo_de_caixa';
+          headers = ['Mês', 'Valor Vendido', 'Valor Recebido', 'Diferença'];
+          break;
+
+        case 'despesas':
+          data = expenses.map((e: any) => ({
+            data: new Date(e.date).toLocaleDateString('pt-BR'),
+            categoria: e.category === 'operational' ? 'Operacional' : 
+                      e.category === 'marketing' ? 'Marketing' : 
+                      e.category === 'travel' ? 'Viagem' : 
+                      e.category === 'equipment' ? 'Equipamento' : 'Outros',
+            descricao: e.description,
+            valor: parseFloat(e.amount),
+            fornecedor: e.vendorName || 'N/A',
+            status: e.status === 'approved' ? 'Aprovado' : 'Pendente'
+          }));
+          filename = 'despesas';
+          headers = ['Data', 'Categoria', 'Descrição', 'Valor', 'Fornecedor', 'Status'];
+          break;
+
+        default:
+          data = filteredOrders.map((order: any) => ({
+            numero: order.orderNumber,
+            cliente: order.clientName,
+            produto: order.product,
+            quantidade: order.quantity,
+            valor: parseFloat(order.totalValue),
+            status: order.status,
+            vendedor: vendors.find((v: any) => v.id === order.vendorId)?.name || 'N/A',
+            data: new Date(order.createdAt).toLocaleDateString('pt-BR')
+          }));
+          filename = 'pedidos_geral';
+          headers = ['Número', 'Cliente', 'Produto', 'Quantidade', 'Valor', 'Status', 'Vendedor', 'Data'];
+          break;
+      }
+
+      if (data.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: "Não há dados para exportar neste relatório.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (format === 'excel') {
+        exportToExcel(data, headers, filename);
+      } else if (format === 'csv') {
+        exportToCSV(data, headers, filename);
+      } else if (format === 'pdf') {
+        exportToPDF(data, headers, filename, reportType);
+      }
+
+      toast({
+        title: "Exportação concluída!",
+        description: `Relatório ${filename} exportado em ${format.toUpperCase()} com sucesso.`
+      });
+
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast({
+        title: "Erro na exportação",
+        description: "Não foi possível exportar o relatório. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToExcel = (data: any[], headers: string[], filename: string) => {
+    // Criar planilha com dados
+    const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+    
+    // Adicionar estilos básicos
+    const range = XLSX.utils.decode_range(ws['!ref']!);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell_address = XLSX.utils.encode_cell({ c: C, r: R });
+        if (!ws[cell_address]) continue;
+        
+        // Header styling
+        if (R === 0) {
+          ws[cell_address].s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F46E5" } }
+          };
+        }
+      }
+    }
+    
+    XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportToCSV = (data: any[], headers: string[], filename: string) => {
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => Object.values(row).map(val => 
+        typeof val === 'string' && val.includes(',') ? `"${val}"` : val
+      ).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = (data: any[], headers: string[], filename: string, reportType: string) => {
+    // Implementação básica de PDF - você pode melhorar usando jsPDF
+    const content = [
+      `RELATÓRIO: ${reportType.toUpperCase().replace('-', ' ')}`,
+      `Data: ${new Date().toLocaleDateString('pt-BR')}`,
+      `Total de registros: ${data.length}`,
+      '',
+      headers.join('\t'),
+      ...data.map(row => Object.values(row).join('\t'))
+    ].join('\n');
+    
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.txt`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const clearFilters = () => {
@@ -499,10 +727,28 @@ export default function AdminReports() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Evolução Temporal dos Pedidos</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => handleExport('evolucao-pedidos')}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('evolucao-pedidos', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('evolucao-pedidos', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('evolucao-pedidos', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -531,8 +777,30 @@ export default function AdminReports() {
 
             {/* Distribuição por Status */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Distribuição por Status</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -564,11 +832,33 @@ export default function AdminReports() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Top Vendedores */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Award className="h-5 w-5" />
                   Top Vendedores
                 </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('top-vendedores', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-vendedores', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-vendedores', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -592,11 +882,33 @@ export default function AdminReports() {
 
             {/* Top Clientes */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Top Clientes
                 </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('top-clientes', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-clientes', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-clientes', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -620,11 +932,33 @@ export default function AdminReports() {
 
             {/* Top Produtos */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
                   Top Produtos
                 </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('top-produtos', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-produtos', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-produtos', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -655,10 +989,28 @@ export default function AdminReports() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Contas a Receber</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => handleExport('receivables')}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('receivables', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('receivables', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('receivables', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -695,10 +1047,28 @@ export default function AdminReports() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Contas a Pagar</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => handleExport('payables')}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('payables', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('payables', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('payables', 'pdf')}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -730,8 +1100,30 @@ export default function AdminReports() {
 
           {/* Gráfico Fluxo de Caixa */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Fluxo de Caixa - Projeção vs Realidade</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExport('fluxo-caixa', 'excel')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('fluxo-caixa', 'csv')}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('fluxo-caixa', 'pdf')}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
@@ -771,45 +1163,254 @@ export default function AdminReports() {
         {/* Outras abas continuam com a estrutura similar... */}
         {/* Por brevidade, vou manter as outras abas com estrutura básica, mas você pode expandir */}
         <TabsContent value="vendas" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Análise de Vendas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500">Conteúdo das análises de vendas...</p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Performance de Vendas por Mês</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('evolucao-pedidos', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('evolucao-pedidos', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={getOrdersByMonth()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="pedidos" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Ranking de Vendedores</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('top-vendedores', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('top-vendedores', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={getTopVendors()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="vendedor" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="valor" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="producao" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Relatórios de Produção</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Status de Produção</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'excel')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'csv')}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500">Conteúdo dos relatórios de produção...</p>
+              <div className="space-y-4">
+                {producerPayments.slice(0, 10).map((payment: any) => (
+                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded">
+                    <div>
+                      <p className="font-medium">{payment.producerName}</p>
+                      <p className="text-sm text-gray-500">Pedido: {payment.orderNumber}</p>
+                    </div>
+                    <Badge variant={payment.status === 'paid' ? 'default' : 'secondary'}>
+                      {payment.status === 'paid' ? 'Pago' : 'Pendente'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="comissoes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Relatórios de Comissões</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500">Conteúdo dos relatórios de comissões...</p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Comissões a Pagar</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagar', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagar', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {commissions.filter((c: any) => ['pending', 'confirmed'].includes(c.status)).slice(0, 5).map((commission: any) => (
+                    <div key={commission.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{vendors.find((v: any) => v.id === commission.vendorId)?.name}</p>
+                        <p className="text-sm text-gray-500">Pedido: {commission.orderNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-red-600">
+                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Comissões Pagas</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagas', 'excel')}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagas', 'csv')}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      CSV
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {commissions.filter((c: any) => c.status === 'paid').slice(0, 5).map((commission: any) => (
+                    <div key={commission.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{vendors.find((v: any) => v.id === commission.vendorId)?.name}</p>
+                        <p className="text-sm text-gray-500">Pedido: {commission.orderNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-green-600">
+                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Analytics Avançados</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Despesas por Categoria</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExport('despesas', 'excel')}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('despesas', 'csv')}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500">Conteúdo de analytics avançados...</p>
+              <div className="space-y-4">
+                {expenses.slice(0, 8).map((expense: any) => (
+                  <div key={expense.id} className="flex items-center justify-between p-3 border rounded">
+                    <div>
+                      <p className="font-medium">{expense.description}</p>
+                      <p className="text-sm text-gray-500">
+                        {expense.category === 'operational' ? 'Operacional' : 
+                         expense.category === 'marketing' ? 'Marketing' : 
+                         expense.category === 'travel' ? 'Viagem' : 
+                         expense.category === 'equipment' ? 'Equipamento' : 'Outros'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">
+                        R$ {parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <Badge variant={expense.status === 'approved' ? 'default' : 'secondary'}>
+                        {expense.status === 'approved' ? 'Aprovado' : 'Pendente'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
