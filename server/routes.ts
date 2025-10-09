@@ -3658,6 +3658,87 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // ===== REPORTS MODULE ROUTES =====
+  
+  // Get comprehensive reports data
+  app.get("/api/reports/dashboard", async (req, res) => {
+    try {
+      const { period = '30' } = req.query;
+      
+      // Calculate date filter
+      const filterDate = period === 'all' ? null : new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
+      
+      const orders = await storage.getOrders();
+      const commissions = await storage.getAllCommissions();
+      const producerPayments = await storage.getProducerPayments();
+      const receivables = await storage.getAccountsReceivable();
+      const expenses = await storage.getExpenseNotes();
+      
+      // Filter by period
+      const filteredOrders = filterDate 
+        ? orders.filter(o => o.createdAt && new Date(o.createdAt) >= filterDate)
+        : orders;
+      
+      const filteredCommissions = filterDate
+        ? commissions.filter(c => new Date(c.createdAt) >= filterDate)
+        : commissions;
+      
+      const filteredProducerPayments = filterDate
+        ? producerPayments.filter(p => p.createdAt && new Date(p.createdAt) >= filterDate)
+        : producerPayments;
+      
+      // Calculate metrics
+      const totalReceivables = receivables
+        .filter(r => r.status !== 'paid')
+        .reduce((sum, r) => sum + (parseFloat(r.amount) - parseFloat(r.receivedAmount)), 0);
+      
+      const totalPayables = producerPayments
+        .filter(p => ['pending', 'approved'].includes(p.status))
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+      const totalCommissionsPending = commissions
+        .filter(c => ['pending', 'confirmed'].includes(c.status))
+        .reduce((sum, c) => sum + parseFloat(c.amount), 0);
+      
+      const ordersEvolution = filteredOrders.reduce((acc, order) => {
+        const month = new Date(order.createdAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' });
+        if (!acc[month]) {
+          acc[month] = { mes: month, pedidos: 0, valor: 0 };
+        }
+        acc[month].pedidos += 1;
+        acc[month].valor += parseFloat(order.totalValue);
+        return acc;
+      }, {} as any);
+      
+      // Status distribution
+      const statusDistribution = filteredOrders.reduce((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {} as any);
+      
+      res.json({
+        summary: {
+          totalReceivables,
+          totalPayables,
+          totalCommissionsPending,
+          totalOrders: filteredOrders.length,
+          totalRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0)
+        },
+        ordersEvolution: Object.values(ordersEvolution),
+        statusDistribution,
+        receivables: receivables.filter(r => r.status !== 'paid'),
+        payables: producerPayments.filter(p => ['pending', 'approved'].includes(p.status)),
+        commissionsPending: commissions.filter(c => ['pending', 'confirmed'].includes(c.status)),
+        commissionsPaid: commissions.filter(c => c.status === 'paid'),
+        producerPaymentsPending: producerPayments.filter(p => ['pending', 'approved'].includes(p.status)),
+        producerPaymentsPaid: producerPayments.filter(p => p.status === 'paid')
+      });
+    } catch (error) {
+      console.error("Error fetching reports data:", error);
+      res.status(500).json({ error: "Failed to fetch reports data" });
+    }
+  });
+
   // ===== FINANCIAL MODULE ROUTES =====
 
   // Accounts Receivable routes
