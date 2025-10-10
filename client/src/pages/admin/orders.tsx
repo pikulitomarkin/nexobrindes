@@ -499,12 +499,13 @@ export default function AdminOrders() {
                   <h3 className="text-lg font-medium mb-3">Informações de Contato</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="edit-contact-name">Nome de Contato</Label>
+                      <Label htmlFor="edit-contact-name">Nome de Contato *</Label>
                       <Input
                         id="edit-contact-name"
                         value={editingOrder.contactName || ""}
                         onChange={(e) => setEditingOrder({ ...editingOrder, contactName: e.target.value })}
                         placeholder="Nome do cliente"
+                        required
                       />
                     </div>
                     <div>
@@ -540,7 +541,7 @@ export default function AdminOrders() {
                         type="number"
                         step="0.01"
                         min="0"
-                        value={editingOrder.totalValue || "0.00"}
+                        value={parseFloat(editingOrder.totalValue || "0").toFixed(2)}
                         onChange={(e) => setEditingOrder({ ...editingOrder, totalValue: e.target.value })}
                       />
                     </div>
@@ -551,7 +552,7 @@ export default function AdminOrders() {
                         type="number"
                         step="0.01"
                         min="0"
-                        value={editingOrder.paidValue || "0.00"}
+                        value={parseFloat(editingOrder.paidValue || "0").toFixed(2)}
                         onChange={(e) => setEditingOrder({ ...editingOrder, paidValue: e.target.value })}
                       />
                     </div>
@@ -602,7 +603,26 @@ export default function AdminOrders() {
                   </div>
                 )}
 
-                {/* Order Items Display (read-only for now) */}
+                {/* Budget Information (if order was converted from budget) */}
+                {editingOrder.budgetId && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Informações do Orçamento Original</h3>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-blue-800">Convertido do Orçamento</span>
+                          <p className="text-blue-700">ID: {editingOrder.budgetId}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-blue-800">Tipo de Entrega</span>
+                          <p className="text-blue-700">{editingOrder.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega com Frete'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Order Items Display */}
                 {editingOrder.items && editingOrder.items.length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium mb-3">Itens do Pedido</h3>
@@ -612,11 +632,48 @@ export default function AdminOrders() {
                           <div>
                             <span className="font-medium">{item.productName}</span>
                             <span className="text-sm text-gray-500 ml-2">Qtd: {item.quantity}</span>
+                            {item.productWidth && item.productHeight && (
+                              <div className="text-xs text-gray-500">
+                                Dimensões: {item.productWidth}x{item.productHeight}{item.productDepth ? `x${item.productDepth}` : ''} cm
+                              </div>
+                            )}
                           </div>
                           <div className="text-right">
                             <div className="font-medium">R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                             {item.hasItemCustomization && (
-                              <div className="text-xs text-blue-600">Com personalização</div>
+                              <div className="text-xs text-blue-600">
+                                Personalização: {item.itemCustomizationDescription || 'Sim'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Budget Items (if no order items but has budget items) */}
+                {editingOrder.budgetItems && editingOrder.budgetItems.length > 0 && (!editingOrder.items || editingOrder.items.length === 0) && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Itens do Orçamento Original</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {editingOrder.budgetItems.map((item: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <div>
+                            <span className="font-medium">{item.product?.name || item.productName}</span>
+                            <span className="text-sm text-gray-500 ml-2">Qtd: {item.quantity}</span>
+                            {item.productWidth && item.productHeight && (
+                              <div className="text-xs text-gray-500">
+                                Dimensões: {item.productWidth}x{item.productHeight}{item.productDepth ? `x${item.productDepth}` : ''} cm
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                            {item.hasItemCustomization && (
+                              <div className="text-xs text-blue-600">
+                                Personalização: {item.itemCustomizationDescription || 'Sim'}
+                              </div>
                             )}
                           </div>
                         </div>
