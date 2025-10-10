@@ -572,11 +572,11 @@ export default function AdminSettings() {
                         <Label htmlFor="base-price">Valor (R$)</Label>
                         <Input
                           id="base-price"
-                          value={`${shippingMethodForm.basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            setShippingMethodForm({ ...shippingMethodForm, basePrice: parseFloat(value) || 0 });
-                          }}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={shippingMethodForm.basePrice}
+                          onChange={(e) => setShippingMethodForm({ ...shippingMethodForm, basePrice: parseFloat(e.target.value) })}
                         />
                       </div>
                     )}
@@ -584,12 +584,12 @@ export default function AdminSettings() {
                       <Label htmlFor="free-threshold">Frete Grátis Acima de (R$)</Label>
                       <Input
                         id="free-threshold"
-                        value={`${shippingMethodForm.freeShippingThreshold.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                          setShippingMethodForm({ ...shippingMethodForm, freeShippingThreshold: parseFloat(value) || 0 });
-                        }}
-                        placeholder="0,00 = sem frete grátis"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={shippingMethodForm.freeShippingThreshold}
+                        onChange={(e) => setShippingMethodForm({ ...shippingMethodForm, freeShippingThreshold: parseFloat(e.target.value) })}
+                        placeholder="0 = sem frete grátis"
                       />
                     </div>
                     <div>

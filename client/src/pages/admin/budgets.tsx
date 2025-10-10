@@ -897,12 +897,9 @@ export default function AdminBudgets() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={parseFloat(adminBudgetForm.shippingCost || 0).toFixed(2)}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      setAdminBudgetForm({ ...adminBudgetForm, shippingCost: value });
-                    }}
-                    placeholder="0.00"
+                    value={adminBudgetForm.shippingCost}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
+                    placeholder="0,00"
                   />
                 </div>
               )}

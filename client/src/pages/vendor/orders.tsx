@@ -527,27 +527,25 @@ export default function VendorOrders() {
   };
 
   const handleEditOrder = (order: any) => {
-    console.log('Editing order:', order);
-    
     // Pre-populate form with existing order data
     setVendorOrderForm({
-      title: order.product || order.title || "",
+      title: order.title,
       description: order.description || "",
       clientId: order.clientId || "",
-      contactName: order.contactName || order.clientName || "",
+      contactName: order.contactName || "",
       contactPhone: order.contactPhone || "",
       contactEmail: order.contactEmail || "",
       vendorId: order.vendorId,
-      deadline: order.deadline ? (typeof order.deadline === 'string' ? order.deadline.split('T')[0] : new Date(order.deadline).toISOString().split('T')[0]) : "",
-      deliveryDeadline: order.deliveryDeadline ? (typeof order.deliveryDeadline === 'string' ? order.deliveryDeadline.split('T')[0] : new Date(order.deliveryDeadline).toISOString().split('T')[0]) : "",
+      deadline: order.deadline || "",
+      deliveryDeadline: order.deliveryDeadline || "",
       deliveryType: order.deliveryType || "delivery",
       items: order.items?.map((item: any) => ({
         productId: item.productId,
-        productName: item.productName || item.product?.name || 'Produto não encontrado',
-        quantity: parseInt(item.quantity) || 1,
-        unitPrice: parseFloat(item.unitPrice) || 0,
-        totalPrice: parseFloat(item.totalPrice) || 0,
-        hasItemCustomization: item.hasItemCustomization || false,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: parseFloat(item.unitPrice),
+        totalPrice: parseFloat(item.totalPrice),
+        hasItemCustomization: item.hasItemCustomization,
         selectedCustomizationId: item.selectedCustomizationId || "",
         itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
         itemCustomizationDescription: item.itemCustomizationDescription || "",
@@ -563,10 +561,10 @@ export default function VendorOrders() {
       })) || [],
       paymentMethodId: order.paymentMethodId || "",
       shippingMethodId: order.shippingMethodId || "",
-      installments: parseInt(order.installments) || 1,
-      downPayment: parseFloat(order.downPayment || 0),
-      remainingAmount: parseFloat(order.remainingAmount || 0),
-      shippingCost: parseFloat(order.shippingCost || 0),
+      installments: order.installments || 1,
+      downPayment: order.downPayment || 0,
+      remainingAmount: order.remainingAmount || 0,
+      shippingCost: order.shippingCost || 0,
       hasDiscount: order.hasDiscount || false,
       discountType: order.discountType || "percentage",
       discountPercentage: parseFloat(order.discountPercentage || 0),
@@ -1331,7 +1329,7 @@ export default function VendorOrders() {
                       O cliente irá retirar o pedido no local. Não há cobrança de frete.
                     </p>
                   </div>
-                ) : (
+                ) : selectedShippingMethod && (
                   <div className="bg-green-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
@@ -1342,23 +1340,23 @@ export default function VendorOrders() {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={parseFloat(vendorOrderForm.shippingCost || 0).toFixed(2)}
+                          value={vendorOrderForm.shippingCost || calculateShippingCost()}
                           onChange={(e) => {
                             const shippingCost = parseFloat(e.target.value) || 0;
-                            const total = calculateOrderTotal() + shippingCost;
+                            const total = calculateTotalWithShipping();
                             setVendorOrderForm({ 
                               ...vendorOrderForm, 
                               shippingCost,
                               remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
                             });
                           }}
-                          placeholder="0.00"
+                          placeholder="0,00"
                         />
                       </div>
                       <div>
                         <Label>Prazo de Entrega</Label>
                         <p className="text-sm text-gray-600 mt-2">
-                          {selectedShippingMethod ? `${selectedShippingMethod.estimatedDays} dias úteis` : 'Configure o método de frete'}
+                          {selectedShippingMethod.estimatedDays} dias úteis
                         </p>
                       </div>
                     </div>
