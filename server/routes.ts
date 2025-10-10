@@ -960,7 +960,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
+          // Always use contactName as primary client name - it's required on order creation
+          let clientName = order.contactName;
+
+          // Only try other methods if contactName is somehow missing
+          if (!clientName && order.clientId) {
+            console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
+
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              console.log(`Found client record:`, clientRecord);
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                console.log(`Found client by userId:`, clientByUserId);
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  console.log(`Found user record:`, clientUser);
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Get budget photos and items if order was converted from budget
@@ -988,7 +1013,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-
           // Check if there are unread production notes
           let hasUnreadNotes = false;
           if (order.producerId) {
@@ -998,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: client?.name || 'Unknown',
+            clientName: clientName, // Never use fallback 'Unknown'
             producerName: producer?.name || null,
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,

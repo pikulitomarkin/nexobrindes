@@ -2028,59 +2028,63 @@ export class MemStorage implements IStorage {
   }
 
   async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
-    const budget = this.budgets.get(budgetId); // Use .get() for Map
+    const budget = this.budgets.get(budgetId);
     if (!budget) {
-      throw new Error("Budget not found");
-    }
-
-    // Get budget items to include in order
-    const budgetItems = this.getBudgetItems(budgetId);
-
-    // Get budget payment info if available
-    const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
-
-    // Determine shipping address based on delivery type
-    let shippingAddress = budget.shippingAddress || null;
-    if (budget.deliveryType === 'pickup') {
-      // If pickup, find the main company address or a default pickup location
-      // For now, setting to null, but ideally this would be a specific pickup point address
-      shippingAddress = null;
+      throw new Error('Budget not found');
     }
 
     // Generate order number
     const orderNumber = `PED-${Date.now()}`;
 
-    // Create order from budget
-    const order = await this.createOrder({
+    // Create order data from budget
+    const orderData = {
       orderNumber,
-      clientId: budget.clientId,
+      clientId: budget.clientId || "", // Use clientId from budget if available
       vendorId: budget.vendorId,
       producerId: producerId || null,
       budgetId: budget.id,
       product: budget.title,
-      description: budget.description,
-      totalValue: budget.totalValue,
-      status: 'confirmed', // Default status for a new order from budget
-      deadline: budget.validUntil, // Use validUntil as deadline for the order
-      shippingAddress: shippingAddress, // Include shipping address
-      deliveryType: budget.deliveryType,
-      // Include budget items as JSON
-      items: budgetItems,
-      // Payment information
-      paymentMethodId: budgetPaymentInfo?.paymentMethodId || "",
-      shippingMethodId: budgetPaymentInfo?.shippingMethodId || "",
-      installments: budgetPaymentInfo?.installments || 1,
-      downPayment: parseFloat(budgetPaymentInfo?.downPayment || '0'),
-      remainingAmount: parseFloat(budgetPaymentInfo?.remainingAmount || '0'),
-      shippingCost: parseFloat(budgetPaymentInfo?.shippingCost || '0'),
+      description: budget.description || "",
+      totalValue: typeof budget.totalValue === 'number' ? budget.totalValue.toFixed(2) : budget.totalValue.toString(),
+      status: 'confirmed',
+      deadline: budget.deliveryDeadline,
+      deliveryDeadline: budget.deliveryDeadline,
+      // Always preserve contact information from budget - this is essential
+      contactName: budget.contactName || "Cliente do Orçamento",
+      contactPhone: budget.contactPhone || "",
+      contactEmail: budget.contactEmail || "",
+      deliveryType: budget.deliveryType || "delivery",
+      items: this.budgetItems.filter(item => item.budgetId === budgetId) || [],
+      paymentMethodId: "",
+      shippingMethodId: "",
+      installments: 1,
+      downPayment: 0,
+      remainingAmount: 0,
+      shippingCost: 0,
       hasDiscount: budget.hasDiscount || false,
       discountType: budget.discountType || "percentage",
-      discountPercentage: parseFloat(budget.discountPercentage || '0'),
-      discountValue: parseFloat(budget.discountValue || '0')
-    });
+      discountPercentage: budget.discountPercentage || 0,
+      discountValue: budget.discountValue || 0
+    };
 
-    // Update budget status
-    await this.updateBudget(budgetId, { status: 'converted' });
+    console.log(`Converting budget ${budgetId} to order with contactName: ${orderData.contactName}`);
+
+    // Create the order
+    const order = await this.createOrder(orderData);
+
+    // Update budget status to converted
+    budget.status = 'converted';
+    this.budgets.set(budgetId, budget);
+
+    // If producer is specified, create production order
+    if (producerId) {
+      await this.createProductionOrder({
+        orderId: order.id,
+        producerId: producerId,
+        status: 'pending',
+        deadline: budget.deliveryDeadline || null
+      });
+    }
 
     return order;
   }
