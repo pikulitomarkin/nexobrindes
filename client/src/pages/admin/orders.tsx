@@ -602,18 +602,18 @@ export default function AdminOrders() {
                   <div>
                     <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
-                      <Input
-                        id="edit-shipping-cost"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={parseFloat(editingOrder.shippingCost || 0).toFixed(2)}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, shippingCost: parseFloat(e.target.value) || 0 })}
-                        placeholder="0,00"
-                        className="pl-10"
-                      />
-                    </div>
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
+                        <Input
+                          id="edit-shipping-cost"
+                          value={`${parseFloat(editingOrder.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                            setEditingOrder({ ...editingOrder, shippingCost: parseFloat(value) || 0 });
+                          }}
+                          placeholder="0,00"
+                          className="pl-10"
+                        />
+                      </div>
                   </div>
                 )}
 
@@ -754,6 +754,8 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
   });
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {

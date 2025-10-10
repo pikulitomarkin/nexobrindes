@@ -1245,13 +1245,11 @@ export default function VendorBudgets() {
                         <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
                         <Input
                           id="shipping-cost"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={vendorBudgetForm.shippingCost || calculateShippingCost()}
+                          value={`${(vendorBudgetForm.shippingCost || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           onChange={(e) => {
-                            const shippingCost = parseFloat(e.target.value) || 0;
-                            const total = calculateTotalWithShipping();
+                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                            const shippingCost = parseFloat(value) || 0;
+                            const total = calculateBudgetTotal() + shippingCost;
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               shippingCost,

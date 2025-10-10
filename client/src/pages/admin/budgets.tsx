@@ -894,11 +894,11 @@ export default function AdminBudgets() {
                   <Label htmlFor="admin-shipping-cost">Custo do Frete (R$)</Label>
                   <Input
                     id="admin-shipping-cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={adminBudgetForm.shippingCost}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
+                    value={`${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                      setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(value) || 0 });
+                    }}
                     placeholder="0,00"
                   />
                 </div>
