@@ -1909,87 +1909,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:budgetId/convert-to-order", async (req, res) => {
+  app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
-      const { budgetId } = req.params;
+      const { id } = req.params;
       const { clientId, producerId } = req.body;
 
-      // Validate that clientId is provided for order conversion
-      if (!clientId) {
-        return res.status(400).json({ error: "Cliente deve ser selecionado para converter orçamento em pedido" });
-      }
-
-      // Fetch budget, users, and related data using storage methods
-      const budget = await storage.getBudget(budgetId);
+      const budget = await storage.getBudget(id);
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      const client = await storage.getUser(clientId);
-      const producer = producerId ? await storage.getUser(producerId) : null;
-
-      if (!client) {
-        return res.status(400).json({ error: "Cliente não encontrado" });
-      }
-      if (producerId && !producer) {
-        return res.status(400).json({ error: "Produtor não encontrado" });
+      // Validate required fields
+      if (!budget.contactName) {
+        return res.status(400).json({ error: "Nome de contato é obrigatório no orçamento" });
       }
 
-      // Update budget with clientId before conversion
-      await storage.updateBudget(budgetId, { clientId });
-
-      // Convert budget to order
-      const order = await storage.convertBudgetToOrder(budgetId, producerId);
-
-      // Create production order for the selected producer
-      if (producerId && order) {
-        await storage.createProductionOrder({
-          orderId: order.id,
-          producerId: producerId,
-          status: 'pending',
-          deadline: order.deadline,
-          notes: `Convertido do orçamento ${budget.budgetNumber}` // Add budget number to notes
-        });
+      // Get budget items
+      const items = await storage.getBudgetItems(id);
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "Orçamento deve ter pelo menos um item" });
       }
 
-      // Fetch budget photos and items again for the enriched order
-      let budgetPhotos = [];
-      let budgetItems = [];
-      if (order.budgetId) {
-        const photos = await storage.getBudgetPhotos(order.budgetId);
-        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+      // Get payment info
+      const paymentInfo = await storage.getBudgetPaymentInfo(id);
 
-        const items = await storage.getBudgetItems(order.budgetId);
-        budgetItems = await Promise.all(
-          items.map(async (item) => {
-            const product = await storage.getProduct(item.productId);
-            return {
-              ...item,
-              product: {
-                name: product?.name || 'Produto não encontrado',
-                description: product?.description || '',
-                category: product?.category || '',
-                imageLink: product?.imageLink || ''
-              }
-            };
-          })
-        );
-      }
+      // Process items with product details
+      const processedItems = await Promise.all(
+        items.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          return {
+            productId: item.productId,
+            productName: product?.name || item.productName || 'Produto não encontrado',
+            quantity: parseInt(item.quantity) || 1,
+            unitPrice: parseFloat(item.unitPrice || '0'),
+            totalPrice: parseFloat(item.totalPrice || '0'),
+            hasItemCustomization: item.hasItemCustomization || false,
+            itemCustomizationValue: parseFloat(item.itemCustomizationValue || '0'),
+            itemCustomizationDescription: item.itemCustomizationDescription || "",
+            customizationPhoto: item.customizationPhoto || "",
+            productWidth: item.productWidth || "",
+            productHeight: item.productHeight || "",
+            productDepth: item.productDepth || ""
+          };
+        })
+      );
 
-
-      const enrichedOrder = {
-        ...order,
-        clientName: client.name, // Use the fetched client name
-        vendorName: await storage.getUser(order.vendorId).then(v => v?.name || 'Unknown'), // Fetch vendor name
-        producerName: producer?.name || null,
-        budgetPhotos: budgetPhotos,
-        budgetItems: budgetItems
+      // Create order from budget
+      const orderData = {
+        clientId: clientId || budget.clientId || null, // Can be null if no client selected
+        vendorId: budget.vendorId,
+        product: budget.title,
+        description: budget.description || "",
+        totalValue: budget.totalValue,
+        status: "confirmed",
+        deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+        deliveryDeadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+        budgetId: id,
+        // Contact information is primary - always required
+        contactName: budget.contactName,
+        contactPhone: budget.contactPhone || "",
+        contactEmail: budget.contactEmail || "",
+        deliveryType: budget.deliveryType || "delivery",
+        // Items and payment info
+        items: processedItems,
+        paymentMethodId: paymentInfo?.paymentMethodId || "",
+        shippingMethodId: paymentInfo?.shippingMethodId || "",
+        installments: paymentInfo?.installments || 1,
+        downPayment: parseFloat(paymentInfo?.downPayment || '0'),
+        remainingAmount: parseFloat(paymentInfo?.remainingAmount || '0'),
+        shippingCost: parseFloat(paymentInfo?.shippingCost || '0'),
+        hasDiscount: budget.hasDiscount || false,
+        discountType: budget.discountType || "percentage",
+        discountPercentage: parseFloat(budget.discountPercentage || '0'),
+        discountValue: parseFloat(budget.discountValue || '0')
       };
 
-      res.json(enrichedOrder);
+      console.log("Converting budget to order with data:", {
+        budgetId: id,
+        contactName: orderData.contactName,
+        clientId: orderData.clientId,
+        itemsCount: orderData.items.length,
+        totalValue: orderData.totalValue
+      });
+
+      const newOrder = await storage.createOrder(orderData);
+
+      // Update budget status to converted
+      await storage.updateBudget(id, { status: "converted" });
+
+      // If producer is specified, send to production
+      if (producerId) {
+        await storage.createProductionOrder({
+          orderId: newOrder.id,
+          producerId: producerId,
+          status: "pending",
+          deadline: newOrder.deadline,
+          notes: `Convertido do orçamento ${budget.budgetNumber}`
+        });
+
+        console.log(`Created production order for order ${newOrder.id} with producer ${producerId}`);
+      }
+
+      console.log("Budget converted successfully:", newOrder.orderNumber);
+
+      res.json({
+        success: true,
+        order: newOrder,
+        message: "Orçamento convertido em pedido com sucesso"
+      });
     } catch (error) {
       console.error("Error converting budget to order:", error);
-      res.status(500).json({ error: "Failed to convert budget to order" });
+      res.status(500).json({
+        error: "Erro ao converter orçamento em pedido",
+        details: error.message
+      });
     }
   });
 
@@ -4300,7 +4333,8 @@ Para mais detalhes, entre em contato conosco!`;
       await storage.updateBankTransaction(transactionId, {
         status: 'matched',
         matchedOrderId: orderId,
-        matchedAt: new Date()
+        matchedAt: new Date(),
+        notes: `Conciliado com pagamento de pedido ${orderId}`
       });
 
       // Create payment record with proper description
