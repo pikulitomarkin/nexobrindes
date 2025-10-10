@@ -1933,6 +1933,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get payment info
       const paymentInfo = await storage.getBudgetPaymentInfo(id);
 
+      // Generate unique order number
+      const orderNumber = `PED-${Date.now()}`;
+
       // Process items with product details
       const processedItems = await Promise.all(
         items.map(async (item) => {
@@ -1954,8 +1957,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Create order from budget
+      // Create order from budget with explicit orderNumber
       const orderData = {
+        orderNumber: orderNumber, // Garantir que o número do pedido seja passado
         clientId: clientId || budget.clientId || null, // Can be null if no client selected
         vendorId: budget.vendorId,
         product: budget.title,
@@ -1986,6 +1990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Converting budget to order with data:", {
         budgetId: id,
+        orderNumber: orderNumber,
         contactName: orderData.contactName,
         clientId: orderData.clientId,
         itemsCount: orderData.items.length,

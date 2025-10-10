@@ -423,24 +423,18 @@ export default function VendorBudgets() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, producerId }),
       });
-      if (!response.ok) throw new Error("Erro ao converter para pedido");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro ao converter orçamento: ${errorText}`);
+      }
       return response.json();
     },
-    onSuccess: (newOrder) => {
-      // Invalidate multiple queries to ensure data consistency
+    onSuccess: () => {
+      // Invalidar múltiplas queries para garantir atualização
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders/vendor", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders/client"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer"] });
-
-      // Invalidate specific client orders
-      if (convertClientId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/client", convertClientId] });
-      }
 
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
@@ -448,7 +442,14 @@ export default function VendorBudgets() {
       setConvertProducerId("");
       toast({
         title: "Sucesso!",
-        description: "Orçamento convertido em pedido e enviado para o produtor",
+        description: "Orçamento convertido em pedido com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao converter orçamento",
+        variant: "destructive",
       });
     },
   });
@@ -1027,7 +1028,8 @@ export default function VendorBudgets() {
                                     const basePrice = item.unitPrice * item.quantity;
                                     if (item.hasItemDiscount) {
                                       if (item.itemDiscountType === 'percentage') {
-                                        return ((basePrice * (item.itemDiscountPercentage || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                        const discountAmount = (basePrice * (item.itemDiscountPercentage || 0)) / 100;
+                                        return discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                                       } else {
                                         return (item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                                       }
@@ -1341,7 +1343,8 @@ export default function VendorBudgets() {
                             }, 0);
 
                             if (vendorBudgetForm.discountType === 'percentage') {
-                              return ((itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              const discountAmount = (itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100;
+                              return discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             } else {
                               return (parseFloat(vendorBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             }
@@ -1378,7 +1381,8 @@ export default function VendorBudgets() {
                         }, 0);
 
                         if (vendorBudgetForm.discountType === 'percentage') {
-                          return ((itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                          const discountAmount = (itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100;
+                          return discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         } else {
                           return (parseFloat(vendorBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         }

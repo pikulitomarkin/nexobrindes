@@ -1187,6 +1187,7 @@ export class MemStorage implements IStorage {
     const order: Order = {
       ...orderData,
       id,
+      orderNumber: orderData.orderNumber || `PED-${Date.now()}`, // Garantir que orderNumber seja definido
       producerId: orderData.producerId || null,
       budgetId: orderData.budgetId || null,
       description: orderData.description || null,
