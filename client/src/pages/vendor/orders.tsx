@@ -529,7 +529,7 @@ export default function VendorOrders() {
   const handleEditOrder = (order: any) => {
     // Pre-populate form with existing order data
     setVendorOrderForm({
-      title: order.title,
+      title: order.product || order.title || "",
       description: order.description || "",
       clientId: order.clientId || "",
       contactName: order.contactName || "",
