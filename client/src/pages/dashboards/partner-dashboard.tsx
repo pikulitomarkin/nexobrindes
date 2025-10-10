@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,11 +63,11 @@ export default function PartnerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header - Idêntico ao admin */}
       <div className="bg-white shadow-sm border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Painel do Sócio</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Painel Administrativo</h1>
             <p className="text-gray-600">Bem-vindo, {user.name}</p>
           </div>
           <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
@@ -77,7 +78,7 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="p-6">
-        {/* Main Stats Cards - Igual ao Admin */}
+        {/* Main Stats Cards - Idênticos ao admin */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card data-testid="card-total-orders">
             <CardContent className="p-6">
@@ -140,7 +141,7 @@ export default function PartnerDashboard() {
           </Card>
         </div>
 
-        {/* Financial Summary Cards - Igual ao Admin */}
+        {/* Financial Summary Cards - Idênticos ao admin */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card data-testid="card-orders-today">
             <CardContent className="p-6">
@@ -183,7 +184,7 @@ export default function PartnerDashboard() {
           </Card>
         </div>
 
-        {/* Recent Orders & Quick Actions - Igual ao Admin */}
+        {/* Recent Orders & Quick Actions - Idênticos ao admin */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-recent-orders">
             <CardHeader className="flex flex-row items-center justify-between">
