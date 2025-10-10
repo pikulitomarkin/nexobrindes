@@ -447,63 +447,191 @@ export default function AdminOrders() {
         {/* Edit Order Dialog */}
         {editingOrder && (
           <Dialog open={!!editingOrder} onOpenChange={() => setEditingOrder(null)}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Editar Pedido</DialogTitle>
+                <DialogTitle>Editar Pedido #{editingOrder.orderNumber}</DialogTitle>
                 <DialogDescription>Atualize os dados do pedido</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="edit-product">Produto</Label>
-                  <Input
-                    id="edit-product"
-                    value={editingOrder.product}
-                    onChange={(e) => setEditingOrder({ ...editingOrder, product: e.target.value })}
-                  />
+              <div className="space-y-6">
+                {/* Basic Order Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-product">Produto</Label>
+                    <Input
+                      id="edit-product"
+                      value={editingOrder.product || ""}
+                      onChange={(e) => setEditingOrder({ ...editingOrder, product: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={editingOrder.status || "pending"}
+                      onValueChange={(value) => setEditingOrder({ ...editingOrder, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Aguardando</SelectItem>
+                        <SelectItem value="confirmed">Confirmado</SelectItem>
+                        <SelectItem value="production">Em Produção</SelectItem>
+                        <SelectItem value="shipped">Enviado</SelectItem>
+                        <SelectItem value="delivered">Entregue</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
                 <div>
                   <Label htmlFor="edit-description">Descrição</Label>
                   <Textarea
                     id="edit-description"
+                    rows={3}
                     value={editingOrder.description || ""}
                     onChange={(e) => setEditingOrder({ ...editingOrder, description: e.target.value })}
                   />
                 </div>
+
+                {/* Contact Information */}
                 <div>
-                  <Label htmlFor="edit-totalValue">Valor Total</Label>
-                  <Input
-                    id="edit-totalValue"
-                    type="number"
-                    step="0.01"
-                    value={editingOrder.totalValue}
-                    onChange={(e) => setEditingOrder({ ...editingOrder, totalValue: e.target.value })}
-                  />
+                  <h3 className="text-lg font-medium mb-3">Informações de Contato</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="edit-contact-name">Nome de Contato</Label>
+                      <Input
+                        id="edit-contact-name"
+                        value={editingOrder.contactName || ""}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, contactName: e.target.value })}
+                        placeholder="Nome do cliente"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-contact-phone">Telefone</Label>
+                      <Input
+                        id="edit-contact-phone"
+                        value={editingOrder.contactPhone || ""}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, contactPhone: e.target.value })}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-contact-email">Email</Label>
+                      <Input
+                        id="edit-contact-email"
+                        type="email"
+                        value={editingOrder.contactEmail || ""}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, contactEmail: e.target.value })}
+                        placeholder="cliente@email.com"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Financial Information */}
                 <div>
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select
-                    value={editingOrder.status}
-                    onValueChange={(value) => setEditingOrder({ ...editingOrder, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Aguardando</SelectItem>
-                      <SelectItem value="confirmed">Confirmado</SelectItem>
-                      <SelectItem value="production">Em Produção</SelectItem>
-                      <SelectItem value="shipped">Enviado</SelectItem>
-                      <SelectItem value="delivered">Entregue</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <h3 className="text-lg font-medium mb-3">Informações Financeiras</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-totalValue">Valor Total (R$)</Label>
+                      <Input
+                        id="edit-totalValue"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingOrder.totalValue || "0.00"}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, totalValue: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-paidValue">Valor Pago (R$)</Label>
+                      <Input
+                        id="edit-paidValue"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingOrder.paidValue || "0.00"}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, paidValue: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Delivery Information */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Informações de Entrega</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-delivery-type">Tipo de Entrega</Label>
+                      <Select
+                        value={editingOrder.deliveryType || "delivery"}
+                        onValueChange={(value) => setEditingOrder({ ...editingOrder, deliveryType: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="delivery">Entrega com Frete</SelectItem>
+                          <SelectItem value="pickup">Retirada no Local</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-deadline">Prazo de Entrega</Label>
+                      <Input
+                        id="edit-deadline"
+                        type="date"
+                        value={editingOrder.deadline ? new Date(editingOrder.deadline).toISOString().split('T')[0] : ""}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, deadline: e.target.value ? new Date(e.target.value) : null })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tracking Information */}
+                {(editingOrder.status === 'shipped' || editingOrder.status === 'delivered') && (
+                  <div>
+                    <Label htmlFor="edit-tracking-code">Código de Rastreamento</Label>
+                    <Input
+                      id="edit-tracking-code"
+                      value={editingOrder.trackingCode || ""}
+                      onChange={(e) => setEditingOrder({ ...editingOrder, trackingCode: e.target.value })}
+                      placeholder="Código de rastreamento"
+                    />
+                  </div>
+                )}
+
+                {/* Order Items Display (read-only for now) */}
+                {editingOrder.items && editingOrder.items.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Itens do Pedido</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {editingOrder.items.map((item: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <div>
+                            <span className="font-medium">{item.productName}</span>
+                            <span className="text-sm text-gray-500 ml-2">Qtd: {item.quantity}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                            {item.hasItemCustomization && (
+                              <div className="text-xs text-blue-600">Com personalização</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end space-x-2 mt-6">
                 <Button variant="outline" onClick={() => setEditingOrder(null)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleUpdateOrder}>Salvar</Button>
+                <Button onClick={handleUpdateOrder} disabled={updateOrderMutation.isPending}>
+                  {updateOrderMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
