@@ -1715,9 +1715,6 @@ export default function VendorOrders() {
                         {order.status === 'production' && productionStatuses?.[order.id] && (
                           <div className="text-xs text-gray-600 space-y-1">
                             <div>Produtor: {productionStatuses[order.id].producerName}</div>
-                            {productionStatuses[order.id].producerValue && (
-                              <div>Valor: R$ {parseFloat(productionStatuses[order.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                            )}
                             {productionStatuses[order.id].deliveryDate && (
                               <div>Entrega: {new Date(productionStatuses[order.id].deliveryDate).toLocaleDateString('pt-BR')}</div>
                             )}
@@ -2225,15 +2222,6 @@ export default function VendorOrders() {
                               Última atualização: {new Date(productionStatuses[selectedOrder.id].lastNoteAt).toLocaleString('pt-BR')}
                             </p>
                           )}
-                        </div>
-                      )}
-
-                      {productionStatuses[selectedOrder.id]?.producerValue && (
-                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <label className="text-sm font-medium text-green-700">Valor da Produção:</label>
-                          <p className="text-green-800 text-lg font-bold mt-1">
-                            R$ {parseFloat(productionStatuses[selectedOrder.id].producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
                         </div>
                       )}
 
