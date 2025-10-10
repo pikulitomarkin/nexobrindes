@@ -122,11 +122,44 @@ export default function AdminReports() {
     return data.filter((item) => {
       // Filtro de data
       let dateMatch = true;
-      if (dateRange) {
+      if (dateRange && dateRange.from && dateRange.to) {
         const itemDate = new Date(item[dateField]);
-        dateMatch = itemDate >= dateRange.from && itemDate <= dateRange.to;
-      } else if (dateFilter !== 'all') {
-        const filterDate = new Date(Date.now() - (parseInt(dateFilter) * 24 * 60 * 60 * 1000));
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        
+        // Ajustar hora para comparação correta
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        
+        dateMatch = itemDate >= fromDate && itemDate <= toDate;
+      } else if (dateFilter !== 'all' && dateFilter !== 'custom') {
+        let filterDate: Date;
+        const now = new Date();
+        
+        switch (dateFilter) {
+          case 'today':
+            filterDate = new Date();
+            filterDate.setHours(0, 0, 0, 0);
+            break;
+          case '7':
+            filterDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+            break;
+          case '30':
+            filterDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+            break;
+          case '90':
+            filterDate = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000));
+            break;
+          case '180':
+            filterDate = new Date(now.getTime() - (180 * 24 * 60 * 60 * 1000));
+            break;
+          case '365':
+            filterDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
+            break;
+          default:
+            filterDate = new Date(now.getTime() - (parseInt(dateFilter) * 24 * 60 * 60 * 1000));
+        }
+        
         const itemDate = new Date(item[dateField]);
         dateMatch = itemDate >= filterDate;
       }
@@ -140,14 +173,26 @@ export default function AdminReports() {
       // Filtro de produtor
       const producerMatch = producerFilter === 'all' || item.producerId === producerFilter;
       
-      // Filtro de busca
+      // Filtro de categoria (para despesas e outros)
+      const categoryMatch = categoryFilter === 'all' || 
+        item.category === categoryFilter ||
+        (categoryFilter === 'receivables' && item.type === 'receivable') ||
+        (categoryFilter === 'payables' && item.type === 'payable') ||
+        (categoryFilter === 'expenses' && item.type === 'expense') ||
+        (categoryFilter === 'revenues' && item.type === 'revenue');
+      
+      // Filtro de busca expandido
       const searchMatch = searchFilter === '' || 
         item.orderNumber?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         item.clientName?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         item.product?.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchFilter.toLowerCase());
+        item.description?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        item.producerName?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        item.vendorName?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        item.client?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        item.vendor?.toLowerCase().includes(searchFilter.toLowerCase());
 
-      return dateMatch && statusMatch && vendorMatch && producerMatch && searchMatch;
+      return dateMatch && statusMatch && vendorMatch && producerMatch && categoryMatch && searchMatch;
     });
   };
 
@@ -545,6 +590,11 @@ export default function AdminReports() {
     setCategoryFilter('all');
     setSearchFilter('');
     setDateRange(undefined);
+    
+    toast({
+      title: "Filtros limpos",
+      description: "Todos os filtros foram resetados para os valores padrão.",
+    });
   };
 
   return (
@@ -570,73 +620,79 @@ export default function AdminReports() {
         </div>
       </div>
 
-      {/* Filtros Avançados */}
+      {/* Filtros Específicos por Aba */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filtros Avançados
+            Filtros - {activeTab === 'overview' ? 'Visão Geral' : 
+                      activeTab === 'financeiro' ? 'Financeiro' : 
+                      activeTab === 'vendas' ? 'Vendas' : 
+                      activeTab === 'producao' ? 'Produção' : 
+                      activeTab === 'comissoes' ? 'Comissões' : 'Analytics'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Filtros Comuns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Período</label>
+              <label className="text-sm font-medium mb-2 block">Período Rápido</label>
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Período" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="today">Hoje</SelectItem>
                   <SelectItem value="7">Últimos 7 dias</SelectItem>
                   <SelectItem value="30">Últimos 30 dias</SelectItem>
                   <SelectItem value="90">Últimos 90 dias</SelectItem>
+                  <SelectItem value="180">Últimos 6 meses</SelectItem>
                   <SelectItem value="365">Último ano</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos os dados</SelectItem>
+                  <SelectItem value="custom">Período personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="confirmed">Confirmado</SelectItem>
-                  <SelectItem value="production">Em Produção</SelectItem>
-                  <SelectItem value="shipped">Enviado</SelectItem>
-                  <SelectItem value="delivered">Entregue</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Vendedor</label>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vendedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {vendors.map((vendor: any) => (
-                    <SelectItem key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {dateFilter === 'custom' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Inicial</label>
+                  <Input
+                    type="date"
+                    value={dateRange?.from ? dateRange.from.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const newDate = new Date(e.target.value);
+                      setDateRange(prev => ({
+                        from: newDate,
+                        to: prev?.to || new Date()
+                      }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Final</label>
+                  <Input
+                    type="date"
+                    value={dateRange?.to ? dateRange.to.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const newDate = new Date(e.target.value);
+                      setDateRange(prev => ({
+                        from: prev?.from || new Date(),
+                        to: newDate
+                      }));
+                    }}
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="text-sm font-medium mb-2 block">Buscar</label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Buscar pedidos, clientes..."
+                  placeholder="Buscar..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   className="pl-10"
@@ -644,6 +700,268 @@ export default function AdminReports() {
               </div>
             </div>
           </div>
+
+          {/* Filtros Específicos por Aba */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(activeTab === 'overview' || activeTab === 'vendas') && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status do Pedido</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="confirmed">Confirmado</SelectItem>
+                      <SelectItem value="production">Em Produção</SelectItem>
+                      <SelectItem value="shipped">Enviado</SelectItem>
+                      <SelectItem value="delivered">Entregue</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Vendedor</label>
+                  <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Vendedores</SelectItem>
+                      {vendors.map((vendor: any) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'producao' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Produtor</label>
+                  <Select value={producerFilter} onValueChange={setProducerFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Produtor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Produtores</SelectItem>
+                      {producers.map((producer: any) => (
+                        <SelectItem key={producer.id} value={producer.id}>
+                          {producer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status de Produção</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="production">Em Produção</SelectItem>
+                      <SelectItem value="ready">Pronto</SelectItem>
+                      <SelectItem value="shipped">Enviado</SelectItem>
+                      <SelectItem value="delivered">Entregue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'financeiro' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Tipo de Conta</label>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Tipos</SelectItem>
+                      <SelectItem value="receivables">Contas a Receber</SelectItem>
+                      <SelectItem value="payables">Contas a Pagar</SelectItem>
+                      <SelectItem value="expenses">Despesas</SelectItem>
+                      <SelectItem value="revenues">Receitas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status Financeiro</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="partial">Parcial</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                      <SelectItem value="overdue">Vencido</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'comissoes' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Vendedor</label>
+                  <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Vendedores</SelectItem>
+                      {vendors.map((vendor: any) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status da Comissão</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="confirmed">Confirmado</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'analytics' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Categoria de Despesa</label>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Categorias</SelectItem>
+                      <SelectItem value="operational">Operacional</SelectItem>
+                      <SelectItem value="marketing">Marketing</SelectItem>
+                      <SelectItem value="travel">Viagem</SelectItem>
+                      <SelectItem value="equipment">Equipamento</SelectItem>
+                      <SelectItem value="office">Escritório</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status da Despesa</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="approved">Aprovado</SelectItem>
+                      <SelectItem value="rejected">Rejeitado</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Indicadores dos Filtros Aplicados */}
+          {(dateFilter !== '30' || statusFilter !== 'all' || vendorFilter !== 'all' || producerFilter !== 'all' || categoryFilter !== 'all' || searchFilter !== '' || dateRange) && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Filtros aplicados:</span>
+                
+                {dateFilter !== '30' && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {dateFilter === 'today' ? 'Hoje' : 
+                     dateFilter === '7' ? '7 dias' : 
+                     dateFilter === '90' ? '90 dias' : 
+                     dateFilter === '180' ? '6 meses' : 
+                     dateFilter === '365' ? '1 ano' : 
+                     dateFilter === 'all' ? 'Todos' : 
+                     dateFilter === 'custom' ? 'Personalizado' : `${dateFilter} dias`}
+                  </Badge>
+                )}
+
+                {dateRange && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {dateRange.from.toLocaleDateString('pt-BR')} - {dateRange.to.toLocaleDateString('pt-BR')}
+                  </Badge>
+                )}
+
+                {statusFilter !== 'all' && (
+                  <Badge variant="outline">
+                    Status: {statusFilter === 'pending' ? 'Pendente' : 
+                            statusFilter === 'confirmed' ? 'Confirmado' : 
+                            statusFilter === 'production' ? 'Em Produção' : 
+                            statusFilter === 'delivered' ? 'Entregue' : statusFilter}
+                  </Badge>
+                )}
+
+                {vendorFilter !== 'all' && (
+                  <Badge variant="outline">
+                    Vendedor: {vendors.find((v: any) => v.id === vendorFilter)?.name || vendorFilter}
+                  </Badge>
+                )}
+
+                {producerFilter !== 'all' && (
+                  <Badge variant="outline">
+                    Produtor: {producers.find((p: any) => p.id === producerFilter)?.name || producerFilter}
+                  </Badge>
+                )}
+
+                {categoryFilter !== 'all' && (
+                  <Badge variant="outline">
+                    Categoria: {categoryFilter}
+                  </Badge>
+                )}
+
+                {searchFilter !== '' && (
+                  <Badge variant="outline">
+                    Busca: "{searchFilter}"
+                  </Badge>
+                )}
+
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearFilters}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  ✕ Limpar todos
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
