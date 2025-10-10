@@ -1474,6 +1474,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create payments endpoint (used by receivables module)
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const { orderId, amount, method, status, transactionId, notes, paidAt } = req.body;
+
+      console.log("Creating payment:", { orderId, amount, method, status });
+
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID é obrigatório" });
+      }
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      // Verify order exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Create payment
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: parseFloat(amount).toFixed(2),
+        method: method || "manual",
+        status: status || "confirmed",
+        transactionId: transactionId || `MANUAL-${Date.now()}`,
+        notes: notes || "",
+        paidAt: paidAt ? new Date(paidAt) : new Date()
+      });
+
+      console.log("Payment created successfully:", payment.id);
+      res.json(payment);
+    } catch (error) {
+      console.error("Error creating payment:", error);
+      res.status(500).json({ error: "Erro ao criar pagamento: " + error.message });
+    }
+  });
+
   // Create test payment for order
   app.post("/api/orders/:id/create-test-payment", async (req, res) => {
     try {
@@ -3986,19 +4026,27 @@ Para mais detalhes, entre em contato conosco!`;
       const { amount, method, transactionId, notes } = req.body;
       const receivableId = req.params.id;
 
+      console.log("Processing receivable payment:", { receivableId, amount, method });
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
       // Get the receivable to find the actual order ID
-      const receivable = await storage.getAccountsReceivable().then(receivables =>
-        receivables.find(r => r.id === receivableId)
-      );
+      const receivables = await storage.getAccountsReceivable();
+      const receivable = receivables.find(r => r.id === receivableId);
 
       if (!receivable) {
+        console.error("Receivable not found:", receivableId);
         return res.status(404).json({ error: "Conta a receber não encontrada" });
       }
+
+      console.log("Found receivable:", receivable);
 
       // Create a confirmed payment record using the actual order ID
       const payment = await storage.createPayment({
         orderId: receivable.orderId, // Use the actual order ID
-        amount: amount.toString(),
+        amount: parseFloat(amount).toFixed(2),
         method: method || "manual",
         status: "confirmed",
         transactionId: transactionId || `MANUAL-${Date.now()}`,
@@ -4006,8 +4054,11 @@ Para mais detalhes, entre em contato conosco!`;
         paidAt: new Date()
       });
 
+      console.log("Created payment:", payment);
+
       // Update the receivable with new received amount
-      const newReceivedAmount = parseFloat(receivable.receivedAmount) + parseFloat(amount);
+      const currentReceived = parseFloat(receivable.receivedAmount || '0');
+      const newReceivedAmount = currentReceived + parseFloat(amount);
       const totalAmount = parseFloat(receivable.amount);
 
       let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = receivable.status;
@@ -4017,15 +4068,18 @@ Para mais detalhes, entre em contato conosco!`;
         newStatus = 'partial';
       }
 
+      console.log("Updating receivable status:", { newReceivedAmount, totalAmount, newStatus });
+
       await storage.updateAccountsReceivable(receivableId, {
         receivedAmount: newReceivedAmount.toFixed(2),
         status: newStatus
       });
 
+      console.log("Successfully processed receivable payment");
       res.json({ success: true, payment });
     } catch (error) {
       console.error("Error creating manual payment:", error);
-      res.status(500).json({ error: "Failed to create manual payment" });
+      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
     }
   });
 
