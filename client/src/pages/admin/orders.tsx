@@ -123,7 +123,7 @@ export default function AdminOrders() {
       const productionOrdersResponse = await fetch(`/api/production-orders/order/${orderId}`);
       if (!productionOrdersResponse.ok) throw new Error("Failed to fetch production orders");
       const productionOrders = await productionOrdersResponse.json();
-      
+
       // Acknowledge notes for all production orders of this order
       for (const po of productionOrders) {
         if (po.hasUnreadNotes) {
@@ -590,6 +590,33 @@ export default function AdminOrders() {
                   </div>
                 </div>
 
+                {/* Shipping Cost */}
+                {editingOrder.deliveryType === "pickup" ? (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800">Retirada no Local</h4>
+                    <p className="text-sm text-blue-700 mt-2">
+                      O cliente irá retirar o pedido no local. Não há cobrança de frete.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
+                      <Input
+                        id="edit-shipping-cost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={parseFloat(editingOrder.shippingCost || 0).toFixed(2)}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, shippingCost: parseFloat(e.target.value) || 0 })}
+                        placeholder="0,00"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Tracking Information */}
                 {(editingOrder.status === 'shipped' || editingOrder.status === 'delivered') && (
                   <div>
@@ -891,7 +918,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
                       {getStatusBadge(po.status)}
                     </div>
                   </div>
-                  
+
                   {po.notes && (
                     <div className="mt-3 p-3 bg-gray-100 rounded-lg">
                       <label className="text-sm font-medium text-gray-600">Observações do Produtor:</label>
