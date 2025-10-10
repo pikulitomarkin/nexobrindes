@@ -31,7 +31,8 @@ interface Partner {
   id: string;
   name: string;
   email: string;
-  accessCode: string;
+  username: string;
+  password: string;
   phone?: string;
   createdAt: string;
   isActive: boolean;
@@ -44,7 +45,8 @@ export default function AdminPartners() {
     name: "",
     email: "",
     phone: "",
-    accessCode: ""
+    username: "",
+    password: ""
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -143,17 +145,13 @@ export default function AdminPartners() {
     },
   });
 
-  const generateAccessCode = () => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setPartnerForm({ ...partnerForm, accessCode: code });
-  };
-
   const resetForm = () => {
     setPartnerForm({
       name: "",
       email: "",
       phone: "",
-      accessCode: ""
+      username: "",
+      password: ""
     });
   };
 
@@ -163,7 +161,8 @@ export default function AdminPartners() {
       name: partner.name,
       email: partner.email,
       phone: partner.phone || "",
-      accessCode: partner.accessCode
+      username: partner.username,
+      password: ""
     });
     setIsDialogOpen(true);
   };
@@ -171,7 +170,7 @@ export default function AdminPartners() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!partnerForm.name || !partnerForm.email || !partnerForm.accessCode) {
+    if (!partnerForm.name || !partnerForm.email || !partnerForm.username || !partnerForm.password) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
@@ -264,19 +263,25 @@ export default function AdminPartners() {
                 />
               </div>
               <div>
-                <Label htmlFor="accessCode">Código de Acesso *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="accessCode"
-                    value={partnerForm.accessCode}
-                    onChange={(e) => setPartnerForm({ ...partnerForm, accessCode: e.target.value })}
-                    placeholder="Código de acesso"
-                    required
-                  />
-                  <Button type="button" variant="outline" onClick={generateAccessCode}>
-                    <Key className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Label htmlFor="username">Username *</Label>
+                <Input
+                  id="username"
+                  value={partnerForm.username}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, username: e.target.value })}
+                  placeholder="Username para login"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="password">Senha *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={partnerForm.password}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, password: e.target.value })}
+                  placeholder="Senha para acesso"
+                  required
+                />
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button
@@ -321,7 +326,7 @@ export default function AdminPartners() {
                     Telefone
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Código de Acesso
+                    Username
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -351,9 +356,7 @@ export default function AdminPartners() {
                         {partner.phone || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                          {partner.accessCode}
-                        </code>
+                        {partner.username}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={partner.isActive ? "default" : "secondary"}>

@@ -3,22 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, TrendingUp, Users, Package, LogOut, ShoppingCart, Factory, Calendar, Eye, ArrowUpRight } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function PartnerDashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  
+
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
 
   const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
-  });
-  
-  const { data: commissions } = useQuery({
-    queryKey: [`/api/commissions/partner/${user.id}`],
   });
 
   const handleLogout = () => {
@@ -27,9 +23,16 @@ export default function PartnerDashboard() {
     window.location.href = "/login";
   };
 
-  const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
-  const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
-  const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) || 0;
+  const quickActions = [
+    { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
+    { href: "/admin/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
+    { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+    { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
+    { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
+    { href: "/admin/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
+    { href: "/admin/reports", icon: BarChart3, label: "Relatórios", color: "text-rose-600" },
+    { href: "/admin/partners", icon: Users, label: "Sócios", color: "text-teal-600" },
+  ];
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
@@ -74,7 +77,7 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="p-6">
-        {/* Main Business Stats Cards - Same as Admin */}
+        {/* Main Stats Cards - Igual ao Admin */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card data-testid="card-total-orders">
             <CardContent className="p-6">
@@ -137,46 +140,16 @@ export default function PartnerDashboard() {
           </Card>
         </div>
 
-        {/* Commission & Financial Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card data-testid="card-total-commissions">
+        {/* Financial Summary Cards - Igual ao Admin */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card data-testid="card-orders-today">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pedidos Hoje</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats?.ordersToday || 0}</p>
                 </div>
-                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-pending-commissions">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pendentes</p>
-                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-paid-commissions">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pagas</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    R$ {paidCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </CardContent>
           </Card>
@@ -186,25 +159,41 @@ export default function PartnerDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Receita Mensal</p>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                     R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                   </p>
                 </div>
-                <Calendar className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-pending-payments">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pagamentos Pendentes</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    R$ {stats?.pendingPayments?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </p>
+                </div>
+                <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Orders & Commission History */}
+        {/* Recent Orders & Quick Actions - Igual ao Admin */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-recent-orders">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Últimos Pedidos</CardTitle>
-              <Button variant="outline" size="sm" data-testid="button-view-all-orders">
-                <Eye className="h-4 w-4 mr-2" />
-                Ver Todos
-              </Button>
+              <Link href="/admin/orders">
+                <Button variant="outline" size="sm" data-testid="button-view-all-orders">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver Todos
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -232,48 +221,25 @@ export default function PartnerDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-commission-history">
+          <Card data-testid="card-quick-actions">
             <CardHeader>
-              <CardTitle>Histórico de Comissões Recentes</CardTitle>
+              <CardTitle>Ações Rápidas</CardTitle>
             </CardHeader>
             <CardContent>
-              {!commissions || commissions.length === 0 ? (
-                <div className="text-center py-8">
-                  <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500 dark:text-gray-400">Nenhuma comissão disponível ainda.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {commissions.slice(0, 5).map((commission: any) => (
-                    <div key={commission.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <div>
-                        <p className="font-semibold text-sm">Pedido #{commission.orderId?.slice(-6) || 'N/A'}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
-                        </p>
+              <div className="grid grid-cols-2 gap-4">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <Link key={action.href} href={action.href}>
+                      <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" data-testid={`link-${action.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                        <Icon className={`h-5 w-5 ${action.color} mr-3`} />
+                        <span className="font-medium text-sm">{action.label}</span>
+                        <ArrowUpRight className="h-4 w-4 ml-auto text-gray-400" />
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-sm text-green-600 dark:text-green-400">
-                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                        <Badge className={`${
-                          commission.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 
-                          commission.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' : 
-                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                        }`}>
-                          {commission.status === 'paid' ? 'Paga' : 
-                           commission.status === 'pending' ? 'Pendente' : 'Outro'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {commissions.length > 5 && (
-                    <div className="text-center pt-4">
-                      <Button variant="outline" size="sm">Ver Histórico Completo</Button>
-                    </div>
-                  )}
-                </div>
-              )}
+                    </Link>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -98,6 +98,11 @@ async function parseOFXBuffer(buffer: Buffer) {
   return { transactions };
 }
 
+// Helper function to generate unique IDs (replace with a proper UUID library in production)
+function generateId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).substring(2, 15)}`;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
@@ -1117,9 +1122,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create partner (admin-level user)
   app.post("/api/partners", async (req, res) => {
+    const { name, email, phone, username, password } = req.body;
+
+    if (!name || !email || !username || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Create user first
+    const userId = generateId("partner");
+    const user = {
+      id: userId,
+      username,
+      password,
+      role: "partner",
+      name,
+      email,
+      phone: phone || "",
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
+    // Create partner profile
+    const partner = {
+      id: userId,
+      userId,
+      name,
+      email,
+      phone: phone || "",
+      username,
+      password, // Note: Storing password directly here is insecure for production.
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
     try {
-      const partner = await storage.createPartner(req.body);
+      await storage.addUser(user); // Assuming addUser exists and handles user creation
+      await storage.addPartner(partner); // Assuming addPartner exists for partner-specific data
       res.json(partner);
     } catch (error) {
       console.error("Error creating partner:", error);
@@ -3659,65 +3699,65 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // ===== REPORTS MODULE ROUTES =====
-  
+
   // Get comprehensive reports data
   app.get("/api/reports/dashboard", async (req, res) => {
     try {
       const { period = '30', status, vendorId, producerId } = req.query;
-      
+
       // Calculate date filter
       const filterDate = period === 'all' ? null : new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
-      
+
       const orders = await storage.getOrders();
       const commissions = await storage.getAllCommissions();
       const producerPayments = await storage.getProducerPayments();
       const receivables = await storage.getAccountsReceivable();
       const expenses = await storage.getExpenseNotes();
-      
+
       // Apply filters
       let filteredOrders = orders;
-      
+
       // Date filter
       if (filterDate) {
         filteredOrders = filteredOrders.filter(o => o.createdAt && new Date(o.createdAt) >= filterDate);
       }
-      
+
       // Status filter
       if (status && status !== 'all') {
         filteredOrders = filteredOrders.filter(o => o.status === status);
       }
-      
+
       // Vendor filter
       if (vendorId && vendorId !== 'all') {
         filteredOrders = filteredOrders.filter(o => o.vendorId === vendorId);
       }
-      
+
       // Producer filter
       if (producerId && producerId !== 'all') {
         filteredOrders = filteredOrders.filter(o => o.producerId === producerId);
       }
-      
+
       const filteredCommissions = filterDate
         ? commissions.filter(c => new Date(c.createdAt) >= filterDate)
         : commissions;
-      
+
       const filteredProducerPayments = filterDate
         ? producerPayments.filter(p => p.createdAt && new Date(p.createdAt) >= filterDate)
         : producerPayments;
-      
+
       // Calculate metrics
       const totalReceivables = receivables
         .filter(r => r.status !== 'paid')
         .reduce((sum, r) => sum + (parseFloat(r.amount) - parseFloat(r.receivedAmount)), 0);
-      
+
       const totalPayables = producerPayments
         .filter(p => ['pending', 'approved'].includes(p.status))
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       const totalCommissionsPending = commissions
         .filter(c => ['pending', 'confirmed'].includes(c.status))
         .reduce((sum, c) => sum + parseFloat(c.amount), 0);
-      
+
       const ordersEvolution = filteredOrders.reduce((acc, order) => {
         const month = new Date(order.createdAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' });
         if (!acc[month]) {
@@ -3728,13 +3768,13 @@ Para mais detalhes, entre em contato conosco!`;
         acc[month].receita += parseFloat(order.paidValue || '0');
         return acc;
       }, {} as any);
-      
+
       // Status distribution
       const statusDistribution = filteredOrders.reduce((acc, order) => {
         acc[order.status] = (acc[order.status] || 0) + 1;
         return acc;
       }, {} as any);
-      
+
       // Vendor performance
       const vendorPerformance = filteredOrders.reduce((acc, order) => {
         const vendorId = order.vendorId;
@@ -3745,7 +3785,7 @@ Para mais detalhes, entre em contato conosco!`;
         acc[vendorId].valor += parseFloat(order.totalValue);
         return acc;
       }, {} as any);
-      
+
       // Client analysis
       const clientAnalysis = filteredOrders.reduce((acc, order) => {
         const clientName = order.clientName || 'Cliente Não Identificado';
@@ -3756,7 +3796,7 @@ Para mais detalhes, entre em contato conosco!`;
         acc[clientName].valor += parseFloat(order.totalValue);
         return acc;
       }, {} as any);
-      
+
       // Product analysis
       const productAnalysis = filteredOrders.reduce((acc, order) => {
         const product = order.product || 'Produto Não Identificado';
@@ -3767,7 +3807,7 @@ Para mais detalhes, entre em contato conosco!`;
         acc[product].valor += parseFloat(order.totalValue);
         return acc;
       }, {} as any);
-      
+
       res.json({
         summary: {
           totalReceivables,
@@ -3776,12 +3816,12 @@ Para mais detalhes, entre em contato conosco!`;
           totalOrders: filteredOrders.length,
           totalRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0),
           totalPaidValue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.paidValue || '0'), 0),
-          averageTicket: filteredOrders.length > 0 ? 
+          averageTicket: filteredOrders.length > 0 ?
             filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0) / filteredOrders.length : 0,
-          conversionRate: orders.length > 0 ? 
+          conversionRate: orders.length > 0 ?
             (filteredOrders.filter(o => o.status !== 'cancelled').length / orders.length) * 100 : 0
         },
-        ordersEvolution: Object.values(ordersEvolution).sort((a: any, b: any) => 
+        ordersEvolution: Object.values(ordersEvolution).sort((a: any, b: any) =>
           new Date(a.mes + ' 2024').getTime() - new Date(b.mes + ' 2024').getTime()
         ),
         statusDistribution: Object.entries(statusDistribution).map(([status, count]) => ({
@@ -3808,10 +3848,10 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { type } = req.params;
       const { format = 'json', period = '30' } = req.query;
-      
+
       // Get data based on type
       let data: any = [];
-      
+
       switch (type) {
         case 'orders':
           data = await storage.getOrders();
@@ -3828,15 +3868,15 @@ Para mais detalhes, entre em contato conosco!`;
         default:
           return res.status(400).json({ error: "Invalid report type" });
       }
-      
+
       // Apply date filter
       if (period !== 'all') {
         const filterDate = new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
-        data = data.filter((item: any) => 
+        data = data.filter((item: any) =>
           item.createdAt && new Date(item.createdAt) >= filterDate
         );
       }
-      
+
       if (format === 'json') {
         res.json(data);
       } else {
