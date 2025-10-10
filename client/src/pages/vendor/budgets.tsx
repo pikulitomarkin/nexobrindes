@@ -1201,12 +1201,11 @@ export default function VendorBudgets() {
                         <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
                         <Input
                           id="down-payment"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={vendorBudgetForm.downPayment || 0}
+                          type="text"
+                          value={vendorBudgetForm.downPayment ? `R$ ${vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                           onChange={(e) => {
-                            const downPayment = parseFloat(e.target.value) || 0;
+                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                            const downPayment = parseFloat(value) || 0;
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1214,7 +1213,7 @@ export default function VendorBudgets() {
                               remainingAmount: Math.max(0, total - downPayment)
                             });
                           }}
-                          placeholder="0,00"
+                          placeholder="R$ 0,00"
                         />
                       </div>
                       <div>
@@ -1245,12 +1244,11 @@ export default function VendorBudgets() {
                         <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
                         <Input
                           id="shipping-cost"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={vendorBudgetForm.shippingCost || calculateShippingCost()}
+                          type="text"
+                          value={(vendorBudgetForm.shippingCost || calculateShippingCost()) ? `R$ ${(vendorBudgetForm.shippingCost || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                           onChange={(e) => {
-                            const shippingCost = parseFloat(e.target.value) || 0;
+                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                            const shippingCost = parseFloat(value) || 0;
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1258,7 +1256,7 @@ export default function VendorBudgets() {
                               remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
                             });
                           }}
-                          placeholder="0,00"
+                          placeholder="R$ 0,00"
                         />
                       </div>
                       <div>
