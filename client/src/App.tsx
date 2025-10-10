@@ -175,11 +175,11 @@ function App() {
             </ProtectedRoute>
           </Route>
 
-          {/* Partner Routes - Same as admin but with separate commissions */}
+          {/* Partner Routes - Same as admin */}
           <Route path="/partner/clients">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerClients />
+                <AdminClients />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -187,7 +187,7 @@ function App() {
           <Route path="/partner/vendors">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerVendors />
+                <AdminVendors />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -195,7 +195,7 @@ function App() {
           <Route path="/partner/commission-management">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerCommissionManagement />
+                <AdminCommissionManagement />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -203,7 +203,7 @@ function App() {
           <Route path="/partner/products">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerProducts />
+                <AdminProducts />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -211,7 +211,7 @@ function App() {
           <Route path="/partner/producers">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerProducers />
+                <AdminProducers />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -219,7 +219,63 @@ function App() {
           <Route path="/partner/dashboard">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <PartnerDashboard />
+                <AdminDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/orders">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminOrders />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/budgets">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminBudgets />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/finance">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminFinance />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/settings">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminSettings />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/users">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminUsers />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/reports">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminReports />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/partners">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <AdminPartners />
               </MainLayout>
             </ProtectedRoute>
           </Route>

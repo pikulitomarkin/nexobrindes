@@ -65,7 +65,7 @@ export default function ProtectedRoute({ children, requiredRole, requiredRoles }
               setLocation("/producer/orders");
               break;
             case "partner":
-              setLocation("/");
+              setLocation("/dashboard");
               break;
             case "finance":
               setLocation("/finance/receivables");
