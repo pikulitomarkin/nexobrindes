@@ -1211,14 +1211,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + Math.max(0, remaining);
         }, 0);
 
-      // Contas a Pagar - pagamentos pendentes para produtores
-      const payables = productionOrders
+      // Contas a Pagar - separado por categorias
+      const producers = productionOrders
         .filter(po =>
           po.producerValue &&
           parseFloat(po.producerValue) > 0 &&
           (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
         )
         .reduce((total, po) => total + parseFloat(po.producerValue || '0'), 0);
+
+      const expenses = expenseNotes
+        .filter(expense => expense.status === 'approved' && !expense.reimbursedAt)
+        .reduce((total, expense) => total + parseFloat(expense.amount), 0);
+
+      const commissions = allCommissions
+        .filter(c => c.status === 'confirmed' && !c.paidAt)
+        .reduce((total, c) => total + parseFloat(c.amount), 0);
+
+      const refunds = orders
+        .filter(order => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+        .reduce((total, order) => {
+          const refundAmount = order.refundAmount ? parseFloat(order.refundAmount) : parseFloat(order.paidValue || '0');
+          return total + refundAmount;
+        }, 0);
+
+      const payables = producers + expenses + commissions + refunds;
 
       // Saldo em Conta - transações bancárias não conciliadas (entrada - saída)
       const bankBalance = bankTransactions.reduce((total, txn) => {
@@ -1256,6 +1273,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         receivables: receivables,
         payables: payables,
+        payablesBreakdown: {
+          producers: producers,
+          expenses: expenses,
+          commissions: commissions,
+          refunds: refunds
+        },
         balance: bankBalance,
         pendingCommissions: pendingCommissions,
         monthlyRevenue: monthlyRevenue,
