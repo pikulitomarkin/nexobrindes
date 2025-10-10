@@ -470,8 +470,8 @@ export class MemStorage implements IStorage {
     // Partner user with same credentials as admin
     const partnerUser = {
       id: "partner-1",
-      username: "admin",
-      password: "123",
+      username: "admin", // Mesmas credenciais do admin
+      password: "123",   // Mesmas credenciais do admin
       name: "João Sócio",
       email: "joao.socio@erp.com",
       phone: null,

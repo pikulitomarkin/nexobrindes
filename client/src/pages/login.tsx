@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, User, Shield, Users, Factory, DollarSign } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedProfile, setSelectedProfile] = useState("admin");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -22,7 +24,7 @@ export default function Login() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, preferredRole: selectedProfile }),
       });
 
       const data = await response.json();
@@ -95,6 +97,7 @@ export default function Login() {
   const quickLogin = (user: any) => {
     setUsername(user.username);
     setPassword(user.password);
+    setSelectedProfile(user.role.toLowerCase());
   };
 
   return (
@@ -110,6 +113,28 @@ export default function Login() {
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile">Perfil de Acesso</Label>
+                <Select value={selectedProfile} onValueChange={setSelectedProfile}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">
+                      <div className="flex items-center">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Administrador
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="partner">
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        Sócio
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Usuário</Label>
                 <Input

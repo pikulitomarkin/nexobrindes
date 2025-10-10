@@ -109,24 +109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, preferredRole } = req.body;
 
     try {
-      const user = await storage.getUserByUsername(username);
+      // Get all users with this username (admin and partner both use "admin")
+      const users = await storage.getUsers();
+      const matchingUsers = users.filter(u => u.username === username && u.password === password && u.isActive);
 
-      if (!user || user.password !== password) {
+      if (matchingUsers.length === 0) {
         return res.status(401).json({ error: "Credenciais inválidas" });
       }
 
-      if (!user.isActive) {
-        return res.status(401).json({ error: "Usuário inativo" });
+      // If preferred role is specified, try to find that role first
+      let selectedUser;
+      if (preferredRole) {
+        selectedUser = matchingUsers.find(u => u.role === preferredRole);
+      }
+      
+      // If no preferred role match, use default priority: admin, then partner
+      if (!selectedUser) {
+        selectedUser = matchingUsers.find(u => u.role === 'admin') || 
+                      matchingUsers.find(u => u.role === 'partner') ||
+                      matchingUsers[0];
       }
 
       // Create a simple token (in production, use JWT)
-      const token = Buffer.from(`${user.id}:${user.username}:${Date.now()}`).toString('base64');
+      const token = Buffer.from(`${selectedUser.id}:${selectedUser.username}:${Date.now()}`).toString('base64');
 
       // Return user data without password
-      const { password: _, ...userWithoutPassword } = user;
+      const { password: _, ...userWithoutPassword } = selectedUser;
 
       res.json({
         success: true,
