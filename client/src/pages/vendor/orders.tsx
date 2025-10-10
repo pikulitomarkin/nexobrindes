@@ -1294,7 +1294,7 @@ export default function VendorOrders() {
                         <Input
                           id="down-payment"
                           type="text"
-                          value={vendorOrderForm.downPayment ? `R$ ${vendorOrderForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          value={`R$ ${(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                           onChange={(e) => {
                             const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                             const downPayment = parseFloat(value) || 0;
@@ -1337,7 +1337,7 @@ export default function VendorOrders() {
                         <Input
                           id="shipping-cost"
                           type="text"
-                          value={(vendorOrderForm.shippingCost || calculateShippingCost()) ? `R$ ${(vendorOrderForm.shippingCost || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          value={`R$ ${(vendorOrderForm.shippingCost || calculateShippingCost() || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                           onChange={(e) => {
                             const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                             const shippingCost = parseFloat(value) || 0;
