@@ -1214,7 +1214,7 @@ export default function VendorBudgets() {
                               remainingAmount: Math.max(0, total - downPayment)
                             });
                           }}
-                          placeholder="0,00"
+                          placeholder="0.00"
                         />
                       </div>
                       <div>
@@ -1237,7 +1237,7 @@ export default function VendorBudgets() {
                       O cliente irá retirar o pedido no local. Não há cobrança de frete.
                     </p>
                   </div>
-                ) : selectedShippingMethod && (
+                ) : (
                   <div className="bg-green-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
@@ -1245,10 +1245,12 @@ export default function VendorBudgets() {
                         <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
                         <Input
                           id="shipping-cost"
-                          value={`${(vendorBudgetForm.shippingCost || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={parseFloat(vendorBudgetForm.shippingCost || 0).toFixed(2)}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const shippingCost = parseFloat(value) || 0;
+                            const shippingCost = parseFloat(e.target.value) || 0;
                             const total = calculateBudgetTotal() + shippingCost;
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1256,13 +1258,13 @@ export default function VendorBudgets() {
                               remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
                             });
                           }}
-                          placeholder="0,00"
+                          placeholder="0.00"
                         />
                       </div>
                       <div>
                         <Label>Prazo de Entrega</Label>
                         <p className="text-sm text-gray-600 mt-2">
-                          {selectedShippingMethod.estimatedDays} dias úteis
+                          {selectedShippingMethod ? `${selectedShippingMethod.estimatedDays} dias úteis` : 'Configure o método de frete'}
                         </p>
                       </div>
                     </div>

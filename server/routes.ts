@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import multer from 'multer';
 import express from 'express';
 import path from 'path';
-import { storage } from "./storage";
 import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
 // Mock requireAuth middleware for demonstration purposes
@@ -1929,125 +1928,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
+  // Convert budget to order
+  app.post('/api/budgets/:id/convert-to-order', async (req, res) => {
     try {
       const { id } = req.params;
       const { clientId, producerId } = req.body;
 
-      const budget = await storage.getBudget(id);
+      console.log(`Converting budget ${id} to order`);
+
+      const budget = await storage.getBudgetById(id);
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Validate required fields
-      if (!budget.contactName) {
-        return res.status(400).json({ error: "Nome de contato é obrigatório no orçamento" });
-      }
-
-      // Get budget items
-      const items = await storage.getBudgetItems(id);
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: "Orçamento deve ter pelo menos um item" });
-      }
-
-      // Get payment info
-      const paymentInfo = await storage.getBudgetPaymentInfo(id);
-
-      // Generate unique order number
-      const orderNumber = `PED-${Date.now()}`;
-
-      // Process items with product details
-      const processedItems = await Promise.all(
-        items.map(async (item) => {
-          const product = await storage.getProduct(item.productId);
-          return {
-            productId: item.productId,
-            productName: product?.name || item.productName || 'Produto não encontrado',
-            quantity: parseInt(item.quantity) || 1,
-            unitPrice: parseFloat(item.unitPrice || '0'),
-            totalPrice: parseFloat(item.totalPrice || '0'),
-            hasItemCustomization: item.hasItemCustomization || false,
-            itemCustomizationValue: parseFloat(item.itemCustomizationValue || '0'),
-            itemCustomizationDescription: item.itemCustomizationDescription || "",
-            customizationPhoto: item.customizationPhoto || "",
-            productWidth: item.productWidth || "",
-            productHeight: item.productHeight || "",
-            productDepth: item.productDepth || ""
-          };
-        })
-      );
-
-      // Create order from budget with explicit orderNumber
+      // Create order from budget data with all necessary fields
       const orderData = {
-        orderNumber: orderNumber, // Garantir que o número do pedido seja passado
-        clientId: clientId || budget.clientId || null, // Can be null if no client selected
+        budgetId: id,
+        clientId: clientId || budget.clientId,
         vendorId: budget.vendorId,
         product: budget.title,
+        title: budget.title, // Add title field
         description: budget.description || "",
         totalValue: budget.totalValue,
         status: "confirmed",
-        deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
-        deliveryDeadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
-        budgetId: id,
-        // Contact information is primary - always required
         contactName: budget.contactName,
         contactPhone: budget.contactPhone || "",
         contactEmail: budget.contactEmail || "",
         deliveryType: budget.deliveryType || "delivery",
-        // Items and payment info
-        items: processedItems,
-        paymentMethodId: paymentInfo?.paymentMethodId || "",
-        shippingMethodId: paymentInfo?.shippingMethodId || "",
-        installments: paymentInfo?.installments || 1,
-        downPayment: parseFloat(paymentInfo?.downPayment || '0'),
-        remainingAmount: parseFloat(paymentInfo?.remainingAmount || '0'),
-        shippingCost: parseFloat(paymentInfo?.shippingCost || '0'),
+        deadline: budget.deliveryDeadline,
+        deliveryDeadline: budget.deliveryDeadline,
+        paymentMethodId: budget.paymentMethodId || "",
+        shippingMethodId: budget.shippingMethodId || "",
+        installments: budget.installments || 1,
+        downPayment: parseFloat(budget.downPayment || 0),
+        remainingAmount: parseFloat(budget.remainingAmount || 0),
+        shippingCost: parseFloat(budget.shippingCost || 0),
         hasDiscount: budget.hasDiscount || false,
         discountType: budget.discountType || "percentage",
-        discountPercentage: parseFloat(budget.discountPercentage || '0'),
-        discountValue: parseFloat(budget.discountValue || '0')
+        discountPercentage: parseFloat(budget.discountPercentage || 0),
+        discountValue: parseFloat(budget.discountValue || 0),
+        items: (budget.items || []).map((item: any) => ({
+          ...item,
+          quantity: parseInt(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          totalPrice: parseFloat(item.totalPrice) || 0,
+          itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+          itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+        })),
+        // Add budget-specific fields for reference
+        budgetItems: budget.items || []
       };
 
-      console.log("Converting budget to order with data:", {
-        budgetId: id,
-        orderNumber: orderNumber,
-        contactName: orderData.contactName,
-        clientId: orderData.clientId,
-        itemsCount: orderData.items.length,
-        totalValue: orderData.totalValue
-      });
+      console.log('Order data for conversion:', orderData);
 
-      const newOrder = await storage.createOrder(orderData);
+      const order = await storage.createOrder(orderData);
 
       // Update budget status to converted
-      await storage.updateBudget(id, { status: "converted" });
+      await storage.updateBudget(id, { status: 'converted' });
 
-      // If producer is specified, send to production
+      // If producerId is provided, send directly to production
       if (producerId) {
         await storage.createProductionOrder({
-          orderId: newOrder.id,
-          producerId: producerId,
-          status: "pending",
-          deadline: newOrder.deadline,
-          notes: `Convertido do orçamento ${budget.budgetNumber}`
+          orderId: order.id,
+          producerId,
+          status: 'pending',
+          acceptedAt: null,
+          deadline: null,
+          completedAt: null,
+          rejectedAt: null,
+          notes: null
         });
-
-        console.log(`Created production order for order ${newOrder.id} with producer ${producerId}`);
       }
-
-      console.log("Budget converted successfully:", newOrder.orderNumber);
 
       res.json({
         success: true,
-        order: newOrder,
-        message: "Orçamento convertido em pedido com sucesso"
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        sentToProduction: !!producerId
       });
     } catch (error) {
-      console.error("Error converting budget to order:", error);
-      res.status(500).json({
-        error: "Erro ao converter orçamento em pedido",
-        details: error.message
-      });
+      console.error('Error converting budget to order:', error);
+      res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
 
