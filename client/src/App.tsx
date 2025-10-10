@@ -22,6 +22,10 @@ import AdminProducerPayments from "./pages/admin/producer-payments";
 import AdminReports from "./pages/admin/reports";
 import AdminPartners from "./pages/admin/partners";
 import AdminOrders from "./pages/admin/orders";
+import AdminBudgets from "./pages/admin/budgets";
+import AdminFinance from "./pages/admin/finance";
+import AdminSettings from "./pages/admin/settings";
+import AdminUsers from "./pages/admin/users";
 
 // Partner pages - Same functionality as admin but with separate commissions
 import PartnerClients from "@/pages/partner/clients";
@@ -219,7 +223,7 @@ function App() {
           <Route path="/partner/dashboard">
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
-                <AdminDashboard />
+                <Dashboard />
               </MainLayout>
             </ProtectedRoute>
           </Route>
