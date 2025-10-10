@@ -125,12 +125,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (preferredRole) {
         selectedUser = matchingUsers.find(u => u.role === preferredRole);
       }
-      
+
       // If no preferred role match, use default priority: admin, then partner
       if (!selectedUser) {
-        selectedUser = matchingUsers.find(u => u.role === 'admin') || 
-                      matchingUsers.find(u => u.role === 'partner') ||
-                      matchingUsers[0];
+        selectedUser = matchingUsers.find(u => u.role === 'admin') ||
+          matchingUsers.find(u => u.role === 'partner') ||
+          matchingUsers[0];
       }
 
       // Create a simple token (in production, use JWT)
@@ -445,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             ...order,
             clientName: clientName, // Use contactName or found client name, never 'Unknown'
-            vendorName: vendor?.name || vendor?.username || 'Vendedor',
+            vendorName: vendor?.name || 'Vendedor',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
@@ -1885,19 +1885,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
+  app.post("/api/budgets/:budgetId/convert-to-order", async (req, res) => {
     try {
-      const { producerId, clientId } = req.body;
+      const { budgetId } = req.params;
+      const { clientId, producerId } = req.body;
 
       // Validate that clientId is provided for order conversion
       if (!clientId) {
         return res.status(400).json({ error: "Cliente deve ser selecionado para converter orçamento em pedido" });
       }
 
-      // Update budget with clientId before conversion
-      await storage.updateBudget(req.params.id, { clientId });
+      // Fetch budget, users, and related data using storage methods
+      const budget = await storage.getBudget(budgetId);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
 
-      const order = await storage.convertBudgetToOrder(req.params.id, producerId);
+      const client = await storage.getUser(clientId);
+      const producer = producerId ? await storage.getUser(producerId) : null;
+
+      if (!client) {
+        return res.status(400).json({ error: "Cliente não encontrado" });
+      }
+      if (producerId && !producer) {
+        return res.status(400).json({ error: "Produtor não encontrado" });
+      }
+
+      // Update budget with clientId before conversion
+      await storage.updateBudget(budgetId, { clientId });
+
+      // Convert budget to order
+      const order = await storage.convertBudgetToOrder(budgetId, producerId);
 
       // Create production order for the selected producer
       if (producerId && order) {
@@ -1905,33 +1923,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: order.id,
           producerId: producerId,
           status: 'pending',
-          deadline: order.deadline
+          deadline: order.deadline,
+          notes: `Convertido do orçamento ${budget.budgetNumber}` // Add budget number to notes
         });
       }
 
-      // Return enriched order data with proper client name
-      let clientName = 'Unknown';
-      const clientDetails = await storage.getClient(order.clientId);
-      if (clientDetails) {
-        clientName = clientDetails.name;
-      } else {
-        const clientUser = await storage.getUser(order.clientId);
-        if (clientUser) {
-          clientName = clientUser.name;
-        }
-      }
-
-      const vendor = await storage.getUser(order.vendorId);
-      const producer = producerId ? await storage.getUser(producerId) : null;
-
-      // Get budget photos and items if order was converted from budget
+      // Fetch budget photos and items again for the enriched order
       let budgetPhotos = [];
       let budgetItems = [];
       if (order.budgetId) {
         const photos = await storage.getBudgetPhotos(order.budgetId);
         budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
 
-        // Get budget items with product details
         const items = await storage.getBudgetItems(order.budgetId);
         budgetItems = await Promise.all(
           items.map(async (item) => {
@@ -1952,8 +1955,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrder = {
         ...order,
-        clientName: clientName,
-        vendorName: vendor?.name || 'Unknown',
+        clientName: client.name, // Use the fetched client name
+        vendorName: await storage.getUser(order.vendorId).then(v => v?.name || 'Unknown'), // Fetch vendor name
         producerName: producer?.name || null,
         budgetPhotos: budgetPhotos,
         budgetItems: budgetItems

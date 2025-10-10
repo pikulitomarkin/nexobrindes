@@ -1761,7 +1761,7 @@ export default function VendorOrders() {
                       {new Date(order.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-0.5">
                         <Button
                           variant="ghost"
                           size="sm"
