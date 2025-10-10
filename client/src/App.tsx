@@ -20,6 +20,8 @@ import AdminCustomizations from "@/pages/admin/customizations"; // Importação 
 import AdminCommissionSettings from "./pages/admin/commission-settings";
 import AdminProducerPayments from "./pages/admin/producer-payments";
 import AdminReports from "./pages/admin/reports";
+import AdminPartners from "./pages/admin/partners";
+import AdminOrders from "./pages/admin/orders";
 
 // Partner pages - Same functionality as admin but with separate commissions
 import PartnerClients from "@/pages/partner/clients";
@@ -27,6 +29,7 @@ import PartnerVendors from "@/pages/partner/vendors";
 import PartnerCommissionManagement from "@/pages/partner/commission-management";
 import PartnerProducts from "@/pages/partner/products";
 import PartnerProducers from "@/pages/partner/producers";
+import PartnerDashboard from "./pages/dashboards/partner-dashboard";
 
 // Vendor pages
 import VendorOrders from "@/pages/vendor/orders";
@@ -56,6 +59,7 @@ import FinanceReceivables from "@/pages/finance/receivables";
 import FinanceExpenses from "@/pages/finance/expenses";
 import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
 import FinancePayables from "@/pages/finance/payables";
+import Finance from "./pages/finance";
 
 function App() {
   return (
@@ -155,6 +159,22 @@ function App() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/admin/orders">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminOrders />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/admin/partners">
+            <ProtectedRoute requiredRole="admin">
+              <MainLayout>
+                <AdminPartners />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           {/* Partner Routes - Same as admin but with separate commissions */}
           <Route path="/partner/clients">
             <ProtectedRoute requiredRole="partner">
@@ -192,6 +212,14 @@ function App() {
             <ProtectedRoute requiredRole="partner">
               <MainLayout>
                 <PartnerProducers />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/partner/dashboard">
+            <ProtectedRoute requiredRole="partner">
+              <MainLayout>
+                <PartnerDashboard />
               </MainLayout>
             </ProtectedRoute>
           </Route>

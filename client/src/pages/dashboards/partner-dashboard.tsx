@@ -25,14 +25,14 @@ export default function PartnerDashboard() {
   };
 
   const quickActions = [
-    { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
-    { href: "/admin/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
-    { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
-    { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
-    { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
-    { href: "/admin/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
-    { href: "/admin/reports", icon: BarChart3, label: "Relatórios", color: "text-rose-600" },
-    { href: "/admin/partners", icon: Users, label: "Sócios", color: "text-teal-600" },
+    { href: "/partner/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
+    { href: "/partner/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
+    { href: "/partner/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+    { href: "/partner/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
+    { href: "/partner/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
+    { href: "/partner/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
+    { href: "/partner/reports", icon: BarChart3, label: "Relatórios", color: "text-rose-600" },
+    { href: "/partner/partners", icon: Users, label: "Sócios", color: "text-teal-600" },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -189,7 +189,7 @@ export default function PartnerDashboard() {
           <Card data-testid="card-recent-orders">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Últimos Pedidos</CardTitle>
-              <Link href="/admin/orders">
+              <Link href="/partner/orders">
                 <Button variant="outline" size="sm" data-testid="button-view-all-orders">
                   <Eye className="h-4 w-4 mr-2" />
                   Ver Todos
