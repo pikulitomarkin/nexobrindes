@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Eye, Edit, Trash, Send, Package, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
 export default function AdminOrders() {
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
@@ -513,8 +514,9 @@ export default function AdminOrders() {
                       <Input
                         id="edit-contact-phone"
                         value={editingOrder.contactPhone || ""}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, contactPhone: e.target.value })}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, contactPhone: phoneMask(e.target.value) })}
                         placeholder="(11) 99999-9999"
+                        maxLength={15}
                       />
                     </div>
                     <div>
@@ -601,19 +603,20 @@ export default function AdminOrders() {
                 ) : (
                   <div>
                     <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">R$</span>
-                      <Input
-                        id="edit-shipping-cost"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={parseFloat(editingOrder.shippingCost || 0).toFixed(2)}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, shippingCost: parseFloat(e.target.value) || 0 })}
-                        placeholder="0,00"
-                        className="pl-10"
-                      />
-                    </div>
+                    <Input
+                      id="edit-shipping-cost"
+                      value={editingOrder.shippingCost > 0 ? currencyMask(editingOrder.shippingCost.toString()) : ''}
+                      onChange={(e) => {
+                        const rawValue = e.target.value;
+                        if (rawValue === '' || rawValue === 'R$ ') {
+                          setEditingOrder({ ...editingOrder, shippingCost: 0 });
+                        } else {
+                          const shippingCost = parseCurrencyValue(rawValue);
+                          setEditingOrder({ ...editingOrder, shippingCost });
+                        }
+                      }}
+                      placeholder="R$ 0,00"
+                    />
                   </div>
                 )}
 

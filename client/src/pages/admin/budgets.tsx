@@ -15,6 +15,33 @@ import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
 
+// Helper functions for currency masking and parsing
+const currencyMask = (value: string): string => {
+  if (!value) return 'R$ ';
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{1,2})$/, ',$1')
+    .replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+};
+
+const parseCurrencyValue = (value: string): number => {
+  if (!value || value === 'R$ ') return 0;
+  return parseFloat(value.replace(/[R$ .]/g, '').replace(',', '.'));
+};
+
+// Helper function for phone masking
+const phoneMask = (value: string): string => {
+  if (!value) return '';
+  const numericValue = value.replace(/\D/g, '');
+  if (numericValue.length <= 10) {
+    // (XX) XXXX-XXXX or (XX) XXXXX-XXXX
+    return numericValue.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
+  } else {
+    // +55 (XX) XXXXX-XXXX
+    return numericValue.replace(/(\d{2})(\d{2})(\d{4,5})(\d{4})/, '+55 ($1) $2$3-$4');
+  }
+};
+
 export default function AdminBudgets() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -489,7 +516,7 @@ export default function AdminBudgets() {
                   <Input
                     id="admin-budget-contact-phone"
                     value={adminBudgetForm.contactPhone}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: e.target.value })}
+                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: phoneMask(e.target.value) })}
                     placeholder="(11) 99999-9999"
                   />
                 </div>
@@ -666,7 +693,7 @@ export default function AdminBudgets() {
                                 });
                               }}
                             />
-                            
+
                             {/* Campos manuais sempre visíveis */}
                             <div className="grid grid-cols-2 gap-3">
                               <div>
@@ -691,7 +718,7 @@ export default function AdminBudgets() {
                                 />
                               </div>
                             </div>
-                            
+
                             <div>
                               <Label>Observações Adicionais (Opcional)</Label>
                               <Input
@@ -891,15 +918,20 @@ export default function AdminBudgets() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="admin-shipping-cost">Custo do Frete (R$)</Label>
+                  <Label htmlFor="admin-shipping-cost">Custo do Frete</Label>
                   <Input
                     id="admin-shipping-cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={adminBudgetForm.shippingCost}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost: parseFloat(e.target.value) || 0 })}
-                    placeholder="0,00"
+                    value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString()) : ''}
+                    onChange={(e) => {
+                      const rawValue = e.target.value;
+                      if (rawValue === '' || rawValue === 'R$ ') {
+                        setAdminBudgetForm({ ...adminBudgetForm, shippingCost: 0 });
+                      } else {
+                        const numericValue = parseCurrencyValue(rawValue);
+                        setAdminBudgetForm({ ...adminBudgetForm, shippingCost: numericValue });
+                      }
+                    }}
+                    placeholder="R$ 0,00"
                   />
                 </div>
               )}

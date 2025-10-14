@@ -13,6 +13,7 @@ import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, P
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
+import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
 export default function VendorOrders() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -826,8 +827,9 @@ export default function VendorOrders() {
                   <Input
                     id="order-contact-phone"
                     value={vendorOrderForm.contactPhone}
-                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactPhone: e.target.value })}
+                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactPhone: phoneMask(e.target.value) })}
                     placeholder="(11) 99999-9999"
+                    maxLength={15}
                   />
                 </div>
                 <div>
@@ -1290,20 +1292,28 @@ export default function VendorOrders() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada</Label>
                         <Input
                           id="down-payment"
-                          type="text"
-                          value={`R$ ${(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString()) : ''}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const downPayment = parseFloat(value) || 0;
-                            const total = calculateTotalWithShipping();
-                            setVendorOrderForm({ 
-                              ...vendorOrderForm, 
-                              downPayment,
-                              remainingAmount: Math.max(0, total - downPayment)
-                            });
+                            const rawValue = e.target.value;
+                            if (rawValue === '' || rawValue === 'R$ ') {
+                              const total = calculateTotalWithShipping();
+                              setVendorOrderForm({ 
+                                ...vendorOrderForm, 
+                                downPayment: 0,
+                                remainingAmount: total
+                              });
+                            } else {
+                              const downPayment = parseCurrencyValue(rawValue);
+                              const total = calculateTotalWithShipping();
+                              setVendorOrderForm({ 
+                                ...vendorOrderForm, 
+                                downPayment,
+                                remainingAmount: Math.max(0, total - downPayment)
+                              });
+                            }
                           }}
                           placeholder="R$ 0,00"
                         />
@@ -1333,20 +1343,28 @@ export default function VendorOrders() {
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
+                        <Label htmlFor="shipping-cost">Valor do Frete</Label>
                         <Input
                           id="shipping-cost"
-                          type="text"
-                          value={`R$ ${(vendorOrderForm.shippingCost || calculateShippingCost() || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          value={vendorOrderForm.shippingCost > 0 ? currencyMask(vendorOrderForm.shippingCost.toString()) : ''}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const shippingCost = parseFloat(value) || 0;
-                            const total = calculateTotalWithShipping();
-                            setVendorOrderForm({ 
-                              ...vendorOrderForm, 
-                              shippingCost,
-                              remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
-                            });
+                            const rawValue = e.target.value;
+                            if (rawValue === '' || rawValue === 'R$ ') {
+                              const total = calculateTotalWithShipping();
+                              setVendorOrderForm({ 
+                                ...vendorOrderForm, 
+                                shippingCost: 0,
+                                remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
+                              });
+                            } else {
+                              const shippingCost = parseCurrencyValue(rawValue);
+                              const total = calculateTotalWithShipping();
+                              setVendorOrderForm({ 
+                                ...vendorOrderForm, 
+                                shippingCost,
+                                remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
+                              });
+                            }
                           }}
                           placeholder="R$ 0,00"
                         />

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
+import { currencyMask, parseCurrencyValue } from "@/lib/currency";
 
 export default function VendorBudgets() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -1241,20 +1242,28 @@ export default function VendorBudgets() {
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="shipping-cost">Valor do Frete (R$)</Label>
+                        <Label htmlFor="shipping-cost">Valor do Frete</Label>
                         <Input
                           id="shipping-cost"
-                          type="text"
-                          value={`R$ ${(vendorBudgetForm.shippingCost || calculateShippingCost() || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString()) : ''}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const shippingCost = parseFloat(value) || 0;
-                            const total = calculateTotalWithShipping();
-                            setVendorBudgetForm({
-                              ...vendorBudgetForm,
-                              shippingCost,
-                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
-                            });
+                            const rawValue = e.target.value;
+                            if (rawValue === '' || rawValue === 'R$ ') {
+                              const total = calculateTotalWithShipping();
+                              setVendorBudgetForm({
+                                ...vendorBudgetForm,
+                                shippingCost: 0,
+                                remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                              });
+                            } else {
+                              const shippingCost = parseCurrencyValue(rawValue);
+                              const total = calculateTotalWithShipping();
+                              setVendorBudgetForm({
+                                ...vendorBudgetForm,
+                                shippingCost,
+                                remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                              });
+                            }
                           }}
                           placeholder="R$ 0,00"
                         />
