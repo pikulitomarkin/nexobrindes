@@ -1099,6 +1099,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         commissions.map(async (commission) => {
           let vendorName = null;
           let partnerName = null;
+          let orderValue = commission.orderValue;
+          let orderNumber = commission.orderNumber;
 
           if (commission.vendorId) {
             const vendor = await storage.getUser(commission.vendorId);
@@ -1110,10 +1112,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             partnerName = partner?.name;
           }
 
+          // Enrich with order data if missing
+          if (commission.orderId && (!orderValue || !orderNumber)) {
+            const order = await storage.getOrder(commission.orderId);
+            if (order) {
+              orderValue = orderValue || order.totalValue;
+              orderNumber = orderNumber || order.orderNumber;
+            }
+          }
+
           return {
             ...commission,
             vendorName,
-            partnerName
+            partnerName,
+            orderValue,
+            orderNumber
           };
         })
       );
@@ -1129,7 +1142,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const commissions = await storage.getCommissionsByVendor(vendorId);
-      res.json(commissions);
+      
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            const order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+      
+      res.json(enrichedCommissions);
     } catch (error) {
       console.error("Error fetching vendor commissions:", error);
       res.status(500).json({ error: "Failed to fetch vendor commissions" });
