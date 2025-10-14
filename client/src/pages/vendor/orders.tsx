@@ -311,7 +311,7 @@ export default function VendorOrders() {
   // Calculate the total including shipping cost
   const calculateTotalWithShipping = () => {
     const subtotal = calculateOrderTotal();
-    const shipping = vendorOrderForm.shippingCost || calculateShippingCost();
+    const shipping = parseFloat(vendorOrderForm.shippingCost) || calculateShippingCost();
     return subtotal + shipping;
   };
 
@@ -563,9 +563,9 @@ export default function VendorOrders() {
       paymentMethodId: order.paymentMethodId || "",
       shippingMethodId: order.shippingMethodId || "",
       installments: order.installments || 1,
-      downPayment: order.downPayment || 0,
-      remainingAmount: order.remainingAmount || 0,
-      shippingCost: order.shippingCost || 0,
+      downPayment: parseFloat(order.downPayment || 0),
+      remainingAmount: parseFloat(order.remainingAmount || 0),
+      shippingCost: parseFloat(order.shippingCost || 0),
       hasDiscount: order.hasDiscount || false,
       discountType: order.discountType || "percentage",
       discountPercentage: parseFloat(order.discountPercentage || 0),

@@ -271,7 +271,7 @@ export default function VendorBudgets() {
   // Calculate the total including shipping cost
   const calculateTotalWithShipping = () => {
     const subtotal = calculateBudgetTotal();
-    const shipping = vendorBudgetForm.shippingCost || calculateShippingCost();
+    const shipping = parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost();
     return subtotal + shipping;
   };
 
