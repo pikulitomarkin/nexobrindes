@@ -204,16 +204,10 @@ export default function ProducerOrderDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Produto</Label>
                   <p className="text-lg font-semibold">{productionOrder.order?.product || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Valor Total</Label>
-                  <p className="text-lg font-semibold text-green-600">
-                    R$ {parseFloat(productionOrder.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
                 </div>
               </div>
 
