@@ -14,22 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
-
-// Helper functions for currency masking and parsing
-const currencyMask = (value: string): string => {
-  if (!value) return 'R$ ';
-  return value
-    .replace(/\D/g, '')
-    .replace(/(\d{1,2})$/, ',$1')
-    .replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-};
-
-const parseCurrencyValue = (value: string): number => {
-  if (!value || value === 'R$ ') return 0;
-  return parseFloat(value.replace(/[R$ .]/g, '').replace(',', '.'));
-};
-
-// Import phone mask from utils
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
 export default function AdminBudgets() {
