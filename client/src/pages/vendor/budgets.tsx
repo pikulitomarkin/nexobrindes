@@ -734,8 +734,9 @@ export default function VendorBudgets() {
                   <Input
                     id="budget-contact-phone"
                     value={vendorBudgetForm.contactPhone}
-                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactPhone: e.target.value })}
+                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactPhone: phoneMask(e.target.value) })}
                     placeholder="(11) 99999-9999"
+                    maxLength={15}
                   />
                 </div>
                 <div>
@@ -1202,8 +1203,7 @@ export default function VendorBudgets() {
                         <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
                         <Input
                           id="down-payment"
-                          type="text"
-                          value={`R$ ${(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          value={vendorBudgetForm.downPayment > 0 ? `R$ ${vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                           onChange={(e) => {
                             const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                             const downPayment = parseFloat(value) || 0;
@@ -1245,25 +1245,16 @@ export default function VendorBudgets() {
                         <Label htmlFor="shipping-cost">Valor do Frete</Label>
                         <Input
                           id="shipping-cost"
-                          value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString()) : ''}
+                          value={vendorBudgetForm.shippingCost > 0 ? `R$ ${vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                           onChange={(e) => {
-                            const rawValue = e.target.value;
-                            if (rawValue === '' || rawValue === 'R$ ') {
-                              const total = calculateTotalWithShipping();
-                              setVendorBudgetForm({
-                                ...vendorBudgetForm,
-                                shippingCost: 0,
-                                remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
-                              });
-                            } else {
-                              const shippingCost = parseCurrencyValue(rawValue);
-                              const total = calculateTotalWithShipping();
-                              setVendorBudgetForm({
-                                ...vendorBudgetForm,
-                                shippingCost,
-                                remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
-                              });
-                            }
+                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                            const shippingCost = parseFloat(value) || 0;
+                            const total = calculateTotalWithShipping();
+                            setVendorBudgetForm({
+                              ...vendorBudgetForm,
+                              shippingCost,
+                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                            });
                           }}
                           placeholder="R$ 0,00"
                         />

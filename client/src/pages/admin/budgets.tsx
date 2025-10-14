@@ -29,18 +29,8 @@ const parseCurrencyValue = (value: string): number => {
   return parseFloat(value.replace(/[R$ .]/g, '').replace(',', '.'));
 };
 
-// Helper function for phone masking
-const phoneMask = (value: string): string => {
-  if (!value) return '';
-  const numericValue = value.replace(/\D/g, '');
-  if (numericValue.length <= 10) {
-    // (XX) XXXX-XXXX or (XX) XXXXX-XXXX
-    return numericValue.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
-  } else {
-    // +55 (XX) XXXXX-XXXX
-    return numericValue.replace(/(\d{2})(\d{2})(\d{4,5})(\d{4})/, '+55 ($1) $2$3-$4');
-  }
-};
+// Import phone mask from utils
+import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
 export default function AdminBudgets() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -518,6 +508,7 @@ export default function AdminBudgets() {
                     value={adminBudgetForm.contactPhone}
                     onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: phoneMask(e.target.value) })}
                     placeholder="(11) 99999-9999"
+                    maxLength={15}
                   />
                 </div>
                 <div>
@@ -921,15 +912,11 @@ export default function AdminBudgets() {
                   <Label htmlFor="admin-shipping-cost">Custo do Frete</Label>
                   <Input
                     id="admin-shipping-cost"
-                    value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString()) : ''}
+                    value={adminBudgetForm.shippingCost > 0 ? `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                     onChange={(e) => {
-                      const rawValue = e.target.value;
-                      if (rawValue === '' || rawValue === 'R$ ') {
-                        setAdminBudgetForm({ ...adminBudgetForm, shippingCost: 0 });
-                      } else {
-                        const numericValue = parseCurrencyValue(rawValue);
-                        setAdminBudgetForm({ ...adminBudgetForm, shippingCost: numericValue });
-                      }
+                      const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                      const shippingCost = parseFloat(value) || 0;
+                      setAdminBudgetForm({ ...adminBudgetForm, shippingCost });
                     }}
                     placeholder="R$ 0,00"
                   />
