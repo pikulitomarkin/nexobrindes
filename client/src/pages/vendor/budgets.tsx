@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
-import { currencyMask, parseCurrencyValue } from "@/lib/currency";
+import { currencyMask, parseCurrencyValue } from "@/utils/masks";
 
 export default function VendorBudgets() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
