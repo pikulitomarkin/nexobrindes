@@ -1231,9 +1231,13 @@ export class MemStorage implements IStorage {
   private async createAccountsReceivableForOrder(order: Order): Promise<void> {
     const paidValue = parseFloat(order.paidValue || "0");
     const totalValue = parseFloat(order.totalValue);
+    const downPayment = parseFloat(order.downPayment || "0");
+
+    // Use downPayment as the expected amount if it exists, otherwise use totalValue
+    const expectedAmount = downPayment > 0 ? downPayment : totalValue;
 
     let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-    if (paidValue >= totalValue) {
+    if (paidValue >= expectedAmount) {
       status = 'paid';
     } else if (paidValue > 0) {
       status = 'partial';
@@ -1251,7 +1255,7 @@ export class MemStorage implements IStorage {
       clientId: order.clientId,
       vendorId: order.vendorId || 'vendor-1',
       description: `Venda: ${order.product}`,
-      amount: order.totalValue,
+      amount: expectedAmount.toFixed(2),
       receivedAmount: order.paidValue || "0.00",
       dueDate: order.deadline,
       status: status,
@@ -1296,20 +1300,21 @@ export class MemStorage implements IStorage {
       await this.processCommissionPayments(updateData, updates.status);
     }
 
-    // Update AccountsReceivable if totalValue or refundAmount changes
-    if (updates.totalValue !== undefined || updates.refundAmount !== undefined) {
+    // Update AccountsReceivable if totalValue, refundAmount, or downPayment changes
+    if (updates.totalValue !== undefined || updates.refundAmount !== undefined || updates.downPayment !== undefined) {
       const receivableId = `ar-${id}`;
       const receivable = this.accountsReceivable.get(receivableId);
       if (receivable) {
         const newTotalValue = parseFloat(updates.totalValue !== undefined ? updates.totalValue : order.totalValue);
         const newRefundAmount = parseFloat(updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount);
+        const newDownPayment = parseFloat(updates.downPayment !== undefined ? updates.downPayment.toString() : order.downPayment);
         const currentPaid = parseFloat(receivable.receivedAmount);
 
-        // Calculate the effective amount to be paid after refund
-        const effectiveAmount = newTotalValue - newRefundAmount;
+        // Use downPayment as the expected amount if it exists, otherwise use totalValue minus refund
+        const expectedAmount = newDownPayment > 0 ? newDownPayment : (newTotalValue - newRefundAmount);
 
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-        if (currentPaid >= effectiveAmount) {
+        if (currentPaid >= expectedAmount) {
           status = 'paid';
         } else if (currentPaid > 0) {
           status = 'partial';
@@ -1322,7 +1327,7 @@ export class MemStorage implements IStorage {
         }
 
         await this.updateAccountsReceivable(receivableId, {
-          amount: newTotalValue.toFixed(2),
+          amount: expectedAmount.toFixed(2),
           receivedAmount: currentPaid.toFixed(2), // Keep current received amount as is
           status: status,
           dueDate: updateData.deadline
