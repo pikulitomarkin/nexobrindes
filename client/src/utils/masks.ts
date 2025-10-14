@@ -20,27 +20,25 @@ export const phoneMask = (value: string): string => {
 export const currencyMask = (value: string): string => {
   if (!value) return '';
   
-  // Remove caracteres não numéricos exceto vírgula e ponto
+  // Remove tudo exceto números e vírgula
   let numbers = value.replace(/[^\d,]/g, '');
   
-  // Se não tem vírgula, adiciona ,00 no final se necessário
-  if (!numbers.includes(',') && numbers.length > 0) {
-    // Se o usuário digitou apenas números, considera como reais
-    if (numbers.length <= 3) {
-      numbers = numbers + ',00';
-    } else {
-      // Separa os centavos
-      const reais = numbers.slice(0, -2);
-      const centavos = numbers.slice(-2);
-      numbers = reais + ',' + centavos;
-    }
+  // Garante apenas uma vírgula
+  const parts = numbers.split(',');
+  if (parts.length > 2) {
+    numbers = parts[0] + ',' + parts.slice(1).join('');
   }
   
-  // Adiciona pontos para milhares
-  const parts = numbers.split(',');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  // Limita centavos a 2 dígitos
+  if (parts.length === 2 && parts[1].length > 2) {
+    numbers = parts[0] + ',' + parts[1].substring(0, 2);
+  }
   
-  return 'R$ ' + parts.join(',');
+  // Adiciona pontos para milhares na parte inteira
+  const finalParts = numbers.split(',');
+  finalParts[0] = finalParts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  
+  return 'R$ ' + finalParts.join(',');
 };
 
 // Função para converter valor com máscara para número
