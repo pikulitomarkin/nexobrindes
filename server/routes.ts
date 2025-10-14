@@ -310,10 +310,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const customizations = await storage.getCustomizationOptions();
             const customization = customizations.find(c => c.id === item.selectedCustomizationId);
 
-            if (customization && item.quantity < customization.minQuantity) {
-              return res.status(400).json({
-                error: `A personalização "${customization.name}" requer no mínimo ${customization.minQuantity} unidades. Item atual tem ${item.quantity} unidades.`
-              });
+            if (customization) {
+              const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+              const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
+              
+              if (itemQty < minQty) {
+                return res.status(400).json({
+                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
+                });
+              }
             }
           }
         }
@@ -1833,10 +1838,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const customizations = await storage.getCustomizationOptions();
             const customization = customizations.find(c => c.id === item.selectedCustomizationId);
 
-            if (customization && item.quantity < customization.minQuantity) {
-              return res.status(400).json({
-                error: `A personalização "${customization.name}" requer no mínimo ${customization.minQuantity} unidades. Item atual tem ${item.quantity} unidades.`
-              });
+            if (customization) {
+              const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+              const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
+              
+              if (itemQty < minQty) {
+                return res.status(400).json({
+                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
+                });
+              }
             }
           }
         }
