@@ -1198,14 +1198,16 @@ export default function VendorBudgets() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada (inclui frete - R$)</Label>
                         <Input
                           id="down-payment"
                           value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const downPayment = parseCurrencyValue(e.target.value);
+                            const entryValue = parseCurrencyValue(e.target.value);
+                            const shippingCost = vendorBudgetForm.shippingCost || 0;
+                            const downPayment = entryValue + shippingCost;
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1215,6 +1217,10 @@ export default function VendorBudgets() {
                           }}
                           placeholder="R$ 0,00"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Total: R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {vendorBudgetForm.shippingCost > 0 && ` (inclui frete de R$ ${vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`}
+                        </p>
                       </div>
                       <div>
                         <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
@@ -1247,15 +1253,19 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            const total = calculateTotalWithShipping();
+                            const entryWithoutShipping = vendorBudgetForm.downPayment - (vendorBudgetForm.shippingCost || 0);
+                            const newDownPayment = entryWithoutShipping + shippingCost;
+                            const total = calculateBudgetTotal() + shippingCost;
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               shippingCost,
-                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                              downPayment: newDownPayment,
+                              remainingAmount: Math.max(0, total - newDownPayment)
                             });
                           }}
                           placeholder="R$ 0,00"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Será somado automaticamente à entrada</p>
                       </div>
                       <div>
                         <Label>Prazo de Entrega</Label>
