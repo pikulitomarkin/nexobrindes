@@ -1203,10 +1203,9 @@ export default function VendorBudgets() {
                         <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
                         <Input
                           id="down-payment"
-                          value={vendorBudgetForm.downPayment > 0 ? `R$ ${vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const downPayment = parseFloat(value) || 0;
+                            const downPayment = parseCurrencyValue(e.target.value);
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1245,10 +1244,9 @@ export default function VendorBudgets() {
                         <Label htmlFor="shipping-cost">Valor do Frete</Label>
                         <Input
                           id="shipping-cost"
-                          value={vendorBudgetForm.shippingCost > 0 ? `R$ ${vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                          value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                            const shippingCost = parseFloat(value) || 0;
+                            const shippingCost = parseCurrencyValue(e.target.value);
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
