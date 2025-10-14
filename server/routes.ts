@@ -305,7 +305,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validar personalizações antes de criar o pedido
       if (req.body.items && req.body.items.length > 0) {
+        console.log("Validando personalizações dos itens:", JSON.stringify(req.body.items, null, 2));
+        
         for (const item of req.body.items) {
+          console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
+          
           if (item.hasItemCustomization && item.selectedCustomizationId) {
             const customizations = await storage.getCustomizationOptions();
             const customization = customizations.find(c => c.id === item.selectedCustomizationId);
@@ -314,11 +318,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
               const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
               
+              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+              
               if (itemQty < minQty) {
+                console.log(`BLOQUEADO: ${itemQty} < ${minQty}`);
                 return res.status(400).json({
                   error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
                 });
               }
+              console.log(`APROVADO: ${itemQty} >= ${minQty}`);
             }
           }
         }
@@ -1833,7 +1841,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validar personalizações antes de criar o orçamento
       if (req.body.items && req.body.items.length > 0) {
+        console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
+        
         for (const item of req.body.items) {
+          console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
+          
           if (item.hasItemCustomization && item.selectedCustomizationId) {
             const customizations = await storage.getCustomizationOptions();
             const customization = customizations.find(c => c.id === item.selectedCustomizationId);
@@ -1842,11 +1854,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
               const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
               
+              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+              
               if (itemQty < minQty) {
+                console.log(`BLOQUEADO: ${itemQty} < ${minQty}`);
                 return res.status(400).json({
                   error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
                 });
               }
+              console.log(`APROVADO: ${itemQty} >= ${minQty}`);
             }
           }
         }
