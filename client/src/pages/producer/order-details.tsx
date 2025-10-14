@@ -76,7 +76,8 @@ export default function ProducerOrderDetails() {
   const handleStatusUpdate = (status: string) => {
     // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
     if (status === 'ready' || status === 'completed') {
-      if (!productionOrder?.producerValue || parseFloat(productionOrder.producerValue || '0') <= 0) {
+      const currentValue = parseFloat(productionOrder?.producerValue || '0');
+      if (!productionOrder?.producerValue || currentValue <= 0) {
         toast({
           title: "Valor do serviço não definido",
           description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
@@ -98,13 +99,16 @@ export default function ProducerOrderDetails() {
 
   const handleStatusUpdateWithNotes = () => {
     // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
-    if ((selectedStatus === 'ready' || selectedStatus === 'completed') && (!productionOrder?.producerValue || parseFloat(productionOrder.producerValue || '0') <= 0)) {
-      toast({
-        title: "Valor do serviço não definido",
-        description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
-        variant: "destructive",
-      });
-      return;
+    if (selectedStatus === 'ready' || selectedStatus === 'completed') {
+      const currentValue = parseFloat(productionOrder?.producerValue || '0');
+      if (!productionOrder?.producerValue || currentValue <= 0) {
+        toast({
+          title: "Valor do serviço não definido",
+          description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     updateStatusMutation.mutate({
       status: selectedStatus,
@@ -474,19 +478,8 @@ export default function ProducerOrderDetails() {
               {productionOrder.status === 'production' && (
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    if (!productionOrder.producerValue) {
-                      toast({
-                        title: "Valor não definido",
-                        description: "Você deve definir o valor do serviço antes de marcar como pronto",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    handleStatusUpdate('ready');
-                  }}
-                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
-                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
+                  onClick={() => handleStatusUpdate('ready')}
+                  disabled={updateStatusMutation.isPending}
                 >
                   <Package className="h-4 w-4 mr-2" />
                   Marcar Pronto
@@ -497,8 +490,7 @@ export default function ProducerOrderDetails() {
                 <Button
                   className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
                   onClick={() => handleStatusUpdate('shipped')}
-                  disabled={!productionOrder.producerValue}
-                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como enviado" : ""}
+                  disabled={updateStatusMutation.isPending}
                 >
                   <Truck className="h-4 w-4 mr-2" />
                   Marcar Enviado
@@ -510,8 +502,7 @@ export default function ProducerOrderDetails() {
                   <Button
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={() => handleStatusUpdate('delivered')}
-                    disabled={!productionOrder.producerValue}
-                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de marcar como entregue" : ""}
+                    disabled={updateStatusMutation.isPending}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Marcar Entregue
@@ -519,8 +510,7 @@ export default function ProducerOrderDetails() {
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleStatusUpdate('completed')}
-                    disabled={!productionOrder.producerValue}
-                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar" : ""}
+                    disabled={updateStatusMutation.isPending}
                   >
                     Finalizar Ordem
                   </Button>
@@ -530,19 +520,8 @@ export default function ProducerOrderDetails() {
               {(productionOrder.status === 'delivered') && (
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    if (!productionOrder.producerValue) {
-                      toast({
-                        title: "Valor não definido",
-                        description: "Você deve definir o valor do serviço antes de finalizar a ordem",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    handleStatusUpdate('completed');
-                  }}
-                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
-                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de finalizar a ordem" : ""}
+                  onClick={() => handleStatusUpdate('completed')}
+                  disabled={updateStatusMutation.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Finalizar Ordem
