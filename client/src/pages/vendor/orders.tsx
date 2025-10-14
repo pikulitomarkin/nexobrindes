@@ -1504,6 +1504,12 @@ export default function VendorOrders() {
                       }
                     </span>
                   </div>
+                  {vendorOrderForm.downPayment > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-green-700 bg-green-50 p-2 rounded">
+                      <span>Frete + Entrada:</span>
+                      <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Pedido:</span>
