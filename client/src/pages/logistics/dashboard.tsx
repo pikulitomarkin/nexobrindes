@@ -349,7 +349,6 @@ export default function LogisticsDashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
 
       {/* Pedidos em Produção */}
       <Card>
