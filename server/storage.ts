@@ -2026,8 +2026,7 @@ export class MemStorage implements IStorage {
           ncm: item.Ncm
         };
 
-        const created = await this.createProduct(productData);
-        console.log(`Created product with producerId: ${created.producerId}`);
+        await this.createProduct(productData);
         imported++;
       } catch (error) {
         errors.push({

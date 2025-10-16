@@ -18,16 +18,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-// Mock storage for demonstration purposes if not provided elsewhere
-const storage = {
-  getUser: async (id: string) => {
-    // In a real app, this would fetch from a database or API
-    console.log(`Mock storage: Fetching user with id ${id}`);
-    if (id === "prod1") return { id: "prod1", name: "Produtor Alfa" };
-    if (id === "prod2") return { id: "prod2", name: "Produtor Beta" };
-    return null;
-  }
-};
 
 export default function LogisticsProducts() {
   const { toast } = useToast();
@@ -86,27 +76,8 @@ export default function LogisticsProducts() {
       if (!response.ok) throw new Error('Failed to fetch products');
       const result = await response.json();
 
-      // Enrich with producer names
-      const enrichedProducts = await Promise.all(
-        result.products.map(async (product: any) => {
-          if (product.producerId && product.producerId !== 'internal') {
-            // Assuming storage.getUser fetches producer details
-            const producer = await storage.getUser(product.producerId);
-            return {
-              ...product,
-              producerName: producer?.name || 'Produtor Desconhecido',
-              type: 'external'
-            };
-          }
-          return {
-            ...product,
-            producerName: null, // No producer name for internal products
-            type: 'internal'
-          };
-        })
-      );
-
-      return { ...result, products: enrichedProducts };
+      // Backend already enriches products with producer names
+      return result;
     },
   });
 
