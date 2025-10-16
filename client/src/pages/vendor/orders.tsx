@@ -495,6 +495,8 @@ export default function VendorOrders() {
 
 
   const handleEditOrder = (order: any) => {
+    console.log('Editing order:', order);
+
     // Pre-populate form with existing order data
     setVendorOrderForm({
       title: order.product || order.title || "",
@@ -507,27 +509,45 @@ export default function VendorOrders() {
       deadline: order.deadline || "",
       deliveryDeadline: order.deliveryDeadline || "",
       deliveryType: order.deliveryType || "delivery",
-      items: order.items?.map((item: any) => ({
-        productId: item.productId,
-        productName: item.productName,
-        producerId: item.producerId, // Include producerId
-        quantity: item.quantity,
-        unitPrice: parseFloat(item.unitPrice),
-        totalPrice: parseFloat(item.totalPrice),
-        hasItemCustomization: item.hasItemCustomization,
-        selectedCustomizationId: item.selectedCustomizationId || "",
-        itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
-        itemCustomizationDescription: item.itemCustomizationDescription || "",
-        additionalCustomizationNotes: item.additionalCustomizationNotes || "",
-        customizationPhoto: item.customizationPhoto || "",
-        productWidth: item.productWidth || "",
-        productHeight: item.productHeight || "",
-        productDepth: item.productDepth || "",
-        hasItemDiscount: item.hasItemDiscount || false,
-        itemDiscountType: item.itemDiscountType || "percentage",
-        itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
-        itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
-      })) || [],
+      items: order.items?.map((item: any) => {
+        // Ensure producerId is correctly mapped
+        let producerId = item.producerId;
+        
+        // If producerId is missing, try to find it from the product
+        if (!producerId && item.productId) {
+          const product = products.find((p: any) => p.id === item.productId);
+          producerId = product?.producerId || 'internal';
+        }
+        
+        // Default to 'internal' if still not found
+        if (!producerId) {
+          producerId = 'internal';
+        }
+
+        console.log(`Mapping item ${item.productName}: producerId=${producerId}`);
+
+        return {
+          productId: item.productId,
+          productName: item.productName || item.product?.name || 'Produto não encontrado',
+          producerId: producerId,
+          quantity: parseInt(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          totalPrice: parseFloat(item.totalPrice) || 0,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+          customizationPhoto: item.customizationPhoto || "",
+          productWidth: item.productWidth || "",
+          productHeight: item.productHeight || "",
+          productDepth: item.productDepth || "",
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+          itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+        };
+      }) || [],
       paymentMethodId: order.paymentMethodId || "",
       shippingMethodId: order.shippingMethodId || "",
       installments: order.installments || 1,

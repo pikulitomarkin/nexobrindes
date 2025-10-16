@@ -523,26 +523,45 @@ export default function VendorBudgets() {
       validUntil: budget.validUntil || "",
       deliveryDeadline: budget.deliveryDeadline || "",
       deliveryType: budget.deliveryType || "delivery",
-      items: (budget.items || []).map((item: any) => ({
-        productId: item.productId,
-        productName: item.productName || item.product?.name || 'Produto não encontrado',
-        quantity: parseInt(item.quantity) || 1,
-        unitPrice: parseFloat(item.unitPrice) || 0,
-        totalPrice: parseFloat(item.totalPrice) || 0,
-        hasItemCustomization: item.hasItemCustomization || false,
-        selectedCustomizationId: item.selectedCustomizationId || "",
-        itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
-        itemCustomizationDescription: item.itemCustomizationDescription || "",
-        additionalCustomizationNotes: item.additionalCustomizationNotes || "",
-        customizationPhoto: item.customizationPhoto || "",
-        productWidth: item.productWidth || "",
-        productHeight: item.productHeight || "",
-        productDepth: item.productDepth || "",
-        hasItemDiscount: item.hasItemDiscount || false,
-        itemDiscountType: item.itemDiscountType || "percentage",
-        itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
-        itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
-      })),
+      items: (budget.items || []).map((item: any) => {
+        // Ensure producerId is correctly mapped
+        let producerId = item.producerId;
+        
+        // If producerId is missing, try to find it from the product
+        if (!producerId && item.productId) {
+          const product = products.find((p: any) => p.id === item.productId);
+          producerId = product?.producerId || 'internal';
+        }
+        
+        // Default to 'internal' if still not found
+        if (!producerId) {
+          producerId = 'internal';
+        }
+
+        console.log(`Mapping budget item ${item.productName}: producerId=${producerId}`);
+
+        return {
+          productId: item.productId,
+          productName: item.productName || item.product?.name || 'Produto não encontrado',
+          producerId: producerId,
+          quantity: parseInt(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          totalPrice: parseFloat(item.totalPrice) || 0,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+          customizationPhoto: item.customizationPhoto || "",
+          productWidth: item.productWidth || "",
+          productHeight: item.productHeight || "",
+          productDepth: item.productDepth || "",
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+          itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+        };
+      }),
       paymentMethodId: budget.paymentMethodId || "",
       shippingMethodId: budget.shippingMethodId || "",
       installments: budget.installments || 1,
