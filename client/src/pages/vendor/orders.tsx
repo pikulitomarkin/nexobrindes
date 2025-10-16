@@ -78,6 +78,9 @@ export default function VendorOrders() {
     updateOrderItem(itemIndex, 'customizationPhoto', '');
   };
 
+  // State for selected producer in product selection
+  const [selectedProducerId, setSelectedProducerId] = useState<string>("");
+
   // Order form state - isolated for vendor
   const [vendorOrderForm, setVendorOrderForm] = useState({
     title: "",
@@ -340,6 +343,7 @@ export default function VendorOrders() {
     });
     setIsEditMode(false);
     setEditingOrderId(null);
+    setSelectedProducerId("");
   };
 
   const createOrderMutation = useMutation({
@@ -1126,90 +1130,114 @@ export default function VendorOrders() {
                 {/* Add Products */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Factory className="h-5 w-5" />
+                      Adicionar Produtos
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Order Product Search and Category Filter */}
-                    <div className="mb-4 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Buscar produtos..."
-                            value={orderProductSearch}
-                            onChange={(e) => setOrderProductSearch(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
-                        <Select value={orderCategoryFilter} onValueChange={setOrderCategoryFilter}>
+                    <div className="space-y-4">
+                      {/* Producer Selection */}
+                      <div>
+                        <Label>Selecionar Produtor</Label>
+                        <Select 
+                          value={selectedProducerId || ""} 
+                          onValueChange={setSelectedProducerId}
+                        >
                           <SelectTrigger>
-                            <SelectValue placeholder="Categoria" />
+                            <SelectValue placeholder="Escolha um produtor" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((category: string) => (
-                              <SelectItem key={category} value={category}>
-                                {category === "all" ? "Todas as Categorias" : category}
+                            <SelectItem value="internal">Produtos Internos</SelectItem>
+                            {producers?.map((producer: any) => (
+                              <SelectItem key={producer.id} value={producer.id}>
+                                {producer.name} - {producer.specialty}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{filteredOrderProducts.length} produtos encontrados</span>
-                        {(orderProductSearch || orderCategoryFilter !== "all") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setOrderProductSearch("");
-                              setOrderCategoryFilter("all");
-                            }}
-                          >
-                            Limpar filtros
-                          </Button>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Products grouped by producer */}
-                    <div className="space-y-4">
-                      {Object.entries(productsByProducer).map(([producerId, producerProducts]) => {
-                        const producer = producers?.find((p: any) => p.id === producerId);
-                        return (
-                          <div key={producerId} className="border p-4 rounded-lg">
-                            <h4 className="text-lg font-semibold mb-3">{producer ? producer.name : `Produtor ID: ${producerId}`}</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                              {producerProducts.length === 0 ? (
-                                <div className="col-span-full text-center py-8">
-                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                  <p className="text-gray-500">Nenhum produto encontrado para este produtor</p>
-                                </div>
-                              ) : (
-                                producerProducts.map((product: any) => (
-                                  <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                                    onClick={() => addProductToOrder(product, producerId)}>
-                                    <div className="flex items-center gap-2">
-                                      {product.imageLink ? (
-                                        <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
-                                      ) : (
-                                        <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                          <Package className="h-4 w-4 text-gray-400" />
-                                        </div>
-                                      )}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{product.name}</p>
-                                        <p className="text-xs text-gray-500">
-                                          R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </p>
+                      {/* Product Search */}
+                      {selectedProducerId && (
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Buscar produtos do produtor..."
+                            value={orderProductSearch}
+                            onChange={(e) => setOrderProductSearch(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
+                      )}
+
+                      {/* Products List */}
+                      {selectedProducerId && (
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="mb-3">
+                            <h4 className="font-medium text-gray-800">
+                              {selectedProducerId === 'internal' ? 'Produtos Internos' : 
+                                producers?.find((p: any) => p.id === selectedProducerId)?.name}
+                            </h4>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                            {(() => {
+                              const producerProducts = productsByProducer[selectedProducerId] || [];
+                              const filteredProducts = producerProducts.filter((product: any) => 
+                                !orderProductSearch || 
+                                product.name.toLowerCase().includes(orderProductSearch.toLowerCase())
+                              );
+
+                              if (filteredProducts.length === 0) {
+                                return (
+                                  <div className="col-span-full text-center py-8">
+                                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                    <p className="text-gray-500">
+                                      {orderProductSearch ? 'Nenhum produto encontrado' : 'Nenhum produto disponível para este produtor'}
+                                    </p>
+                                  </div>
+                                );
+                              }
+
+                              return filteredProducts.map((product: any) => (
+                                <div 
+                                  key={product.id} 
+                                  className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors" 
+                                  onClick={() => addProductToOrder(product, selectedProducerId)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {product.imageLink ? (
+                                      <img src={product.imageLink} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                                    ) : (
+                                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                                        <Package className="h-5 w-5 text-gray-400" />
                                       </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">{product.name}</p>
+                                      <p className="text-xs text-gray-500">
+                                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      {product.category && (
+                                        <p className="text-xs text-blue-600">{product.category}</p>
+                                      )}
                                     </div>
                                   </div>
-                                ))
-                              )}
-                            </div>
+                                </div>
+                              ));
+                            })()}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
+
+                      {!selectedProducerId && (
+                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                          <Factory className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500 font-medium">Selecione um produtor acima</p>
+                          <p className="text-sm text-gray-400">Escolha um produtor para ver seus produtos disponíveis</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
