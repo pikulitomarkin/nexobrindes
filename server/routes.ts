@@ -991,32 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          // Always use contactName as primary client name - it's required on order creation
-          let clientName = order.contactName;
-
-          // Only try other methods if contactName is somehow missing
-          if (!clientName && order.clientId) {
-            console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
-
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              console.log(`Found client record:`, clientRecord);
-              clientName = clientRecord.name;
-            } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                console.log(`Found client by userId:`, clientByUserId);
-                clientName = clientByUserId.name;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  console.log(`Found user record:`, clientUser);
-                  clientName = clientUser.name;
-                }
-              }
-            }
-          }
-
+          const client = await storage.getUser(order.clientId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Get budget photos and items if order was converted from budget
@@ -1053,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: clientName, // Never use fallback 'Unknown'
+            clientName: client?.name || 'Unknown',
             producerName: producer?.name || null,
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
@@ -1447,7 +1422,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get products grouped by producer for budget/order creation
+  app.get("/api/products/by-producer", async (req, res) => {
+    try {
+      const productsGrouped = await storage.getProductsGroupedByProducer();
+      res.json(productsGrouped);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch products by producer" });
+    }
+  });
 
+  // Get products for specific producer
+  app.get("/api/products/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      const products = await storage.getProductsByProducer(producerId);
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch producer products" });
+    }
+  });
 
   app.get("/api/products/categories", async (req, res) => {
     try {

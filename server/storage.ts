@@ -139,6 +139,8 @@ export interface IStorage {
   deleteProduct(id: string): Promise<boolean>;
   importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }>;
   searchProducts(query: string): Promise<any[]>;
+  getProductsByProducer(producerId: string): Promise<any[]>;
+  getProductsGroupedByProducer(): Promise<{ [key: string]: any[] }>;
 
   // Budgets
   getBudgets(): Promise<any[]>;
@@ -1439,9 +1441,41 @@ export class MemStorage implements IStorage {
 
   async getProductionOrdersByProducer(producerId: string): Promise<ProductionOrder[]> {
     console.log(`Storage: Getting production orders for producer: ${producerId}`);
-    const orders = Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
-    console.log(`Storage: Found ${orders.length} production orders for producer ${producerId}:`, orders.map(o => ({ id: o.id, orderId: o.orderId, status: o.status })));
-    return orders;
+    const productionOrders = Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
+
+    // Também incluir pedidos onde o produtor tem itens específicos
+    const ordersWithProducerItems = Array.from(this.orders.values()).filter(order => {
+      if (order.items && Array.isArray(order.items)) {
+        return order.items.some((item: any) => item.producerId === producerId);
+      }
+      return false;
+    });
+
+    // Criar production orders para pedidos que têm itens deste produtor mas ainda não têm production order
+    for (const order of ordersWithProducerItems) {
+      const existingPO = productionOrders.find(po => po.orderId === order.id);
+      if (!existingPO && order.status === 'production') {
+        const newPO = {
+          id: `po-${Date.now()}-${producerId}-${order.id}`,
+          orderId: order.id,
+          producerId: producerId,
+          status: 'pending',
+          deadline: order.deadline,
+          acceptedAt: null,
+          completedAt: null,
+          notes: null,
+          deliveryDeadline: order.deliveryDeadline,
+          hasUnreadNotes: false,
+          lastNoteAt: null,
+          producerValue: null
+        };
+        this.productionOrders.set(newPO.id, newPO);
+        productionOrders.push(newPO);
+      }
+    }
+
+    console.log(`Storage: Found ${productionOrders.length} production orders for producer ${producerId}:`, productionOrders.map(o => ({ id: o.id, orderId: o.orderId, status: o.status })));
+    return productionOrders;
   }
 
   async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {
@@ -2015,6 +2049,27 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getProductsByProducer(producerId: string): Promise<any[]> {
+    return Array.from(this.products.values()).filter(p =>
+      p.isActive && (p.producerId === producerId || p.producerId === 'internal')
+    );
+  }
+
+  async getProductsGroupedByProducer(): Promise<{ [key: string]: any[] }> {
+    const products = Array.from(this.products.values()).filter(p => p.isActive);
+    const grouped: { [key: string]: any[] } = {};
+
+    products.forEach(product => {
+      const producerId = product.producerId || 'internal';
+      if (!grouped[producerId]) {
+        grouped[producerId] = [];
+      }
+      grouped[producerId].push(product);
+    });
+
+    return grouped;
+  }
+
   // Budget methods
   async getBudgets(): Promise<any[]> {
     return Array.from(this.budgets.values());
@@ -2127,14 +2182,40 @@ export class MemStorage implements IStorage {
     budget.status = 'converted';
     this.budgets.set(budgetId, budget);
 
-    // If producer is specified, create production order
-    if (producerId) {
-      await this.createProductionOrder({
-        orderId: order.id,
-        producerId: producerId,
-        status: 'pending',
-        deadline: budget.deliveryDeadline || null
+    // Create production orders for each producer involved in the order
+    const producersInvolved = new Set<string>();
+
+    // Get all producers from order items
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        if (item.producerId && item.producerId !== 'internal') {
+          producersInvolved.add(item.producerId);
+        }
       });
+    }
+
+    // If a specific producer was provided, include it
+    if (producerId && producerId !== 'internal') {
+      producersInvolved.add(producerId);
+    }
+
+    // Create production orders for each producer
+    for (const pId of producersInvolved) {
+      const productionOrder = {
+        id: `po-${Date.now()}-${pId}`,
+        orderId: order.id,
+        producerId: pId,
+        status: 'pending',
+        deadline: order.deadline,
+        acceptedAt: null,
+        completedAt: null,
+        notes: null,
+        deliveryDeadline: order.deliveryDeadline,
+        hasUnreadNotes: false,
+        lastNoteAt: null,
+        producerValue: null
+      };
+      this.productionOrders.set(productionOrder.id, productionOrder);
     }
 
     return order;

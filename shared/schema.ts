@@ -38,7 +38,6 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   clientId: varchar("client_id").references(() => clients.id).notNull(),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
-  producerId: varchar("producer_id").references(() => users.id),
   budgetId: varchar("budget_id").references(() => budgets.id),
   product: text("product").notNull(),
   description: text("description"),
@@ -136,8 +135,8 @@ export const products = pgTable("products", {
   unit: text("unit").default('un'),
   isActive: boolean("is_active").default(true),
 
-  // Produtor responsável - 'internal' para produtos internos ou ID do produtor
-  producerId: text("producer_id").default('internal'),
+  // Produtor responsável - 'internal' para produtos internos ou ID do produtor específico
+  producerId: varchar("producer_id").references(() => users.id).default('internal'),
   type: text("type").default('internal'), // 'internal' ou 'external'
 
   // Campos adicionais do JSON XBZ
@@ -199,6 +198,7 @@ export const budgetItems = pgTable("budget_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   budgetId: varchar("budget_id").references(() => budgets.id).notNull(),
   productId: varchar("product_id").references(() => products.id).notNull(),
+  producerId: varchar("producer_id").references(() => users.id), // Produtor responsável por este item
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),

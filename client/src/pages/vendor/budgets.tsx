@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -118,7 +118,7 @@ export default function VendorBudgets() {
     },
   });
 
-  const { data: productsData } = useQuery({
+  const { data: allProductsData } = useQuery({
     queryKey: ["/api/products", { limit: 9999 }],
     queryFn: async () => {
       const response = await fetch('/api/products?limit=9999');
@@ -126,6 +126,29 @@ export default function VendorBudgets() {
       return response.json();
     },
   });
+
+  const { data: producers } = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
+      return response.json();
+    },
+  });
+
+
+  const products = allProductsData?.products || [];
+
+  // Group products by producer
+  const productsByProducer = products.reduce((acc, product) => {
+    const producerId = product.producerId || 'internal'; // Default to 'internal' if no producer assigned
+    if (!acc[producerId]) {
+      acc[producerId] = [];
+    }
+    acc[producerId].push(product);
+    return acc;
+  }, {} as Record<string, any[]>);
+
 
   const { data: paymentMethods } = useQuery({
     queryKey: ["/api/payment-methods"],
@@ -145,14 +168,7 @@ export default function VendorBudgets() {
     },
   });
 
-  const products = productsData?.products || [];
-  const categorySet = new Set<string>();
-  (products || []).forEach((product: any) => {
-    if (product.category && typeof product.category === 'string') {
-      categorySet.add(product.category);
-    }
-  });
-  const categories: string[] = ['all', ...Array.from(categorySet)];
+  const categories: string[] = ['all', ...new Set((products || []).map((product: any) => product.category).filter(Boolean))];
 
   // Helper variables for selected payment and shipping methods
   const selectedPaymentMethod = paymentMethods?.find((pm: any) => pm.id === vendorBudgetForm.paymentMethodId);
@@ -176,10 +192,11 @@ export default function VendorBudgets() {
   };
 
   // Budget functions
-  const addProductToBudget = (product: any) => {
+  const addProductToBudget = (product: any, producerId?: string) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
+      producerId: producerId || product.producerId || 'internal', // Ensure producerId is captured
       quantity: 1,
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
@@ -407,15 +424,6 @@ export default function VendorBudgets() {
   const [convertProducerId, setConvertProducerId] = useState("");
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
   const [budgetToView, setBudgetToView] = useState<any>(null);
-
-  const { data: producers } = useQuery({
-    queryKey: ["/api/producers"],
-    queryFn: async () => {
-      const response = await fetch('/api/producers');
-      if (!response.ok) throw new Error('Failed to fetch producers');
-      return response.json();
-    },
-  });
 
   const convertToOrderMutation = useMutation({
     mutationFn: async ({ budgetId, clientId, producerId }: { budgetId: string; clientId: string; producerId: string }) => {
@@ -1055,86 +1063,84 @@ export default function VendorBudgets() {
                   </div>
                 )}
 
-                {/* Add Products */}
+                {/* Add Products - Grouped by Producer */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Factory className="h-5 w-5" />
+                      Produtos por Produtor
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Budget Product Search */}
-                    <div className="mb-4 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Buscar produtos..."
-                            value={budgetProductSearch}
-                            onChange={(e) => setBudgetProductSearch(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
-                        <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Categoria" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category: string) => (
-                              <SelectItem key={category} value={category}>
-                                {category === "all" ? "Todas as Categorias" : category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{filteredBudgetProducts.length} produtos encontrados</span>
-                        {(budgetProductSearch || budgetCategoryFilter !== "all") && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setBudgetProductSearch("");
-                              setBudgetCategoryFilter("all");
-                            }}
-                          >
-                            Limpar filtros
-                          </Button>
-                        )}
+                    <div className="mb-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Buscar produtos..."
+                          value={budgetProductSearch}
+                          onChange={(e) => setBudgetProductSearch(e.target.value)}
+                          className="pl-9"
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {filteredBudgetProducts.length === 0 ? (
-                        <div className="col-span-full text-center py-8">
-                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500">
-                            {budgetProductSearch || budgetCategoryFilter !== "all" ?
-                              "Nenhum produto encontrado com os filtros aplicados" :
-                              "Nenhum produto disponível"}
-                          </p>
-                        </div>
-                      ) : (
-                        filteredBudgetProducts.map((product: any) => (
-                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                            onClick={() => addProductToBudget(product)}>
-                            <div className="flex items-center gap-2">
-                              {product.imageLink ? (
-                                <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
-                              ) : (
-                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                  <Package className="h-4 w-4 text-gray-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{product.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
+
+                    {productsByProducer && Object.keys(productsByProducer).length > 0 ? (
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {Object.entries(productsByProducer).map(([producerId, products]) => {
+                          const producerName = producerId === 'internal' ? 'Produtos Internos' : 
+                            producers?.find((p: any) => p.id === producerId)?.name || `Produtor ${producerId}`;
+
+                          const filteredProducts = (products as any[]).filter(product => 
+                            !budgetProductSearch || 
+                            product.name.toLowerCase().includes(budgetProductSearch.toLowerCase())
+                          );
+
+                          if (filteredProducts.length === 0) return null;
+
+                          return (
+                            <div key={producerId} className="border rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Factory className="h-4 w-4 text-blue-600" />
+                                <h4 className="font-medium text-blue-800">{producerName}</h4>
+                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                                  {filteredProducts.length} produtos
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {filteredProducts.map((product: any) => (
+                                  <div 
+                                    key={product.id} 
+                                    className="p-2 border border-gray-200 rounded hover:bg-blue-50 cursor-pointer transition-colors" 
+                                    onClick={() => addProductToBudget(product, producerId)}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {product.imageLink ? (
+                                        <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                                      ) : (
+                                        <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                          <Package className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{product.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                          R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-500">Nenhum produto disponível</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

@@ -21,7 +21,7 @@ export default function VendorOrders() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderProductSearch, setOrderProductSearch] = useState("");
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
-  
+
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -215,10 +215,11 @@ export default function VendorOrders() {
   };
 
   // Order functions
-  const addProductToOrder = (product: any) => {
+  const addProductToOrder = (product: any, producerId: string) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
+      producerId: producerId, // Add producerId to the item
       quantity: 1,
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
@@ -467,7 +468,7 @@ export default function VendorOrders() {
     },
   });
 
-  
+
 
   const markNotesReadMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -487,7 +488,7 @@ export default function VendorOrders() {
     },
   });
 
-  
+
 
   const handleEditOrder = (order: any) => {
     // Pre-populate form with existing order data
@@ -505,6 +506,7 @@ export default function VendorOrders() {
       items: order.items?.map((item: any) => ({
         productId: item.productId,
         productName: item.productName,
+        producerId: item.producerId, // Include producerId
         quantity: item.quantity,
         unitPrice: parseFloat(item.unitPrice),
         totalPrice: parseFloat(item.totalPrice),
@@ -556,6 +558,18 @@ export default function VendorOrders() {
       createOrderMutation.mutate(vendorOrderForm);
     }
   };
+
+  // Group products by producer for selection
+  const productsByProducer: { [producerId: string]: any[] } = {};
+  (products || []).forEach((product: any) => {
+    const producerId = product.producerId; // Assuming product has a producerId
+    if (producerId) {
+      if (!productsByProducer[producerId]) {
+        productsByProducer[producerId] = [];
+      }
+      productsByProducer[producerId].push(product);
+    }
+  });
 
   // Filter products for order creation
   const filteredOrderProducts = products.filter((product: any) => {
@@ -695,7 +709,7 @@ export default function VendorOrders() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               className="gradient-bg text-white"
               onClick={() => {
                 // Ensure we're in create mode when clicking new order
@@ -748,8 +762,8 @@ export default function VendorOrders() {
                 </div>
                 <div>
                   <Label htmlFor="order-delivery-type">Tipo de Entrega</Label>
-                  <Select 
-                    value={vendorOrderForm.deliveryType} 
+                  <Select
+                    value={vendorOrderForm.deliveryType}
                     onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, deliveryType: value })}
                   >
                     <SelectTrigger>
@@ -808,8 +822,8 @@ export default function VendorOrders() {
 
               <div>
                 <Label htmlFor="order-client">Cliente Cadastrado (Opcional)</Label>
-                <Select 
-                  value={vendorOrderForm.clientId || "none"} 
+                <Select
+                  value={vendorOrderForm.clientId || "none"}
                   onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, clientId: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
@@ -930,7 +944,7 @@ export default function VendorOrders() {
 
                         {item.hasItemCustomization && (
                           <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
-                            <CustomizationSelector 
+                            <CustomizationSelector
                               productCategory={products.find((p: any) => p.id === item.productId)?.category}
                               quantity={item.quantity}
                               selectedCustomization={item.selectedCustomizationId}
@@ -987,9 +1001,9 @@ export default function VendorOrders() {
                                       </svg>
                                       <p className="text-xs text-gray-500">Clique para enviar imagem</p>
                                     </div>
-                                    <input 
-                                      type="file" 
-                                      className="hidden" 
+                                    <input
+                                      type="file"
+                                      className="hidden"
                                       accept="image/*"
                                       onChange={(e) => handleProductImageUpload(e, index)}
                                     />
@@ -998,9 +1012,9 @@ export default function VendorOrders() {
 
                                 {item.customizationPhoto && (
                                   <div className="relative inline-block">
-                                    <img 
-                                      src={item.customizationPhoto} 
-                                      alt={`Personalização ${item.productName}`} 
+                                    <img
+                                      src={item.customizationPhoto}
+                                      alt={`Personalização ${item.productName}`}
                                       className="w-24 h-24 object-cover rounded-lg"
                                       onError={(e) => {
                                         console.error('Erro ao carregar imagem:', item.customizationPhoto);
@@ -1115,7 +1129,7 @@ export default function VendorOrders() {
                     <CardTitle className="text-base">Adicionar Produtos</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Order Product Search */}
+                    {/* Order Product Search and Category Filter */}
                     <div className="mb-4 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div className="relative">
@@ -1156,38 +1170,46 @@ export default function VendorOrders() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {filteredOrderProducts.length === 0 ? (
-                        <div className="col-span-full text-center py-8">
-                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500">
-                            {orderProductSearch || orderCategoryFilter !== "all" ?
-                              "Nenhum produto encontrado com os filtros aplicados" :
-                              "Nenhum produto disponível"}
-                          </p>
-                        </div>
-                      ) : (
-                        filteredOrderProducts.map((product: any) => (
-                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                            onClick={() => addProductToOrder(product)}>
-                            <div className="flex items-center gap-2">
-                              {product.imageLink ? (
-                                <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
-                              ) : (
-                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                  <Package className="h-4 w-4 text-gray-400" />
+
+                    {/* Products grouped by producer */}
+                    <div className="space-y-4">
+                      {Object.entries(productsByProducer).map(([producerId, producerProducts]) => {
+                        const producer = producers?.find((p: any) => p.id === producerId);
+                        return (
+                          <div key={producerId} className="border p-4 rounded-lg">
+                            <h4 className="text-lg font-semibold mb-3">{producer ? producer.name : `Produtor ID: ${producerId}`}</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                              {producerProducts.length === 0 ? (
+                                <div className="col-span-full text-center py-8">
+                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                  <p className="text-gray-500">Nenhum produto encontrado para este produtor</p>
                                 </div>
+                              ) : (
+                                producerProducts.map((product: any) => (
+                                  <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
+                                    onClick={() => addProductToOrder(product, producerId)}>
+                                    <div className="flex items-center gap-2">
+                                      {product.imageLink ? (
+                                        <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
+                                      ) : (
+                                        <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                          <Package className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">{product.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                          R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
                               )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{product.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
-                              </div>
                             </div>
                           </div>
-                        ))
-                      )}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -1262,16 +1284,16 @@ export default function VendorOrders() {
                             const rawValue = e.target.value;
                             if (rawValue === '' || rawValue === 'R$ ') {
                               const total = calculateTotalWithShipping();
-                              setVendorOrderForm({ 
-                                ...vendorOrderForm, 
+                              setVendorOrderForm({
+                                ...vendorOrderForm,
                                 downPayment: 0,
                                 remainingAmount: total
                               });
                             } else {
                               const downPayment = parseCurrencyValue(rawValue);
                               const total = calculateTotalWithShipping();
-                              setVendorOrderForm({ 
-                                ...vendorOrderForm, 
+                              setVendorOrderForm({
+                                ...vendorOrderForm,
                                 downPayment,
                                 remainingAmount: Math.max(0, total - downPayment)
                               });
@@ -1313,16 +1335,16 @@ export default function VendorOrders() {
                             const rawValue = e.target.value;
                             if (rawValue === '' || rawValue === 'R$ ') {
                               const total = calculateTotalWithShipping();
-                              setVendorOrderForm({ 
-                                ...vendorOrderForm, 
+                              setVendorOrderForm({
+                                ...vendorOrderForm,
                                 shippingCost: 0,
                                 remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
                               });
                             } else {
                               const shippingCost = parseCurrencyValue(rawValue);
                               const total = calculateTotalWithShipping();
-                              setVendorOrderForm({ 
-                                ...vendorOrderForm, 
+                              setVendorOrderForm({
+                                ...vendorOrderForm,
                                 shippingCost,
                                 remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
                               });
@@ -1460,8 +1482,8 @@ export default function VendorOrders() {
                   <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>
-                      {vendorOrderForm.deliveryType === "pickup" ? 
-                        "Retirada no local" : 
+                      {vendorOrderForm.deliveryType === "pickup" ?
+                        "Retirada no local" :
                         `R$ ${(vendorOrderForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
@@ -1756,8 +1778,8 @@ export default function VendorOrders() {
                           Ver
                         </Button>
                         {order.status !== 'production' && order.status !== 'shipped' && order.status !== 'delivered' && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             className="text-orange-600 hover:text-orange-900"
                             onClick={() => handleEditOrder(order)}
@@ -1837,7 +1859,7 @@ export default function VendorOrders() {
         </CardContent>
       </Card>
 
-      
+
 
       {/* Order Details Modal */}
       <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>
@@ -1938,9 +1960,9 @@ export default function VendorOrders() {
                             {/* Product Image */}
                             <div className="flex items-center justify-center">
                               {item.customizationPhoto ? (
-                                <img 
-                                  src={item.customizationPhoto} 
-                                  alt={`Personalização ${item.productName}`} 
+                                <img
+                                  src={item.customizationPhoto}
+                                  alt={`Personalização ${item.productName}`}
                                   className="w-24 h-24 object-cover rounded-lg border"
                                 />
                               ) : (
@@ -2007,8 +2029,8 @@ export default function VendorOrders() {
                                   <p className="text-sm">
                                     <span className="text-orange-600">Desconto aplicado:</span>
                                     <span className="ml-1 font-medium">
-                                      {item.itemDiscountType === 'percentage' 
-                                        ? `${item.itemDiscountPercentage}%` 
+                                      {item.itemDiscountType === 'percentage'
+                                        ? `${item.itemDiscountPercentage}%`
                                         : `R$ ${parseFloat(item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                     </span>
                                   </p>
@@ -2187,15 +2209,15 @@ export default function VendorOrders() {
                       <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
                         <div>
                           <label className="text-purple-600">Prazo de Entrega:</label>
-                          <p>{productionStatuses[selectedOrder.id]?.deliveryDate ? 
-                            new Date(productionStatuses[selectedOrder.id].deliveryDate).toLocaleDateString('pt-BR') : 
+                          <p>{productionStatuses[selectedOrder.id]?.deliveryDate ?
+                            new Date(productionStatuses[selectedOrder.id].deliveryDate).toLocaleDateString('pt-BR') :
                             'Não definido'}</p>
                         </div>
                         <div>
                           <label className="text-purple-600">Status:</label>
-                          <p className="font-medium">{productionStatuses[selectedOrder.id]?.status === 'production' ? 'Em Produção' : 
-                            productionStatuses[selectedOrder.id]?.status === 'ready' ? 'Pronto' : 
-                            productionStatuses[selectedOrder.id]?.status === 'shipped' ? 'Enviado' : 
+                          <p className="font-medium">{productionStatuses[selectedOrder.id]?.status === 'production' ? 'Em Produção' :
+                            productionStatuses[selectedOrder.id]?.status === 'ready' ? 'Pronto' :
+                            productionStatuses[selectedOrder.id]?.status === 'shipped' ? 'Enviado' :
                             productionStatuses[selectedOrder.id]?.status}</p>
                         </div>
                       </div>
