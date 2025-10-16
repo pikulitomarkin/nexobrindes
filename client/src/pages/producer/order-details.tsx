@@ -487,13 +487,11 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'ready' && (
-                <Button
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                  onClick={() => handleStatusUpdate('shipped')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Marcar Enviado
+                <div className="w-full text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="h-6 w-6 text-green-600 mx-auto mb-2" />
+                  <p className="text-green-800 font-medium">Produto Pronto</p>
+                  <p className="text-green-600 text-sm">Enviado para logística processar o envio</p>
+                </div>viado
                 </Button>
               )}
 

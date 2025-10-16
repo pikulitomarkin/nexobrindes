@@ -21,8 +21,6 @@ export default function ProductionDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
   const [updateNotes, setUpdateNotes] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [trackingCode, setTrackingCode] = useState("");
   const [producerValue, setProducerValue] = useState("");
   const [producerNotes, setProducerNotes] = useState("");
   const { toast } = useToast();
@@ -44,17 +42,15 @@ export default function ProductionDashboard() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, notes, deliveryDate, trackingCode }: {
+    mutationFn: async ({ id, status, notes }: {
       id: string;
       status: string;
       notes?: string;
-      deliveryDate?: string;
-      trackingCode?: string;
     }) => {
       const response = await fetch(`/api/production-orders/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, notes, deliveryDate, trackingCode }),
+        body: JSON.stringify({ status, notes }),
       });
       if (!response.ok) throw new Error("Erro ao atualizar status");
       return response.json();
@@ -63,8 +59,6 @@ export default function ProductionDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer", producerId] });
       setIsUpdateDialogOpen(false);
       setUpdateNotes("");
-      setDeliveryDate("");
-      setTrackingCode("");
       setSelectedOrder(null);
       toast({
         title: "Sucesso!",
@@ -109,34 +103,19 @@ export default function ProductionDashboard() {
 
   const handleStatusUpdate = (order: any, status: string) => {
     // Verificar se o valor está definido antes de permitir mudanças de status críticas
-    if ((status === 'ready' || status === 'completed' || status === 'shipped') && (!order.producerValue || parseFloat(order.producerValue || '0') <= 0)) {
+    if (status === 'ready' && (!order.producerValue || parseFloat(order.producerValue || '0') <= 0)) {
       toast({
         title: "Valor não definido",
-        description: "Você deve definir o valor do serviço antes de marcar como pronto, enviado ou finalizado.",
+        description: "Você deve definir o valor do serviço antes de marcar como pronto.",
         variant: "destructive",
       });
       return;
     }
 
-    if (status === 'completed' || status === 'shipped') {
-      setSelectedOrder(order);
-      setIsUpdateDialogOpen(true);
-    } else {
-      updateStatusMutation.mutate({ id: order.id, status });
-    }
+    updateStatusMutation.mutate({ id: order.id, status });
   };
 
-  const handleUpdateWithTracking = () => {
-    if (!selectedOrder) return;
-
-    updateStatusMutation.mutate({
-      id: selectedOrder.id,
-      status: 'shipped',
-      notes: updateNotes,
-      deliveryDate: deliveryDate || undefined,
-      trackingCode: trackingCode
-    });
-  };
+  
 
   const handleSetValue = (order: any) => {
     setSelectedOrder(order);
@@ -230,10 +209,7 @@ export default function ProductionDashboard() {
       pending: { label: "Aguardando", className: "bg-yellow-100 text-yellow-800" },
       accepted: { label: "Aceito", className: "bg-blue-100 text-blue-800" },
       production: { label: "Em Produção", className: "bg-purple-100 text-purple-800" },
-      ready: { label: "Pronto", className: "bg-green-100 text-green-800" },
-      shipped: { label: "Enviado", className: "bg-cyan-100 text-cyan-800" },
-      delivered: { label: "Entregue", className: "bg-emerald-100 text-emerald-800" },
-      completed: { label: "Finalizado", className: "bg-green-100 text-green-800" },
+      ready: { label: "Pronto - Enviado à Logística", className: "bg-green-100 text-green-800" },
       rejected: { label: "Rejeitado", className: "bg-red-100 text-red-800" },
     };
 
@@ -298,45 +274,10 @@ export default function ProductionDashboard() {
         );
       case 'ready':
         return (
-          <Button
-            size="sm"
-            className="bg-cyan-600 hover:bg-cyan-700"
-            onClick={() => handleStatusUpdate(order, 'shipped')}
-          >
-            <Truck className="h-4 w-4 mr-1" />
-            Marcar Enviado
-          </Button>
-        );
-      case 'shipped':
-        return (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => handleStatusUpdate(order, 'delivered')}
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Marcar Entregue
-            </Button>
-            <Button
-              size="sm"
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => handleStatusUpdate(order, 'completed')}
-            >
-              Finalizar
-            </Button>
+          <div className="text-sm text-green-700 font-medium bg-green-50 px-3 py-2 rounded-lg">
+            <CheckCircle className="h-4 w-4 mr-1 inline" />
+            Produto Pronto - Aguardando Logística
           </div>
-        );
-      case 'delivered':
-        return (
-          <Button
-            size="sm"
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => handleStatusUpdate(order, 'completed')}
-          >
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Finalizar Ordem
-          </Button>
         );
       default:
         return null;
@@ -433,18 +374,18 @@ export default function ProductionDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 hover:shadow-lg transition-shadow">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-cyan-700">Enviados</p>
-                <p className="text-3xl font-bold text-cyan-900 mt-2">
-                  {filteredOrders.filter(o => ['shipped', 'delivered'].includes(o.status)).length}
+                <p className="text-sm font-medium text-green-700">Prontos</p>
+                <p className="text-3xl font-bold text-green-900 mt-2">
+                  {filteredOrders.filter(o => o.status === 'ready').length}
                 </p>
-                <p className="text-xs text-cyan-600 mt-1">Em transporte</p>
+                <p className="text-xs text-green-600 mt-1">Enviados à logística</p>
               </div>
-              <div className="h-12 w-12 bg-cyan-600 rounded-xl flex items-center justify-center">
-                <Truck className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -480,9 +421,6 @@ export default function ProductionDashboard() {
             <SelectItem value="accepted">Aceito</SelectItem>
             <SelectItem value="production">Em Produção</SelectItem>
             <SelectItem value="ready">Pronto</SelectItem>
-            <SelectItem value="shipped">Enviado</SelectItem>
-            <SelectItem value="delivered">Entregue</SelectItem>
-            <SelectItem value="completed">Finalizado</SelectItem>
           </SelectContent>
         </Select>
 
@@ -636,14 +574,7 @@ export default function ProductionDashboard() {
                     </div>
                   )}
 
-                  {order.trackingCode && (
-                    <div className="mb-4">
-                      <Label className="text-sm font-medium text-gray-500">Código de Rastreamento</Label>
-                      <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded">
-                        <p className="font-mono font-semibold text-blue-800">{order.trackingCode}</p>
-                      </div>
-                    </div>
-                  )}
+                  
 
                   {order.notes && (
                     <div className="mb-4">
@@ -800,61 +731,7 @@ export default function ProductionDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Update Dialog with Tracking */}
-      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Marcar como Enviado</DialogTitle>
-            <DialogDescription>
-              Adicione o código de rastreamento e informações sobre o envio
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="tracking-code">Código de Rastreamento *</Label>
-              <Input
-                id="tracking-code"
-                placeholder="Ex: BR123456789..."
-                value={trackingCode}
-                onChange={(e) => setTrackingCode(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="delivery-date">Data de Envio (Opcional)</Label>
-              <Input
-                id="delivery-date"
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Observações (Opcional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Informações sobre o envio, transportadora, etc..."
-                value={updateNotes}
-                onChange={(e) => setUpdateNotes(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-2 mt-6">
-            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleUpdateWithTracking}
-              disabled={updateStatusMutation.isPending || !trackingCode}
-            >
-              {updateStatusMutation.isPending ? "Salvando..." : "Marcar como Enviado"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      
     </div>
   );
 }

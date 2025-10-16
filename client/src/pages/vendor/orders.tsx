@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign, Factory } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
@@ -1801,6 +1801,30 @@ export default function VendorOrders() {
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Pago - Aguardando Logística
+                          </Button>
+                        )}
+                        {order.status === 'production' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-600 hover:text-purple-900"
+                            disabled
+                            data-testid={`button-in-production-${order.id}`}
+                          >
+                            <Factory className="h-4 w-4 mr-1" />
+                            Em Produção
+                          </Button>
+                        )}
+                        {order.status === 'ready' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            disabled
+                            data-testid={`button-ready-logistics-${order.id}`}
+                          >
+                            <Package className="h-4 w-4 mr-1" />
+                            Pronto - Aguardando Logística
                           </Button>
                         )}
                       </div>
