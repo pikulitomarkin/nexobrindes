@@ -42,10 +42,12 @@ export function CustomizationSelector({
     },
   });
 
-  // Filtra personalizações pela categoria digitada - TODAS da categoria
+  // Filtra personalizações pela categoria digitada E pela quantidade mínima
   const filteredCustomizations = customizations.filter((customization: any) => {
     if (!categoryFilter.trim()) return false;
-    return customization.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    const matchesCategory = customization.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    const meetsQuantityRequirement = customization.minQuantity <= quantity;
+    return matchesCategory && meetsQuantityRequirement;
   });
 
   const selectedCustomizationData = filteredCustomizations.find((c: any) => c.id === selectedCustomization);
@@ -139,20 +141,12 @@ export function CustomizationSelector({
                   <SelectItem 
                     key={customization.id} 
                     value={customization.id}
-                    disabled={quantity < customization.minQuantity}
                   >
                     <div className="flex justify-between items-center w-full">
                       <div className="flex flex-col">
-                        <span className={quantity < customization.minQuantity ? "text-gray-400" : ""}>
-                          {customization.name}
-                        </span>
-                        {quantity < customization.minQuantity && (
-                          <span className="text-xs text-red-500">
-                            Requer mín. {customization.minQuantity} unidades
-                          </span>
-                        )}
+                        <span>{customization.name}</span>
                       </div>
-                      <span className={`text-sm ${quantity < customization.minQuantity ? "text-gray-400" : "text-gray-500"}`}>
+                      <span className="text-sm text-gray-500">
                         R$ {parseFloat(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         {customization.minQuantity > 1 && ` (mín. ${customization.minQuantity})`}
                       </span>
@@ -166,7 +160,9 @@ export function CustomizationSelector({
 
         {categoryFilter.trim() && filteredCustomizations.length === 0 && (
           <div className="w-full text-sm text-orange-700 bg-orange-100 p-3 rounded border border-orange-300">
-            <strong>Nenhuma personalização encontrada</strong> para a categoria "{categoryFilter}".
+            <strong>Nenhuma personalização disponível</strong> para a categoria "{categoryFilter}" com {quantity} unidades.
+            <br />
+            As personalizações disponíveis podem exigir quantidade mínima maior que {quantity} unidades.
             <br />
             Tente outras palavras como: copo, mochila, mesa, camiseta, etc.
           </div>
