@@ -791,7 +791,18 @@ export default function VendorBudgets() {
                 {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
                     {vendorBudgetForm.items.map((item, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
+                      <div key={index} className={`p-4 border rounded-lg ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                        {/* Producer Name Header */}
+                        <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <Factory className="h-4 w-4 text-gray-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                                producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
+                            </span>
+                          </div>
+                        </div>
+                        
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
                           <Button
@@ -1814,9 +1825,20 @@ export default function VendorBudgets() {
                   <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
                   <div className="space-y-3">
                     {budgetToView.items.map((item: any, index: number) => (
-                      <div key={index} className="border rounded-lg p-4 bg-white">
+                      <div key={index} className={`border rounded-lg p-4 ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
+                            {/* Producer Name Header */}
+                            <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <Factory className="h-4 w-4 text-gray-600" />
+                                <span className="text-sm font-medium text-gray-700">
+                                  Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                                    producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
+                                </span>
+                              </div>
+                            </div>
+                            
                             <h4 className="font-medium text-gray-900">
                               {item.productName || 'Produto não encontrado'}
                             </h4>

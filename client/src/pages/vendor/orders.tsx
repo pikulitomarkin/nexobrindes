@@ -852,7 +852,18 @@ export default function VendorOrders() {
                 {vendorOrderForm.items.length > 0 && (
                   <div className="space-y-4">
                     {vendorOrderForm.items.map((item, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
+                      <div key={index} className={`p-4 border rounded-lg ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                        {/* Producer Name Header */}
+                        <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <Factory className="h-4 w-4 text-gray-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                                producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
+                            </span>
+                          </div>
+                        </div>
+                        
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
                           <Button
@@ -2014,8 +2025,18 @@ export default function VendorOrders() {
                   <h3 className="text-lg font-semibold mb-4">Produtos do Pedido ({selectedOrder.items.length})</h3>
                   <div className="space-y-4">
                     {selectedOrder.items.map((item, index) => (
-                      <Card key={index} className="border border-gray-200">
+                      <Card key={index} className={`border ${index % 2 === 0 ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
                         <CardContent className="p-4">
+                          {/* Producer Name Header */}
+                          <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <Factory className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-700">
+                                Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                                  producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
+                              </span>
+                            </div>
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Product Image */}
                             <div className="flex items-center justify-center">
