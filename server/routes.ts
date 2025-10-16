@@ -2872,8 +2872,10 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich with producer names
       const enrichedProducts = await Promise.all(
         result.products.map(async (product: any) => {
+          console.log(`Product ${product.name} has producerId: ${product.producerId}`);
           if (product.producerId && product.producerId !== 'internal') {
             const producer = await storage.getUser(product.producerId);
+            console.log(`Found producer for ${product.producerId}:`, producer);
             return {
               ...product,
               producerName: producer?.name || 'Produtor Desconhecido',
@@ -2947,6 +2949,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       const { producerId } = req.body;
+      console.log(`Import request for producerId: ${producerId}`);
       if (!producerId) {
         return res.status(400).json({ error: "Produtor é obrigatório para importação" });
       }
