@@ -922,21 +922,30 @@ export default function VendorBudgets() {
                               quantity={item.quantity}
                               selectedCustomization={item.selectedCustomizationId || ''}
                               onCustomizationChange={(customization) => {
-                                if (customization) {
-                                  updateBudgetItem(index, 'selectedCustomizationId', customization.id);
-                                  updateBudgetItem(index, 'itemCustomizationValue', customization.price);
-                                  updateBudgetItem(index, 'itemCustomizationDescription', customization.name);
-                                } else {
-                                  updateBudgetItem(index, 'selectedCustomizationId', '');
-                                  // Não limpar os valores manuais
-                                }
+                                setVendorBudgetForm(prev => {
+                                  const newItems = [...prev.items];
+                                  const item = { ...newItems[index] };
+                                  
+                                  if (customization) {
+                                    item.selectedCustomizationId = customization.id;
+                                    item.itemCustomizationValue = parseFloat(customization.price) || 0;
+                                    item.itemCustomizationDescription = customization.name;
+                                  } else {
+                                    item.selectedCustomizationId = '';
+                                  }
+                                  
+                                  newItems[index] = item;
+                                  return { ...prev, items: newItems };
+                                });
                               }}
                               onValidationError={(error) => {
-                                toast({
-                                  title: "Quantidade Insuficiente",
-                                  description: error,
-                                  variant: "destructive"
-                                });
+                                if (error) {
+                                  toast({
+                                    title: "Quantidade Insuficiente",
+                                    description: error,
+                                    variant: "destructive"
+                                  });
+                                }
                               }}
                             />
 

@@ -109,13 +109,12 @@ export function CustomizationSelector({
                     if (onValidationError) {
                       onValidationError(errorMessage);
                     }
-                    // Não permite selecionar se não atender à quantidade mínima, mas mantém a seleção visualmente
-                    // A lógica de "não permitir" fica com o disabled no SelectItem
-                  } else {
-                    // Limpar erro de validação se a nova seleção for válida
-                    if (onValidationError) {
-                      onValidationError("");
-                    }
+                    return; // Não permite selecionar se não atender à quantidade mínima
+                  }
+
+                  // Limpar erro de validação se a nova seleção for válida
+                  if (onValidationError) {
+                    onValidationError("");
                   }
 
                   onCustomizationChange(customization);
@@ -184,49 +183,6 @@ export function CustomizationSelector({
         )}
       </div>
 
-      {/* Resumo da personalização selecionada */}
-      {selectedCustomizationData && (
-        <div className="w-full p-4 bg-white rounded-lg border border-blue-300 shadow-sm">
-          <h4 className="text-base font-semibold text-blue-900 mb-3">
-            ✅ {selectedCustomizationData.name}
-          </h4>
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">Categoria:</span>
-              <p className="font-medium">{selectedCustomizationData.category}</p>
-            </div>
-            <div>
-              <span className="text-gray-600">Quantidade Mínima:</span>
-              <p className="font-medium">{selectedCustomizationData.minQuantity} unidades</p>
-            </div>
-            <div>
-              <span className="text-gray-600">Valor Unitário:</span>
-              <p className="font-medium text-green-700">
-                R$ {parseFloat(selectedCustomizationData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-600">Descrição:</span>
-              <p className="font-medium">{selectedCustomizationData.description || 'N/A'}</p>
-            </div>
-          </div>
-
-          {/* Campo para observações */}
-          <div className="mt-4">
-            <Label htmlFor="customization-notes" className="text-sm font-medium text-gray-700">
-              Observações Adicionais (Opcional)
-            </Label>
-            <Input
-              id="customization-notes"
-              value={customizationDescription}
-              onChange={(e) => onCustomizationDescriptionChange?.(e.target.value)}
-              placeholder="Observações sobre a personalização..."
-              className="mt-1"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
