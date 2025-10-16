@@ -211,7 +211,7 @@ export default function Login() {
                     <span className="text-xs text-gray-400">Clique para preencher</span>
                   </button>
                 );
-              })}</div>
+              })}
             </div>
 
             <div className="text-center text-xs text-gray-500">
