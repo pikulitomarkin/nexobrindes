@@ -411,10 +411,37 @@ function App() {
           </Route>
 
           {/* Logistics Routes */}
-          <Route path="/logistics/dashboard" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
-          <Route path="/logistics/paid-orders" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
-          <Route path="/logistics/production-tracking" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
-          <Route path="/logistics/shipments" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
+          <Route path="/logistics/dashboard">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/logistics/paid-orders">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/logistics/production-tracking">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/logistics/shipments">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
 
           {/* Finance Routes - Accessible by admin and finance roles */}
           <Route path="/finance">

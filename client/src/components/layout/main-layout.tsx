@@ -45,6 +45,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { value: "client", label: "Cliente" },
     { value: "producer", label: "Produtor" },
     { value: "finance", label: "Financeiro" },
+    { value: "logistics", label: "Logística" },
   ];
 
   const getMenuItems = () => {
@@ -98,6 +99,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
           { href: "/finance/payments", icon: Package, label: "Pagamentos" },
         ];
+      case "logistics":
+        return [
+          { href: "/logistics/dashboard", icon: Home, label: "Dashboard" },
+          { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos Pagos" },
+          { href: "/logistics/production-tracking", icon: Factory, label: "Acompanhar Produção" },
+          { href: "/logistics/shipments", icon: Package, label: "Despachos" },
+        ];
       default:
         return [];
     }
@@ -112,7 +120,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     client: "Cliente",
     producer: "Produtor",
     partner: "Sócio",
-    finance: "Financeiro"
+    finance: "Financeiro",
+    logistics: "Logística"
   };
 
   return (
