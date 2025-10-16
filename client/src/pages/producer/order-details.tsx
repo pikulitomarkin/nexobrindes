@@ -491,8 +491,7 @@ export default function ProducerOrderDetails() {
                   <CheckCircle className="h-6 w-6 text-green-600 mx-auto mb-2" />
                   <p className="text-green-800 font-medium">Produto Pronto</p>
                   <p className="text-green-600 text-sm">Enviado para logística processar o envio</p>
-                </div>viado
-                </Button>
+                </div>
               )}
 
               {productionOrder.status === 'shipped' && (
