@@ -57,6 +57,8 @@ import ProducerReceivables from "@/pages/producer/receivables";
 
 // Logistics pages
 import LogisticsDashboard from "@/pages/logistics/dashboard";
+import LogisticsProducts from "@/pages/logistics/products";
+import LogisticsProducers from "@/pages/logistics/producersard";
 
 // Finance pages
 import FinanceIndex from "@/pages/finance/index";
@@ -439,6 +441,22 @@ function App() {
             <ProtectedRoute requiredRole="logistics">
               <MainLayout>
                 <LogisticsDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/logistics/products">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsProducts />
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/logistics/producers">
+            <ProtectedRoute requiredRole="logistics">
+              <MainLayout>
+                <LogisticsProducers />
               </MainLayout>
             </ProtectedRoute>
           </Route>

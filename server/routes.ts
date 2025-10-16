@@ -2814,6 +2814,202 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Logistics Products Management
+  app.get("/api/logistics/products", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const search = (req.query.search as string) || '';
+      const category = (req.query.category as string) || '';
+      const producer = (req.query.producer as string) || '';
+
+      const result = await storage.getProducts({
+        page,
+        limit,
+        search,
+        category,
+        producer
+      });
+
+      // Enrich with producer names
+      const enrichedProducts = await Promise.all(
+        result.products.map(async (product: any) => {
+          if (product.producerId && product.producerId !== 'internal') {
+            const producer = await storage.getUser(product.producerId);
+            return {
+              ...product,
+              producerName: producer?.name || 'Produtor Desconhecido',
+              type: 'external'
+            };
+          }
+          return {
+            ...product,
+            producerName: null,
+            type: 'internal'
+          };
+        })
+      );
+
+      res.json({
+        ...result,
+        products: enrichedProducts
+      });
+    } catch (error) {
+      console.error("Error fetching logistics products:", error);
+      res.status(500).json({ error: "Failed to fetch logistics products" });
+    }
+  });
+
+  app.post("/api/logistics/products", async (req, res) => {
+    try {
+      const productData = {
+        ...req.body,
+        producerId: 'internal', // Força como produto interno
+        type: 'internal'
+      };
+      const newProduct = await storage.createProduct(productData);
+      res.json(newProduct);
+    } catch (error) {
+      console.error("Error creating logistics product:", error);
+      res.status(500).json({ error: "Failed to create logistics product" });
+    }
+  });
+
+  app.put("/api/logistics/products/:id", async (req, res) => {
+    try {
+      const updatedProduct = await storage.updateProduct(req.params.id, req.body);
+      if (!updatedProduct) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Error updating logistics product:", error);
+      res.status(500).json({ error: "Failed to update logistics product" });
+    }
+  });
+
+  app.delete("/api/logistics/products/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProduct(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting logistics product:", error);
+      res.status(500).json({ error: "Failed to delete logistics product" });
+    }
+  });
+
+  app.post("/api/logistics/products/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const { producerId } = req.body;
+      if (!producerId) {
+        return res.status(400).json({ error: "Produtor é obrigatório para importação" });
+      }
+
+      // Check file size
+      if (req.file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      let productsData;
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+
+      if (fileExtension === 'json') {
+        try {
+          const fileContent = req.file.buffer.toString('utf8');
+          productsData = JSON.parse(fileContent);
+        } catch (parseError) {
+          return res.status(400).json({
+            error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
+            details: (parseError as Error).message
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
+      }
+
+      if (!Array.isArray(productsData)) {
+        return res.status(400).json({
+          error: "O arquivo JSON deve conter um array de produtos"
+        });
+      }
+
+      if (productsData.length === 0) {
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio. Adicione pelo menos um produto."
+        });
+      }
+
+      if (productsData.length > 10000) {
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
+        });
+      }
+
+      console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
+
+      // Add producerId to all products
+      const productsWithProducer = productsData.map(product => ({
+        ...product,
+        producerId: producerId,
+        type: 'external'
+      }));
+
+      const result = await storage.importProducts(productsWithProducer);
+
+      console.log(`Import completed for producer: ${result.imported} imported, ${result.errors.length} errors`);
+
+      res.json({
+        message: `${result.imported} produtos importados com sucesso para o produtor`,
+        imported: result.imported,
+        total: productsData.length,
+        producerId: producerId,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('Logistics products import error:', error);
+      res.status(500).json({
+        error: "Erro interno do servidor ao processar importação",
+        details: (error as Error).message
+      });
+    }
+  });
+
+  // Get producer stats for logistics
+  app.get("/api/logistics/producer-stats", async (req, res) => {
+    try {
+      const products = await storage.getProducts({ limit: 9999 });
+      const producers = await storage.getUsers();
+      
+      const stats = producers
+        .filter(user => user.role === 'producer')
+        .map(producer => {
+          const producerProducts = products.products.filter((p: any) => p.producerId === producer.id);
+          const activeProducts = producerProducts.filter((p: any) => p.isActive).length;
+          
+          return {
+            producerId: producer.id,
+            producerName: producer.name,
+            totalProducts: producerProducts.length,
+            activeProducts: activeProducts
+          };
+        });
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching producer stats:", error);
+      res.status(500).json({ error: "Failed to fetch producer stats" });
+    }
+  });
+
   // Producer payment approval route
   app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
     try {

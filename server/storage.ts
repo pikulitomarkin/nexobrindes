@@ -131,6 +131,7 @@ export interface IStorage {
     limit?: number;
     search?: string;
     category?: string;
+    producer?: string; // Added producer filter
   }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }>;
   getProduct(id: string): Promise<any>;
   createProduct(productData: any): Promise<any>;
@@ -832,6 +833,7 @@ export class MemStorage implements IStorage {
         basePrice: '2500.00',
         unit: 'un',
         isActive: true,
+        producerId: 'producer-1', // Added producerId
         createdAt: new Date().toISOString()
       },
       {
@@ -842,6 +844,7 @@ export class MemStorage implements IStorage {
         basePrice: '450.00',
         unit: 'un',
         isActive: true,
+        producerId: 'producer-1', // Added producerId
         createdAt: new Date().toISOString()
       },
       {
@@ -852,6 +855,7 @@ export class MemStorage implements IStorage {
         basePrice: '1200.00',
         unit: 'm',
         isActive: true,
+        producerId: 'internal', // Example of internal product
         createdAt: new Date().toISOString()
       }
     ];
@@ -929,6 +933,12 @@ export class MemStorage implements IStorage {
         status = 'paid';
       } else if (paidValue > 0) {
         status = 'partial';
+      }
+
+      // Check if overdue
+      const dueDate = order.deadline ? new Date(order.deadline) : null;
+      if (dueDate && new Date() > dueDate && status !== 'paid') {
+        status = 'overdue';
       }
 
       const receivable: AccountsReceivable = {
@@ -1848,18 +1858,29 @@ export class MemStorage implements IStorage {
   }
 
   // Product methods
-  async getProducts(options?: {
+  async getProducts(options: {
     page?: number;
     limit?: number;
     search?: string;
     category?: string;
-  }): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
-    let filteredProducts = Array.from(this.products.values());
+    producer?: string; // Added producer filter
+  } = {}): Promise<{ products: any[]; total: number; page: number; totalPages: number; }> {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      category = '',
+      producer = ''
+    } = options;
+
+    const offset = (page - 1) * limit;
+
+    let query = Array.from(this.products.values()); // Use Array.from to get all products
 
     // Apply search filter
-    if (options?.search) {
-      const searchLower = options.search.toLowerCase();
-      filteredProducts = filteredProducts.filter(product =>
+    if (search) {
+      const searchLower = search.toLowerCase();
+      query = query.filter(product =>
         (product.name?.toLowerCase() || '').includes(searchLower) ||
         (product.description?.toLowerCase() || '').includes(searchLower) ||
         (product.category?.toLowerCase() || '').includes(searchLower) ||
@@ -1870,21 +1891,28 @@ export class MemStorage implements IStorage {
     }
 
     // Apply category filter
-    if (options?.category) {
-      filteredProducts = filteredProducts.filter(product =>
-        product.category === options.category
+    if (category) {
+      query = query.filter(product =>
+        product.category === category
       );
     }
 
-    const total = filteredProducts.length;
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    // Apply producer filter
+    if (producer) {
+      if (producer === 'internal') {
+        query = query.filter(product => product.producerId === 'internal');
+      } else {
+        query = query.filter(product => product.producerId === producer);
+      }
+    }
+
+    const total = query.length;
     const totalPages = Math.ceil(total / limit);
 
     // Apply pagination
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    const products = filteredProducts.slice(startIndex, endIndex);
+    const products = query.slice(startIndex, endIndex);
 
     return { products, total, page, totalPages };
   }
@@ -1899,6 +1927,7 @@ export class MemStorage implements IStorage {
       id,
       ...productData,
       basePrice: productData.basePrice.toString(), // Ensure it's a string
+      producerId: productData.producerId || 'internal', // Default to 'internal' if not provided
       isActive: productData.isActive !== undefined ? productData.isActive : true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

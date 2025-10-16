@@ -136,6 +136,10 @@ export const products = pgTable("products", {
   unit: text("unit").default('un'),
   isActive: boolean("is_active").default(true),
 
+  // Produtor responsável - 'internal' para produtos internos ou ID do produtor
+  producerId: text("producer_id").default('internal'),
+  type: text("type").default('internal'), // 'internal' ou 'external'
+
   // Campos adicionais do JSON XBZ
   externalId: text("external_id"), // IdProduto
   externalCode: text("external_code"), // CodigoXbz

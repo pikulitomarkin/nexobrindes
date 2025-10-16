@@ -332,6 +332,24 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             href="/logistics/shipments"
             isActive={location === "/logistics/shipments"}
           />
+          
+          <div className="px-6 mt-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Gestão
+            </p>
+          </div>
+          <SidebarItem 
+            icon={Package} 
+            label="Produtos" 
+            href="/logistics/products"
+            isActive={location === "/logistics/products"}
+          />
+          <SidebarItem 
+            icon={Factory} 
+            label="Produtores" 
+            href="/logistics/producers"
+            isActive={location === "/logistics/producers"}
+          />
         </nav>
       )}
 
