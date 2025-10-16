@@ -2769,12 +2769,12 @@ Para mais detalhes, entre em contato conosco!`;
         })
       );
 
-      // Filter only orders that are in production or ready for shipment
+      // Filter only orders that are ready for shipment (production sends them here when ready)
       const filteredOrders = enrichedOrders.filter(po =>
-        ['production', 'ready'].includes(po.status)
+        po.status === 'ready'
       );
 
-      console.log(`Found ${filteredOrders.length} production orders for logistics tracking`);
+      console.log(`Found ${filteredOrders.length} orders ready for logistics dispatch`);
       res.json(filteredOrders);
     } catch (error) {
       console.error("Error fetching production orders for logistics:", error);

@@ -209,7 +209,10 @@ export default function ProductionDashboard() {
       pending: { label: "Aguardando", className: "bg-yellow-100 text-yellow-800" },
       accepted: { label: "Aceito", className: "bg-blue-100 text-blue-800" },
       production: { label: "Em Produção", className: "bg-purple-100 text-purple-800" },
-      ready: { label: "Pronto - Enviado à Logística", className: "bg-green-100 text-green-800" },
+      ready: { label: "Pronto - Em Expedição", className: "bg-green-100 text-green-800" },
+      shipped: { label: "Despachado", className: "bg-cyan-100 text-cyan-800" },
+      delivered: { label: "Entregue", className: "bg-emerald-100 text-emerald-800" },
+      completed: { label: "Finalizado", className: "bg-slate-100 text-slate-800" },
       rejected: { label: "Rejeitado", className: "bg-red-100 text-red-800" },
     };
 
@@ -276,7 +279,7 @@ export default function ProductionDashboard() {
         return (
           <div className="text-sm text-green-700 font-medium bg-green-50 px-3 py-2 rounded-lg">
             <CheckCircle className="h-4 w-4 mr-1 inline" />
-            Produto Pronto - Aguardando Logística
+            Produto Pronto - Enviado para Expedição
           </div>
         );
       default:
@@ -380,9 +383,9 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-green-700">Prontos</p>
                 <p className="text-3xl font-bold text-green-900 mt-2">
-                  {filteredOrders.filter(o => o.status === 'ready').length}
+                  {filteredOrders.filter(o => ['ready', 'shipped', 'delivered', 'completed'].includes(o.status)).length}
                 </p>
-                <p className="text-xs text-green-600 mt-1">Enviados à logística</p>
+                <p className="text-xs text-green-600 mt-1">Finalizados pela produção</p>
               </div>
               <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
                 <CheckCircle className="h-6 w-6 text-white" />

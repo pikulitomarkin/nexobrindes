@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,7 +149,7 @@ export default function LogisticsDashboard() {
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

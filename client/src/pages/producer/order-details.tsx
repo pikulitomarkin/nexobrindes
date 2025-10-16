@@ -419,10 +419,10 @@ export default function ProducerOrderDetails() {
                   { status: 'pending', label: 'Aguardando', completed: true },
                   { status: 'accepted', label: 'Aceito', completed: ['accepted', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
                   { status: 'production', label: 'Em Produção', completed: ['production', 'ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'ready', label: 'Pronto', completed: ['ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'shipped', label: 'Enviado', completed: ['shipped', 'delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'delivered', label: 'Entregue', completed: ['delivered', 'completed'].includes(productionOrder.status) },
-                  { status: 'completed', label: 'Finalizado', completed: productionOrder.status === 'completed' }
+                  { status: 'ready', label: 'Pronto (Produção)', completed: ['ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'shipped', label: 'Despachado (Logística)', completed: ['shipped', 'delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'delivered', label: 'Entregue (Logística)', completed: ['delivered', 'completed'].includes(productionOrder.status) },
+                  { status: 'completed', label: 'Finalizado (Logística)', completed: productionOrder.status === 'completed' }
                 ].map((step, index) => (
                   <div key={step.status} className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
@@ -486,43 +486,20 @@ export default function ProducerOrderDetails() {
                 </Button>
               )}
 
-              {productionOrder.status === 'ready' && (
+              {['ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) && (
                 <div className="w-full text-center p-4 bg-green-50 border border-green-200 rounded-lg">
                   <CheckCircle className="h-6 w-6 text-green-600 mx-auto mb-2" />
-                  <p className="text-green-800 font-medium">Produto Pronto</p>
-                  <p className="text-green-600 text-sm">Enviado para logística processar o envio</p>
+                  <p className="text-green-800 font-medium">
+                    {productionOrder.status === 'ready' && 'Produto Pronto - Em Expedição'}
+                    {productionOrder.status === 'shipped' && 'Produto Despachado'}
+                    {productionOrder.status === 'delivered' && 'Produto Entregue'}
+                    {productionOrder.status === 'completed' && 'Ordem Finalizada'}
+                  </p>
+                  <p className="text-green-600 text-sm">
+                    {productionOrder.status === 'ready' && 'A logística está processando o envio'}
+                    {['shipped', 'delivered', 'completed'].includes(productionOrder.status) && 'Processo concluído pela logística'}
+                  </p>
                 </div>
-              )}
-
-              {productionOrder.status === 'shipped' && (
-                <div className="space-y-2">
-                  <Button
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleStatusUpdate('delivered')}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Marcar Entregue
-                  </Button>
-                  <Button
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => handleStatusUpdate('completed')}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    Finalizar Ordem
-                  </Button>
-                </div>
-              )}
-
-              {(productionOrder.status === 'delivered') && (
-                <Button
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handleStatusUpdate('completed')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Finalizar Ordem
-                </Button>
               )}
 
               {/* Action Buttons */}
