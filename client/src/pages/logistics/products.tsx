@@ -213,7 +213,11 @@ export default function LogisticsProducts() {
 
   const handleEditProduct = (product: any) => {
     setEditingProduct(product);
-    setProductForm(product);
+    setProductForm({
+      ...product,
+      producerId: product.producerId || "internal",
+      type: product.type || (product.producerId === "internal" ? "internal" : "external")
+    });
     setIsProductDialogOpen(true);
   };
 
@@ -225,10 +229,18 @@ export default function LogisticsProducts() {
 
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Ensure correct producer data is set
+    const formData = {
+      ...productForm,
+      producerId: productForm.producerId || "internal",
+      type: productForm.producerId === "internal" || !productForm.producerId ? "internal" : "external"
+    };
+    
     if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: productForm });
+      updateProductMutation.mutate({ id: editingProduct.id, data: formData });
     } else {
-      createProductMutation.mutate(productForm);
+      createProductMutation.mutate(formData);
     }
   };
 
@@ -398,7 +410,18 @@ export default function LogisticsProducts() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button className="bg-white text-orange-600 hover:bg-orange-50">
+                  <Button 
+                    className="bg-white text-orange-600 hover:bg-orange-50"
+                    onClick={() => {
+                      resetProductForm();
+                      setProductForm(prev => ({
+                        ...prev,
+                        producerId: "internal",
+                        type: "internal"
+                      }));
+                      setEditingProduct(null);
+                    }}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Produto Interno
                   </Button>
@@ -489,13 +512,60 @@ export default function LogisticsProducts() {
                           </div>
                         </div>
 
-                        <div className="bg-blue-50 p-3 rounded-lg border">
+                        <div>
+                          <Label htmlFor="producerId">Produtor Responsável</Label>
+                          <Select 
+                            value={productForm.producerId}
+                            onValueChange={(value) => setProductForm({
+                              ...productForm, 
+                              producerId: value,
+                              type: value === "internal" ? "internal" : "external"
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o produtor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="internal">
+                                <div className="flex items-center">
+                                  <Package className="h-4 w-4 text-blue-500 mr-2" />
+                                  Produtos Internos da Empresa
+                                </div>
+                              </SelectItem>
+                              {producers?.map((producer: any) => (
+                                <SelectItem key={producer.id} value={producer.id}>
+                                  <div className="flex items-center">
+                                    <Factory className="h-4 w-4 text-purple-500 mr-2" />
+                                    {producer.name} - {producer.specialty}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className={`p-3 rounded-lg border ${
+                          productForm.producerId === "internal" ? "bg-blue-50" : "bg-purple-50"
+                        }`}>
                           <div className="flex items-center space-x-2 mb-2">
-                            <Package className="h-4 w-4 text-blue-600" />
-                            <Label className="text-blue-700 font-medium">Tipo de Produto</Label>
+                            {productForm.producerId === "internal" ? (
+                              <Package className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <Factory className="h-4 w-4 text-purple-600" />
+                            )}
+                            <Label className={`font-medium ${
+                              productForm.producerId === "internal" ? "text-blue-700" : "text-purple-700"
+                            }`}>
+                              Tipo de Produto
+                            </Label>
                           </div>
-                          <p className="text-sm text-blue-600">
-                            Este produto será cadastrado como <strong>PRODUTO INTERNO</strong> da empresa
+                          <p className={`text-sm ${
+                            productForm.producerId === "internal" ? "text-blue-600" : "text-purple-600"
+                          }`}>
+                            {productForm.producerId === "internal" 
+                              ? "Este produto será cadastrado como PRODUTO INTERNO da empresa"
+                              : `Este produto será associado ao produtor ${producers?.find(p => p.id === productForm.producerId)?.name || 'selecionado'}`
+                            }
                           </p>
                         </div>
                       </TabsContent>
