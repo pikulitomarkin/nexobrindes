@@ -2704,20 +2704,53 @@ Para mais detalhes, entre em contato conosco!`;
       // Filter orders that are paid but not yet in production
       const paidOrders = [];
       for (const order of orders) {
+        // Skip cancelled orders
+        if (order.status === 'cancelled') continue;
+
         const payments = await storage.getPaymentsByOrder(order.id);
         const totalPaid = payments
           .filter(p => p.status === 'confirmed')
           .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
-        // Order is paid if total paid >= total value and status is not already in production
-        if (totalPaid >= parseFloat(order.totalValue) &&
-          !['production', 'shipped', 'delivered', 'cancelled'].includes(order.status)) {
+        // Check if order has budget with down payment
+        let budgetDownPayment = 0;
+        if (order.budgetId) {
+          try {
+            const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+            if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+              budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment);
+            }
+          } catch (error) {
+            console.log("Error fetching budget info for paid orders:", order.id, error);
+          }
+        }
 
-          // Get client name
+        // Use budget down payment if available, otherwise use calculated payments
+        const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
+        const totalValue = parseFloat(order.totalValue);
+        const isPaid = actualPaidValue >= totalValue;
+
+        // Order is paid if total paid >= total value and status allows sending to production
+        if (isPaid && !['production', 'ready', 'shipped', 'delivered'].includes(order.status)) {
+          // Always use contactName from order as primary client identifier
           let clientName = order.contactName;
+          
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
-            const client = await storage.getUser(order.clientId);
-            clientName = client?.name || 'Cliente não encontrado';
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
           }
 
           // Get last payment date
@@ -2727,12 +2760,16 @@ Para mais detalhes, entre em contato conosco!`;
 
           paidOrders.push({
             ...order,
-            clientName,
-            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt
+            clientName: clientName || 'Cliente não identificado',
+            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
+            paidValue: actualPaidValue.toFixed(2),
+            totalPaid: totalPaid.toFixed(2),
+            budgetDownPayment: budgetDownPayment.toFixed(2)
           });
         }
       }
 
+      console.log(`Found ${paidOrders.length} paid orders waiting to be sent to production`);
       res.json(paidOrders);
     } catch (error) {
       console.error("Error fetching paid orders:", error);
@@ -2750,18 +2787,32 @@ Para mais detalhes, entre em contato conosco!`;
           const order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          // Get client name - use contactName from order as primary
+          // Always use contactName from order as primary client identifier
           let clientName = order?.contactName;
+          
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order?.clientId) {
-            const client = await storage.getUser(order.clientId);
-            clientName = client?.name || 'Cliente não encontrado';
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
           }
 
           return {
             ...po,
             orderNumber: order?.orderNumber || `PO-${po.id}`,
             product: order?.product || 'Produto não informado',
-            clientName,
+            clientName: clientName || 'Cliente não identificado',
             producerName: producer?.name || null,
             order,
             deadline: po.deadline || order?.deadline
@@ -2769,12 +2820,12 @@ Para mais detalhes, entre em contato conosco!`;
         })
       );
 
-      // Filter only orders that are ready for shipment (production sends them here when ready)
+      // Return all production orders for tracking, not just ready ones
       const filteredOrders = enrichedOrders.filter(po =>
-        po.status === 'ready'
+        ['production', 'ready', 'shipped'].includes(po.status)
       );
 
-      console.log(`Found ${filteredOrders.length} orders ready for logistics dispatch`);
+      console.log(`Found ${filteredOrders.length} orders in production for logistics tracking`);
       res.json(filteredOrders);
     } catch (error) {
       console.error("Error fetching production orders for logistics:", error);

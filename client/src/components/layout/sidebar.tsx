@@ -350,6 +350,18 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             href="/logistics/producers"
             isActive={location === "/logistics/producers"}
           />
+          <SidebarItem 
+            icon={Package} 
+            label="Produtos" 
+            href="/logistics/products"
+            isActive={location === "/logistics/products"}
+          />
+          <SidebarItem 
+            icon={Factory} 
+            label="Produtores" 
+            href="/logistics/producers"
+            isActive={location === "/logistics/producers"}
+          />
         </nav>
       )}
 
