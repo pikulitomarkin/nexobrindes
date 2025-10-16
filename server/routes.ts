@@ -3002,6 +3002,9 @@ Para mais detalhes, entre em contato conosco!`;
         type: producerId === 'internal' ? 'internal' : 'external'
       }));
 
+      console.log(`Setting producerId to: ${producerId} for ${productsWithProducer.length} products`);
+      console.log('Sample product:', JSON.stringify(productsWithProducer[0], null, 2));
+
       const result = await storage.importProducts(productsWithProducer);
 
       console.log(`Import completed for producer: ${result.imported} imported, ${result.errors.length} errors`);

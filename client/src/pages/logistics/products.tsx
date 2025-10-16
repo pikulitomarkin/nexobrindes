@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,11 +18,22 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
+// Mock storage for demonstration purposes if not provided elsewhere
+const storage = {
+  getUser: async (id: string) => {
+    // In a real app, this would fetch from a database or API
+    console.log(`Mock storage: Fetching user with id ${id}`);
+    if (id === "prod1") return { id: "prod1", name: "Produtor Alfa" };
+    if (id === "prod2") return { id: "prod2", name: "Produtor Beta" };
+    return null;
+  }
+};
+
 export default function LogisticsProducts() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedProducer, setSelectedProducer] = useState("internal");
+  const [selectedProducer, setSelectedProducer] = useState("all"); // Changed default to 'all'
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
@@ -65,16 +75,38 @@ export default function LogisticsProducts() {
     queryFn: async ({ queryKey }) => {
       const [, params] = queryKey as [string, any];
       const searchParams = new URLSearchParams();
-      
+
       if (params.page) searchParams.append('page', params.page.toString());
       if (params.limit) searchParams.append('limit', params.limit.toString());
       if (params.search) searchParams.append('search', params.search);
       if (params.category) searchParams.append('category', params.category);
       if (params.producer) searchParams.append('producer', params.producer);
-      
+
       const response = await fetch(`/api/logistics/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+      const result = await response.json();
+
+      // Enrich with producer names
+      const enrichedProducts = await Promise.all(
+        result.products.map(async (product: any) => {
+          if (product.producerId && product.producerId !== 'internal') {
+            // Assuming storage.getUser fetches producer details
+            const producer = await storage.getUser(product.producerId);
+            return {
+              ...product,
+              producerName: producer?.name || 'Produtor Desconhecido',
+              type: 'external'
+            };
+          }
+          return {
+            ...product,
+            producerName: null, // No producer name for internal products
+            type: 'internal'
+          };
+        })
+      );
+
+      return { ...result, products: enrichedProducts };
     },
   });
 
@@ -146,23 +178,23 @@ export default function LogisticsProducts() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('producerId', producerId);
-      
+
       const response = await fetch('/api/logistics/products/import', {
         method: 'POST',
         body: formData,
       });
-      
+
       const responseData = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(responseData.error || 'Erro ao importar produtos');
       }
-      
+
       return responseData;
     },
     onSuccess: (data) => {
       const hasErrors = data.errors && data.errors.length > 0;
-      
+
       toast({
         title: hasErrors ? "Importação Concluída com Avisos" : "Importação Concluída",
         description: hasErrors 
@@ -175,7 +207,7 @@ export default function LogisticsProducts() {
       setImportFile(null);
       setImportProgress(0);
       setSelectedProducerForImport("");
-      
+
       if (hasErrors) {
         console.log('Import errors:', data.errors);
       }
@@ -229,14 +261,14 @@ export default function LogisticsProducts() {
 
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Ensure correct producer data is set
     const formData = {
       ...productForm,
       producerId: productForm.producerId || "internal",
       type: productForm.producerId === "internal" || !productForm.producerId ? "internal" : "external"
     };
-    
+
     if (editingProduct) {
       updateProductMutation.mutate({ id: editingProduct.id, data: formData });
     } else {
@@ -442,7 +474,7 @@ export default function LogisticsProducts() {
                         <TabsTrigger value="details">Detalhes</TabsTrigger>
                         <TabsTrigger value="appearance">Aparência</TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="basic" className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -569,7 +601,7 @@ export default function LogisticsProducts() {
                           </p>
                         </div>
                       </TabsContent>
-                      
+
                       <TabsContent value="details" className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -616,7 +648,7 @@ export default function LogisticsProducts() {
                           </div>
                         </div>
                       </TabsContent>
-                      
+
                       <TabsContent value="appearance" className="space-y-4">
                         <div>
                           <Label htmlFor="imageLink">Link da Imagem</Label>
@@ -826,7 +858,7 @@ export default function LogisticsProducts() {
               </TableBody>
             </Table>
           )}
-          
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t">
@@ -845,6 +877,7 @@ export default function LogisticsProducts() {
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const page = i + 1;
+                    // Basic pagination, can be improved for larger numbers of pages
                     return (
                       <Button
                         key={page}
