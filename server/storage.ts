@@ -491,6 +491,7 @@ export class MemStorage implements IStorage {
       name: "Maria Transportes",
       email: "maria@logistica.com",
       phone: "(11) 98765-1111",
+      vendorId: null,
       role: "logistics",
       isActive: true,
       createdAt: new Date(),
@@ -1087,7 +1088,7 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return this.users.get(username) || Array.from(this.users.values()).find(user => user.username === username);
+    return Array.from(this.users.values()).find(user => user.username === username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

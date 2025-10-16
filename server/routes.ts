@@ -112,32 +112,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { username, password, preferredRole } = req.body;
 
     try {
-      // Get all users with this username (admin and partner both use "admin")
-      const users = await storage.getUsers();
-      const matchingUsers = users.filter(u => u.username === username && u.password === password && u.isActive);
-
-      if (matchingUsers.length === 0) {
+      console.log("Login attempt:", { username, preferredRole });
+      
+      // Get user by username first
+      const user = await storage.getUserByUsername(username);
+      console.log("Found user:", user ? { id: user.id, username: user.username, role: user.role } : "not found");
+      
+      if (!user || user.password !== password || !user.isActive) {
+        console.log("Login failed - invalid credentials or inactive user");
         return res.status(401).json({ error: "Credenciais inválidas" });
       }
 
-      // If preferred role is specified, try to find that role first
-      let selectedUser;
-      if (preferredRole) {
-        selectedUser = matchingUsers.find(u => u.role === preferredRole);
-      }
-
-      // If no preferred role match, use default priority: admin, then partner
-      if (!selectedUser) {
-        selectedUser = matchingUsers.find(u => u.role === 'admin') ||
-          matchingUsers.find(u => u.role === 'partner') ||
-          matchingUsers[0];
+      // Check if preferred role matches user role
+      if (preferredRole && user.role !== preferredRole) {
+        console.log(`Role mismatch: requested ${preferredRole}, user has ${user.role}`);
+        return res.status(401).json({ error: "Credenciais inválidas" });
       }
 
       // Create a simple token (in production, use JWT)
-      const token = Buffer.from(`${selectedUser.id}:${selectedUser.username}:${Date.now()}`).toString('base64');
+      const token = Buffer.from(`${user.id}:${user.username}:${Date.now()}`).toString('base64');
 
       // Return user data without password
-      const { password: _, ...userWithoutPassword } = selectedUser;
+      const { password: _, ...userWithoutPassword } = user;
+
+      console.log("Login successful for:", userWithoutPassword.username, "role:", userWithoutPassword.role);
 
       res.json({
         success: true,

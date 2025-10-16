@@ -90,18 +90,18 @@ export default function Login() {
   };
 
   const demoUsers = [
-    { username: "admin", password: "123456", role: "Administrador", icon: Shield, color: "text-red-600" },
-    { username: "vendedor1", password: "123456", role: "Vendedor", icon: Users, color: "text-blue-600" },
-    { username: "cliente1", password: "123456", role: "Cliente", icon: User, color: "text-green-600" },
-    { username: "produtor1", password: "123456", role: "Produtor", icon: Factory, color: "text-purple-600" },
-    { username: "logistica1", password: "123456", role: "Logística", icon: Factory, color: "text-indigo-600" },
-    { username: "admin", password: "123456", role: "Sócio", icon: DollarSign, color: "text-yellow-600" },
+    { username: "admin", password: "123456", role: "admin", label: "Administrador", icon: Shield, color: "text-red-600" },
+    { username: "vendedor1", password: "123456", role: "vendor", label: "Vendedor", icon: Users, color: "text-blue-600" },
+    { username: "cliente1", password: "123456", role: "client", label: "Cliente", icon: User, color: "text-green-600" },
+    { username: "produtor1", password: "123456", role: "producer", label: "Produtor", icon: Factory, color: "text-purple-600" },
+    { username: "logistica1", password: "123456", role: "logistics", label: "Logística", icon: Factory, color: "text-indigo-600" },
+    { username: "admin", password: "123456", role: "partner", label: "Sócio", icon: DollarSign, color: "text-yellow-600" },
   ];
 
   const quickLogin = (user: any) => {
     setUsername(user.username);
     setPassword(user.password);
-    setSelectedProfile(user.role.toLowerCase());
+    setSelectedProfile(user.role);
   };
 
   return (
@@ -192,26 +192,26 @@ export default function Login() {
             </div>
 
             <div className="grid grid-cols-1 gap-2">
-              {demoUsers.map((user) => {
+              {demoUsers.map((user, index) => {
                 const Icon = user.icon;
                 return (
                   <button
-                    key={user.username}
-                    data-testid={`button-demo-${user.username}`}
+                    key={`${user.username}-${user.role}-${index}`}
+                    data-testid={`button-demo-${user.username}-${user.role}`}
                     onClick={() => quickLogin(user)}
                     className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
                       <Icon className={`h-5 w-5 ${user.color}`} />
                       <div>
-                        <p className="font-medium text-sm">{user.role}</p>
+                        <p className="font-medium text-sm">{user.label}</p>
                         <p className="text-xs text-gray-500">{user.username}</p>
                       </div>
                     </div>
                     <span className="text-xs text-gray-400">Clique para preencher</span>
                   </button>
                 );
-              })}
+              })}</div>
             </div>
 
             <div className="text-center text-xs text-gray-500">
