@@ -1304,7 +1304,7 @@ export default function VendorOrders() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 ? "(Inclui Frete)" : ""} (R$)</Label>
                         <Input
                           id="down-payment"
                           value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString()) : ''}
@@ -1329,9 +1329,27 @@ export default function VendorOrders() {
                           }}
                           placeholder="R$ 0,00"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                          {vendorOrderForm.shippingCost > 0 && `Frete: R$ ${vendorOrderForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (já incluso no total)`}
-                        </p>
+                        <div className="text-xs text-gray-600 mt-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Subtotal dos Produtos:</span>
+                            <span>R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
+                            <div className="flex justify-between">
+                              <span>Frete:</span>
+                              <span>R$ {vendorOrderForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-medium text-green-700 pt-1 border-t">
+                            <span>Entrada para Iniciar:</span>
+                            <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          {vendorOrderForm.downPayment > 0 && vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
+                            <p className="text-blue-600 font-medium text-sm">
+                              * Valor inclui frete de R$ {vendorOrderForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
@@ -1340,6 +1358,9 @@ export default function VendorOrders() {
                           value={`R$ ${(vendorOrderForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           disabled
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Valor a pagar após início da produção
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1521,9 +1542,16 @@ export default function VendorOrders() {
                     </span>
                   </div>
                   {vendorOrderForm.downPayment > 0 && (
-                    <div className="flex justify-between text-sm font-medium text-green-700 bg-green-50 p-2 rounded">
-                      <span>Valor de Entrada:</span>
-                      <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <div className="bg-green-50 p-3 rounded space-y-1">
+                      <div className="flex justify-between text-sm font-medium text-green-700">
+                        <span>Valor de Entrada {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 ? "(Inclui Frete)" : ""}:</span>
+                        <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
+                        <div className="text-xs text-green-600">
+                          Inclui produtos + frete para iniciar o projeto
+                        </div>
+                      )}
                     </div>
                   )}
                   <Separator />
