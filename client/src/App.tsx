@@ -58,7 +58,7 @@ import ProducerReceivables from "@/pages/producer/receivables";
 // Logistics pages
 import LogisticsDashboard from "@/pages/logistics/dashboard";
 import LogisticsProducts from "@/pages/logistics/products";
-import LogisticsProducers from "@/pages/logistics/producersard";
+import LogisticsProducers from "@/pages/logistics/producers";
 
 // Finance pages
 import FinanceIndex from "@/pages/finance/index";
