@@ -60,6 +60,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const menuItems = [
     { id: "admin", label: "Admin Geral", icon: LayoutDashboard },
     { id: "vendor", label: "Vendedor", icon: ShoppingCart },
+    { id: "logistics", label: "Logística", icon: Package },
     { id: "client", label: "Painel de Clientes", icon: Users },
     { id: "producer", label: "Produtor Externo", icon: Factory },
     { id: "finance", label: "Módulo Financeiro", icon: DollarSign },
@@ -296,6 +297,40 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             label="Contas a Receber" 
             href="/producer/receivables"
             isActive={location === "/producer/receivables"}
+          />
+        </nav>
+      )}
+
+      {activePanel === "logistics" && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Logística
+            </p>
+          </div>
+          <SidebarItem 
+            icon={LayoutDashboard} 
+            label="Dashboard" 
+            href="/logistics/dashboard"
+            isActive={location === "/logistics/dashboard"}
+          />
+          <SidebarItem 
+            icon={Package} 
+            label="Pedidos Pagos" 
+            href="/logistics/paid-orders"
+            isActive={location === "/logistics/paid-orders"}
+          />
+          <SidebarItem 
+            icon={Factory} 
+            label="Acompanhar Produção" 
+            href="/logistics/production-tracking"
+            isActive={location === "/logistics/production-tracking"}
+          />
+          <SidebarItem 
+            icon={Bus} 
+            label="Despachos" 
+            href="/logistics/shipments"
+            isActive={location === "/logistics/shipments"}
           />
         </nav>
       )}

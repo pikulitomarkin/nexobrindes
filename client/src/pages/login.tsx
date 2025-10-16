@@ -57,6 +57,9 @@ export default function Login() {
             case "producer":
               window.location.href = "/producer/production-dashboard";
               break;
+            case "logistics":
+              window.location.href = "/logistics/dashboard";
+              break;
             case "finance":
               window.location.href = "/finance/payments";
               break;
@@ -91,6 +94,7 @@ export default function Login() {
     { username: "vendedor1", password: "123456", role: "Vendedor", icon: Users, color: "text-blue-600" },
     { username: "cliente1", password: "123456", role: "Cliente", icon: User, color: "text-green-600" },
     { username: "produtor1", password: "123456", role: "Produtor", icon: Factory, color: "text-purple-600" },
+    { username: "logistica1", password: "123456", role: "Logística", icon: Factory, color: "text-indigo-600" },
     { username: "admin", password: "123456", role: "Sócio", icon: DollarSign, color: "text-yellow-600" },
   ];
 
@@ -124,6 +128,12 @@ export default function Login() {
                       <div className="flex items-center">
                         <Shield className="h-4 w-4 mr-2" />
                         Administrador
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="logistics">
+                      <div className="flex items-center">
+                        <Factory className="h-4 w-4 mr-2" />
+                        Logística
                       </div>
                     </SelectItem>
                     <SelectItem value="partner">

@@ -2697,6 +2697,114 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Logistics Routes
+  // Get paid orders waiting to be sent to production
+  app.get("/api/logistics/paid-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      
+      // Filter orders that are paid but not yet in production
+      const paidOrders = [];
+      for (const order of orders) {
+        const payments = await storage.getPaymentsByOrder(order.id);
+        const totalPaid = payments
+          .filter(p => p.status === 'confirmed')
+          .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        
+        // Order is paid if total paid >= total value and status is not already in production
+        if (totalPaid >= parseFloat(order.totalValue) && 
+            !['production', 'shipped', 'delivered', 'cancelled'].includes(order.status)) {
+          
+          // Get client name
+          let clientName = order.contactName;
+          if (!clientName && order.clientId) {
+            const client = await storage.getUser(order.clientId);
+            clientName = client?.name || 'Cliente não encontrado';
+          }
+          
+          // Get last payment date
+          const lastPayment = payments
+            .filter(p => p.status === 'confirmed')
+            .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
+          
+          paidOrders.push({
+            ...order,
+            clientName,
+            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt
+          });
+        }
+      }
+      
+      res.json(paidOrders);
+    } catch (error) {
+      console.error("Error fetching paid orders:", error);
+      res.status(500).json({ error: "Failed to fetch paid orders" });
+    }
+  });
+
+  // Get production orders for logistics tracking
+  app.get("/api/logistics/production-orders", async (req, res) => {
+    try {
+      const productionOrders = await storage.getProductionOrders();
+      
+      const enrichedOrders = await Promise.all(
+        productionOrders.map(async (po) => {
+          const order = await storage.getOrder(po.orderId);
+          const producer = await storage.getUser(po.producerId);
+          
+          // Get client name
+          let clientName = order?.contactName;
+          if (!clientName && order?.clientId) {
+            const client = await storage.getUser(order.clientId);
+            clientName = client?.name || 'Cliente não encontrado';
+          }
+          
+          return {
+            id: po.orderId, // Use order ID for consistency
+            orderNumber: order?.orderNumber,
+            clientName,
+            product: order?.product,
+            status: po.status,
+            producerName: producer?.name,
+            deadline: po.deadline,
+            createdAt: order?.createdAt,
+            totalValue: order?.totalValue
+          };
+        })
+      );
+      
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching production orders for logistics:", error);
+      res.status(500).json({ error: "Failed to fetch production orders" });
+    }
+  });
+
+  // Dispatch order (mark as shipped)
+  app.patch("/api/logistics/dispatch-order/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      // Update order status to shipped
+      const updatedOrder = await storage.updateOrder(orderId, { status: 'shipped' });
+      
+      // Update production order status to shipped
+      const productionOrders = await storage.getProductionOrdersByOrder(orderId);
+      if (productionOrders.length > 0) {
+        await storage.updateProductionOrderStatus(
+          productionOrders[0].id, 
+          'shipped', 
+          'Despachado pela logística'
+        );
+      }
+      
+      res.json({ success: true, order: updatedOrder });
+    } catch (error) {
+      console.error("Error dispatching order:", error);
+      res.status(500).json({ error: "Failed to dispatch order" });
+    }
+  });
+
   // Producer payment approval route
   app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
     try {

@@ -482,6 +482,21 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(partnerUser.id, partnerUser);
+
+    // Logistics user
+    const logisticsUser = {
+      id: "logistics-1",
+      username: "logistica1",
+      password: "123456",
+      name: "Maria Transportes",
+      email: "maria@logistica.com",
+      phone: "(11) 98765-1111",
+      role: "logistics",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.users.set(logisticsUser.id, logisticsUser);
   }
 
   private initializeData() {

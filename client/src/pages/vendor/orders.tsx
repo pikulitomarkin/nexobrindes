@@ -21,9 +21,7 @@ export default function VendorOrders() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderProductSearch, setOrderProductSearch] = useState("");
   const [orderCategoryFilter, setOrderCategoryFilter] = useState("all");
-  const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
-  const [orderToSend, setOrderToSend] = useState<string | null>(null);
-  const [selectedProducer, setSelectedProducer] = useState<string>("");
+  
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -469,34 +467,7 @@ export default function VendorOrders() {
     },
   });
 
-  const sendToProductionMutation = useMutation({
-    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId: string }) => {
-      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ producerId }),
-      });
-      if (!response.ok) throw new Error("Erro ao enviar para produção");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
-      setShowSendToProductionModal(false);
-      setOrderToSend(null);
-      setSelectedProducer("");
-      toast({
-        title: "Sucesso!",
-        description: "Pedido enviado para produção",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar pedido para produção",
-        variant: "destructive"
-      });
-    }
-  });
+  
 
   const markNotesReadMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -516,16 +487,7 @@ export default function VendorOrders() {
     },
   });
 
-  const handleSendToProductionClick = (orderId: string) => {
-    setOrderToSend(orderId);
-    setShowSendToProductionModal(true);
-  };
-
-  const confirmSendToProduction = () => {
-    if (orderToSend && selectedProducer) {
-      sendToProductionMutation.mutate({ orderId: orderToSend, producerId: selectedProducer });
-    }
-  };
+  
 
   const handleEditOrder = (order: any) => {
     // Pre-populate form with existing order data
@@ -1817,33 +1779,29 @@ export default function VendorOrders() {
                             Ciente
                           </Button>
                         )}
-                        {(order.status === 'confirmed' || order.status === 'pending') && (
-                          <>
-                            {parseFloat(order.paidValue || '0') > 0 ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-blue-600 hover:text-blue-900"
-                                onClick={() => handleSendToProductionClick(order.id)}
-                                disabled={sendToProductionMutation.isPending}
-                                data-testid={`button-production-${order.id}`}
-                              >
-                                <Send className="h-4 w-4 mr-1" />
-                                {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar p/ Produção'}
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-orange-600 hover:text-orange-900"
-                                disabled
-                                data-testid={`button-waiting-payment-${order.id}`}
-                              >
-                                <Clock className="h-4 w-4 mr-1" />
-                                Aguardando Pagamento
-                              </Button>
-                            )}
-                          </>
+                        {(order.status === 'confirmed' || order.status === 'pending') && parseFloat(order.paidValue || '0') === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            disabled
+                            data-testid={`button-waiting-payment-${order.id}`}
+                          >
+                            <Clock className="h-4 w-4 mr-1" />
+                            Aguardando Pagamento
+                          </Button>
+                        )}
+                        {(order.status === 'confirmed' || order.status === 'pending') && parseFloat(order.paidValue || '0') > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-green-600 hover:text-green-900"
+                            disabled
+                            data-testid={`button-paid-logistics-${order.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Pago - Aguardando Logística
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -1855,54 +1813,7 @@ export default function VendorOrders() {
         </CardContent>
       </Card>
 
-      {/* Send to Production Confirmation Dialog */}
-      <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enviar para Produção</DialogTitle>
-            <DialogDescription>
-              Selecione o produtor que receberá este pedido para produção.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="producer-select">Produtor Responsável</Label>
-              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produtor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {producers?.map((producer: any) => (
-                    <SelectItem key={producer.id} value={producer.id}>
-                      {producer.name} - {producer.specialty}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowSendToProductionModal(false);
-                setOrderToSend(null);
-                setSelectedProducer("");
-              }}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={confirmSendToProduction}
-              disabled={sendToProductionMutation.isPending || !selectedProducer}
-              className="flex-1"
-            >
-              {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar para Produção'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      
 
       {/* Order Details Modal */}
       <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>

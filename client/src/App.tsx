@@ -46,6 +46,7 @@ import VendorBudgets from "@/pages/vendor/budgets";
 import ClientOrders from "@/pages/client/orders";
 import ClientProfile from "@/pages/client/profile";
 import ClientDashboard from "@/pages/dashboards/client-dashboard";
+import ClientOrderTimeline from "./pages/client/order-timeline";
 
 // Producer pages
 import ProducerOrders from "@/pages/producer/orders";
@@ -53,7 +54,9 @@ import ProductionDashboard from "@/pages/producer/production-dashboard";
 import ProducerOrderDetails from "./pages/producer/order-details";
 import ProducerProfileSettings from "@/pages/producer/profile-settings";
 import ProducerReceivables from "@/pages/producer/receivables";
-import ClientOrderTimeline from "./pages/client/order-timeline";
+
+// Logistics pages
+import LogisticsDashboard from "@/pages/logistics/dashboard";
 
 // Finance pages
 import FinanceIndex from "@/pages/finance/index";
@@ -406,6 +409,12 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           </Route>
+
+          {/* Logistics Routes */}
+          <Route path="/logistics/dashboard" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
+          <Route path="/logistics/paid-orders" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
+          <Route path="/logistics/production-tracking" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
+          <Route path="/logistics/shipments" component={() => <ProtectedRoute requiredRole="logistics"><LogisticsDashboard /></ProtectedRoute>} />
 
           {/* Finance Routes - Accessible by admin and finance roles */}
           <Route path="/finance">
