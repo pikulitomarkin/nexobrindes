@@ -114,18 +114,18 @@ export default function LogisticsDashboard() {
       paid: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
       confirmed: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
       production: "bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium",
-      ready: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium",
+      ready: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse",
       shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
       delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
     };
 
     const statusLabels = {
-      paid: "Pago - Aguardando Produção",
-      confirmed: "Confirmado",
+      paid: "Pago - Aguardando Envio para Produção",
+      confirmed: "Confirmado - Pago",
       production: "Em Produção",
-      ready: "Pronto para Despacho",
-      shipped: "Despachado",
-      delivered: "Entregue",
+      ready: "🚚 PRONTO PARA EXPEDIÇÃO",
+      shipped: "Despachado para Cliente",
+      delivered: "Entregue ao Cliente",
     };
 
     return (
@@ -217,12 +217,12 @@ export default function LogisticsDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-700">Prontos para Despacho</p>
+                <p className="text-sm font-medium text-orange-700">Prontos para Expedição</p>
                 <p className="text-3xl font-bold text-orange-900 mt-2">{readyToShipCount}</p>
-                <p className="text-xs text-orange-600 mt-1">Aguardando envio</p>
+                <p className="text-xs text-orange-600 mt-1">Produção finalizada - pronto para despachar</p>
               </div>
               <div className="h-12 w-12 bg-orange-600 rounded-xl flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
+                <Truck className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -409,9 +409,10 @@ export default function LogisticsDashboard() {
                             className="bg-orange-600 hover:bg-orange-700 text-white"
                             onClick={() => handleDispatchOrder(order.id)}
                             disabled={dispatchOrderMutation.isPending}
+                            title="Produto está pronto - clique para despachar ao cliente"
                           >
                             <Truck className="h-4 w-4 mr-1" />
-                            Despachar
+                            {dispatchOrderMutation.isPending ? 'Despachando...' : 'Despachar para Cliente'}
                           </Button>
                         )}
                       </div>
