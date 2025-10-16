@@ -2728,10 +2728,19 @@ Para mais detalhes, entre em contato conosco!`;
         // Use budget down payment if available, otherwise use calculated payments
         const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
         const totalValue = parseFloat(order.totalValue);
-        const isPaid = actualPaidValue >= totalValue;
+        
+        // Consider order paid if it has received any payment (not necessarily full)
+        // OR if total paid >= total value AND status is confirmed/paid
+        const hasSomePayment = actualPaidValue > 0;
+        const isFullyPaid = actualPaidValue >= totalValue;
+        const statusAllowsProduction = ['confirmed', 'paid'].includes(order.status) || 
+          (order.status === 'production' && !order.producerId); // In production but no producer assigned yet
 
-        // Order is paid if total paid >= total value and status allows sending to production
-        if (isPaid && !['production', 'ready', 'shipped', 'delivered'].includes(order.status)) {
+        // Order qualifies for logistics if:
+        // 1. Has some payment AND status allows production, OR
+        // 2. Is fully paid AND not yet in final stages
+        if ((hasSomePayment && statusAllowsProduction) || 
+            (isFullyPaid && !['production', 'ready', 'shipped', 'delivered'].includes(order.status))) {
           // Always use contactName from order as primary client identifier
           let clientName = order.contactName;
           
@@ -2757,6 +2766,16 @@ Para mais detalhes, entre em contato conosco!`;
           const lastPayment = payments
             .filter(p => p.status === 'confirmed')
             .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
+
+          console.log(`Order ${order.orderNumber} qualifies for logistics:`, {
+            actualPaidValue,
+            totalValue,
+            hasSomePayment,
+            isFullyPaid,
+            status: order.status,
+            statusAllowsProduction,
+            producerId: order.producerId
+          });
 
           paidOrders.push({
             ...order,

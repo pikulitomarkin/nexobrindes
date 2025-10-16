@@ -274,14 +274,16 @@ export default function LogisticsDashboard() {
       </Card>
 
       {/* Pedidos Pagos - Aguardando Envio para Produção */}
-      {paidOrdersCount > 0 && (
-        <Card className="mb-6">
-          <CardHeader className="bg-green-50">
-            <CardTitle className="text-green-800 flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Pedidos Pagos - Aguardando Envio para Produção ({paidOrdersCount})
-            </CardTitle>
-          </CardHeader>
+      <Card className="mb-6">
+        <CardHeader className="bg-green-50">
+          <CardTitle className="text-green-800 flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Pedidos Pagos - Aguardando Envio para Produção ({paidOrdersCount})
+          </CardTitle>
+          <p className="text-sm text-green-700 mt-2">
+            Pedidos que receberam pagamento e estão prontos para serem enviados à produção
+          </p>
+        </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
