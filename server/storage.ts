@@ -2004,6 +2004,10 @@ export class MemStorage implements IStorage {
           unit: 'un',
           isActive: true,
 
+          // Preserve producerId and type from import
+          producerId: item.producerId || 'internal',
+          type: item.type || 'internal',
+
           // Campos específicos do JSON XBZ
           externalId: item.IdProduto?.toString(),
           externalCode: item.CodigoXbz,

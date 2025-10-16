@@ -4,6 +4,13 @@ This is a comprehensive ERP (Enterprise Resource Planning) system designed for s
 
 The application features vendor-specific sales links, automated client and order registration upon 30% payment confirmation, production order distribution to external producers, and OFX bank file import for payment reconciliation. It's built as a modern web application with real-time updates and role-based access control.
 
+# Recent Changes
+
+**October 16, 2025**
+- Fixed critical bug in product import: storage.importProducts now correctly preserves producerId and type fields when importing JSON products
+- Product imports in Logistics panel now correctly associate products with the selected producer instead of defaulting to "internal"
+- Added producerId and type preservation in storage.ts importProducts function (lines 2010-2012)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
