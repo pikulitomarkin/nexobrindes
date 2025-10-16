@@ -1304,7 +1304,7 @@ export default function VendorOrders() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
                         <Input
                           id="down-payment"
                           value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString()) : ''}
@@ -1329,6 +1329,9 @@ export default function VendorOrders() {
                           }}
                           placeholder="R$ 0,00"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {vendorOrderForm.shippingCost > 0 && `Frete: R$ ${vendorOrderForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (já incluso no total)`}
+                        </p>
                       </div>
                       <div>
                         <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
@@ -1362,7 +1365,7 @@ export default function VendorOrders() {
                           onChange={(e) => {
                             const rawValue = e.target.value;
                             if (rawValue === '' || rawValue === 'R$ ') {
-                              const total = calculateTotalWithShipping();
+                              const total = calculateOrderTotal();
                               setVendorOrderForm({
                                 ...vendorOrderForm,
                                 shippingCost: 0,
@@ -1370,7 +1373,7 @@ export default function VendorOrders() {
                               });
                             } else {
                               const shippingCost = parseCurrencyValue(rawValue);
-                              const total = calculateTotalWithShipping();
+                              const total = calculateOrderTotal() + shippingCost;
                               setVendorOrderForm({
                                 ...vendorOrderForm,
                                 shippingCost,
@@ -1380,6 +1383,7 @@ export default function VendorOrders() {
                           }}
                           placeholder="R$ 0,00"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Será somado ao total do pedido</p>
                       </div>
                       <div>
                         <Label>Prazo de Entrega</Label>
@@ -1518,7 +1522,7 @@ export default function VendorOrders() {
                   </div>
                   {vendorOrderForm.downPayment > 0 && (
                     <div className="flex justify-between text-sm font-medium text-green-700 bg-green-50 p-2 rounded">
-                      <span>Frete + Entrada:</span>
+                      <span>Valor de Entrada:</span>
                       <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}

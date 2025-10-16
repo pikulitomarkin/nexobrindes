@@ -1244,14 +1244,12 @@ export default function VendorBudgets() {
 
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (inclui frete - R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
                         <Input
                           id="down-payment"
                           value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const entryValue = parseCurrencyValue(e.target.value);
-                            const shippingCost = vendorBudgetForm.shippingCost || 0;
-                            const downPayment = entryValue + shippingCost;
+                            const downPayment = parseCurrencyValue(e.target.value);
                             const total = calculateTotalWithShipping();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
@@ -1262,8 +1260,8 @@ export default function VendorBudgets() {
                           placeholder="R$ 0,00"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Total: R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          {vendorBudgetForm.shippingCost > 0 && ` (inclui frete de R$ ${vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`}
+                          Valor de entrada: R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {vendorBudgetForm.shippingCost > 0 && ` | Frete: R$ ${vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                         </p>
                       </div>
                       <div>
@@ -1297,19 +1295,16 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            const entryWithoutShipping = vendorBudgetForm.downPayment - (vendorBudgetForm.shippingCost || 0);
-                            const newDownPayment = entryWithoutShipping + shippingCost;
                             const total = calculateBudgetTotal() + shippingCost;
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               shippingCost,
-                              downPayment: newDownPayment,
-                              remainingAmount: Math.max(0, total - newDownPayment)
+                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
                             });
                           }}
                           placeholder="R$ 0,00"
                         />
-                        <p className="text-xs text-gray-500 mt-1">Será somado automaticamente à entrada</p>
+                        <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do orçamento</p>
                       </div>
                       <div>
                         <Label>Prazo de Entrega</Label>
@@ -1450,7 +1445,7 @@ export default function VendorBudgets() {
                   </div>
                   {vendorBudgetForm.downPayment > 0 && (
                     <div className="flex justify-between text-sm font-medium text-green-700 bg-green-50 p-2 rounded">
-                      <span>Frete + Entrada:</span>
+                      <span>Valor de Entrada:</span>
                       <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
