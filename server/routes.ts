@@ -2900,10 +2900,11 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/logistics/products", async (req, res) => {
     try {
+      // Permitir que o producerId seja especificado ou use 'internal' como padrão
       const productData = {
         ...req.body,
-        producerId: 'internal', // Força como produto interno
-        type: 'internal'
+        producerId: req.body.producerId || 'internal',
+        type: req.body.producerId && req.body.producerId !== 'internal' ? 'external' : 'internal'
       };
       const newProduct = await storage.createProduct(productData);
       res.json(newProduct);
@@ -2994,11 +2995,11 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
 
-      // Add producerId to all products
+      // Add producerId to all products and set correct type
       const productsWithProducer = productsData.map(product => ({
         ...product,
         producerId: producerId,
-        type: 'external'
+        type: producerId === 'internal' ? 'internal' : 'external'
       }));
 
       const result = await storage.importProducts(productsWithProducer);

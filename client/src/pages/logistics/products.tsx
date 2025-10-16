@@ -333,6 +333,9 @@ export default function LogisticsProducts() {
                           <SelectValue placeholder="Selecione o produtor" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="internal">
+                            Produtos Internos da Empresa
+                          </SelectItem>
                           {producers?.map((producer: any) => (
                             <SelectItem key={producer.id} value={producer.id}>
                               {producer.name} - {producer.specialty}
