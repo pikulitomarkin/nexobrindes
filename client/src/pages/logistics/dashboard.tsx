@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
@@ -18,6 +19,9 @@ export default function LogisticsDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [selectedProducer, setSelectedProducer] = useState<string>("");
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchNotes, setDispatchNotes] = useState("");
+  const [dispatchTrackingCode, setDispatchTrackingCode] = useState("");
   const { toast } = useToast();
 
   // Buscar pedidos pagos que precisam ser enviados para produção
@@ -104,8 +108,41 @@ export default function LogisticsDashboard() {
     }
   };
 
-  const handleDispatchOrder = (orderId: string) => {
-    dispatchOrderMutation.mutate(orderId);
+  const handleDispatchOrder = (order: any) => {
+    // Find the production order for this order
+    const productionOrder = productionOrders?.find((po: any) => po.orderId === order.id);
+    
+    if (!productionOrder) {
+      toast({
+        title: "Erro",
+        description: "Ordem de produção não encontrada",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedOrder(order);
+    setDispatchNotes(`Produto despachado para ${order.clientName}`);
+    setDispatchTrackingCode("");
+    setShowDispatchModal(true);
+  };
+
+  const confirmDispatch = () => {
+    if (!selectedOrder) return;
+
+    const productionOrder = productionOrders?.find((po: any) => po.orderId === selectedOrder.id);
+    
+    dispatchOrderMutation.mutate({
+      productionOrderId: productionOrder.id,
+      orderId: selectedOrder.id,
+      notes: dispatchNotes,
+      trackingCode: dispatchTrackingCode
+    });
+
+    setShowDispatchModal(false);
+    setDispatchNotes("");
+    setDispatchTrackingCode("");
+    setSelectedOrder(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -407,7 +444,7 @@ export default function LogisticsDashboard() {
                           <Button
                             size="sm"
                             className="bg-orange-600 hover:bg-orange-700 text-white"
-                            onClick={() => handleDispatchOrder(order.id)}
+                            onClick={() => handleDispatchOrder(order)}
                             disabled={dispatchOrderMutation.isPending}
                             title="Produto está pronto - clique para despachar ao cliente"
                           >
@@ -526,6 +563,55 @@ export default function LogisticsDashboard() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal - Despachar Pedido */}
+      <Dialog open={showDispatchModal} onOpenChange={setShowDispatchModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Despachar Pedido</DialogTitle>
+            <DialogDescription>
+              Finalize o despacho do pedido para o cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="dispatch-notes">Observações do Despacho</Label>
+              <Textarea
+                id="dispatch-notes"
+                value={dispatchNotes}
+                onChange={(e) => setDispatchNotes(e.target.value)}
+                placeholder="Observações sobre o despacho..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="tracking-code">Código de Rastreamento (Opcional)</Label>
+              <Input
+                id="tracking-code"
+                value={dispatchTrackingCode}
+                onChange={(e) => setDispatchTrackingCode(e.target.value)}
+                placeholder="Ex: BR123456789..."
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowDispatchModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmDispatch}
+              disabled={dispatchOrderMutation.isPending || !dispatchNotes.trim()}
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
+            >
+              {dispatchOrderMutation.isPending ? 'Despachando...' : 'Confirmar Despacho'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

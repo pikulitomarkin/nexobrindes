@@ -731,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let clientPhone = order?.contactPhone;
           let clientEmail = order?.contactEmail;
 
-          // Only try other methods if contactName is missing
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order?.clientId) {
             console.log(`Contact name missing, looking for client with ID: ${order.clientId}`);
 
@@ -2083,8 +2083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: newOrder.id,
           producerId: producerId,
           status: "pending",
-          deadline: newOrder.deadline,
-          notes: `Convertido do orçamento ${budget.budgetNumber}`
+          deadline: newOrder.deadline
         });
 
         console.log(`Created production order for order ${newOrder.id} with producer ${producerId}`);
@@ -2728,22 +2727,22 @@ Para mais detalhes, entre em contato conosco!`;
         // Use budget down payment if available, otherwise use calculated payments
         const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
         const totalValue = parseFloat(order.totalValue);
-        
+
         // Consider order paid if it has received any payment (not necessarily full)
         // OR if total paid >= total value AND status is confirmed/paid
         const hasSomePayment = actualPaidValue > 0;
         const isFullyPaid = actualPaidValue >= totalValue;
-        const statusAllowsProduction = ['confirmed', 'paid'].includes(order.status) || 
+        const statusAllowsProduction = ['confirmed', 'paid'].includes(order.status) ||
           (order.status === 'production' && !order.producerId); // In production but no producer assigned yet
 
         // Order qualifies for logistics if:
         // 1. Has some payment AND status allows production, OR
         // 2. Is fully paid AND not yet in final stages
-        if ((hasSomePayment && statusAllowsProduction) || 
-            (isFullyPaid && !['production', 'ready', 'shipped', 'delivered'].includes(order.status))) {
+        if ((hasSomePayment && statusAllowsProduction) ||
+          (isFullyPaid && !['production', 'ready', 'shipped', 'delivered'].includes(order.status))) {
           // Always use contactName from order as primary client identifier
           let clientName = order.contactName;
-          
+
           // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
@@ -2808,7 +2807,7 @@ Para mais detalhes, entre em contato conosco!`;
 
           // Always use contactName from order as primary client identifier
           let clientName = order?.contactName;
-          
+
           // Only if contactName is missing, try to get from client record
           if (!clientName && order?.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
@@ -2853,30 +2852,27 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Dispatch order (mark as shipped)
-  app.patch("/api/logistics/dispatch-order/:orderId", async (req, res) => {
+  app.post("/api/logistics/dispatch-order", async (req, res) => {
     try {
-      const { orderId } = req.params;
+      const { productionOrderId, orderId, notes, trackingCode } = req.body;
 
-      // Find the production order
-      const productionOrders = await storage.getProductionOrdersByOrder(orderId);
-      if (!productionOrders || productionOrders.length === 0) {
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      if (!productionOrderId || !orderId) {
+        return res.status(400).json({ error: "Production order ID and Order ID are required" });
       }
 
-      const productionOrder = productionOrders[0];
-
       // Update production order status to shipped
-      await storage.updateProductionOrderStatus(productionOrder.id, 'shipped', 'Despachado pela logística');
+      await storage.updateProductionOrderStatus(productionOrderId, 'shipped', notes || 'Despachado pela logística', undefined, trackingCode);
 
       // Update main order status to shipped
-      await storage.updateOrder(orderId, { status: 'shipped' });
+      await storage.updateOrder(orderId, { status: 'shipped', trackingCode: trackingCode || null });
 
-      console.log(`Order ${orderId} dispatched by logistics`);
+      console.log(`Order ${orderId} (production: ${productionOrderId}) dispatched by logistics`);
 
       res.json({
         success: true,
         message: "Pedido despachado com sucesso",
-        orderId: orderId
+        orderId: orderId,
+        productionOrderId: productionOrderId
       });
     } catch (error) {
       console.error("Error dispatching order:", error);
@@ -3058,13 +3054,13 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const products = await storage.getProducts({ limit: 9999 });
       const producers = await storage.getUsers();
-      
+
       const stats = producers
         .filter(user => user.role === 'producer')
         .map(producer => {
           const producerProducts = products.products.filter((p: any) => p.producerId === producer.id);
           const activeProducts = producerProducts.filter((p: any) => p.isActive).length;
-          
+
           return {
             producerId: producer.id,
             producerName: producer.name,
