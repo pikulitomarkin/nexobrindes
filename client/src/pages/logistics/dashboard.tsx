@@ -120,20 +120,33 @@ export default function LogisticsDashboard() {
   };
 
   const handleDispatchOrder = (order: any) => {
-    // Find the production order for this order
-    const productionOrder = productionOrders?.find((po: any) => po.orderId === order.id);
+    // order can be either a production order from the production tracking table
+    // or a regular order from the paid orders table
     
-    if (!productionOrder) {
-      toast({
-        title: "Erro",
-        description: "Ordem de produção não encontrada",
-        variant: "destructive"
-      });
-      return;
+    let targetOrder = null;
+    let clientName = order.clientName || 'Cliente';
+
+    if (order.orderId) {
+      // This is a production order from the tracking table
+      targetOrder = order;
+      clientName = order.clientName || order.order?.clientName || 'Cliente';
+    } else {
+      // This is a regular order, find the production order
+      const productionOrder = productionOrders?.find((po: any) => po.orderId === order.id);
+      
+      if (!productionOrder) {
+        toast({
+          title: "Erro",
+          description: "Ordem de produção não encontrada para este pedido",
+          variant: "destructive"
+        });
+        return;
+      }
+      targetOrder = order;
     }
 
-    setSelectedOrder(order);
-    setDispatchNotes(`Produto despachado para ${order.clientName}`);
+    setSelectedOrder(targetOrder);
+    setDispatchNotes(`Produto despachado para ${clientName}`);
     setDispatchTrackingCode("");
     setShowDispatchModal(true);
   };
@@ -141,7 +154,20 @@ export default function LogisticsDashboard() {
   const confirmDispatch = () => {
     if (!selectedOrder) return;
 
-    const productionOrder = productionOrders?.find((po: any) => po.orderId === selectedOrder.id);
+    // selectedOrder can be either a production order or a regular order
+    // If it's a production order, use it directly, otherwise find the production order
+    let productionOrder = null;
+    let orderId = null;
+
+    if (selectedOrder.orderId) {
+      // selectedOrder is a production order
+      productionOrder = selectedOrder;
+      orderId = selectedOrder.orderId;
+    } else {
+      // selectedOrder is a regular order, find the production order
+      productionOrder = productionOrders?.find((po: any) => po.orderId === selectedOrder.id);
+      orderId = selectedOrder.id;
+    }
     
     if (!productionOrder) {
       toast({
@@ -154,7 +180,7 @@ export default function LogisticsDashboard() {
 
     dispatchOrderMutation.mutate({
       productionOrderId: productionOrder.id,
-      orderId: selectedOrder.id,
+      orderId: orderId,
       notes: dispatchNotes,
       trackingCode: dispatchTrackingCode
     });
