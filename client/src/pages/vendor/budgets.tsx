@@ -434,7 +434,7 @@ export default function VendorBudgets() {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, producerId }),
+        body: JSON.stringify({ clientId }),
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -494,11 +494,11 @@ export default function VendorBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert && convertClientId && convertProducerId) {
+    if (budgetToConvert && convertClientId) {
       convertToOrderMutation.mutate({
         budgetId: budgetToConvert,
         clientId: convertClientId,
-        producerId: convertProducerId
+        producerId: '' // Empty since producers are already defined in budget items
       });
     }
   };
@@ -2109,7 +2109,7 @@ export default function VendorBudgets() {
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Para converter em pedido, é necessário associar um cliente cadastrado e selecionar um produtor.
+              Para converter em pedido, é necessário associar um cliente cadastrado. Os produtores já estão definidos pelos produtos do orçamento.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2126,21 +2126,41 @@ export default function VendorBudgets() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="convert-producer">Produtor *</Label>
-              <Select value={convertProducerId} onValueChange={setConvertProducerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produtor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {producers?.map((producer: any) => (
-                    <SelectItem key={producer.id} value={producer.id}>
-                      {producer.name} - {producer.specialty}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {/* Show producers involved in this budget */}
+            {budgetToConvert && (() => {
+              const budget = budgets?.find((b: any) => b.id === budgetToConvert);
+              if (!budget?.items) return null;
+              
+              const producersInvolved = new Set();
+              budget.items.forEach((item: any) => {
+                if (item.producerId && item.producerId !== 'internal') {
+                  const producer = producers?.find((p: any) => p.id === item.producerId);
+                  if (producer) {
+                    producersInvolved.add(`${producer.name} - ${producer.specialty}`);
+                  }
+                } else if (item.producerId === 'internal') {
+                  producersInvolved.add('Produtos Internos');
+                }
+              });
+              
+              if (producersInvolved.size > 0) {
+                return (
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <Label className="text-sm font-medium text-blue-800">Produtores Envolvidos:</Label>
+                    <ul className="text-sm text-blue-700 mt-1">
+                      {Array.from(producersInvolved).map((producer: string, index: number) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <span className="w-1 h-1 bg-blue-600 rounded-full"></span>
+                          {producer}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
           <div className="flex gap-2 pt-4">
             <Button
@@ -2157,7 +2177,7 @@ export default function VendorBudgets() {
             </Button>
             <Button
               onClick={handleConfirmConvert}
-              disabled={convertToOrderMutation.isPending || !convertClientId || !convertProducerId}
+              disabled={convertToOrderMutation.isPending || !convertClientId}
               className="flex-1"
             >
               {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter e Enviar'}

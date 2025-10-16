@@ -1981,76 +1981,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const { id } = req.params;
-      const { clientId, producerId } = req.body;
+      const { clientId } = req.body;
+
+      console.log(`Converting budget ${id} to order for client ${clientId}`);
 
       const budget = await storage.getBudget(id);
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Validate required fields
-      if (!budget.contactName) {
-        return res.status(400).json({ error: "Nome de contato é obrigatório no orçamento" });
+      if (budget.status === 'converted') {
+        return res.status(400).json({ error: "Este orçamento já foi convertido em pedido" });
       }
 
-      // Get budget items
-      const items = await storage.getBudgetItems(id);
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: "Orçamento deve ter pelo menos um item" });
-      }
-
-      // Get payment info
-      const paymentInfo = await storage.getBudgetPaymentInfo(id);
-
-      // Generate unique order number
+      // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
-      // Process items with product details
-      const processedItems = await Promise.all(
-        items.map(async (item) => {
-          const product = await storage.getProduct(item.productId);
-          return {
-            productId: item.productId,
-            productName: product?.name || item.productName || 'Produto não encontrado',
-            quantity: parseInt(item.quantity) || 1,
-            unitPrice: parseFloat(item.unitPrice || '0'),
-            totalPrice: parseFloat(item.totalPrice || '0'),
-            hasItemCustomization: item.hasItemCustomization || false,
-            itemCustomizationValue: parseFloat(item.itemCustomizationValue || '0'),
-            itemCustomizationDescription: item.itemCustomizationDescription || "",
-            customizationPhoto: item.customizationPhoto || "",
-            productWidth: item.productWidth || "",
-            productHeight: item.productHeight || "",
-            productDepth: item.productDepth || ""
-          };
-        })
-      );
-
-      // Create order from budget with explicit orderNumber
       const orderData = {
-        orderNumber: orderNumber, // Garantir que o número do pedido seja passado
-        clientId: clientId || budget.clientId || null, // Can be null if no client selected
+        orderNumber,
+        clientId: clientId,
         vendorId: budget.vendorId,
         product: budget.title,
         description: budget.description || "",
-        totalValue: budget.totalValue,
+        totalValue: typeof budget.totalValue === 'number' ? budget.totalValue.toFixed(2) : budget.totalValue.toString(),
         status: "confirmed",
-        deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
-        deliveryDeadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
-        budgetId: id,
-        // Contact information is primary - always required
-        contactName: budget.contactName,
+        deadline: budget.deliveryDeadline,
+        deliveryDeadline: budget.deliveryDeadline,
+        contactName: budget.contactName || "Cliente do Orçamento",
         contactPhone: budget.contactPhone || "",
         contactEmail: budget.contactEmail || "",
         deliveryType: budget.deliveryType || "delivery",
-        // Items and payment info
-        items: processedItems,
-        paymentMethodId: paymentInfo?.paymentMethodId || "",
-        shippingMethodId: paymentInfo?.shippingMethodId || "",
-        installments: paymentInfo?.installments || 1,
-        downPayment: parseFloat(paymentInfo?.downPayment || '0'),
-        remainingAmount: parseFloat(paymentInfo?.remainingAmount || '0'),
-        shippingCost: parseFloat(paymentInfo?.shippingCost || '0'),
+        items: budget.items || [],
+        paymentMethodId: budget.paymentMethodId || "",
+        shippingMethodId: budget.shippingMethodId || "",
+        installments: budget.installments || 1,
+        downPayment: parseFloat(budget.downPayment || '0'),
+        remainingAmount: parseFloat(budget.remainingAmount || '0'),
+        shippingCost: parseFloat(budget.shippingCost || '0'),
         hasDiscount: budget.hasDiscount || false,
         discountType: budget.discountType || "percentage",
         discountPercentage: parseFloat(budget.discountPercentage || '0'),
@@ -2071,8 +2038,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update budget status to converted
       await storage.updateBudget(id, { status: "converted" });
 
-      // If producer is specified, send to production
-      if (producerId) {
+      // Create production orders for all producers involved in the budget items
+      const producersInvolved = new Set<string>();
+
+      if (budget.items && Array.isArray(budget.items)) {
+        budget.items.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            producersInvolved.add(item.producerId);
+          }
+        });
+      }
+
+      // Create production orders for each producer
+      for (const producerId of producersInvolved) {
         await storage.createProductionOrder({
           orderId: newOrder.id,
           producerId: producerId,
@@ -4959,117 +4937,49 @@ Para mais detalhes, entre em contato conosco!`;
   // Producer payment association route
   app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
     try {
-      const { transactionIds, productionOrderId } = req.body;
+      const { transactionId, producerPaymentId, amount } = req.body;
 
-      if (!transactionIds || !Array.isArray(transactionIds) || !productionOrderId) {
-        return res.status(400).json({ error: "TransactionIds e productionOrderId são obrigatórios" });
+      console.log("Associating producer payment:", { transactionId, producerPaymentId, amount });
+
+      // Get the bank transaction
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
       }
 
-      console.log(`Associating ${transactionIds.length} transactions to production order ${productionOrderId}`);
-
-      // Get the production order
-      const productionOrder = await storage.getProductionOrder(productionOrderId);
-      if (!productionOrder) {
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      // Verify this is a debit transaction (outgoing payment)
+      if (parseFloat(transaction.amount) >= 0) {
+        return res.status(400).json({ error: "Esta transação não é uma saída (débito)" });
       }
 
-      // Get producer payment
-      const producerPayments = await storage.getProducerPaymentsByProducer(productionOrder.producerId);
-      const payment = producerPayments.find(p => p.productionOrderId === productionOrderId);
-
-      if (!payment) {
-        return res.status(404).json({ error: "Pagamento do produtor não encontrado" });
+      // Get the producer payment
+      const producerPayment = await storage.getProducerPayment(producerPaymentId);
+      if (!producerPayment) {
+        return res.status(404).json({ error: "Pagamento de produtor não encontrado" });
       }
 
-      // Calculate total transaction amount
-      let totalTransactionAmount = 0;
-      let processedTransactions = 0;
-      let hasAdjustment = false;
-      let difference = 0;
-
-      // Process each transaction
-      for (const transactionId of transactionIds) {
-        const transaction = await storage.getBankTransaction(transactionId);
-        if (!transaction) {
-          console.warn(`Transaction ${transactionId} not found, skipping`);
-          continue;
-        }
-
-        // Verify this is a debit transaction (outgoing payment)
-        const transactionAmount = parseFloat(transaction.amount);
-        if (transactionAmount >= 0) {
-          console.warn(`Transaction ${transactionId} is not a debit, skipping`);
-          continue;
-        }
-
-        // Check if already matched
-        if (transaction.status === 'matched') {
-          console.warn(`Transaction ${transactionId} already matched, skipping`);
-          continue;
-        }
-
-        // Update bank transaction status
-        await storage.updateBankTransaction(transactionId, {
-          status: 'matched',
-          matchedOrderId: productionOrder.orderId, // Link to the main order for reference
-          matchedAt: new Date(),
-          notes: `Conciliado com pagamento de produtor ${productionOrder.producerId} - Ordem ${productionOrder.id}`
-        });
-
-        totalTransactionAmount += Math.abs(transactionAmount); // Convert to positive for comparison
-        processedTransactions++;
-      }
-
-      if (processedTransactions === 0) {
-        return res.status(400).json({ error: "Nenhuma transação válida foi processada" });
-      }
-
-      // Update production order payment status
-      await storage.updateProductionOrder(productionOrderId, {
-        producerPaymentStatus: 'paid',
-        paidAt: new Date()
+      // Update producer payment status to paid
+      await storage.updateProducerPayment(producerPaymentId, {
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: 'bank_transfer'
       });
 
-      // Get producer name for response
-      const producer = await storage.getUser(productionOrder.producerId);
-
-      // Check for differences between transaction total and production order value
-      const productionOrderValue = parseFloat(productionOrder.producerValue || '0');
-      difference = totalTransactionAmount - productionOrderValue;
-
-      if (Math.abs(difference) > 0.01) { // More than 1 cent difference
-        hasAdjustment = true;
-
-        // Create adjustment record if needed
-        if (difference !== 0) {
-          await storage.createExpenseNote({
-            type: difference > 0 ? 'adjustment_surplus' : 'adjustment_shortage',
-            vendorId: producer?.id, // Use producer ID for the adjustment
-            amount: Math.abs(difference).toFixed(2),
-            description: `Ajuste de conciliação - ${difference > 0 ? 'sobra' : 'falta'} na conciliação do pagamento do produtor ${producer?.name || productionOrder.producerId}`,
-            status: 'pending', // Needs review
-            date: new Date()
-          });
-        }
-      }
-
-      console.log(`Successfully associated ${processedTransactions} transactions with payment for producer ${producer?.name || productionOrder.producerId}`);
+      // Update bank transaction status
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        paidAt: new Date(),
+        notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
+      });
 
       res.json({
         success: true,
-        message: `Pagamento conciliado com sucesso`,
-        payment: {
-          producerName: producer?.name || 'Desconhecido',
-          amount: productionOrderValue.toFixed(2),
-          transactionsProcessed: processedTransactions,
-          hasAdjustment,
-          difference: difference.toFixed(2)
-        }
+        message: "Pagamento de produtor conciliado com sucesso"
       });
 
     } catch (error) {
       console.error("Error associating producer payment:", error);
-      res.status(500).json({ error: "Failed to associate producer payment: " + error.message });
+      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
     }
   });
 
