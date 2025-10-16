@@ -80,10 +80,21 @@ export default function LogisticsDashboard() {
 
   // Finalizar envio (marcar como despachado)
   const dispatchOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/logistics/dispatch-order/${orderId}`, {
-        method: "PATCH",
+    mutationFn: async ({ productionOrderId, orderId, notes, trackingCode }: { 
+      productionOrderId: string; 
+      orderId: string; 
+      notes: string; 
+      trackingCode: string; 
+    }) => {
+      const response = await fetch("/api/logistics/dispatch-order", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productionOrderId,
+          orderId,
+          notes,
+          trackingCode
+        })
       });
       if (!response.ok) throw new Error("Erro ao despachar pedido");
       return response.json();
@@ -132,6 +143,15 @@ export default function LogisticsDashboard() {
 
     const productionOrder = productionOrders?.find((po: any) => po.orderId === selectedOrder.id);
     
+    if (!productionOrder) {
+      toast({
+        title: "Erro",
+        description: "Ordem de produção não encontrada",
+        variant: "destructive"
+      });
+      return;
+    }
+
     dispatchOrderMutation.mutate({
       productionOrderId: productionOrder.id,
       orderId: selectedOrder.id,
