@@ -1788,7 +1788,7 @@ export class MemStorage implements IStorage {
 
   // Create manual receivable
   async createManualReceivable(data: any): Promise<any> {
-    const id = `manual-${randomUUID()}`;
+    const id = `manual-${randomUUID()}`;// Ensure a unique ID for manual receivables
     const receivable = {
       id,
       orderId: null,
@@ -1847,9 +1847,9 @@ export class MemStorage implements IStorage {
   }
 
   // Update commission status
-  async updateCommissionStatus(id: string, status: string) {
+  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
     const commission = this.commissions.get(id);
-    if (!commission) return null;
+    if (!commission) return undefined;
 
     commission.status = status;
     if (status === 'paid') {
@@ -1863,7 +1863,7 @@ export class MemStorage implements IStorage {
   }
 
   // Update commissions based on order status
-  async updateCommissionsByOrderStatus(orderId: string, orderStatus: string) {
+  async updateCommissionsByOrderStatus(orderId: string, orderStatus: string): Promise<void> {
     const allCommissions = Array.from(this.commissions.values());
     const orderCommissions = allCommissions.filter(c => c.orderId === orderId);
 
@@ -2639,11 +2639,11 @@ export class MemStorage implements IStorage {
       } else if (receivedAmount > 0) {
         // Check if minimum payment requirement is met
         if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
-          updatedReceivable.status = 'partial'; // Minimum met, can proceed
+          updatedReceivable.status = 'partial';
         } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
-          updatedReceivable.status = 'pending'; // Minimum not met, order cannot proceed
+          updatedReceivable.status = 'pending'; // Minimum not met
         } else {
-          updatedReceivable.status = 'partial'; // No minimum requirement
+          updatedReceivable.status = 'partial';
         }
       } else {
         updatedReceivable.status = minimumPayment > 0 ? 'pending' : 'open';
@@ -2720,7 +2720,7 @@ export class MemStorage implements IStorage {
       } else if (minimumPayment > 0 && paidValue < minimumPayment) {
         return 'pending'; // Minimum not met
       } else {
-        return 'partial'; // No minimum requirement
+        return 'partial';
       }
     } else {
       // Check if overdue
@@ -2814,7 +2814,7 @@ export class MemStorage implements IStorage {
       }
       // Ensure a unique ID for manual receivables if not provided
       if (!receivable.id || receivable.id.startsWith('ar-')) {
-        receivable.id = `manual-${randomUUID()}`;
+        receivable.id = `manual-${randomUUID()}`;// Ensure a unique ID for manual receivables
       }
       this.mockData.manualReceivables.push(receivable);
     }

@@ -256,11 +256,7 @@ export default function FinancePayables() {
   });
 
   const handlePayProducer = (producerPayment: any) => {
-    setSelectedPayable({
-      ...producerPayment,
-      // Use productionOrderId for the payment endpoint
-      id: producerPayment.productionOrderId || producerPayment.id
-    });
+    setSelectedPayable(producerPayment);
     setPaymentData(prev => ({ 
       ...prev, 
       amount: producerPayment.amount,
@@ -271,8 +267,13 @@ export default function FinancePayables() {
 
   const handlePay = () => {
     if (selectedPayable && paymentData.amount && paymentData.method) {
+      // Extract the actual ID from the composed ID
+      const actualId = selectedPayable.id.startsWith('producer-') 
+        ? selectedPayable.id.replace('producer-', '') 
+        : selectedPayable.productionOrderId || selectedPayable.id;
+      
       payProducerMutation.mutate({
-        payableId: selectedPayable.id.replace('producer-', ''),
+        payableId: actualId,
         amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
         method: paymentData.method,
         transactionId: paymentData.transactionId,

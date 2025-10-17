@@ -2715,9 +2715,9 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/producer-payments/:id/pay", async (req, res) => {
     try {
       const { id } = req.params;
-      const { paymentMethod, notes } = req.body;
+      const { paymentMethod, notes, transactionId } = req.body;
 
-      console.log(`Manual payment for producer payment: ${id}`, { paymentMethod, notes });
+      console.log(`Manual payment for producer payment: ${id}`, { paymentMethod, notes, transactionId });
 
       // First try to get existing producer payment
       let payment = await storage.getProducerPayment(id);
@@ -2730,7 +2730,7 @@ Para mais detalhes, entre em contato conosco!`;
             productionOrderId: id,
             producerId: productionOrder.producerId,
             amount: productionOrder.producerValue,
-            status: 'approved', // Set as approved since we're paying it directly
+            status: 'pending',
             notes: productionOrder.producerNotes || notes || null
           });
           console.log(`Created producer payment for production order ${id}`);
@@ -2739,7 +2739,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
       }
 
-      // Update payment status to paid
+      // Update payment status to paid with all payment details
       const updatedPayment = await storage.updateProducerPayment(payment.id, {
         status: 'paid',
         paidBy: 'admin-1', // Could be req.user.id in real auth
@@ -2750,13 +2750,12 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Update production order payment status
       if (payment.productionOrderId) {
-        const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-        if (productionOrder) {
-          await storage.updateProductionOrder(payment.productionOrderId, {
-            producerPaymentStatus: 'paid'
-          });
-        }
+        await storage.updateProductionOrder(payment.productionOrderId, {
+          producerPaymentStatus: 'paid'
+        });
       }
+
+      console.log(`Producer payment ${payment.id} marked as paid successfully`);
 
       res.json({
         success: true,
@@ -2803,7 +2802,15 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/producer-payments/pending", async (req, res) => {
     try {
       const allPayments = await storage.getProducerPayments();
-      const pendingPayments = allPayments.filter(p => ['pending', 'approved'].includes(p.status));
+      console.log(`Found ${allPayments.length} total producer payments`);
+      
+      const pendingPayments = allPayments.filter(p => {
+        const isPending = ['pending', 'approved'].includes(p.status);
+        console.log(`Payment ${p.id}: status=${p.status}, isPending=${isPending}`);
+        return isPending;
+      });
+
+      console.log(`Found ${pendingPayments.length} pending producer payments`);
 
       // Enrich with production order, order and producer data
       const enrichedPayments = await Promise.all(
@@ -2851,7 +2858,6 @@ Para mais detalhes, entre em contato conosco!`;
         })
       );
 
-      console.log(`Found ${enrichedPayments.length} pending producer payments`);
       res.json(enrichedPayments);
     } catch (error) {
       console.error("Error fetching pending producer payments:", error);
@@ -3251,6 +3257,8 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       const { paidBy, paymentMethod, transactionId, notes } = req.body;
 
+      console.log(`Processing producer payment: ${id}`, { paidBy, paymentMethod, transactionId });
+
       // First try to get the payment
       let payment = await storage.getProducerPayment(id);
 
@@ -3283,9 +3291,23 @@ Para mais detalhes, entre em contato conosco!`;
         updateData.paidAt = new Date();
         updateData.paymentMethod = paymentMethod || 'manual';
         updateData.notes = notes || payment.notes;
+
+        // Update production order payment status when payment is completed
+        if (payment.productionOrderId) {
+          await storage.updateProductionOrder(payment.productionOrderId, {
+            producerPaymentStatus: 'paid'
+          });
+        }
       }
 
       const updated = await storage.updateProducerPayment(payment.id, updateData);
+
+      console.log(`Updated producer payment ${payment.id}:`, {
+        status: updateData.status,
+        amount: payment.amount,
+        paidAt: updateData.paidAt,
+        paymentMethod: updateData.paymentMethod
+      });
 
       console.log(`Producer payment ${payment.id} ${paidBy ? 'paid' : 'approved'} successfully`);
       res.json(updated);
