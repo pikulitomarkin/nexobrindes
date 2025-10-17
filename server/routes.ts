@@ -982,6 +982,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quote Requests routes
+  app.post("/api/quote-requests", async (req, res) => {
+    try {
+      const quoteRequestData = req.body;
+      
+      if (!quoteRequestData.clientId || !quoteRequestData.vendorId || !quoteRequestData.productId) {
+        return res.status(400).json({ error: "Dados obrigatórios não fornecidos" });
+      }
+
+      const newQuoteRequest = await storage.createQuoteRequest(quoteRequestData);
+      res.json(newQuoteRequest);
+    } catch (error) {
+      console.error("Error creating quote request:", error);
+      res.status(500).json({ error: "Failed to create quote request" });
+    }
+  });
+
+  app.get("/api/quote-requests/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const quoteRequests = await storage.getQuoteRequestsByVendor(vendorId);
+      res.json(quoteRequests);
+    } catch (error) {
+      console.error("Error fetching quote requests:", error);
+      res.status(500).json({ error: "Failed to fetch quote requests" });
+    }
+  });
+
+  app.patch("/api/quote-requests/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      const updatedRequest = await storage.updateQuoteRequestStatus(id, status);
+      if (!updatedRequest) {
+        return res.status(404).json({ error: "Quote request not found" });
+      }
+      
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error("Error updating quote request status:", error);
+      res.status(500).json({ error: "Failed to update quote request status" });
+    }
+  });
+
   // Endpoint específico para pedidos do vendedor (usado na página de pedidos do vendedor)
   app.get("/api/vendors/:vendorId/orders", async (req, res) => {
     const { vendorId } = req.params;

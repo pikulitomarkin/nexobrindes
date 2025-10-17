@@ -373,6 +373,22 @@ export const producerPayments = pgTable("producer_payments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const quoteRequests = pgTable("quote_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => users.id).notNull(),
+  vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  observations: text("observations"),
+  contactName: text("contact_name").notNull(),
+  whatsapp: text("whatsapp"),
+  email: text("email"),
+  status: text("status").notNull().default('pending'), // 'pending', 'reviewing', 'quoted', 'rejected'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -400,6 +416,7 @@ export const insertExpenseNoteSchema = createInsertSchema(expenseNotes).omit({ i
 export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({ id: true, createdAt: true });
 export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProducerPaymentSchema = createInsertSchema(producerPayments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -452,3 +469,5 @@ export type CustomizationOption = typeof customizationOptions.$inferSelect;
 export type InsertCustomizationOption = z.infer<typeof insertCustomizationOptionSchema>;
 export type ProducerPayment = typeof producerPayments.$inferSelect;
 export type InsertProducerPayment = z.infer<typeof insertProducerPaymentSchema>;
+export type QuoteRequest = typeof quoteRequests.$inferSelect;
+export type InsertQuoteRequest = z.infer<typeof insertQuoteRequestSchema>;

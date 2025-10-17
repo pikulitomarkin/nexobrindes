@@ -314,6 +314,14 @@ function App() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/vendor/quote-requests">
+            <ProtectedRoute>
+              <MainLayout>
+                {lazy(() => import("./pages/vendor/quote-requests"))()}
+              </MainLayout>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/vendor/orders">
             <ProtectedRoute>
               <MainLayout>
@@ -347,29 +355,10 @@ function App() {
             </ProtectedRoute>
           </Route>
 
-          <Route path="/client/orders">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/client/profile">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientProfile />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/client/order/:id/timeline">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientOrderTimeline />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
+          <Route path="/client/products" component={lazy(() => import("./pages/client/products"))} />
+          <Route path="/client/orders" component={ClientOrders} />
+          <Route path="/client/order/:id/timeline" component={ClientOrderTimeline} />
+          <Route path="/client/profile" component={ClientProfile} />
 
           {/* Producer Routes - Accessible by producer users and admin */}
           <Route path="/producer/production-dashboard">

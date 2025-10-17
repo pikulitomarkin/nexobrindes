@@ -235,6 +235,11 @@ export interface IStorage {
   createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
   updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
   getProducerPayment(id: string): Promise<ProducerPayment | undefined>;
+
+  // Quote Requests
+  createQuoteRequest(data: any): Promise<any>;
+  getQuoteRequestsByVendor(vendorId: string): Promise<any[]>;
+  updateQuoteRequestStatus(id: string, status: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -252,6 +257,7 @@ export class MemStorage implements IStorage {
   private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
   private commissionSettings: CommissionSettings;
   private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
+  private quoteRequests: any[] = []; // Added for quote requests
 
   // Financial module storage
   private accountsReceivable: Map<string, AccountsReceivable>;
@@ -2920,6 +2926,38 @@ export class MemStorage implements IStorage {
 
   async getProducerPayment(id: string): Promise<ProducerPayment | undefined> {
     return this.producerPayments.get(id);
+  }
+
+  // Quote Requests methods
+  async createQuoteRequest(data: any): Promise<any> {
+    const newQuoteRequest = {
+      id: `qr-${Date.now()}`,
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.quoteRequests.push(newQuoteRequest);
+    return newQuoteRequest;
+  }
+
+  async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
+    return this.quoteRequests
+      .filter(qr => qr.vendorId === vendorId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async updateQuoteRequestStatus(id: string, status: string): Promise<any> {
+    const index = this.quoteRequests.findIndex(qr => qr.id === id);
+    if (index === -1) return null;
+
+    this.quoteRequests[index] = {
+      ...this.quoteRequests[index],
+      status,
+      updatedAt: new Date().toISOString()
+    };
+
+    return this.quoteRequests[index];
   }
 
   // Automatic commission calculation and processing methods
