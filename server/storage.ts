@@ -1738,6 +1738,9 @@ export class MemStorage implements IStorage {
     }
 
     this.mockData.manualReceivables.push(receivable);
+    console.log(`Created manual receivable: ${receivable.id} for ${receivable.clientName} - ${receivable.amount}`);
+    console.log(`Total manual receivables: ${this.mockData.manualReceivables.length}`);
+    
     return receivable;
   }
 
@@ -2563,31 +2566,13 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async getManualReceivables(): Promise<any[]> {
-    if (!this.mockData.manualReceivables) {
-      this.mockData.manualReceivables = [];
-    }
-    
-    return this.mockData.manualReceivables.map(receivable => ({
-      id: receivable.id,
-      orderId: null,
-      orderNumber: 'MANUAL',
-      clientName: receivable.clientName,
-      amount: receivable.amount,
-      receivedAmount: receivable.receivedAmount || "0.00",
-      status: receivable.status,
-      dueDate: receivable.dueDate ? new Date(receivable.dueDate) : null,
-      createdAt: new Date(receivable.createdAt),
-      lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
-      isManual: true,
-      description: receivable.description,
-      notes: receivable.notes
-    }));
-  }
+  
 
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
     const orders = await this.getOrders();
-    const manualReceivables = await this.getManualReceivables();
+
+    // Get manual receivables from mockData
+    const manualReceivables = this.mockData.manualReceivables || [];
 
     const orderReceivables = orders
       .filter(order => order.status !== 'cancelled')
@@ -2605,11 +2590,31 @@ export class MemStorage implements IStorage {
           dueDate: order.deadline ? new Date(order.deadline) : null,
           createdAt: new Date(order.createdAt),
           lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
-          isManual: false
+          isManual: false,
+          type: 'sale'
         };
       });
 
-    return [...orderReceivables, ...manualReceivables];
+    // Convert manual receivables to the expected format
+    const formattedManualReceivables = manualReceivables.map(receivable => ({
+      id: receivable.id,
+      orderId: null,
+      orderNumber: 'MANUAL',
+      clientName: receivable.clientName,
+      amount: receivable.amount,
+      receivedAmount: receivable.receivedAmount || "0.00",
+      status: receivable.status,
+      dueDate: receivable.dueDate ? new Date(receivable.dueDate) : null,
+      createdAt: new Date(receivable.createdAt),
+      lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
+      isManual: true,
+      type: 'manual',
+      description: receivable.description,
+      notes: receivable.notes
+    }));
+
+    console.log(`Returning ${orderReceivables.length} order receivables and ${formattedManualReceivables.length} manual receivables`);
+    return [...orderReceivables, ...formattedManualReceivables];
   }
 
   async createAccountsReceivable(receivable: any): Promise<any> {

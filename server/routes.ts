@@ -1297,6 +1297,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all accounts receivable (orders + manual)
+  app.get("/api/finance/receivables", async (req, res) => {
+    try {
+      const receivables = await storage.getAccountsReceivable();
+      console.log(`Returning ${receivables.length} total receivables to frontend`);
+      res.json(receivables);
+    } catch (error) {
+      console.error("Error fetching accounts receivable:", error);
+      res.status(500).json({ error: "Failed to fetch accounts receivable" });
+    }
+  });
+
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {
