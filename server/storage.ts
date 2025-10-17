@@ -2539,6 +2539,25 @@ export class MemStorage implements IStorage {
   }
 
   // Financial module methods - Accounts Receivable
+  // Helper method to calculate receivable status
+  private calculateReceivableStatus(order: Order): 'pending' | 'partial' | 'paid' | 'overdue' {
+    const totalValue = parseFloat(order.totalValue);
+    const paidValue = parseFloat(order.paidValue || "0");
+    
+    if (paidValue >= totalValue) {
+      return 'paid';
+    } else if (paidValue > 0) {
+      return 'partial';
+    } else {
+      // Check if overdue
+      const dueDate = order.deadline ? new Date(order.deadline) : null;
+      if (dueDate && new Date() > dueDate) {
+        return 'overdue';
+      }
+      return 'pending';
+    }
+  }
+
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
     const orders = await this.getOrders();
     const manualReceivables = await this.getManualReceivables();

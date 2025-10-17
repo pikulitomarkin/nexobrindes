@@ -501,7 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Always use contactName as primary client name - it's required on order creation
           let clientName = order.contactName;
 
-          // Only try other methods if contactName is somehow missing
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
             console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
 
@@ -986,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quote-requests", async (req, res) => {
     try {
       const quoteRequestData = req.body;
-      
+
       if (!quoteRequestData.clientId || !quoteRequestData.vendorId || !quoteRequestData.productId) {
         return res.status(400).json({ error: "Dados obrigatórios não fornecidos" });
       }
@@ -1014,12 +1014,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      
+
       const updatedRequest = await storage.updateQuoteRequestStatus(id, status);
       if (!updatedRequest) {
         return res.status(404).json({ error: "Quote request not found" });
       }
-      
+
       res.json(updatedRequest);
     } catch (error) {
       console.error("Error updating quote request status:", error);
@@ -4537,35 +4537,24 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const receivables = await storage.getAccountsReceivable();
 
-      // Enrich with order and client data
+      // Enrich receivables with client names
       const enrichedReceivables = await Promise.all(
         receivables.map(async (receivable) => {
-          const order = await storage.getOrder(receivable.orderId);
-          let clientName = 'Cliente não identificado';
+          let clientName = receivable.clientName || 'Cliente não identificado';
 
-          if (order) {
-            // Try to get client details
-            const client = await storage.getClient(order.clientId);
-            if (client) {
-              clientName = client.name;
-            } else {
-              // Fallback to user table
-              const user = await storage.getUser(order.clientId);
-              if (user) {
-                clientName = user.name;
-              }
+          // Try to get client name from order if not available
+          if (!clientName && receivable.orderId) {
+            const order = await storage.getOrder(receivable.orderId);
+            if (order) {
+              clientName = order.contactName || 'Cliente não identificado';
             }
           }
 
           return {
             ...receivable,
-            orderNumber: order?.orderNumber || `#${receivable.orderId}`,
-            clientName: clientName,
-            amount: receivable.amount.toString(),
-            receivedAmount: receivable.receivedAmount.toString(),
-            dueDate: receivable.dueDate ? new Date(receivable.dueDate).toISOString() : null,
-            createdAt: receivable.createdAt ? new Date(receivable.createdAt).toISOString() : null,
-            updatedAt: receivable.updatedAt ? new Date(receivable.updatedAt).toISOString() : null
+            clientName,
+            // Ensure we have the orderNumber field that the frontend expects
+            orderNumber: receivable.orderNumber || (receivable.orderId ? `#${receivable.orderId}` : 'MANUAL')
           };
         })
       );
@@ -4573,7 +4562,7 @@ Para mais detalhes, entre em contato conosco!`;
       res.json(enrichedReceivables);
     } catch (error) {
       console.error("Failed to fetch receivables:", error);
-      res.status(500).json({ error: "Failed to fetch receivables" });
+      res.status(500).json({ error: "Failed to fetch receivables: " + error.message });
     }
   });
 
@@ -5485,7 +5474,7 @@ Para mais detalhes, entre em contato conosco!`;
           if (!a.acceptedAt && !b.acceptedAt) return 0;
           if (!a.acceptedAt) return 1;
           if (!b.acceptedAt) return -1;
-          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime();
+          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt.getTime() - new Date(a.acceptedAt).getTime();
         });
 
       console.log(`Producer orders for ${producerId}:`, filteredOrders.length, 'orders found');
