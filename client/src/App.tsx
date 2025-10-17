@@ -208,6 +208,8 @@ function App() {
 
                   {/* Logistics Routes */}
                   <Route path="/logistics/dashboard" component={LogisticsDashboard} />
+                  <Route path="/logistics/paid-orders" component={LogisticsDashboard} />
+                  <Route path="/logistics/production-tracking" component={LogisticsDashboard} />
                   <Route path="/logistics/products" component={LogisticsProducts} />
                   <Route path="/logistics/producers" component={LogisticsProducers} />
 
