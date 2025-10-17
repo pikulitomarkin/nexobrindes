@@ -1309,6 +1309,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create expense note
+  app.post("/api/finance/expenses", async (req, res) => {
+    try {
+      const { name, amount, category, date, description, status, createdBy } = req.body;
+
+      if (!name || !amount || !category || !date) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create expense note
+      const expense = await storage.createExpenseNote({
+        date: new Date(date),
+        category: category,
+        description: name + (description ? ` - ${description}` : ''),
+        amount: parseFloat(amount).toFixed(2),
+        vendorId: null, // Notas de despesa não têm vendedor associado
+        orderId: null,  // Não estão associadas a pedidos
+        attachmentUrl: null,
+        status: status || 'recorded',
+        approvedBy: null,
+        approvedAt: null,
+        createdBy: createdBy || 'admin-1'
+      });
+
+      res.json(expense);
+    } catch (error) {
+      console.error("Error creating expense note:", error);
+      res.status(500).json({ error: "Erro ao criar nota de despesa: " + error.message });
+    }
+  });
+
+  // Get expense notes
+  app.get("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenseNotes();
+      res.json(expenses);
+    } catch (error) {
+      console.error("Error fetching expense notes:", error);
+      res.status(500).json({ error: "Failed to fetch expense notes" });
+    }
+  });
+
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {

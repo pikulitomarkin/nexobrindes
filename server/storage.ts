@@ -2872,7 +2872,10 @@ export class MemStorage implements IStorage {
 
   // Financial module methods - Expense Notes
   async getExpenseNotes(): Promise<ExpenseNote[]> {
-    return this.mockData.expenseNotes || [];
+    if (!this.mockData.expenseNotes) {
+      this.mockData.expenseNotes = [];
+    }
+    return this.mockData.expenseNotes;
   }
 
   async getExpenseNotesByVendor(vendorId: string): Promise<ExpenseNote[]> {
@@ -2884,6 +2887,10 @@ export class MemStorage implements IStorage {
   }
 
   async createExpenseNote(data: InsertExpenseNote): Promise<ExpenseNote> {
+    if (!this.mockData.expenseNotes) {
+      this.mockData.expenseNotes = [];
+    }
+    
     const id = `expense-${Date.now()}`;
     const expense: ExpenseNote = {
       id,
@@ -2892,6 +2899,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.mockData.expenseNotes.push(expense);
+    console.log(`Created expense note: ${expense.id} - ${expense.description} - R$ ${expense.amount}`);
     return expense;
   }
 

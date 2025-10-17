@@ -33,20 +33,20 @@ export default function FinanceExpenses() {
 
   const createExpenseMutation = useMutation({
     mutationFn: async (data: any) => {
-      const formData = new FormData();
-      formData.append('date', data.date);
-      formData.append('name', data.name);
-      formData.append('amount', data.amount);
-      formData.append('category', data.category);
-      formData.append('description', data.description || '');
-      
-      if (selectedFile) {
-        formData.append('attachment', selectedFile);
-      }
-
       const response = await fetch("/api/finance/expenses", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: data.name,
+          amount: parseFloat(data.amount).toFixed(2),
+          category: data.category,
+          date: data.date,
+          description: data.description || '',
+          status: 'recorded',
+          createdBy: 'admin-1'
+        }),
       });
       if (!response.ok) throw new Error("Erro ao criar despesa");
       return response.json();
