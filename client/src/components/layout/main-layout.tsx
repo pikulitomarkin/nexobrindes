@@ -85,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "client":
         return [
           { href: "/client/dashboard", icon: Home, label: "Dashboard" },
-          { href: "/client/products", icon: Package, label: "Produtos" },
+          { href: "/client/products", icon: Package, label: "Catálogo" },
           { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
           { href: "/client/profile", icon: Users, label: "Meu Perfil" },
         ];
