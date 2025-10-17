@@ -63,7 +63,11 @@ export default function ClientProducts() {
   });
 
   const products = productsData?.products || [];
-  const categories = ['all', ...new Set(products.map((p: any) => p.category).filter(Boolean))];
+  const uniqueCategories = new Set<string>();
+  products.forEach((p: any) => {
+    if (p.category) uniqueCategories.add(p.category);
+  });
+  const categories: string[] = ['all', ...Array.from(uniqueCategories)];
 
   const requestQuoteMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -413,7 +417,7 @@ export default function ClientProducts() {
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => (
+                {categories.map((category: string) => (
                   <SelectItem key={category} value={category}>
                     {category === "all" ? "Todas as Categorias" : category}
                   </SelectItem>
