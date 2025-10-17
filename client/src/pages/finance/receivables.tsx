@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Search, Eye, DollarSign, TrendingUp, Clock, CheckCircle, Plus, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -15,11 +16,19 @@ export default function FinanceReceivables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedReceivable, setSelectedReceivable] = useState<any>(null);
   const [paymentData, setPaymentData] = useState({
     amount: "",
     method: "",
     transactionId: "",
+    notes: "",
+  });
+  const [newReceivableData, setNewReceivableData] = useState({
+    clientName: "",
+    description: "",
+    amount: "",
+    dueDate: "",
     notes: "",
   });
   const { toast } = useToast();
@@ -115,6 +124,53 @@ export default function FinanceReceivables() {
     },
   });
 
+  const createReceivableMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/finance/receivables/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          clientName: data.clientName,
+          description: data.description,
+          amount: parseFloat(data.amount).toFixed(2),
+          dueDate: data.dueDate,
+          notes: data.notes
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao criar conta a receber');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
+      setIsCreateDialogOpen(false);
+      setNewReceivableData({
+        clientName: "",
+        description: "",
+        amount: "",
+        dueDate: "",
+        notes: "",
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Conta a receber criada com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível criar a conta a receber",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       pending: { label: "Pendente", variant: "secondary" as const },
@@ -150,6 +206,12 @@ export default function FinanceReceivables() {
         transactionId: paymentData.transactionId,
         notes: paymentData.notes
       });
+    }
+  };
+
+  const handleCreateReceivable = () => {
+    if (newReceivableData.clientName && newReceivableData.description && newReceivableData.amount && newReceivableData.dueDate) {
+      createReceivableMutation.mutate(newReceivableData);
     }
   };
 
@@ -271,7 +333,94 @@ export default function FinanceReceivables() {
       {/* Receivables Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Pedidos a Receber ({filteredReceivables.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Pedidos a Receber ({filteredReceivables.length})</CardTitle>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-bg text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Conta a Receber
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Nova Conta a Receber</DialogTitle>
+                  <DialogDescription>
+                    Crie uma nova conta a receber manualmente
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="client-name">Nome do Cliente *</Label>
+                    <Input
+                      id="client-name"
+                      placeholder="Nome do cliente"
+                      value={newReceivableData.clientName}
+                      onChange={(e) => setNewReceivableData(prev => ({ ...prev, clientName: e.target.value }))}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="description">Descrição *</Label>
+                    <Input
+                      id="description"
+                      placeholder="Descrição da conta a receber"
+                      value={newReceivableData.description}
+                      onChange={(e) => setNewReceivableData(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="amount">Valor (R$) *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        value={newReceivableData.amount}
+                        onChange={(e) => setNewReceivableData(prev => ({ ...prev, amount: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="due-date">Data de Vencimento *</Label>
+                      <Input
+                        id="due-date"
+                        type="date"
+                        value={newReceivableData.dueDate}
+                        onChange={(e) => setNewReceivableData(prev => ({ ...prev, dueDate: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="notes">Observações</Label>
+                    <Textarea
+                      id="notes"
+                      placeholder="Observações adicionais"
+                      value={newReceivableData.notes}
+                      onChange={(e) => setNewReceivableData(prev => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      className="gradient-bg text-white"
+                      onClick={handleCreateReceivable}
+                      disabled={!newReceivableData.clientName || !newReceivableData.description || !newReceivableData.amount || !newReceivableData.dueDate || createReceivableMutation.isPending}
+                    >
+                      {createReceivableMutation.isPending ? "Criando..." : "Criar Conta a Receber"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

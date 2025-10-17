@@ -4585,6 +4585,47 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Create manual receivable
+  app.post("/api/finance/receivables/manual", async (req, res) => {
+    try {
+      const { clientName, description, amount, dueDate, notes } = req.body;
+
+      if (!clientName || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Todos os campos obrigatórios devem ser preenchidos" });
+      }
+
+      if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      // Create a manual receivable entry
+      const receivableId = `manual-${Date.now()}`;
+      const receivable = {
+        id: receivableId,
+        orderId: null, // Manual receivables don't have order IDs
+        orderNumber: `MANUAL-${Date.now()}`,
+        clientName: clientName,
+        description: description,
+        amount: parseFloat(amount).toFixed(2),
+        receivedAmount: "0.00",
+        status: 'pending' as const,
+        dueDate: new Date(dueDate),
+        createdAt: new Date(),
+        notes: notes || "",
+        isManual: true
+      };
+
+      // Store in accounts receivable
+      await storage.createAccountsReceivable(receivable);
+
+      console.log("Created manual receivable:", receivable);
+      res.json({ success: true, receivable });
+    } catch (error) {
+      console.error("Error creating manual receivable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a receber: " + error.message });
+    }
+  });
+
   // Manual payment for receivables
   app.post("/api/receivables/:id/payment", async (req, res) => {
     try {

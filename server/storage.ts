@@ -267,6 +267,7 @@ export class MemStorage implements IStorage {
   private expenseNotes: Map<string, ExpenseNote>;
   private commissionPayouts: Map<string, CommissionPayout>;
 
+  // Mock data, including manual receivables
   private mockData = {
     users: [] as User[],
     clients: [] as Client[],
@@ -293,6 +294,7 @@ export class MemStorage implements IStorage {
     customizationOptions: [] as CustomizationOption[],
     customizationCategories: [] as string[], // Added for storing customization categories
     financialNotes: [] as any[], // Added for financial notes
+    manualReceivables: [] as any[] // Added for manual receivables
   };
 
   // Payment Methods
@@ -405,6 +407,17 @@ export class MemStorage implements IStorage {
 
     this.initializeData();
     this.createTestUsers();
+  }
+
+  // Helper to load all mock data
+  private async loadData(): Promise<any> {
+    return Promise.resolve(this.mockData);
+  }
+
+  // Helper to save all mock data
+  private async saveData(data: any): Promise<void> {
+    this.mockData = data;
+    return Promise.resolve();
   }
 
   // Create test users for each role
@@ -2500,35 +2513,71 @@ export class MemStorage implements IStorage {
 
   // Financial module methods - Accounts Receivable
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
-    return Array.from(this.accountsReceivable.values());
+    const orders = await this.getOrders();
+    const manualReceivables = await this.getManualReceivables();
+
+    const orderReceivables = orders
+      .filter(order => order.status !== 'cancelled')
+      .map(order => ({
+        id: `ar-${order.id}`,
+        orderId: order.id,
+        orderNumber: order.orderNumber || `#${order.id}`,
+        amount: order.totalValue || "0.00",
+        receivedAmount: order.paidValue || "0.00",
+        status: this.calculateReceivableStatus(order),
+        dueDate: order.deadline ? new Date(order.deadline) : null,
+        createdAt: new Date(order.createdAt),
+        lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
+        isManual: false
+      }));
+
+    return [...orderReceivables, ...manualReceivables];
   }
 
-  async getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]> {
-    return Array.from(this.accountsReceivable.values()).filter(ar => ar.orderId === orderId);
+  async createAccountsReceivable(receivable: any): Promise<any> {
+    const data = await this.loadData();
+    if (!data.manualReceivables) {
+      data.manualReceivables = [];
+    }
+    // Ensure the new receivable has a unique ID
+    if (!receivable.id) {
+      receivable.id = randomUUID();
+    }
+    // Set creation and update dates
+    receivable.createdAt = new Date();
+    receivable.updatedAt = new Date();
+    // Mark as manual
+    receivable.isManual = true;
+
+    data.manualReceivables.push(receivable);
+    await this.saveData(data);
+    return receivable;
   }
 
-  async getAccountsReceivableByClient(clientId: string): Promise<AccountsReceivable[]> {
-    return Array.from(this.accountsReceivable.values()).filter(ar => ar.clientId === clientId);
-  }
-
-  async getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]> {
-    return Array.from(this.accountsReceivable.values()).filter(ar => ar.vendorId === vendorId);
-  }
-
-  async createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable> {
-    const newAR: AccountsReceivable = {
-      id: randomUUID(),
-      ...data,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.accountsReceivable.set(newAR.id, newAR);
-    return newAR;
+  async getManualReceivables(): Promise<any[]> {
+    const data = await this.loadData();
+    return data.manualReceivables || [];
   }
 
   async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
     const existing = this.accountsReceivable.get(id);
-    if (!existing) return undefined;
+    if (!existing) {
+      // If it's a manual receivable, try to update it from mockData
+      const manualReceivables = await this.getManualReceivables();
+      const manualIndex = manualReceivables.findIndex((ar: any) => ar.id === id);
+      if (manualIndex !== -1) {
+        const updatedManual = {
+          ...manualReceivables[manualIndex],
+          ...data,
+          updatedAt: new Date()
+        };
+        // Update in mockData
+        manualReceivables[manualIndex] = updatedManual;
+        await this.saveData({ ...await this.loadData(), manualReceivables });
+        return updatedManual as AccountsReceivable;
+      }
+      return undefined;
+    }
 
     const updated: AccountsReceivable = {
       ...existing,
@@ -2566,7 +2615,7 @@ export class MemStorage implements IStorage {
     });
 
     // Update receivable amount
-    const receivable = this.accountsReceivable.get(receivableId);
+    const receivable = await this.accountsReceivable.get(receivableId);
     if (receivable) {
       const currentReceived = parseFloat(receivable.receivedAmount);
       const allocationAmount = parseFloat(amount);
