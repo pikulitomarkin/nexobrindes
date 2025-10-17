@@ -2638,7 +2638,7 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Producer Payment routes
-  app.get("/api/producer-payments", async (req, res) => {
+  app.get("/api/finance/producer-payments", async (req, res) => {
     try {
       const payments = await storage.getProducerPayments();
 
@@ -2669,7 +2669,50 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/producer-payments/producer/:producerId", async (req, res) => {
+  // Register manual payment for producer
+  app.post("/api/finance/producer-payments/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes } = req.body;
+
+      console.log(`Manual payment for producer payment: ${id}`, { paymentMethod, notes });
+
+      const payment = await storage.getProducerPayment(id);
+      if (!payment) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      // Update payment status to paid
+      const updatedPayment = await storage.updateProducerPayment(id, {
+        status: 'paid',
+        paidBy: 'admin-1', // Could be req.user.id in real auth
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        notes: notes || null
+      });
+
+      // Update production order payment status
+      if (payment.productionOrderId) {
+        const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+        if (productionOrder) {
+          await storage.updateProductionOrder(payment.productionOrderId, {
+            producerPaymentStatus: 'paid'
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        payment: updatedPayment,
+        message: "Pagamento registrado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error registering producer payment:", error);
+      res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
+    }
+  });
+
+  app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
     try {
       const { producerId } = req.params;
       const payments = await storage.getProducerPaymentsByProducer(producerId);
@@ -2699,52 +2742,63 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.post("/api/production-orders/:id/set-value", async (req, res) => {
+  // Get pending producer payments for admin
+  app.get("/api/finance/producer-payments/pending", async (req, res) => {
     try {
-      const { id } = req.params;
-      const { value, notes } = req.body;
+      const allPayments = await storage.getProducerPayments();
+      const pendingPayments = allPayments.filter(p => ['pending', 'approved'].includes(p.status));
 
-      console.log(`API: Setting value for production order ${id}:`, { value, notes, type: typeof value });
+      // Enrich with production order, order and producer data
+      const enrichedPayments = await Promise.all(
+        pendingPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const producer = await storage.getUser(payment.producerId);
+          let order = null;
+          let clientName = null;
 
-      if (!value && value !== 0) {
-        console.log("API: Value is missing");
-        return res.status(400).json({ error: "Valor é obrigatório" });
-      }
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+            if (order) {
+              // Always use contactName from order as primary client identifier
+              clientName = order.contactName;
 
-      const numericValue = parseFloat(value);
-      if (isNaN(numericValue) || numericValue <= 0) {
-        console.log("API: Invalid numeric value:", numericValue);
-        return res.status(400).json({ error: "Valor deve ser um número válido maior que zero" });
-      }
+              // Only if contactName is missing, try to get from client record
+              if (!clientName && order.clientId) {
+                const clientRecord = await storage.getClient(order.clientId);
+                if (clientRecord) {
+                  clientName = clientRecord.name;
+                } else {
+                  const clientByUserId = await storage.getClientByUserId(order.clientId);
+                  if (clientByUserId) {
+                    clientName = clientByUserId.name;
+                  } else {
+                    const clientUser = await storage.getUser(order.clientId);
+                    if (clientUser) {
+                      clientName = clientUser.name;
+                    }
+                  }
+                }
+              }
+            }
+          }
 
-      // Verificar se o valor já foi definido e está bloqueado
-      const productionOrder = await storage.getProductionOrder(id);
-      if (!productionOrder) {
-        console.log("API: Production order not found");
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
-      }
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            producerName: producer?.name || 'Produtor Desconhecido',
+            clientName: clientName || 'Cliente não identificado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não informado'
+          };
+        })
+      );
 
-      if (productionOrder.producerValueLocked) {
-        console.log("API: Producer value is locked");
-        return res.status(400).json({ error: "O valor já foi definido e não pode ser alterado" });
-      }
-
-      console.log("API: Calling storage.updateProductionOrderValue...");
-      const updated = await storage.updateProductionOrderValue(id, numericValue.toFixed(2), notes, true); // true para bloquear valor
-
-      if (!updated) {
-        console.log("API: Production order not found");
-        return res.status(404).json({ error: "Ordem de produção não encontrada" });
-      }
-
-      console.log("API: Value updated successfully:", { id: updated.id, producerValue: updated.producerValue });
-      res.json({ success: true, productionOrder: updated });
+      console.log(`Found ${enrichedPayments.length} pending producer payments`);
+      res.json(enrichedPayments);
     } catch (error) {
-      console.error("API Error setting production order value:", error);
-      res.status(500).json({
-        error: "Failed to set production order value",
-        details: error.message
-      });
+      console.error("Error fetching pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
     }
   });
 
@@ -3758,7 +3812,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Mark production notes as read
+  // Mark notes as read
   app.patch("/api/orders/:id/mark-notes-read", async (req, res) => {
     const { id } = req.params;
 
@@ -4711,8 +4765,8 @@ Para mais detalhes, entre em contato conosco!`;
       });
 
       console.log("Successfully processed receivable payment");
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Pagamento registrado com sucesso",
         receivable: {
           ...receivable,
@@ -5296,7 +5350,6 @@ Para mais detalhes, entre em contato conosco!`;
 
             if (productionOrder) {
               order = await storage.getOrder(productionOrder.orderId);
-
               if (order) {
                 // Get client name
                 const clientRecord = await storage.getClient(order.clientId);
@@ -5321,9 +5374,9 @@ Para mais detalhes, entre em contato conosco!`;
               productionOrder,
               order,
               producerName: producer?.name || 'Unknown',
+              clientName: clientName,
               orderNumber: order?.orderNumber || 'Unknown',
-              product: order?.product || 'Unknown',
-              clientName: clientName
+              product: order?.product || 'Unknown'
             };
           })
       );

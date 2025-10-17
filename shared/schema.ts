@@ -367,7 +367,7 @@ export const producerPayments = pgTable("producer_payments", {
   approvedAt: timestamp("approved_at"),
   paidBy: varchar("paid_by").references(() => users.id),
   paidAt: timestamp("paid_at"),
-  paymentMethod: text("payment_method"), // 'pix', 'transfer', 'check'
+  paymentMethod: text("payment_method"), // 'pix', 'transfer', 'check', 'cash', 'manual'
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -37,8 +37,9 @@ export default function FinancePayables() {
     queryKey: ["/api/finance/overview"],
   });
 
-  const { data: producerPayments = [] } = useQuery({
-    queryKey: ["/api/finance/producer-payments/pending"],
+  // Get pending producer payments
+  const { data: pendingProducerPayments = [] } = useQuery({
+    queryKey: ["/api/finance/producer-payments/pending"]
   });
 
   const { data: expenses = [] } = useQuery({
@@ -65,6 +66,7 @@ export default function FinancePayables() {
         body: JSON.stringify({
           paidBy: 'current-user-id',
           paymentMethod: data.method,
+          transactionId: data.transactionId,
           notes: data.notes
         })
       });
@@ -206,7 +208,7 @@ export default function FinancePayables() {
       }))
   ];
 
-  const getStatusBadge = (status: string, type: string) => {
+  const getStatusBadge = (status: string, type?: string) => {
     const statusMap = {
       pending: { label: "Pendente", variant: "secondary" as const },
       approved: { label: "Aprovado", variant: "outline" as const },
@@ -246,11 +248,21 @@ export default function FinancePayables() {
     return matchesStatus && matchesType && matchesSearch;
   });
 
+  const handlePayProducer = (producerPayment: any) => {
+    setSelectedPayable(producerPayment);
+    setPaymentData(prev => ({ 
+      ...prev, 
+      amount: producerPayment.amount,
+      notes: producerPayment.notes || '' 
+    }));
+    setIsPayDialogOpen(true);
+  };
+
   const handlePay = () => {
-    if (selectedPayable && paymentData.amount) {
+    if (selectedPayable && paymentData.amount && paymentData.method) {
       payProducerMutation.mutate({
         payableId: selectedPayable.id.replace('producer-', ''),
-        amount: parseFloat(paymentData.amount).toFixed(2),
+        amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
         method: paymentData.method,
         transactionId: paymentData.transactionId,
         notes: paymentData.notes
@@ -259,7 +271,7 @@ export default function FinancePayables() {
   };
 
   const handleSetRefund = () => {
-    if (selectedPayable && refundData.amount) {
+    if (selectedPayable && refundData.amount && refundData.notes) {
       setRefundMutation.mutate({
         orderId: selectedPayable.originalOrder.id,
         amount: parseFloat(refundData.amount).toFixed(2),
@@ -397,6 +409,7 @@ export default function FinancePayables() {
                   <SelectItem value="confirmed">Confirmado</SelectItem>
                   <SelectItem value="pending_definition">Aguardando Valor</SelectItem>
                   <SelectItem value="defined">Valor Definido</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -462,7 +475,7 @@ export default function FinancePayables() {
                     <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                       <div className="flex items-center">
                         {getTypeIcon(payable.type)}
-                        <span className="ml-2 capitalize">{payable.category}</span>
+                        <span className="ml-2 capitalize">{payable.category || payable.type}</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-900 max-w-xs truncate">
@@ -486,15 +499,11 @@ export default function FinancePayables() {
                           <Eye className="h-3 w-3 mr-0.5" />
                           Ver
                         </Button>
-                        {payable.type === 'producer' && payable.status === 'approved' && (
+                        {payable.type === 'producer' && (payable.status === 'approved' || payable.status === 'pending') && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => {
-                              setSelectedPayable(payable);
-                              setPaymentData(prev => ({ ...prev, amount: payable.amount }));
-                              setIsPayDialogOpen(true);
-                            }}
+                            onClick={() => handlePayProducer(payable)}
                           >
                             <CreditCard className="h-3 w-3 mr-0.5" />
                             Pagar
@@ -528,9 +537,11 @@ export default function FinancePayables() {
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Pagamento para Produtor</DialogTitle>
+            <DialogTitle>Registrar Pagamento Manual</DialogTitle>
             <DialogDescription>
-              Registre o pagamento para {selectedPayable?.beneficiary}
+              {selectedPayable?.type === 'producer' 
+                ? `Registrando pagamento de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.producerName || 'Produtor'}`
+                : `Registrando pagamento de ${selectedPayable?.type || 'item'}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
@@ -558,24 +569,29 @@ export default function FinancePayables() {
             </div>
 
             {/* Campos de pagamento */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="payment-amount">Valor a Pagar <span className="text-red-500">*</span></Label>
+                <Label htmlFor="payment-amount">Valor</Label>
                 <Input
                   id="payment-amount"
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  value={selectedPayable?.type === 'producer' 
+                    ? `R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                    : paymentData.amount}
+                  onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value.replace('R$ ', '').replace(',', '.') }))}
                   placeholder="0,00"
-                  value={paymentData.amount}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
-                  className="text-lg font-medium"
+                  disabled={selectedPayable?.type === 'producer'}
+                  className={selectedPayable?.type === 'producer' ? 'bg-gray-100' : ''}
                 />
+                {selectedPayable?.type === 'producer' && (
+                  <p className="text-sm text-gray-500 mt-1">Valor definido na ordem de produção</p>
+                )}
               </div>
 
               <div>
                 <Label htmlFor="payment-method">Método de Pagamento <span className="text-red-500">*</span></Label>
                 <Select 
-                  value={paymentData.method} 
+                  value={paymentData.method}
                   onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
                 >
                   <SelectTrigger>
@@ -583,10 +599,10 @@ export default function FinancePayables() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="bank_transfer">TED/DOC</SelectItem>
-                    <SelectItem value="check">Cheque</SelectItem>
+                    <SelectItem value="transfer">Transferência Bancária</SelectItem>
                     <SelectItem value="cash">Dinheiro</SelectItem>
-                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="check">Cheque</SelectItem>
+                    <SelectItem value="manual">Manual/Outros</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

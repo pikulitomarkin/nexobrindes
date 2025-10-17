@@ -3060,7 +3060,7 @@ export class MemStorage implements IStorage {
     return newPayment;
   }
 
-  async updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined> {
+  async updateProducerPayment(id: string, data: Partial<InsertProducerPayment & { paidBy?: string; paidAt?: Date; paymentMethod?: string }>): Promise<ProducerPayment | undefined> {
     const existing = this.producerPayments.get(id);
     if (!existing) return undefined;
 
@@ -3070,6 +3070,12 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.producerPayments.set(id, updated);
+    console.log(`Updated producer payment ${id}:`, { 
+      status: updated.status, 
+      amount: updated.amount, 
+      paidAt: updated.paidAt,
+      paymentMethod: updated.paymentMethod 
+    });
     return updated;
   }
 
