@@ -672,27 +672,59 @@ export class MemStorage implements IStorage {
         product: "Mesa de Jantar Personalizada",
         description: "Mesa de madeira maciça para 6 pessoas",
         totalValue: "2450.00",
-        paidValue: "735.00",
+        paidValue: "1470.00", // Entrada + frete já pagos
         status: "production",
         deadline: new Date("2024-11-22"),
         trackingCode: null,
+        // Campos de pagamento
+        downPayment: "1250.00", // Entrada de R$ 1.250
+        shippingCost: "220.00", // Frete de R$ 220
+        remainingAmount: "980.00", // Restante após entrada e frete
+        deliveryType: "delivery",
+        paymentMethodId: "pm-1",
+        shippingMethodId: "sm-2",
+        installments: 1,
+        hasDiscount: false,
+        discountType: "percentage",
+        discountPercentage: "0.00",
+        discountValue: "0.00",
+        contactName: "João Silva",
+        contactPhone: "(11) 98765-4321",
+        contactEmail: "joao@gmail.com",
+        items: [],
         createdAt: new Date("2024-11-15"),
         updatedAt: new Date("2024-11-16")
       },
       {
         id: "order-2",
         orderNumber: "#12346",
-        clientId: "client-1",
+        clientId: "client-2",
         vendorId: "vendor-1",
         producerId: null,
         budgetId: null,
         product: "Estante Personalizada",
         description: "Estante de madeira com 5 prateleiras",
         totalValue: "1890.00",
-        paidValue: "567.00",
+        paidValue: "567.00", // Pagamento parcial
         status: "pending",
         deadline: new Date("2024-11-25"),
         trackingCode: null,
+        // Campos de pagamento
+        downPayment: "945.00", // Entrada de R$ 945 (50%)
+        shippingCost: "150.00", // Frete de R$ 150
+        remainingAmount: "795.00", // Restante após entrada e frete
+        deliveryType: "delivery",
+        paymentMethodId: "pm-2",
+        shippingMethodId: "sm-1",
+        installments: 2,
+        hasDiscount: false,
+        discountType: "percentage",
+        discountPercentage: "0.00",
+        discountValue: "0.00",
+        contactName: "Maria Santos",
+        contactPhone: "(11) 99876-5432",
+        contactEmail: "maria@gmail.com",
+        items: [],
         createdAt: new Date("2024-11-14"),
         updatedAt: new Date("2024-11-14")
       }
@@ -1117,37 +1149,8 @@ export class MemStorage implements IStorage {
       }
     });
 
-    // Initialize accounts receivable
-    this.mockData.accountsReceivable = [
-      {
-        id: "ar-order-1",
-        orderId: "order-1",
-        clientId: "client-1",
-        vendorId: "vendor-1",
-        dueDate: new Date(),
-        amount: "2500.00",
-        receivedAmount: "1470.00", // Partial payment
-        minimumPayment: "1250.00", // Entrada (50%) + frete obrigatório
-        status: "partial", // Minimum payment met
-        notes: "Pagamento parcial recebido via PIX - entrada + frete pagos",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: "ar-order-2",
-        orderId: "order-2",
-        clientId: "client-2",
-        vendorId: "vendor-1",
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-        amount: "1800.00",
-        receivedAmount: "0.00",
-        minimumPayment: "950.00", // Entrada (50%) + frete R$50 obrigatório
-        status: "pending", // Minimum payment not met, order cannot proceed
-        notes: "Aguardando entrada + frete para liberar pedido",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    // Initialize accounts receivable - deixar vazio para ser criado automaticamente pelos pedidos
+    this.mockData.accountsReceivable = [];
   }
 
   // User methods
@@ -1318,9 +1321,9 @@ export class MemStorage implements IStorage {
     const downPayment = parseFloat(order.downPayment || "0");
     const shippingCost = parseFloat(order.shippingCost || "0");
 
-    // Use downPayment as the expected amount if it exists, otherwise use totalValue
-    // The minimum payment is the sum of downPayment and shippingCost, or just downPayment if shippingCost is 0
-    const minimumPaymentValue = (downPayment + shippingCost).toFixed(2);
+    // O pagamento mínimo é SEMPRE entrada + frete quando há entrada definida
+    // Se não há entrada definida, o pagamento mínimo é 0 (opcional)
+    const minimumPaymentValue = downPayment > 0 ? (downPayment + shippingCost).toFixed(2) : "0.00";
 
     let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
     if (paidValue >= totalValue) {
@@ -1405,25 +1408,24 @@ export class MemStorage implements IStorage {
         const newShippingCost = parseFloat(updates.shippingCost !== undefined ? updates.shippingCost.toString() : order.shippingCost);
         const currentPaid = parseFloat(receivable.receivedAmount);
 
-        // Use downPayment as the expected amount if it exists, otherwise use totalValue minus refund
-        // The minimum payment is the sum of downPayment and shippingCost
-        const expectedAmount = newDownPayment > 0 ? newDownPayment : (newTotalValue - newRefundAmount);
-        const minimumPaymentValue = (newDownPayment + newShippingCost).toFixed(2);
+        // O valor esperado é sempre o valor total menos reembolso
+        const expectedAmount = newTotalValue - newRefundAmount;
+        // O pagamento mínimo é SEMPRE entrada + frete quando há entrada definida
+        const minimumPaymentValue = newDownPayment > 0 ? (newDownPayment + newShippingCost).toFixed(2) : "0.00";
 
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
         if (currentPaid >= expectedAmount) {
           status = 'paid';
         } else if (currentPaid > 0) {
           // Check if minimum payment requirement is met
-          if (parseFloat(minimumPaymentValue) > 0 && currentPaid >= parseFloat(minimumPaymentValue)) {
-            status = 'partial';
-          } else if (parseFloat(minimumPaymentValue) > 0 && currentPaid < parseFloat(minimumPaymentValue)) {
-            status = 'pending'; // Minimum not met
+          const minPayment = parseFloat(minimumPaymentValue);
+          if (minPayment > 0 && currentPaid >= minPayment) {
+            status = 'partial'; // Entrada + frete pagos, restante pendente
+          } else if (minPayment > 0 && currentPaid < minPayment) {
+            status = 'pending'; // Entrada + frete ainda não pagos completamente
           } else {
-            status = 'partial'; // No minimum requirement
+            status = 'partial'; // Sem exigência de entrada, qualquer valor é parcial
           }
-        } else {
-          status = parseFloat(minimumPaymentValue) > 0 ? 'pending' : 'open';
         }
 
         // Check if overdue
