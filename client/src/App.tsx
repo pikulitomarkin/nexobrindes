@@ -48,6 +48,7 @@ import ClientProfile from "@/pages/client/profile";
 import ClientDashboard from "@/pages/dashboards/client-dashboard";
 import ClientOrderTimeline from "./pages/client/order-timeline";
 import ClientProducts from "@/pages/client/products";
+import VendorQuoteRequests from "@/pages/vendor/quote-requests";
 
 // Producer pages
 import ProducerOrders from "@/pages/producer/orders";
@@ -318,7 +319,7 @@ function App() {
           <Route path="/vendor/quote-requests">
             <ProtectedRoute>
               <MainLayout>
-                <LazyQuoteRequests />
+                <VendorQuoteRequests />
               </MainLayout>
             </ProtectedRoute>
           </Route>
@@ -514,7 +515,5 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-const LazyQuoteRequests = lazy(() => import("./pages/vendor/quote-requests"));
 
 export default App;
