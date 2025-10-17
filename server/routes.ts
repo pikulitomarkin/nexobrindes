@@ -3196,7 +3196,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // First try to get the payment
       let payment = await storage.getProducerPayment(id);
-      
+
       if (!payment) {
         // If payment doesn't exist, try to find production order and create payment
         const productionOrder = await storage.getProductionOrder(id);
@@ -3217,7 +3217,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Update payment status based on request data
       const updateData: any = {
         status: paidBy ? 'paid' : 'approved',
-        approvedBy: 'admin-1',
+        approvedBy: 'admin-1', // Could be req.user.id in real auth
         approvedAt: new Date()
       };
 
@@ -4832,10 +4832,27 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/finance/expenses", async (req, res) => {
     try {
-      const expense = await storage.createExpenseNote(req.body);
-      res.json(expense);
+      const { date, category, name, description, amount, vendorId, orderId } = req.body;
+
+      if (!name || !amount || !category) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      const newExpense = await storage.createExpenseNote({
+        date: date ? new Date(date) : new Date(),
+        category,
+        name: name,
+        description: description || name,
+        amount: parseFloat(amount).toFixed(2),
+        vendorId: vendorId || null,
+        orderId: orderId || null,
+        status: "pending",
+        attachmentUrl: null
+      });
+
+      res.json(newExpense);
     } catch (error) {
-      console.error("Failed to create expense:", error);
+      console.error("Error creating expense:", error);
       res.status(500).json({ error: "Failed to create expense" });
     }
   });

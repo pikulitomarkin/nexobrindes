@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,16 +16,14 @@ import { queryClient } from "@/lib/queryClient";
 export default function FinanceExpenses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [expenseData, setExpenseData] = useState({
     date: new Date().toISOString().split('T')[0],
-    category: "",
-    description: "",
+    name: "",
     amount: "",
-    attachment: null, // Add state for file upload
-    vendorId: "", // Remove as per new requirement
-    orderId: "",  // Remove as per new requirement
+    category: "",
+    description: ""
   });
   const { toast } = useToast();
 
@@ -32,23 +31,17 @@ export default function FinanceExpenses() {
     queryKey: ["/api/finance/expenses"],
   });
 
-  const { data: vendors } = useQuery({
-    queryKey: ["/api/vendors"],
-  });
-
-  const { data: orders } = useQuery({
-    queryKey: ["/api/orders"],
-  });
-
   const createExpenseMutation = useMutation({
     mutationFn: async (data: any) => {
       const formData = new FormData();
       formData.append('date', data.date);
-      formData.append('category', data.category);
-      formData.append('description', data.description);
+      formData.append('name', data.name);
       formData.append('amount', data.amount);
-      if (data.attachment) {
-        formData.append('attachment', data.attachment);
+      formData.append('category', data.category);
+      formData.append('description', data.description || '');
+      
+      if (selectedFile) {
+        formData.append('attachment', selectedFile);
       }
 
       const response = await fetch("/api/finance/expenses", {
@@ -63,42 +56,25 @@ export default function FinanceExpenses() {
       setIsAddDialogOpen(false);
       setExpenseData({
         date: new Date().toISOString().split('T')[0],
-        category: "",
-        description: "",
+        name: "",
         amount: "",
-        attachment: null,
-        vendorId: "",
-        orderId: "",
+        category: "",
+        description: ""
       });
+      setSelectedFile(null);
       toast({
         title: "Sucesso!",
-        description: "Despesa criada com sucesso",
+        description: "Nota de despesa criada com sucesso",
       });
     },
     onError: () => {
       toast({
         title: "Erro",
-        description: "Não foi possível criar a despesa",
+        description: "Não foi possível criar a nota de despesa",
         variant: "destructive",
       });
     },
   });
-
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      recorded: { label: "Registrada", variant: "secondary" as const },
-      approved: { label: "Aprovada", variant: "default" as const },
-      reimbursed: { label: "Reembolsada", variant: "outline" as const },
-    };
-
-    const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.recorded;
-
-    return (
-      <Badge variant={statusInfo.variant} className="capitalize">
-        {statusInfo.label}
-      </Badge>
-    );
-  };
 
   const getCategoryIcon = (category: string) => {
     const iconMap = {
@@ -106,22 +82,37 @@ export default function FinanceExpenses() {
       marketing: <TrendingDown className="h-4 w-4" />,
       travel: <Calendar className="h-4 w-4" />,
       equipment: <Receipt className="h-4 w-4" />,
+      material: <Receipt className="h-4 w-4" />,
+      transport: <Calendar className="h-4 w-4" />,
       other: <FileText className="h-4 w-4" />,
     };
 
     return iconMap[category as keyof typeof iconMap] || iconMap.other;
   };
 
+  const getCategoryLabel = (category: string) => {
+    const labelMap = {
+      operational: "Operacional",
+      marketing: "Marketing",
+      travel: "Viagem",
+      equipment: "Equipamento",
+      material: "Material",
+      transport: "Transporte",
+      other: "Outros"
+    };
+    return labelMap[category as keyof typeof labelMap] || category;
+  };
+
   const filteredExpenses = (expenses || [])?.filter((expense: any) => {
     const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
     const matchesSearch = searchTerm === "" || 
-      expense.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesCategory && matchesSearch;
+      expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
   });
 
   const handleCreateExpense = () => {
-    if (expenseData.category && expenseData.description && expenseData.amount) {
+    if (expenseData.name && expenseData.amount && expenseData.category) {
       createExpenseMutation.mutate({
         ...expenseData,
         amount: parseFloat(expenseData.amount).toFixed(2),
@@ -130,14 +121,22 @@ export default function FinanceExpenses() {
     }
   };
 
-  const totalExpenses = (expenses || [])?.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0) || 0;
+  const handleViewExpense = (expense: any) => {
+    toast({
+      title: "Detalhes da Despesa",
+      description: `${expense.description || expense.name} - R$ ${parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+    });
+  };
+
+  const totalExpenses = (expenses || [])?.reduce((sum: number, e: any) => sum + parseFloat(e.amount || '0'), 0) || 0;
   const approvedExpenses = (expenses || [])?.filter((e: any) => e.status === 'approved').length || 0;
-  const pendingExpenses = (expenses || [])?.filter((e: any) => e.status === 'recorded').length || 0;
+  const pendingExpenses = (expenses || [])?.filter((e: any) => e.status === 'pending').length || 0;
   const thisMonthExpenses = (expenses || [])?.filter((e: any) => {
-    const expenseDate = new Date(e.date);
+    if (!e.createdAt && !e.date) return false;
+    const expenseDate = new Date(e.createdAt || e.date);
     const now = new Date();
     return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
-  }).reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0) || 0;
+  }).reduce((sum: number, e: any) => sum + parseFloat(e.amount || '0'), 0) || 0;
 
   if (isLoading) {
     return (
@@ -159,24 +158,24 @@ export default function FinanceExpenses() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="text-page-title">Notas de Despesas</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Notas de Despesas</h1>
           <p className="text-gray-600">Controle de gastos e despesas da empresa</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gradient-bg text-white" data-testid="button-add-expense">
+            <Button className="gradient-bg text-white">
               <Plus className="h-4 w-4 mr-2" />
               Nova Despesa
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Nova Despesa</DialogTitle>
+              <DialogTitle>Nova Nota de Despesa</DialogTitle>
               <DialogDescription>
-                Registre uma nova despesa da empresa
+                Registre uma nova despesa para controle interno
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="expense-date">Data <span className="text-red-500">*</span></Label>
@@ -185,8 +184,6 @@ export default function FinanceExpenses() {
                     type="date"
                     value={expenseData.date}
                     onChange={(e) => setExpenseData(prev => ({ ...prev, date: e.target.value }))}
-                    data-testid="input-expense-date"
-                    className="text-lg"
                   />
                 </div>
                 <div>
@@ -198,8 +195,6 @@ export default function FinanceExpenses() {
                     placeholder="0,00"
                     value={expenseData.amount}
                     onChange={(e) => setExpenseData(prev => ({ ...prev, amount: e.target.value }))}
-                    data-testid="input-expense-amount"
-                    className="text-lg font-medium"
                   />
                 </div>
               </div>
@@ -210,7 +205,7 @@ export default function FinanceExpenses() {
                   value={expenseData.category} 
                   onValueChange={(value) => setExpenseData(prev => ({ ...prev, category: value }))}
                 >
-                  <SelectTrigger data-testid="select-expense-category">
+                  <SelectTrigger>
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
@@ -218,21 +213,31 @@ export default function FinanceExpenses() {
                     <SelectItem value="marketing">Marketing</SelectItem>
                     <SelectItem value="travel">Viagem</SelectItem>
                     <SelectItem value="equipment">Equipamento</SelectItem>
+                    <SelectItem value="material">Material</SelectItem>
+                    <SelectItem value="transport">Transporte</SelectItem>
                     <SelectItem value="other">Outros</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label htmlFor="expense-description">Nome da Despesa <span className="text-red-500">*</span></Label>
+                <Label htmlFor="expense-name">Nome da Despesa <span className="text-red-500">*</span></Label>
+                <Input
+                  id="expense-name"
+                  placeholder="Nome da despesa..."
+                  value={expenseData.name}
+                  onChange={(e) => setExpenseData(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="expense-description">Descrição (Opcional)</Label>
                 <Textarea
                   id="expense-description"
-                  placeholder="Nome da despesa..."
+                  placeholder="Descrição adicional..."
                   value={expenseData.description}
                   onChange={(e) => setExpenseData(prev => ({ ...prev, description: e.target.value }))}
-                  data-testid="textarea-expense-description"
-                  rows={4}
-                  className="min-h-[100px]"
+                  rows={3}
                 />
               </div>
 
@@ -241,19 +246,16 @@ export default function FinanceExpenses() {
                 <Input
                   id="expense-attachment"
                   type="file"
-                  onChange={(e) => setExpenseData(prev => ({ ...prev, attachment: e.target.files ? e.target.files[0] : null }))}
-                  data-testid="input-expense-attachment"
-                  className="text-lg"
+                  onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                  accept="image/*,.pdf"
                 />
               </div>
-
-              {/* Removed fields for cliente and produtor as per new requirement */}
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded">
                 <h4 className="font-medium text-blue-900 mb-2">Informações Importantes</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Esta nota é apenas para controle interno e não afeta o cálculo do sistema.</li>
-                  <li>• Anexe o comprovante de despesa.</li>
+                  <li>• Esta nota é apenas para controle interno e não afeta cálculos do sistema.</li>
+                  <li>• Anexe o comprovante de despesa quando disponível.</li>
                 </ul>
               </div>
 
@@ -264,8 +266,7 @@ export default function FinanceExpenses() {
                 <Button
                   className="gradient-bg text-white px-6"
                   onClick={handleCreateExpense}
-                  disabled={!expenseData.category || !expenseData.description || !expenseData.amount || createExpenseMutation.isPending}
-                  data-testid="button-save-expense"
+                  disabled={!expenseData.category || !expenseData.name || !expenseData.amount || createExpenseMutation.isPending}
                 >
                   {createExpenseMutation.isPending ? "Salvando..." : "Salvar Despesa"}
                 </Button>
@@ -275,14 +276,14 @@ export default function FinanceExpenses() {
         </Dialog>
       </div>
 
-      {/* Summary Cards - These might also need adjustment if they relied on fields that are now removed */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Despesas</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-total-expenses">
+                <p className="text-2xl font-bold gradient-text">
                   R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
@@ -298,7 +299,7 @@ export default function FinanceExpenses() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Este Mês</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-month-expenses">
+                <p className="text-2xl font-bold gradient-text">
                   R$ {thisMonthExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
@@ -314,7 +315,7 @@ export default function FinanceExpenses() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Aprovadas</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-approved-expenses">
+                <p className="text-2xl font-bold gradient-text">
                   {approvedExpenses}
                 </p>
               </div>
@@ -330,7 +331,7 @@ export default function FinanceExpenses() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-pending-expenses">
+                <p className="text-2xl font-bold gradient-text">
                   {pendingExpenses}
                 </p>
               </div>
@@ -350,38 +351,22 @@ export default function FinanceExpenses() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Buscar por descrição..."
+                  placeholder="Buscar por nome ou descrição..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
-                  data-testid="input-search"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="recorded">Registrada</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
                   <SelectItem value="approved">Aprovada</SelectItem>
-                  <SelectItem value="reimbursed">Reembolsada</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Categorias</SelectItem>
-                  <SelectItem value="operational">Operacional</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="travel">Viagem</SelectItem>
-                  <SelectItem value="equipment">Equipamento</SelectItem>
-                  <SelectItem value="other">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -418,25 +403,36 @@ export default function FinanceExpenses() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredExpenses?.map((expense: any) => (
-                  <tr key={expense.id} data-testid={`row-expense-${expense.id}`}>
+                  <tr key={expense.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(expense.date).toLocaleDateString('pt-BR')}
+                      {expense.date ? new Date(expense.date).toLocaleDateString('pt-BR') : 
+                       expense.createdAt ? new Date(expense.createdAt).toLocaleDateString('pt-BR') : 
+                       'Data não informada'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         {getCategoryIcon(expense.category)}
-                        <span className="ml-2 capitalize">{expense.category}</span>
+                        <span className="ml-2">{getCategoryLabel(expense.category)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {expense.description}
+                      <div>
+                        <div className="font-medium">{expense.name || expense.description}</div>
+                        {expense.description && expense.name && (
+                          <div className="text-gray-500 text-xs">{expense.description}</div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                      R$ {parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {parseFloat(expense.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" data-testid={`button-view-${expense.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewExpense(expense)}
+                        >
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
@@ -445,16 +441,22 @@ export default function FinanceExpenses() {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => window.open(expense.attachmentUrl, '_blank')}
-                            data-testid={`button-attachment-${expense.id}`}
                           >
                             <FileText className="h-4 w-4 mr-1" />
-                            Comprovante
+                            Anexo
                           </Button>
                         )}
                       </div>
                     </td>
                   </tr>
                 ))}
+                {(!filteredExpenses || filteredExpenses.length === 0) && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                      Nenhuma despesa encontrada
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
