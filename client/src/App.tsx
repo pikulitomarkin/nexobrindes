@@ -1,3 +1,4 @@
+
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useState, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -215,7 +216,7 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
 
-            {/* Catch-all for unauthenticated users, this will redirect to login if not authenticated */}
+            {/* Catch-all for unauthenticated users */}
             <Route path="/:rest*" component={() => <Login onLogin={setUser} />} />
           </Switch>
         </Suspense>
