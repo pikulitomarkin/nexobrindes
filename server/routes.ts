@@ -1297,6 +1297,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create manual receivables endpoint
+  app.post("/api/finance/receivables/manual", async (req, res) => {
+    try {
+      const { clientName, description, amount, dueDate, notes } = req.body;
+
+      if (!clientName || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create a manual receivable entry
+      const receivable = await storage.createManualReceivable({
+        clientName,
+        description,
+        amount: parseFloat(amount).toFixed(2),
+        dueDate: new Date(dueDate),
+        notes: notes || null
+      });
+
+      res.json(receivable);
+    } catch (error) {
+      console.error("Error creating manual receivable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a receber: " + error.message });
+    }
+  });
+
   // Financial data
   app.get("/api/finance/overview", async (req, res) => {
     try {

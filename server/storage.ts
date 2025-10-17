@@ -222,6 +222,9 @@ export interface IStorage {
   createCommissionPayout(data: InsertCommissionPayout): Promise<CommissionPayout>;
   updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined>;
 
+  // Manual Receivables
+  createManualReceivable(data: any): Promise<any>;
+
   // Customization Options
   createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
   getCustomizationOptions(): Promise<CustomizationOption[]>;
@@ -1707,6 +1710,30 @@ export class MemStorage implements IStorage {
         });
       }
     }
+  }
+
+  // Create manual receivable
+  async createManualReceivable(data: any): Promise<any> {
+    const id = `manual-${randomUUID()}`;
+    const receivable: AccountsReceivable = {
+      id,
+      orderId: null, // Manual receivables don't have orders
+      clientId: null, // Generic receivable
+      vendorId: null,
+      description: data.description,
+      amount: data.amount,
+      receivedAmount: "0.00",
+      dueDate: data.dueDate,
+      status: 'pending',
+      type: 'manual',
+      notes: data.notes,
+      clientName: data.clientName, // Store client name directly
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    this.accountsReceivable.set(id, receivable);
+    return receivable;
   }
 
   // Commission methods
