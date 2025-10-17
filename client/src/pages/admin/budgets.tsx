@@ -945,17 +945,25 @@ export default function AdminBudgets() {
                     <span>R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Frete:</span>
+                    <span>Valor da Entrada:</span>
+                    <span>R$ 0,00</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Valor do Frete:</span>
                     <span>
                       {adminBudgetForm.deliveryType === "pickup" ? 
-                        "Retirada no local (R$ 0,00)" : 
+                        "R$ 0,00" : 
                         `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
+                  <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
+                    <span>Entrada + Frete (para financeiro):</span>
+                    <span>R$ {(adminBudgetForm.deliveryType === "pickup" ? 0 : adminBudgetForm.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Total do Orçamento (com Frete):</span>
+                    <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
                       R$ {calculateAdminTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
