@@ -1116,6 +1116,38 @@ export class MemStorage implements IStorage {
         this.mockData.customizationCategories.push(option.category);
       }
     });
+
+    // Initialize accounts receivable
+    this.mockData.accountsReceivable = [
+      {
+        id: "ar-order-1",
+        orderId: "order-1",
+        clientId: "client-1",
+        vendorId: "vendor-1",
+        dueDate: new Date(),
+        amount: "2500.00",
+        receivedAmount: "1470.00", // Partial payment
+        minimumPayment: "1250.00", // Entrada (50%) + frete obrigatório
+        status: "partial", // Minimum payment met
+        notes: "Pagamento parcial recebido via PIX - entrada + frete pagos",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: "ar-order-2",
+        orderId: "order-2",
+        clientId: "client-2",
+        vendorId: "vendor-1",
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        amount: "1800.00",
+        receivedAmount: "0.00",
+        minimumPayment: "950.00", // Entrada (50%) + frete R$50 obrigatório
+        status: "pending", // Minimum payment not met, order cannot proceed
+        notes: "Aguardando entrada + frete para liberar pedido",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
   }
 
   // User methods
@@ -1284,15 +1316,24 @@ export class MemStorage implements IStorage {
     const paidValue = parseFloat(order.paidValue || "0");
     const totalValue = parseFloat(order.totalValue);
     const downPayment = parseFloat(order.downPayment || "0");
+    const shippingCost = parseFloat(order.shippingCost || "0");
 
     // Use downPayment as the expected amount if it exists, otherwise use totalValue
-    const expectedAmount = downPayment > 0 ? downPayment : totalValue;
+    // The minimum payment is the sum of downPayment and shippingCost, or just downPayment if shippingCost is 0
+    const minimumPaymentValue = (downPayment + shippingCost).toFixed(2);
 
     let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-    if (paidValue >= expectedAmount) {
+    if (paidValue >= totalValue) {
       status = 'paid';
     } else if (paidValue > 0) {
-      status = 'partial';
+      // Check if minimum payment requirement is met
+      if (parseFloat(minimumPaymentValue) > 0 && paidValue >= parseFloat(minimumPaymentValue)) {
+        status = 'partial';
+      } else if (parseFloat(minimumPaymentValue) > 0 && paidValue < parseFloat(minimumPaymentValue)) {
+        status = 'pending'; // Minimum not met
+      } else {
+        status = 'partial'; // No minimum requirement
+      }
     }
 
     // Check if overdue
@@ -1307,9 +1348,10 @@ export class MemStorage implements IStorage {
       clientId: order.clientId,
       vendorId: order.vendorId || 'vendor-1',
       description: `Venda: ${order.product}`,
-      amount: expectedAmount.toFixed(2),
+      amount: totalValue.toFixed(2),
       receivedAmount: order.paidValue || "0.00",
       dueDate: order.deadline,
+      minimumPayment: minimumPaymentValue, // Set the calculated minimum payment
       status: status,
       type: 'sale',
       createdAt: new Date(),
@@ -1353,23 +1395,35 @@ export class MemStorage implements IStorage {
     }
 
     // Update AccountsReceivable if totalValue, refundAmount, or downPayment changes
-    if (updates.totalValue !== undefined || updates.refundAmount !== undefined || updates.downPayment !== undefined) {
+    if (updates.totalValue !== undefined || updates.refundAmount !== undefined || updates.downPayment !== undefined || updates.shippingCost !== undefined) {
       const receivableId = `ar-${id}`;
       const receivable = this.accountsReceivable.get(receivableId);
       if (receivable) {
         const newTotalValue = parseFloat(updates.totalValue !== undefined ? updates.totalValue : order.totalValue);
         const newRefundAmount = parseFloat(updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount);
         const newDownPayment = parseFloat(updates.downPayment !== undefined ? updates.downPayment.toString() : order.downPayment);
+        const newShippingCost = parseFloat(updates.shippingCost !== undefined ? updates.shippingCost.toString() : order.shippingCost);
         const currentPaid = parseFloat(receivable.receivedAmount);
 
         // Use downPayment as the expected amount if it exists, otherwise use totalValue minus refund
+        // The minimum payment is the sum of downPayment and shippingCost
         const expectedAmount = newDownPayment > 0 ? newDownPayment : (newTotalValue - newRefundAmount);
+        const minimumPaymentValue = (newDownPayment + newShippingCost).toFixed(2);
 
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
         if (currentPaid >= expectedAmount) {
           status = 'paid';
         } else if (currentPaid > 0) {
-          status = 'partial';
+          // Check if minimum payment requirement is met
+          if (parseFloat(minimumPaymentValue) > 0 && currentPaid >= parseFloat(minimumPaymentValue)) {
+            status = 'partial';
+          } else if (parseFloat(minimumPaymentValue) > 0 && currentPaid < parseFloat(minimumPaymentValue)) {
+            status = 'pending'; // Minimum not met
+          } else {
+            status = 'partial'; // No minimum requirement
+          }
+        } else {
+          status = parseFloat(minimumPaymentValue) > 0 ? 'pending' : 'open';
         }
 
         // Check if overdue
@@ -1381,6 +1435,7 @@ export class MemStorage implements IStorage {
         await this.updateAccountsReceivable(receivableId, {
           amount: expectedAmount.toFixed(2),
           receivedAmount: currentPaid.toFixed(2), // Keep current received amount as is
+          minimumPayment: minimumPaymentValue, // Update minimum payment
           status: status,
           dueDate: updateData.deadline
         });
@@ -1677,7 +1732,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values()).filter(payment => payment.orderId === orderId);
   }
 
-  async updateOrderPaidValue(orderId: string): Promise<void> {
+  async updateOrderPaidValue(orderId: string, receivedAmount?: string): Promise<void> {
     const payments = await this.getPaymentsByOrder(orderId);
     const totalPaid = payments
       .filter(payment => payment.status === 'confirmed')
@@ -1686,8 +1741,7 @@ export class MemStorage implements IStorage {
     const order = await this.getOrder(orderId);
     if (!order) return;
 
-    const oldPaidValue = parseFloat(order.paidValue);
-    const newPaidValue = totalPaid.toFixed(2);
+    const newPaidValue = receivedAmount !== undefined ? receivedAmount : totalPaid.toFixed(2);
 
     if (newPaidValue !== order.paidValue) {
       await this.updateOrder(orderId, { paidValue: newPaidValue });
@@ -1698,16 +1752,32 @@ export class MemStorage implements IStorage {
 
       if (receivable) {
         const totalValue = parseFloat(receivable.amount);
-        let status: 'pending' | 'partial' | 'paid' = 'pending';
+        const minimumPayment = parseFloat(receivable.minimumPayment || 0);
+        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
 
-        if (totalPaid >= totalValue) {
+        if (parseFloat(newPaidValue) >= totalValue) {
           status = 'paid';
-        } else if (totalPaid > 0) {
-          status = 'partial';
+        } else if (parseFloat(newPaidValue) > 0) {
+          // Check if minimum payment requirement is met
+          if (minimumPayment > 0 && parseFloat(newPaidValue) >= minimumPayment) {
+            status = 'partial';
+          } else if (minimumPayment > 0 && parseFloat(newPaidValue) < minimumPayment) {
+            status = 'pending'; // Minimum not met
+          } else {
+            status = 'partial'; // No minimum requirement
+          }
+        } else {
+          status = minimumPayment > 0 ? 'pending' : 'open';
+        }
+
+        // Check if overdue
+        const dueDate = order.deadline ? new Date(order.deadline) : null;
+        if (dueDate && new Date() > dueDate && status !== 'paid') {
+          status = 'overdue';
         }
 
         await this.updateAccountsReceivable(receivableId, {
-          receivedAmount: totalPaid.toFixed(2),
+          receivedAmount: parseFloat(newPaidValue).toFixed(2),
           status: status
         });
       }
@@ -1726,7 +1796,8 @@ export class MemStorage implements IStorage {
       amount: data.amount,
       receivedAmount: "0.00",
       dueDate: data.dueDate,
-      status: 'pending',
+      status: 'pending', // Default to pending
+      minimumPayment: data.minimumPayment || '0.00', // Add minimumPayment
       type: 'manual',
       notes: data.notes,
       clientName: data.clientName,
@@ -1781,6 +1852,8 @@ export class MemStorage implements IStorage {
     commission.status = status;
     if (status === 'paid') {
       commission.paidAt = new Date();
+    } else if (status === 'deducted') {
+      commission.deductedAt = new Date();
     }
 
     this.commissions.set(id, commission);
@@ -2527,49 +2600,80 @@ export class MemStorage implements IStorage {
   }
 
   // Added method to update accounts receivable
-  async updateAccountsReceivable(id: string, data: any) {
+  async updateAccountsReceivable(id: string, data: any): Promise<AccountsReceivable | undefined> {
     console.log(`Updating receivable ${id} with data:`, data);
 
     // Check if this is a manual receivable
     if (id.startsWith('manual-')) {
-      // Find and update manual receivable
       const manualIndex = this.mockData.manualReceivables.findIndex((r: any) => r.id === id);
       if (manualIndex >= 0) {
-        this.mockData.manualReceivables[manualIndex] = {
+        const updatedManualReceivable = {
           ...this.mockData.manualReceivables[manualIndex],
           ...data,
           updatedAt: new Date()
         };
-        console.log(`Updated manual receivable ${id}:`, this.mockData.manualReceivables[manualIndex]);
-        return this.mockData.manualReceivables[manualIndex];
+        this.mockData.manualReceivables[manualIndex] = updatedManualReceivable;
+        console.log(`Updated manual receivable ${id}:`, updatedManualReceivable);
+        return updatedManualReceivable;
       }
-    } else {
-      // This is an order-based receivable - update order paid value
-      const orderId = id.startsWith('ar-') ? id.replace('ar-', '') : id;
-      const order = await this.getOrder(orderId);
+    } else if (this.accountsReceivable.has(id)) {
+      // This is an order-based receivable
+      const receivable = this.accountsReceivable.get(id);
+      if (!receivable) return undefined;
 
-      if (order && data.receivedAmount !== undefined) { // Check for receivedAmount specifically
-        await this.updateOrder(orderId, {
-          paidValue: data.receivedAmount
-        });
-        console.log(`Updated order ${orderId} paidValue to ${data.receivedAmount}`);
-        // Also update the status and receivedAmount in the accountsReceivable map
-        const receivable = this.accountsReceivable.get(id);
-        if (receivable) {
-          const updatedReceivable: AccountsReceivable = {
-            ...receivable,
-            receivedAmount: data.receivedAmount,
-            status: data.status || receivable.status, // Update status if provided
-            updatedAt: new Date()
-          };
-          this.accountsReceivable.set(id, updatedReceivable);
-          return updatedReceivable;
+      const updatedReceivable: AccountsReceivable = {
+        ...receivable,
+        ...data,
+        updatedAt: new Date()
+      };
+
+      // Update status based on received amount and minimum payment
+      const totalAmount = parseFloat(updatedReceivable.amount);
+      const receivedAmount = parseFloat(updatedReceivable.receivedAmount);
+      const minimumPayment = parseFloat(updatedReceivable.minimumPayment || 0);
+
+      if (receivedAmount >= totalAmount) {
+        updatedReceivable.status = 'paid';
+      } else if (receivedAmount > 0) {
+        // Check if minimum payment requirement is met
+        if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
+          updatedReceivable.status = 'partial'; // Minimum met, can proceed
+        } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
+          updatedReceivable.status = 'pending'; // Minimum not met, order cannot proceed
+        } else {
+          updatedReceivable.status = 'partial'; // No minimum requirement
         }
+      } else {
+        updatedReceivable.status = minimumPayment > 0 ? 'pending' : 'open';
       }
+
+      // Check if overdue
+      const dueDate = updatedReceivable.dueDate ? new Date(updatedReceivable.dueDate) : null;
+      if (dueDate && new Date() > dueDate && updatedReceivable.status !== 'paid') {
+        updatedReceivable.status = 'overdue';
+      }
+
+      this.accountsReceivable.set(id, updatedReceivable);
+      console.log(`Updated receivable ${id}:`, {
+        id: updatedReceivable.id,
+        amount: updatedReceivable.amount,
+        receivedAmount: updatedReceivable.receivedAmount,
+        minimumPayment: updatedReceivable.minimumPayment,
+        status: updatedReceivable.status,
+        dueDate: updatedReceivable.dueDate
+      });
+
+      // Also update the order's paidValue if receivedAmount is provided in data
+      if (data.receivedAmount !== undefined && receivable.orderId) {
+        await this.updateOrderPaidValue(receivable.orderId, data.receivedAmount);
+      }
+
+      return updatedReceivable;
     }
 
     return undefined; // Return undefined if not found or not updated
   }
+
 
   // Added method to get manual receivables
   async getManualReceivables(): Promise<any[]> {
@@ -2602,11 +2706,20 @@ export class MemStorage implements IStorage {
   private calculateReceivableStatus(order: Order): 'pending' | 'partial' | 'paid' | 'overdue' {
     const totalValue = parseFloat(order.totalValue);
     const paidValue = parseFloat(order.paidValue || "0");
+    const minimumPayment = parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0");
+
 
     if (paidValue >= totalValue) {
       return 'paid';
     } else if (paidValue > 0) {
-      return 'partial';
+      // Check if minimum payment requirement is met
+      if (minimumPayment > 0 && paidValue >= minimumPayment) {
+        return 'partial';
+      } else if (minimumPayment > 0 && paidValue < minimumPayment) {
+        return 'pending'; // Minimum not met
+      } else {
+        return 'partial'; // No minimum requirement
+      }
     } else {
       // Check if overdue
       const dueDate = order.deadline ? new Date(order.deadline) : null;
@@ -2629,6 +2742,7 @@ export class MemStorage implements IStorage {
       .filter(order => order.status !== 'cancelled')
       .map(order => {
         let clientName = order.contactName || 'Cliente não identificado';
+        const minimumPayment = (parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0")).toFixed(2);
 
         return {
           id: `ar-${order.id}`,
@@ -2637,6 +2751,7 @@ export class MemStorage implements IStorage {
           clientName: clientName,
           amount: order.totalValue || "0.00",
           receivedAmount: order.paidValue || "0.00",
+          minimumPayment: minimumPayment, // Add minimumPayment
           status: this.calculateReceivableStatus(order),
           dueDate: order.deadline ? new Date(order.deadline) : null,
           createdAt: new Date(order.createdAt),
@@ -2654,6 +2769,7 @@ export class MemStorage implements IStorage {
       clientName: receivable.clientName,
       amount: receivable.amount,
       receivedAmount: receivable.receivedAmount || "0.00",
+      minimumPayment: receivable.minimumPayment || "0.00", // Add minimumPayment
       status: receivable.status,
       dueDate: receivable.dueDate ? new Date(receivable.dueDate) : null,
       createdAt: new Date(receivable.createdAt),
@@ -2668,23 +2784,40 @@ export class MemStorage implements IStorage {
     return [...orderReceivables, ...formattedManualReceivables];
   }
 
-  async createAccountsReceivable(receivable: any): Promise<any> {
-    const data = await this.loadData();
-    if (!data.manualReceivables) {
-      data.manualReceivables = [];
-    }
-    // Ensure the new receivable has a unique ID
-    if (!receivable.id) {
-      receivable.id = randomUUID();
-    }
-    // Set creation and update dates
-    receivable.createdAt = new Date();
-    receivable.updatedAt = new Date();
-    // Mark as manual
-    receivable.isManual = true;
+  // This method is for creating manual receivables directly, not order-based ones.
+  async createAccountsReceivable(data: any): Promise<any> {
+    const id = `ar-${data.orderId}`; // This ID should be unique and related to an order or unique identifier for manual receivables
+    const receivable = {
+      id,
+      orderId: data.orderId, // Might be null for manual receivables
+      clientId: data.clientId,
+      vendorId: data.vendorId,
+      dueDate: data.dueDate,
+      amount: data.amount,
+      receivedAmount: '0.00',
+      minimumPayment: data.minimumPayment || '0.00', // Entrada + frete obrigatório
+      status: data.status || 'open',
+      notes: data.notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-    data.manualReceivables.push(receivable);
-    await this.saveData(data);
+    // If it's an order-based receivable, update the map
+    if (data.orderId) {
+      this.accountsReceivable.set(id, receivable);
+    } else {
+      // If it's a manual receivable, add it to mockData
+      if (!this.mockData.manualReceivables) {
+        this.mockData.manualReceivables = [];
+      }
+      // Ensure a unique ID for manual receivables if not provided
+      if (!receivable.id || receivable.id.startsWith('ar-')) {
+        receivable.id = `manual-${randomUUID()}`;
+      }
+      this.mockData.manualReceivables.push(receivable);
+    }
+
+    console.log(`Created receivable: ${receivable.id} with minimum payment: ${receivable.minimumPayment}`);
     return receivable;
   }
 
@@ -2725,7 +2858,23 @@ export class MemStorage implements IStorage {
       if (newReceived >= parseFloat(receivable.amount)) {
         status = 'paid';
       } else if (newReceived > 0) {
-        status = 'partial';
+        // Check minimum payment requirement
+        const minimumPayment = parseFloat(receivable.minimumPayment || 0);
+        if (minimumPayment > 0 && newReceived >= minimumPayment) {
+          status = 'partial';
+        } else if (minimumPayment > 0 && newReceived < minimumPayment) {
+          status = 'pending';
+        } else {
+          status = 'partial';
+        }
+      } else {
+        status = receivable.minimumPayment > 0 ? 'pending' : 'open';
+      }
+
+      // Check if overdue
+      const dueDate = receivable.dueDate ? new Date(receivable.dueDate) : null;
+      if (dueDate && new Date() > dueDate && status !== 'paid') {
+        status = 'overdue';
       }
 
       await this.updateAccountsReceivable(receivableId, {
@@ -2890,7 +3039,7 @@ export class MemStorage implements IStorage {
     if (!this.mockData.expenseNotes) {
       this.mockData.expenseNotes = [];
     }
-    
+
     const id = `expense-${Date.now()}`;
     const expense: ExpenseNote = {
       id,
@@ -3078,11 +3227,11 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.producerPayments.set(id, updated);
-    console.log(`Updated producer payment ${id}:`, { 
-      status: updated.status, 
-      amount: updated.amount, 
+    console.log(`Updated producer payment ${id}:`, {
+      status: updated.status,
+      amount: updated.amount,
       paidAt: updated.paidAt,
-      paymentMethod: updated.paymentMethod 
+      paymentMethod: updated.paymentMethod
     });
     return updated;
   }

@@ -57,6 +57,7 @@ export default function FinanceReceivables() {
     dueDate: receivable.dueDate ? new Date(receivable.dueDate) : new Date(),
     amount: receivable.amount || "0.00",
     paidAmount: receivable.receivedAmount || "0.00",
+    minimumPayment: receivable.minimumPayment || "0.00", // Pagamento mínimo obrigatório (entrada + frete)
     status: receivable.status || "pending",
     createdAt: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
     lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null
@@ -432,6 +433,9 @@ export default function FinanceReceivables() {
                     Valor Total
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Entrada+Frete
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Recebido
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -446,57 +450,77 @@ export default function FinanceReceivables() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredReceivables.map((receivable: any) => (
-                  <tr key={receivable.id}>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {new Date(receivable.dueDate).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
-                      {receivable.orderNumber}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 max-w-[120px] truncate">
-                      {receivable.clientName}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
-                      R$ {parseFloat(receivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
-                      R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
-                      R$ {(parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {getStatusBadge(receivable.status)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
-                      <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Ver
-                        </Button>
-                        {receivable.status !== 'paid' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => {
-                              setSelectedReceivable(receivable);
-                              setPaymentData({
-                                ...paymentData,
-                                amount: (parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toString()
-                              });
-                              setIsReceiveDialogOpen(true);
-                            }}
-                          >
-                            <CreditCard className="h-3 w-3 mr-1" />
-                            Receber
-                          </Button>
+                {filteredReceivables.map((receivable: any) => {
+                  const minimumPayment = parseFloat(receivable.minimumPayment || 0);
+                  const paidAmount = parseFloat(receivable.paidAmount || 0);
+                  const isMinimumMet = paidAmount >= minimumPayment;
+                  
+                  return (
+                    <tr key={receivable.id} className={!isMinimumMet && minimumPayment > 0 ? 'bg-red-50' : ''}>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                        {new Date(receivable.dueDate).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                        {receivable.orderNumber}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 max-w-[120px] truncate">
+                        {receivable.clientName}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                        R$ {parseFloat(receivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold">
+                        <span className={isMinimumMet ? 'text-green-600' : 'text-red-600'}>
+                          R$ {minimumPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {minimumPayment > 0 && (
+                          <div className="text-xs text-gray-500">
+                            {isMinimumMet ? '✓ Pago' : '⚠ Obrigatório'}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                        R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                        R$ {(parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {getStatusBadge(receivable.status)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
+                        <div className="flex space-x-1">
+                          <Button variant="ghost" size="sm" className="h-7 px-2">
+                            <Eye className="h-3 w-3 mr-1" />
+                            Ver
+                          </Button>
+                          {receivable.status !== 'paid' && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className={`h-7 px-2 ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
+                              onClick={() => {
+                                setSelectedReceivable(receivable);
+                                // Suggest minimum payment if not met, otherwise remaining amount
+                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
+                                  minimumPayment.toString() : 
+                                  (parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toString();
+                                setPaymentData({
+                                  ...paymentData,
+                                  amount: suggestedAmount
+                                });
+                                setIsReceiveDialogOpen(true);
+                              }}
+                            >
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              {!isMinimumMet && minimumPayment > 0 ? 'Entrada' : 'Receber'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

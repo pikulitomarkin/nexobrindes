@@ -144,16 +144,17 @@ export default function AdminBudgets() {
     }, 0);
 
     // Apply discount
+    let discountedSubtotal = subtotal;
     if (adminBudgetForm.hasDiscount) {
       if (adminBudgetForm.discountType === 'percentage') {
         const discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
-        return Math.max(0, subtotal - discountAmount);
+        discountedSubtotal = Math.max(0, subtotal - discountAmount);
       } else if (adminBudgetForm.discountType === 'value') {
-        return Math.max(0, subtotal - adminBudgetForm.discountValue);
+        discountedSubtotal = Math.max(0, subtotal - adminBudgetForm.discountValue);
       }
     }
 
-    return subtotal;
+    return discountedSubtotal;
   };
 
   const calculateAdminItemTotal = (item: any) => {
@@ -940,17 +941,21 @@ export default function AdminBudgets() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
+                    <span>Subtotal com Desconto:</span>
+                    <span>R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>
                       {adminBudgetForm.deliveryType === "pickup" ? 
-                        "Retirada no local" : 
+                        "Retirada no local (R$ 0,00)" : 
                         `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Total do Orçamento:</span>
+                    <span>Total do Orçamento (com Frete):</span>
                     <span className="text-blue-600">
                       R$ {calculateAdminTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>

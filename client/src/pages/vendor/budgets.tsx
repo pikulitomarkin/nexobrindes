@@ -526,13 +526,13 @@ export default function VendorBudgets() {
       items: (budget.items || []).map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
-        
+
         // If producerId is missing, try to find it from the product
         if (!producerId && item.productId) {
           const product = products.find((p: any) => p.id === item.productId);
           producerId = product?.producerId || 'internal';
         }
-        
+
         // Default to 'internal' if still not found
         if (!producerId) {
           producerId = 'internal';
@@ -821,7 +821,7 @@ export default function VendorBudgets() {
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
                           <Button
@@ -925,7 +925,7 @@ export default function VendorBudgets() {
                                 setVendorBudgetForm(prev => {
                                   const newItems = [...prev.items];
                                   const item = { ...newItems[index] };
-                                  
+
                                   if (customization) {
                                     item.selectedCustomizationId = customization.id;
                                     item.itemCustomizationValue = parseFloat(customization.price) || 0;
@@ -933,7 +933,7 @@ export default function VendorBudgets() {
                                   } else {
                                     item.selectedCustomizationId = '';
                                   }
-                                  
+
                                   newItems[index] = item;
                                   return { ...prev, items: newItems };
                                 });
@@ -1159,7 +1159,7 @@ export default function VendorBudgets() {
                                 producers?.find((p: any) => p.id === selectedProducerId)?.name}
                             </h4>
                           </div>
-                          
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                             {(() => {
                               const producerProducts = productsByProducer[selectedProducerId] || [];
@@ -1467,9 +1467,7 @@ export default function VendorBudgets() {
                     <span>Subtotal dos Produtos:</span>
                     <span>R$ {(() => {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                        const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
-                        const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                        return total + basePrice + customizationValue;
+                        return total + calculateItemTotal(item);
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     })()}</span>
@@ -1479,45 +1477,33 @@ export default function VendorBudgets() {
                       <span>Desconto:</span>
                       <span>- R$ {(() => {
                         const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                          const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
-                          const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                          return total + basePrice + customizationValue;
+                          return total + calculateItemTotal(item);
                         }, 0);
 
                         if (vendorBudgetForm.discountType === 'percentage') {
-                          const discountAmount = (itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100;
-                          return discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                          return ((itemsSubtotal * vendorBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         } else {
-                          return (parseFloat(vendorBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                          return vendorBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                         }
                       })()}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
+                    <span>Subtotal com Desconto:</span>
+                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>
-                      {vendorBudgetForm.deliveryType === "pickup" ?
-                        "Retirada no local" :
-                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      {vendorBudgetForm.deliveryType === "pickup" ? 
+                        "Retirada no local (R$ 0,00)" : 
+                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
-                  {vendorBudgetForm.downPayment > 0 && (
-                    <div className="bg-green-50 p-3 rounded space-y-1">
-                      <div className="flex justify-between text-sm font-medium text-green-700">
-                        <span>Valor de Entrada {vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 ? "(Inclui Frete)" : ""}:</span>
-                        <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      {vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 && (
-                        <div className="text-xs text-green-600">
-                          Inclui produtos + frete para iniciar o projeto
-                        </div>
-                      )}
-                    </div>
-                  )}
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Total do Orçamento:</span>
+                    <span>Total do Orçamento (com Frete):</span>
                     <span className="text-blue-600">
                       R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
@@ -1866,7 +1852,7 @@ export default function VendorBudgets() {
                                 </span>
                               </div>
                             </div>
-                            
+
                             <h4 className="font-medium text-gray-900">
                               {item.productName || 'Produto não encontrado'}
                             </h4>
@@ -2198,12 +2184,12 @@ export default function VendorBudgets() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Show producers involved in this budget */}
             {budgetToConvert && (() => {
               const budget = budgets?.find((b: any) => b.id === budgetToConvert);
               if (!budget?.items) return null;
-              
+
               const producersInvolved = new Set();
               budget.items.forEach((item: any) => {
                 if (item.producerId && item.producerId !== 'internal') {
@@ -2215,7 +2201,7 @@ export default function VendorBudgets() {
                   producersInvolved.add('Produtos Internos');
                 }
               });
-              
+
               if (producersInvolved.size > 0) {
                 return (
                   <div className="bg-blue-50 p-3 rounded-lg">

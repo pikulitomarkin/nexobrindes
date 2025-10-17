@@ -269,7 +269,8 @@ export const accountsReceivable = pgTable("accounts_receivable", {
   dueDate: timestamp("due_date").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   receivedAmount: decimal("received_amount", { precision: 10, scale: 2 }).default('0.00'),
-  status: text("status").notNull().default('open'), // 'open', 'partial', 'paid', 'overdue', 'cancelled'
+  minimumPayment: decimal("minimum_payment", { precision: 10, scale: 2 }).default('0.00'), // Entrada + frete mínimo obrigatório
+  status: text("status").notNull().default('open'), // 'pending', 'open', 'partial', 'paid', 'overdue', 'cancelled'
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

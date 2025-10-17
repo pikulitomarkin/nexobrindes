@@ -512,13 +512,13 @@ export default function VendorOrders() {
       items: order.items?.map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
-        
+
         // If producerId is missing, try to find it from the product
         if (!producerId && item.productId) {
           const product = products.find((p: any) => p.id === item.productId);
           producerId = product?.producerId || 'internal';
         }
-        
+
         // Default to 'internal' if still not found
         if (!producerId) {
           producerId = 'internal';
@@ -883,7 +883,7 @@ export default function VendorOrders() {
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
                           <Button
@@ -1211,7 +1211,7 @@ export default function VendorOrders() {
                                 producers?.find((p: any) => p.id === selectedProducerId)?.name}
                             </h4>
                           </div>
-                          
+
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                             {(() => {
                               const producerProducts = productsByProducer[selectedProducerId] || [];
@@ -1363,7 +1363,7 @@ export default function VendorOrders() {
                         <div className="text-xs text-gray-600 mt-2 space-y-1">
                           <div className="flex justify-between">
                             <span>Subtotal dos Produtos:</span>
-                            <span>R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>R$ {vendorOrderForm.downPayment > 0 ? (calculateOrderTotal() - vendorOrderForm.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
                           {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
                             <div className="flex justify-between">
@@ -1538,9 +1538,7 @@ export default function VendorOrders() {
                     <span>Subtotal dos Produtos:</span>
                     <span>R$ {(() => {
                       const itemsSubtotal = vendorOrderForm.items.reduce((total, item) => {
-                        const basePrice = item.unitPrice * item.quantity;
-                        const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                        return total + basePrice + customizationValue;
+                        return total + calculateItemTotal(item);
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     })()}</span>
@@ -1550,9 +1548,7 @@ export default function VendorOrders() {
                       <span>Desconto:</span>
                       <span>- R$ {(() => {
                         const itemsSubtotal = vendorOrderForm.items.reduce((total, item) => {
-                          const basePrice = item.unitPrice * item.quantity;
-                          const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                          return total + basePrice + customizationValue;
+                          return total + calculateItemTotal(item);
                         }, 0);
 
                         if (vendorOrderForm.discountType === 'percentage') {
@@ -1564,30 +1560,21 @@ export default function VendorOrders() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
+                    <span>Subtotal com Desconto:</span>
+                    <span>R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span>Frete:</span>
                     <span>
-                      {vendorOrderForm.deliveryType === "pickup" ?
-                        "Retirada no local" :
-                        `R$ ${(vendorOrderForm.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      {vendorOrderForm.deliveryType === "pickup" ? 
+                        "Retirada no local (R$ 0,00)" : 
+                        `R$ ${(parseFloat(vendorOrderForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
-                  {vendorOrderForm.downPayment > 0 && (
-                    <div className="bg-green-50 p-3 rounded space-y-1">
-                      <div className="flex justify-between text-sm font-medium text-green-700">
-                        <span>Valor de Entrada {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 ? "(Inclui Frete)" : ""}:</span>
-                        <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
-                        <div className="text-xs text-green-600">
-                          Inclui produtos + frete para iniciar o projeto
-                        </div>
-                      )}
-                    </div>
-                  )}
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Total do Pedido:</span>
+                    <span>Total do Pedido (com Frete):</span>
                     <span className="text-blue-600">
                       R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
