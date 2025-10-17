@@ -210,7 +210,7 @@ export default function FinanceReceivables() {
   };
 
   const handleCreateReceivable = () => {
-    if (newReceivableData.description && newReceivableData.amount && newReceivableData.dueDate) {
+    if (newReceivableData.clientName && newReceivableData.description && newReceivableData.amount && newReceivableData.dueDate) {
       createReceivableMutation.mutate(newReceivableData);
     }
   };
@@ -351,10 +351,10 @@ export default function FinanceReceivables() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="client-name">Nome do Cliente/Devedor</Label>
+                    <Label htmlFor="client-name">Nome do Cliente *</Label>
                     <Input
                       id="client-name"
-                      placeholder="Nome do cliente ou origem da conta"
+                      placeholder="Nome do cliente"
                       value={newReceivableData.clientName}
                       onChange={(e) => setNewReceivableData(prev => ({ ...prev, clientName: e.target.value }))}
                     />
@@ -412,7 +412,7 @@ export default function FinanceReceivables() {
                     <Button
                       className="gradient-bg text-white"
                       onClick={handleCreateReceivable}
-                      disabled={!newReceivableData.description || !newReceivableData.amount || !newReceivableData.dueDate || createReceivableMutation.isPending}
+                      disabled={!newReceivableData.clientName || !newReceivableData.description || !newReceivableData.amount || !newReceivableData.dueDate || createReceivableMutation.isPending}
                     >
                       {createReceivableMutation.isPending ? "Criando..." : "Criar Conta a Receber"}
                     </Button>

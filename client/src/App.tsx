@@ -147,7 +147,6 @@ function App() {
                 <Switch>
                   {/* Admin Routes */}
                   <Route path="/" component={AdminDashboard} />
-                  <Route path="/admin" component={AdminDashboard} />
                   <Route path="/admin/dashboard" component={AdminDashboard} />
                   <Route path="/admin/orders" component={AdminOrders} />
                   <Route path="/admin/budgets" component={AdminBudgets} />
