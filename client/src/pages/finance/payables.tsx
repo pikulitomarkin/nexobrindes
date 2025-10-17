@@ -1,3 +1,4 @@
+replit_final_file>
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -164,6 +165,7 @@ export default function FinancePayables() {
       status: payment.status,
       beneficiary: payment.producerName,
       orderNumber: payment.orderNumber,
+      productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
       category: 'Produção'
     })),
 
@@ -255,7 +257,11 @@ export default function FinancePayables() {
   });
 
   const handlePayProducer = (producerPayment: any) => {
-    setSelectedPayable(producerPayment);
+    setSelectedPayable({
+      ...producerPayment,
+      // Use productionOrderId for the payment endpoint
+      id: producerPayment.productionOrderId || producerPayment.id
+    });
     setPaymentData(prev => ({ 
       ...prev, 
       amount: producerPayment.amount,
@@ -500,13 +506,26 @@ export default function FinancePayables() {
                     <td className="px-2 py-2 text-xs">
                       <div className="flex space-x-1">
                         {payable.type === 'producer' && (payable.status === 'approved' || payable.status === 'pending') && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            onClick={() => {
+                              setSelectedPayable({
+                                ...payable,
+                                // Use productionOrderId for the payment endpoint
+                                id: payable.productionOrderId || payable.id
+                              });
+                              setPaymentData({
+                                amount: payable.amount,
+                                method: "",
+                                transactionId: "",
+                                notes: "",
+                              });
+                              setIsPayDialogOpen(true);
+                            }}
                             size="sm"
-                            className="h-7 px-2"
-                            onClick={() => handlePayProducer(payable)}
+                            className="gradient-bg text-white"
                           >
-                            <CreditCard className="h-3 w-3" />
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Pagar
                           </Button>
                         )}
                         {payable.type === 'refund' && payable.status === 'pending_definition' && (
@@ -789,3 +808,4 @@ export default function FinancePayables() {
     </div>
   );
 }
+</replit_final_file>

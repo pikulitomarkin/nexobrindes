@@ -2719,18 +2719,33 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Manual payment for producer payment: ${id}`, { paymentMethod, notes });
 
-      const payment = await storage.getProducerPayment(id);
+      // First try to get existing producer payment
+      let payment = await storage.getProducerPayment(id);
+      
       if (!payment) {
-        return res.status(404).json({ error: "Pagamento não encontrado" });
+        // If payment doesn't exist, try to find production order and create payment
+        const productionOrder = await storage.getProductionOrder(id);
+        if (productionOrder && productionOrder.producerValue) {
+          payment = await storage.createProducerPayment({
+            productionOrderId: id,
+            producerId: productionOrder.producerId,
+            amount: productionOrder.producerValue,
+            status: 'approved', // Set as approved since we're paying it directly
+            notes: productionOrder.producerNotes || notes || null
+          });
+          console.log(`Created producer payment for production order ${id}`);
+        } else {
+          return res.status(404).json({ error: "Ordem de produção não encontrada ou sem valor definido" });
+        }
       }
 
       // Update payment status to paid
-      const updatedPayment = await storage.updateProducerPayment(id, {
+      const updatedPayment = await storage.updateProducerPayment(payment.id, {
         status: 'paid',
         paidBy: 'admin-1', // Could be req.user.id in real auth
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
-        notes: notes || null
+        notes: notes || payment.notes
       });
 
       // Update production order payment status
