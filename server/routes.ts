@@ -501,7 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Always use contactName as primary client name - it's required on order creation
           let clientName = order.contactName;
 
-          // Only try other methods if contactName is somehow missing
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
             console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
 
@@ -986,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quote-requests", async (req, res) => {
     try {
       const quoteRequestData = req.body;
-      
+
       if (!quoteRequestData.clientId || !quoteRequestData.vendorId || !quoteRequestData.productId) {
         return res.status(400).json({ error: "Dados obrigatórios não fornecidos" });
       }
@@ -1014,12 +1014,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { status } = req.body;
-      
+
       const updatedRequest = await storage.updateQuoteRequestStatus(id, status);
       if (!updatedRequest) {
         return res.status(404).json({ error: "Quote request not found" });
       }
-      
+
       res.json(updatedRequest);
     } catch (error) {
       console.error("Error updating quote request status:", error);
@@ -3302,10 +3302,10 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Get vendor orders
-  app.get("/api/vendors/:vendorId/orders", async (req, res) => {
-    const { vendorId } = req.params;
+  app.get("/api/vendors/:id/orders", async (req, res) => {
+    const { id } = req.params;
     try {
-      const orders = await storage.getOrdersByVendor(vendorId);
+      const orders = await storage.getOrdersByVendor(id);
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
@@ -4588,7 +4588,7 @@ Para mais detalhes, entre em contato conosco!`;
   // Create manual receivable
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {
-      const { clientName, description, amount, dueDate, notes } = req.body;
+      const { clientName, description, amount, dueDate, notes, type } = req.body;
 
       if (!clientName || !description || !amount || !dueDate) {
         return res.status(400).json({ error: "Todos os campos obrigatórios devem ser preenchidos" });
@@ -4604,7 +4604,7 @@ Para mais detalhes, entre em contato conosco!`;
         id: receivableId,
         orderId: null, // Manual receivables don't have order IDs
         orderNumber: `MANUAL-${Date.now()}`,
-        clientName: clientName,
+        clientName: clientName || 'Conta Manual',
         description: description,
         amount: parseFloat(amount).toFixed(2),
         receivedAmount: "0.00",
@@ -4612,7 +4612,8 @@ Para mais detalhes, entre em contato conosco!`;
         dueDate: new Date(dueDate),
         createdAt: new Date(),
         notes: notes || "",
-        isManual: true
+        isManual: true,
+        type: type || 'manual'
       };
 
       // Store in accounts receivable

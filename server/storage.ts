@@ -190,6 +190,8 @@ export interface IStorage {
   getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]>;
   createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable>;
   updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined>;
+  createManualReceivable(data: any): Promise<any>; // Added for manual receivables
+  getManualReceivables(): Promise<any[]>; // Added to retrieve manual receivables
 
   // Financial module - Payment Allocations
   getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]>;
@@ -2554,10 +2556,52 @@ export class MemStorage implements IStorage {
     return receivable;
   }
 
+  // Implement the createManualReceivable method as defined in the interface
+  async createManualReceivable(data: any): Promise<any> {
+    const id = randomUUID();
+    const receivable: AccountsReceivable = {
+      id: `manual-${id}`,
+      orderId: null, // Manual receivables don't have orders
+      clientId: null, // Manual receivables might not have specific clients
+      vendorId: null, // Manual receivables might not have vendors
+      description: data.description,
+      amount: data.amount,
+      receivedAmount: "0.00",
+      dueDate: data.dueDate,
+      status: data.status || 'pending',
+      type: 'manual',
+      notes: data.notes,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Store in manual receivables list for easier management
+    if (!this.mockData.manualReceivables) {
+      this.mockData.manualReceivables = [];
+    }
+    this.mockData.manualReceivables.push({
+      ...receivable,
+      clientName: data.clientName // Store clientName if provided
+    });
+
+    // Also add to main receivables map
+    this.accountsReceivable.set(receivable.id, receivable);
+
+    // Save mock data to persist changes
+    await this.saveData(this.mockData);
+
+    return {
+      ...receivable,
+      clientName: data.clientName
+    };
+  }
+
+
   async getManualReceivables(): Promise<any[]> {
     const data = await this.loadData();
     return data.manualReceivables || [];
   }
+
 
   async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
     const existing = this.accountsReceivable.get(id);
@@ -2979,34 +3023,28 @@ export class MemStorage implements IStorage {
 
   // Quote Requests methods
   async createQuoteRequest(data: any): Promise<any> {
-    const newQuoteRequest = {
-      id: `qr-${Date.now()}`,
+    const id = randomUUID();
+    const quoteRequest = {
+      id,
       ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-
-    this.quoteRequests.push(newQuoteRequest);
-    return newQuoteRequest;
+    this.quoteRequests.push(quoteRequest);
+    return quoteRequest;
   }
 
   async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
-    return this.quoteRequests
-      .filter(qr => qr.vendorId === vendorId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return this.quoteRequests.filter(req => req.vendorId === vendorId);
   }
 
   async updateQuoteRequestStatus(id: string, status: string): Promise<any> {
-    const index = this.quoteRequests.findIndex(qr => qr.id === id);
-    if (index === -1) return null;
-
-    this.quoteRequests[index] = {
-      ...this.quoteRequests[index],
-      status,
-      updatedAt: new Date().toISOString()
-    };
-
-    return this.quoteRequests[index];
+    const request = this.quoteRequests.find(req => req.id === id);
+    if (request) {
+      request.status = status;
+      request.updatedAt = new Date();
+    }
+    return request;
   }
 
   // Automatic commission calculation and processing methods
