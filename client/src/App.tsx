@@ -1,544 +1,226 @@
-import { Switch, Route } from "wouter";
-import { lazy } from "react";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect, useState, Suspense } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import MainLayout from "@/components/layout/main-layout";
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import Dashboard from "@/pages/dashboard";
-import NotFound from "@/pages/not-found";
+import { queryClient } from "@/lib/queryClient";
 import Login from "@/pages/login";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import MainLayout from "@/components/layout/main-layout";
+import NotFound from "@/pages/not-found";
 
-// Admin pages - Only the simplified ones
-import AdminClients from "./pages/admin/clients";
-import AdminVendors from "./pages/admin/vendors";
-import AdminCommissionManagement from './pages/admin/commission-management';
-import AdminProducts from "@/pages/admin/products";
-import AdminProducers from "@/pages/admin/producers";
-import AdminCustomizations from "@/pages/admin/customizations"; // Importação da página de customizações
-import AdminCommissionSettings from "./pages/admin/commission-settings";
-import AdminProducerPayments from "./pages/admin/producer-payments";
-import AdminReports from "./pages/admin/reports";
-import AdminPartners from "./pages/admin/partners";
-import AdminOrders from "./pages/admin/orders";
-import AdminBudgets from "./pages/admin/budgets";
-import AdminFinance from "./pages/admin/finance";
-import AdminSettings from "./pages/admin/settings";
-import AdminUsers from "./pages/admin/users";
-
-// Partner pages - Same functionality as admin but with separate commissions
-import PartnerClients from "@/pages/partner/clients";
-import PartnerVendors from "@/pages/partner/vendors";
-import PartnerCommissionManagement from "@/pages/partner/commission-management";
-import PartnerProducts from "@/pages/partner/products";
-import PartnerProducers from "@/pages/partner/producers";
-import PartnerDashboard from "./pages/dashboards/partner-dashboard";
-
-// Vendor pages
-import VendorOrders from "@/pages/vendor/orders";
-import VendorClients from "@/pages/vendor/clients";
-import VendorCommissions from "@/pages/vendor/commissions";
-import VendorProducts from "@/pages/vendor/products";
-import VendorBudgets from "@/pages/vendor/budgets";
-
-// Client pages
-import ClientOrders from "@/pages/client/orders";
-import ClientProfile from "@/pages/client/profile";
+// Dashboard imports
+import AdminDashboard from "@/pages/dashboards/admin-dashboard";
+import VendorDashboard from "@/pages/dashboards/vendor-dashboard";
 import ClientDashboard from "@/pages/dashboards/client-dashboard";
-import ClientOrderTimeline from "./pages/client/order-timeline";
-import ClientProducts from "@/pages/client/products";
+import ProducerDashboard from "@/pages/dashboards/producer-dashboard";
+import PartnerDashboard from "@/pages/dashboards/partner-dashboard";
+
+// Admin imports
+import AdminOrders from "@/pages/admin/orders";
+import AdminBudgets from "@/pages/admin/budgets";
+import AdminClients from "@/pages/admin/clients";
+import AdminVendors from "@/pages/admin/vendors";
+import AdminProducers from "@/pages/admin/producers";
+import AdminProducts from "@/pages/admin/products";
+import AdminSettings from "@/pages/admin/settings";
+import AdminCommissionManagement from "@/pages/admin/commission-management";
+import AdminCommissionSettings from "@/pages/admin/commission-settings";
+import AdminPartners from "@/pages/admin/partners";
+import AdminUsers from "@/pages/admin/users";
+import AdminReports from "@/pages/admin/reports";
+import AdminProducerPayments from "@/pages/admin/producer-payments";
+import AdminFinance from "@/pages/admin/finance";
+import AdminCustomizations from "@/pages/admin/customizations";
+
+// Vendor imports
+import VendorOrders from "@/pages/vendor/orders";
+import VendorBudgets from "@/pages/vendor/budgets";
+import VendorClients from "@/pages/vendor/clients";
+import VendorProducts from "@/pages/vendor/products";
+import VendorCommissions from "@/pages/vendor/commissions";
 import VendorQuoteRequests from "@/pages/vendor/quote-requests";
 
-// Producer pages
+// Client imports
+import ClientOrders from "@/pages/client/orders";
+import ClientProducts from "@/pages/client/products";
+import ClientProfile from "@/pages/client/profile";
+import ClientOrderTimeline from "@/pages/client/order-timeline";
+
+// Producer imports
 import ProducerOrders from "@/pages/producer/orders";
-import ProductionDashboard from "@/pages/producer/production-dashboard";
-import ProducerOrderDetails from "./pages/producer/order-details";
+import ProducerOrderDetails from "@/pages/producer/order-details";
+import ProducerProductionDashboard from "@/pages/producer/production-dashboard";
 import ProducerProfileSettings from "@/pages/producer/profile-settings";
 import ProducerReceivables from "@/pages/producer/receivables";
 
-// Logistics pages
+// Partner imports
+import PartnerClients from "@/pages/partner/clients";
+import PartnerVendors from "@/pages/partner/vendors";
+import PartnerProducers from "@/pages/partner/producers";
+import PartnerProducts from "@/pages/partner/products";
+import PartnerCommissionManagement from "@/pages/partner/commission-management";
+
+// Finance imports
+import FinanceIndex from "@/pages/finance/index";
+import FinanceReceivables from "@/pages/finance/receivables";
+import FinancePayables from "@/pages/finance/payables";
+import FinancePayments from "@/pages/finance/payments";
+import FinanceExpenses from "@/pages/finance/expenses";
+import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
+import FinanceReconciliation from "@/pages/finance/reconciliation";
+
+// Logistics imports
 import LogisticsDashboard from "@/pages/logistics/dashboard";
 import LogisticsProducts from "@/pages/logistics/products";
 import LogisticsProducers from "@/pages/logistics/producers";
 
-// Finance pages
-import FinanceIndex from "@/pages/finance/index";
-import FinancePayments from "@/pages/finance/payments";
-import FinanceReconciliation from "@/pages/finance/reconciliation";
-import FinanceReceivables from "@/pages/finance/receivables";
-import FinanceExpenses from "@/pages/finance/expenses";
-import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
-import FinancePayables from "@/pages/finance/payables";
-import Finance from "./pages/finance";
-
 function App() {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [location] = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Checking auth with token:', token?.substring(0, 20) + '...');
+
+      if (!token) {
+        console.log('No token found');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/auth/verify', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      console.log('Auth response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Auth verification successful:', data.user.username, data.user.role);
+        setUser(data.user);
+      } else {
+        console.log('Auth verification failed');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    } catch (error) {
+      console.error('Auth verification error:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          </div>
+        }>
+          <Switch>
+            {/* Login Route */}
+            <Route path="/login" component={() => <Login onLogin={setUser} />} />
+
+            {/* Protected Routes */}
+            <ProtectedRoute path="/" user={user} redirect="/login">
+              <MainLayout>
+                <Switch>
+                  {/* Admin Routes */}
+                  <Route path="/" component={AdminDashboard} />
+                  <Route path="/admin/dashboard" component={AdminDashboard} />
+                  <Route path="/admin/orders" component={AdminOrders} />
+                  <Route path="/admin/budgets" component={AdminBudgets} />
+                  <Route path="/admin/clients" component={AdminClients} />
+                  <Route path="/admin/vendors" component={AdminVendors} />
+                  <Route path="/admin/producers" component={AdminProducers} />
+                  <Route path="/admin/products" component={AdminProducts} />
+                  <Route path="/admin/settings" component={AdminSettings} />
+                  <Route path="/admin/commission-management" component={AdminCommissionManagement} />
+                  <Route path="/admin/commission-settings" component={AdminCommissionSettings} />
+                  <Route path="/admin/partners" component={AdminPartners} />
+                  <Route path="/admin/users" component={AdminUsers} />
+                  <Route path="/admin/reports" component={AdminReports} />
+                  <Route path="/admin/producer-payments" component={AdminProducerPayments} />
+                  <Route path="/admin/finance" component={AdminFinance} />
+                  <Route path="/admin/customizations" component={AdminCustomizations} />
+
+                  {/* Vendor Routes */}
+                  <Route path="/vendor/dashboard" component={VendorDashboard} />
+                  <Route path="/vendor/orders" component={VendorOrders} />
+                  <Route path="/vendor/budgets" component={VendorBudgets} />
+                  <Route path="/vendor/clients" component={VendorClients} />
+                  <Route path="/vendor/products" component={VendorProducts} />
+                  <Route path="/vendor/commissions" component={VendorCommissions} />
+                  <Route path="/vendor/quote-requests" component={VendorQuoteRequests} />
+
+                  {/* Client Routes */}
+                  <Route path="/client/dashboard" component={ClientDashboard} />
+                  <Route path="/client/orders" component={ClientOrders} />
+                  <Route path="/client/products" component={ClientProducts} />
+                  <Route path="/client/profile" component={ClientProfile} />
+                  <Route path="/client/order-timeline/:orderId" component={ClientOrderTimeline} />
+
+                  {/* Producer Routes */}
+                  <Route path="/producer/dashboard" component={ProducerDashboard} />
+                  <Route path="/producer/orders" component={ProducerOrders} />
+                  <Route path="/producer/order/:id" component={ProducerOrderDetails} />
+                  <Route path="/producer/production-dashboard" component={ProducerProductionDashboard} />
+                  <Route path="/producer/profile-settings" component={ProducerProfileSettings} />
+                  <Route path="/producer/receivables" component={ProducerReceivables} />
+
+                  {/* Partner Routes */}
+                  <Route path="/partner/dashboard" component={PartnerDashboard} />
+                  <Route path="/partner/clients" component={PartnerClients} />
+                  <Route path="/partner/vendors" component={PartnerVendors} />
+                  <Route path="/partner/producers" component={PartnerProducers} />
+                  <Route path="/partner/products" component={PartnerProducts} />
+                  <Route path="/partner/commission-management" component={PartnerCommissionManagement} />
+
+                  {/* Finance Routes */}
+                  <Route path="/finance" component={FinanceIndex} />
+                  <Route path="/finance/receivables" component={FinanceReceivables} />
+                  <Route path="/finance/payables" component={FinancePayables} />
+                  <Route path="/finance/payments" component={FinancePayments} />
+                  <Route path="/finance/expenses" component={FinanceExpenses} />
+                  <Route path="/finance/commission-payouts" component={FinanceCommissionPayouts} />
+                  <Route path="/finance/reconciliation" component={FinanceReconciliation} />
+
+                  {/* Logistics Routes */}
+                  <Route path="/logistics/dashboard" component={LogisticsDashboard} />
+                  <Route path="/logistics/products" component={LogisticsProducts} />
+                  <Route path="/logistics/producers" component={LogisticsProducers} />
+
+                  {/* 404 Route */}
+                  <Route component={NotFound} />
+                </Switch>
+              </MainLayout>
+            </ProtectedRoute>
+
+            {/* Catch-all for unauthenticated users, this will redirect to login if not authenticated */}
+            <Route path="/:rest*" component={() => <Login onLogin={setUser} />} />
+          </Switch>
+        </Suspense>
         <Toaster />
-        <Switch>
-          <Route path="/login" component={Login} />
-
-          {/* Default routes */}
-          <Route path="/">
-            <ProtectedRoute>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/dashboard">
-            <ProtectedRoute>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Admin Routes - Only simplified ones */}
-          <Route path="/admin/clients">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminClients />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/vendors">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminVendors />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/commission-management">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminCommissionManagement />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/products">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/customizations">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminCustomizations />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/producers">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminProducers />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/commission-settings">
-            <ProtectedRoute requiredRoles={["admin"]}>
-              <MainLayout>
-                <AdminCommissionSettings />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/producer-payments">
-            <ProtectedRoute requiredRoles={["admin"]}>
-              <MainLayout>
-                <AdminProducerPayments />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/reports">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminReports />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/orders">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/admin/partners">
-            <ProtectedRoute requiredRole="admin">
-              <MainLayout>
-                <AdminPartners />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Partner Routes - Same as admin */}
-          <Route path="/partner/clients">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminClients />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/vendors">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminVendors />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/commission-management">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminCommissionManagement />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/products">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/producers">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminProducers />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/dashboard">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/orders">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/budgets">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminBudgets />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/finance">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminFinance />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/settings">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminSettings />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/users">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminUsers />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/reports">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminReports />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/partner/partners">
-            <ProtectedRoute requiredRole="partner">
-              <MainLayout>
-                <AdminPartners />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Vendor Routes - Accessible by vendor users and admin */}
-          <Route path="/vendor/dashboard">
-            <ProtectedRoute>
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/products">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/budgets">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorBudgets />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/quote-requests">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorQuoteRequests />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/orders">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/clients">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorClients />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/vendor/commissions">
-            <ProtectedRoute>
-              <MainLayout>
-                <VendorCommissions />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Client Routes - Accessible by client users and admin */}
-          <Route path="/client/dashboard">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/client/products">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-          
-          <Route path="/client/orders">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-          
-          <Route path="/client/order/:id/timeline">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientOrderTimeline />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-          
-          <Route path="/client/profile">
-            <ProtectedRoute>
-              <MainLayout>
-                <ClientProfile />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Producer Routes - Accessible by producer users and admin */}
-          <Route path="/producer/production-dashboard">
-            <ProtectedRoute>
-              <MainLayout>
-                <ProductionDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/producer/orders">
-            <ProtectedRoute>
-              <MainLayout>
-                <ProducerOrders />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/producer/order/:id">
-            <ProtectedRoute>
-              <MainLayout>
-                <ProducerOrderDetails />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/producer/profile-settings">
-            <ProtectedRoute>
-              <MainLayout>
-                <ProducerProfileSettings />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/producer/receivables">
-            <ProtectedRoute>
-              <MainLayout>
-                <ProducerReceivables />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Logistics Routes */}
-          <Route path="/logistics/dashboard">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/logistics/paid-orders">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/logistics/production-tracking">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/logistics/shipments">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsDashboard />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/logistics/products">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsProducts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/logistics/producers">
-            <ProtectedRoute requiredRole="logistics">
-              <MainLayout>
-                <LogisticsProducers />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          {/* Finance Routes - Accessible by admin and finance roles */}
-          <Route path="/finance">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceIndex />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/payments">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinancePayments />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/reconciliation">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceReconciliation />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/receivables">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceReceivables />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/payables">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinancePayables />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/expenses">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceExpenses />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route path="/finance/commission-payouts">
-            <ProtectedRoute requiredRoles={["admin", "finance"]}>
-              <MainLayout>
-                <FinanceCommissionPayouts />
-              </MainLayout>
-            </ProtectedRoute>
-          </Route>
-
-          <Route component={NotFound} />
-        </Switch>
-      </TooltipProvider>
+      </div>
     </QueryClientProvider>
   );
 }
