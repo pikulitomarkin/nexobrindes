@@ -42,6 +42,11 @@ export default function FinancePayables() {
     queryKey: ["/api/finance/producer-payments/pending"]
   });
 
+  // Get all producer payments for payables
+  const { data: producerPayments = [] } = useQuery({
+    queryKey: ["/api/finance/producer-payments"]
+  });
+
   const { data: expenses = [] } = useQuery({
     queryKey: ["/api/finance/expenses"],
   });
