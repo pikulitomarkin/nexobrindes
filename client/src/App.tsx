@@ -139,10 +139,10 @@ function App() {
         }>
           <Switch>
             {/* Login Route */}
-            <Route path="/login" component={() => <Login onLogin={setUser} />} />
+            <Route path="/login" component={Login} />
 
             {/* Protected Routes */}
-            <ProtectedRoute path="/" user={user} redirect="/login">
+            <ProtectedRoute>
               <MainLayout>
                 <Switch>
                   {/* Admin Routes */}
@@ -217,7 +217,7 @@ function App() {
             </ProtectedRoute>
 
             {/* Catch-all for unauthenticated users */}
-            <Route path="/:rest*" component={() => <Login onLogin={setUser} />} />
+            <Route path="/:rest*" component={Login} />
           </Switch>
         </Suspense>
         <Toaster />
