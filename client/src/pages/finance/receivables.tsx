@@ -64,38 +64,30 @@ export default function FinanceReceivables() {
 
   const receivePaymentMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Encontrar a conta a receber real para obter o orderId
-      const receivable = mockReceivables.find(r => r.id === data.receivableId);
+      // Encontrar a conta a receber real
+      const receivable = receivablesData.find((r: any) => r.id === data.receivableId);
       if (!receivable) {
         throw new Error('Conta a receber não encontrada');
       }
 
-      // O receivable ID tem formato "ar-{orderId}", extrair o orderId real
-      let actualOrderId = receivable.id;
-      if (receivable.id && receivable.id.startsWith('ar-')) {
-        actualOrderId = receivable.id.replace('ar-', '');
-      }
-
-      // Criar um pagamento direto via API usando o orderId real
-      const response = await fetch('/api/payments', {
+      // Usar a API específica para pagamento de contas a receber
+      const response = await fetch(`/api/receivables/${data.receivableId}/payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          orderId: actualOrderId, // Usar o ID real do pedido
           amount: data.amount,
-          method: data.method,
-          status: 'confirmed',
-          transactionId: data.transactionId,
-          notes: data.notes,
-          paidAt: new Date()
+          method: data.method || 'manual',
+          transactionId: data.transactionId || `MANUAL-${Date.now()}`,
+          notes: data.notes || ''
         })
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao registrar pagamento');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao registrar pagamento');
       }
 
       return response.json();

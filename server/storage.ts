@@ -201,6 +201,7 @@ export interface IStorage {
   getBankImports(): Promise<BankImport[]>;
   getBankImport(id: string): Promise<BankImport | undefined>;
   createBankImport(data: InsertBankImport): Promise<BankImport>;
+  updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined>;
   getBankTransactionsByImport(importId: string): Promise<BankTransaction[]>;
   getBankTransactions(): Promise<BankTransaction[]>;
   getBankTransaction(id: string): Promise<BankTransaction | undefined>;
@@ -224,6 +225,7 @@ export interface IStorage {
 
   // Manual Receivables
   createManualReceivable(data: any): Promise<any>;
+  getManualReceivables(): Promise<any[]>;
 
   // Customization Options
   createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
@@ -1740,7 +1742,7 @@ export class MemStorage implements IStorage {
     this.mockData.manualReceivables.push(receivable);
     console.log(`Created manual receivable: ${receivable.id} for ${receivable.clientName} - ${receivable.amount}`);
     console.log(`Total manual receivables: ${this.mockData.manualReceivables.length}`);
-    
+
     return receivable;
   }
 
@@ -2524,7 +2526,56 @@ export class MemStorage implements IStorage {
     });
   }
 
-  // Added getAll method as per the changes
+  // Added method to update accounts receivable
+  async updateAccountsReceivable(id: string, data: any) {
+    console.log(`Updating receivable ${id} with data:`, data);
+
+    // Check if this is a manual receivable
+    if (id.startsWith('manual-')) {
+      // Find and update manual receivable
+      const manualIndex = this.mockData.manualReceivables.findIndex((r: any) => r.id === id);
+      if (manualIndex >= 0) {
+        this.mockData.manualReceivables[manualIndex] = {
+          ...this.mockData.manualReceivables[manualIndex],
+          ...data,
+          updatedAt: new Date()
+        };
+        console.log(`Updated manual receivable ${id}:`, this.mockData.manualReceivables[manualIndex]);
+        return this.mockData.manualReceivables[manualIndex];
+      }
+    } else {
+      // This is an order-based receivable - update order paid value
+      const orderId = id.startsWith('ar-') ? id.replace('ar-', '') : id;
+      const order = await this.getOrder(orderId);
+
+      if (order && data.receivedAmount !== undefined) { // Check for receivedAmount specifically
+        await this.updateOrder(orderId, {
+          paidValue: data.receivedAmount
+        });
+        console.log(`Updated order ${orderId} paidValue to ${data.receivedAmount}`);
+        // Also update the status and receivedAmount in the accountsReceivable map
+        const receivable = this.accountsReceivable.get(id);
+        if (receivable) {
+          const updatedReceivable: AccountsReceivable = {
+            ...receivable,
+            receivedAmount: data.receivedAmount,
+            status: data.status || receivable.status, // Update status if provided
+            updatedAt: new Date()
+          };
+          this.accountsReceivable.set(id, updatedReceivable);
+          return updatedReceivable;
+        }
+      }
+    }
+
+    return undefined; // Return undefined if not found or not updated
+  }
+
+  // Added method to get manual receivables
+  async getManualReceivables(): Promise<any[]> {
+    return this.mockData.manualReceivables || [];
+  }
+
   getAll(table: string): any[] {
     switch(table) {
       case 'products':
@@ -2551,7 +2602,7 @@ export class MemStorage implements IStorage {
   private calculateReceivableStatus(order: Order): 'pending' | 'partial' | 'paid' | 'overdue' {
     const totalValue = parseFloat(order.totalValue);
     const paidValue = parseFloat(order.paidValue || "0");
-    
+
     if (paidValue >= totalValue) {
       return 'paid';
     } else if (paidValue > 0) {
@@ -2566,7 +2617,7 @@ export class MemStorage implements IStorage {
     }
   }
 
-  
+
 
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
     const orders = await this.getOrders();
@@ -2635,40 +2686,6 @@ export class MemStorage implements IStorage {
     data.manualReceivables.push(receivable);
     await this.saveData(data);
     return receivable;
-  }
-
-  async getManualReceivables(): Promise<any[]> {
-    const data = await this.loadData();
-    return data.manualReceivables || [];
-  }
-
-  async updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined> {
-    const existing = this.accountsReceivable.get(id);
-    if (!existing) {
-      // If it's a manual receivable, try to update it from mockData
-      const manualReceivables = await this.getManualReceivables();
-      const manualIndex = manualReceivables.findIndex((ar: any) => ar.id === id);
-      if (manualIndex !== -1) {
-        const updatedManual = {
-          ...manualReceivables[manualIndex],
-          ...data,
-          updatedAt: new Date()
-        };
-        // Update in mockData
-        manualReceivables[manualIndex] = updatedManual;
-        await this.saveData({ ...await this.loadData(), manualReceivables });
-        return updatedManual as AccountsReceivable;
-      }
-      return undefined;
-    }
-
-    const updated: AccountsReceivable = {
-      ...existing,
-      ...data,
-      updatedAt: new Date()
-    };
-    this.accountsReceivable.set(id, updated);
-    return updated;
   }
 
   // Financial module methods - Payment Allocations

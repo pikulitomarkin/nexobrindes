@@ -4661,7 +4661,7 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Valor deve ser maior que zero" });
       }
 
-      // Get the receivable to find the actual order ID
+      // Get the receivable
       const receivables = await storage.getAccountsReceivable();
       const receivable = receivables.find(r => r.id === receivableId);
 
@@ -4672,18 +4672,23 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log("Found receivable:", receivable);
 
-      // Create a confirmed payment record using the actual order ID
-      const payment = await storage.createPayment({
-        orderId: receivable.orderId, // Use the actual order ID
-        amount: parseFloat(amount).toFixed(2),
-        method: method || "manual",
-        status: "confirmed",
-        transactionId: transactionId || `MANUAL-${Date.now()}`,
-        notes: notes || "",
-        paidAt: new Date()
-      });
-
-      console.log("Created payment:", payment);
+      // Check if this is a manual receivable or order-based receivable
+      if (receivable.orderId && !receivable.orderId.startsWith('manual-')) {
+        // This is an order-based receivable - create payment for the order
+        const payment = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          status: "confirmed",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        });
+        console.log("Created payment for order:", payment);
+      } else {
+        // This is a manual receivable - just log the payment
+        console.log("Processing manual receivable payment - no order payment needed");
+      }
 
       // Update the receivable with new received amount
       const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -4701,11 +4706,20 @@ Para mais detalhes, entre em contato conosco!`;
 
       await storage.updateAccountsReceivable(receivableId, {
         receivedAmount: newReceivedAmount.toFixed(2),
-        status: newStatus
+        status: newStatus,
+        lastPaymentDate: new Date()
       });
 
       console.log("Successfully processed receivable payment");
-      res.json({ success: true, payment });
+      res.json({ 
+        success: true, 
+        message: "Pagamento registrado com sucesso",
+        receivable: {
+          ...receivable,
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newStatus
+        }
+      });
     } catch (error) {
       console.error("Error creating manual payment:", error);
       res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
