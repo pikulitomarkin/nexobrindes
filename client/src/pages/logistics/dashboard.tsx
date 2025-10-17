@@ -11,8 +11,10 @@ import { Separator } from "@/components/ui/separator";
 import { Package, Send, Eye, Search, Truck, Clock, CheckCircle, AlertTriangle, ShoppingCart, DollarSign, Factory } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useLocation } from "react-router-dom"; // Import useLocation
 
 export default function LogisticsDashboard() {
+  const location = window.location.pathname; // Get current location
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
@@ -80,11 +82,11 @@ export default function LogisticsDashboard() {
 
   // Finalizar envio (marcar como despachado)
   const dispatchOrderMutation = useMutation({
-    mutationFn: async ({ productionOrderId, orderId, notes, trackingCode }: { 
-      productionOrderId: string; 
-      orderId: string; 
-      notes: string; 
-      trackingCode: string; 
+    mutationFn: async ({ productionOrderId, orderId, notes, trackingCode }: {
+      productionOrderId: string;
+      orderId: string;
+      notes: string;
+      trackingCode: string;
     }) => {
       const response = await fetch("/api/logistics/dispatch-order", {
         method: "POST",
@@ -122,7 +124,7 @@ export default function LogisticsDashboard() {
   const handleDispatchOrder = (order: any) => {
     // order can be either a production order from the production tracking table
     // or a regular order from the paid orders table
-    
+
     let targetOrder = null;
     let clientName = order.clientName || 'Cliente';
 
@@ -133,7 +135,7 @@ export default function LogisticsDashboard() {
     } else {
       // This is a regular order, find the production order
       const productionOrder = productionOrders?.find((po: any) => po.orderId === order.id);
-      
+
       if (!productionOrder) {
         toast({
           title: "Erro",
@@ -168,7 +170,7 @@ export default function LogisticsDashboard() {
       productionOrder = productionOrders?.find((po: any) => po.orderId === selectedOrder.id);
       orderId = selectedOrder.id;
     }
-    
+
     if (!productionOrder) {
       toast({
         title: "Erro",
@@ -256,117 +258,173 @@ export default function LogisticsDashboard() {
   const inProductionCount = productionOrders?.filter((o: any) => o.status === 'production')?.length || 0;
   const readyToShipCount = productionOrders?.filter((o: any) => o.status === 'ready')?.length || 0;
 
+  // Determinar qual seção mostrar baseado na rota
+  const getCurrentSection = () => {
+    if (location.includes('/logistics/paid-orders')) return 'paid-orders';
+    if (location.includes('/logistics/production-tracking')) return 'production-tracking';
+    if (location.includes('/logistics/shipments')) return 'shipments';
+    if (location.includes('/logistics/paid-orders')) return 'paid-orders'; // Added for clarity, though covered above
+    if (location.includes('/logistics/production-tracking')) return 'production-tracking'; // Added for clarity
+    if (location.includes('/logistics/shipments')) return 'shipments'; // Added for clarity
+    return 'dashboard'; // rota padrão
+  };
+
+  const currentSection = getCurrentSection();
+
+  // Função para renderizar o título e descrição baseado na seção
+  const getSectionInfo = () => {
+    switch (currentSection) {
+      case 'paid-orders':
+        return {
+          title: 'Pedidos Pagos - Aguardando Envio',
+          description: 'Pedidos que receberam pagamento e estão prontos para serem enviados à produção'
+        };
+      case 'production-tracking':
+        return {
+          title: 'Acompanhamento de Produção',
+          description: 'Monitore o status dos pedidos que estão sendo produzidos'
+        };
+      case 'shipments':
+        return {
+          title: 'Despachos e Expedição',
+          description: 'Gerencie os pedidos prontos para despacho e expedição'
+        };
+      default:
+        return {
+          title: 'Painel de Logística',
+          description: 'Gerencie pedidos pagos, envios para produção e despachos'
+        };
+    }
+  };
+
+  const sectionInfo = getSectionInfo();
+
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Painel de Logística</h1>
-        <p className="text-gray-600">Gerencie pedidos pagos, envios para produção e despachos</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{sectionInfo.title}</h1>
+        <p className="text-gray-600">{sectionInfo.description}</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
+      {/* Stats Cards - Rendered only for the main dashboard or when relevant */}
+      {(currentSection === 'dashboard' || currentSection === 'paid-orders' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {currentSection === 'dashboard' || currentSection === 'paid-orders' ? (
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Pagos - Aguardando Envio</p>
+                    <p className="text-3xl font-bold text-green-900 mt-2">{paidOrdersCount}</p>
+                    <p className="text-xs text-green-600 mt-1">Para produção</p>
+                  </div>
+                  <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {currentSection === 'dashboard' || currentSection === 'production-tracking' ? (
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Em Produção</p>
+                    <p className="text-3xl font-bold text-purple-900 mt-2">{inProductionCount}</p>
+                    <p className="text-xs text-purple-600 mt-1">Sendo produzidos</p>
+                  </div>
+                  <div className="h-12 w-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                    <Factory className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {currentSection === 'dashboard' || currentSection === 'shipments' || currentSection === 'production-tracking' ? (
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700">Prontos para Expedição</p>
+                    <p className="text-3xl font-bold text-orange-900 mt-2">{readyToShipCount}</p>
+                    <p className="text-xs text-orange-600 mt-1">Produção finalizada - pronto para despachar</p>
+                  </div>
+                  <div className="h-12 w-12 bg-orange-600 rounded-xl flex items-center justify-center">
+                    <Truck className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {(currentSection === 'dashboard' || currentSection === 'paid-orders' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Total em Acompanhamento</p>
+                    <p className="text-3xl font-bold text-blue-900 mt-2">
+                      {(paidOrders?.length || 0) + (productionOrders?.length || 0)}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">Pedidos ativos</p>
+                  </div>
+                  <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Search and Filters - Rendered only when relevant */}
+      {(currentSection === 'dashboard' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
+        <Card className="mb-6">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-700">Pagos - Aguardando Envio</p>
-                <p className="text-3xl font-bold text-green-900 mt-2">{paidOrdersCount}</p>
-                <p className="text-xs text-green-600 mt-1">Para produção</p>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar por número, cliente ou produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-              <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
+              {(currentSection === 'dashboard' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="production">Em Produção</SelectItem>
+                    <SelectItem value="ready">Pronto para Despacho</SelectItem>
+                    <SelectItem value="shipped">Despachado</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-700">Em Produção</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">{inProductionCount}</p>
-                <p className="text-xs text-purple-600 mt-1">Sendo produzidos</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-600 rounded-xl flex items-center justify-center">
-                <Factory className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-700">Prontos para Expedição</p>
-                <p className="text-3xl font-bold text-orange-900 mt-2">{readyToShipCount}</p>
-                <p className="text-xs text-orange-600 mt-1">Produção finalizada - pronto para despachar</p>
-              </div>
-              <div className="h-12 w-12 bg-orange-600 rounded-xl flex items-center justify-center">
-                <Truck className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-700">Total em Acompanhamento</p>
-                <p className="text-3xl font-bold text-blue-900 mt-2">
-                  {(paidOrders?.length || 0) + (productionOrders?.length || 0)}
-                </p>
-                <p className="text-xs text-blue-600 mt-1">Pedidos ativos</p>
-              </div>
-              <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <ShoppingCart className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar por número, cliente ou produto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="production">Em Produção</SelectItem>
-                <SelectItem value="ready">Pronto para Despacho</SelectItem>
-                <SelectItem value="shipped">Despachado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      )}
 
       {/* Pedidos Pagos - Aguardando Envio para Produção */}
-      <Card className="mb-6">
-        <CardHeader className="bg-green-50">
-          <CardTitle className="text-green-800 flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Pedidos Pagos - Aguardando Envio para Produção ({paidOrdersCount})
-          </CardTitle>
-          <p className="text-sm text-green-700 mt-2">
-            Pedidos que receberam pagamento e estão prontos para serem enviados à produção
-          </p>
-        </CardHeader>
+      {(currentSection === 'dashboard' || currentSection === 'paid-orders') && (
+        <Card className="mb-6">
+          <CardHeader className="bg-green-50">
+            <CardTitle className="text-green-800 flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Pedidos Pagos - Aguardando Envio para Produção ({paidOrdersCount})
+            </CardTitle>
+            <p className="text-sm text-green-700 mt-2">
+              Pedidos que receberam pagamento e estão prontos para serem enviados à produção
+            </p>
+          </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -432,81 +490,142 @@ export default function LogisticsDashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
 
       {/* Pedidos em Produção */}
-      <Card>
-        <CardHeader className="bg-purple-50">
-          <CardTitle className="text-purple-800 flex items-center gap-2">
-            <Factory className="h-5 w-5" />
-            Pedidos em Produção - Acompanhamento ({productionOrders?.length || 0})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produtor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProductionOrders?.map((order: any) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                      <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.clientName}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.producerName || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(order.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
+      {(currentSection === 'dashboard' || currentSection === 'production-tracking') && (
+        <Card>
+          <CardHeader className="bg-purple-50">
+            <CardTitle className="text-purple-800 flex items-center gap-2">
+              <Factory className="h-5 w-5" />
+              Pedidos em Produção - Acompanhamento ({productionOrders?.length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produtor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredProductionOrders?.map((order: any) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                        <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.clientName}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.producerName || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(order.status)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setShowOrderDetailsModal(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                          {order.status === 'ready' && (
+                            <Button
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700 text-white"
+                              onClick={() => handleDispatchOrder(order)}
+                              disabled={dispatchOrderMutation.isPending}
+                              title="Produto está pronto - clique para despachar ao cliente"
+                            >
+                              <Truck className="h-4 w-4 mr-1" />
+                              {dispatchOrderMutation.isPending ? 'Despachando...' : 'Despachar para Cliente'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pedidos em Expedição */}
+      {(currentSection === 'dashboard' || currentSection === 'shipments') && (
+        <Card>
+          <CardHeader className="bg-cyan-50">
+            <CardTitle className="text-cyan-800 flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Pedidos Despachados ({productionOrders?.filter(o => o.status === 'shipped').length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Rastreio</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Despacho</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {productionOrders?.filter((o: any) => o.status === 'shipped').map((order: any) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                        <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.clientName}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {order.dispatchDate ? new Date(order.dispatchDate).toLocaleDateString('pt-BR') : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => {
                             setSelectedOrder(order);
                             setShowOrderDetailsModal(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
-                        {order.status === 'ready' && (
-                          <Button
-                            size="sm"
-                            className="bg-orange-600 hover:bg-orange-700 text-white"
-                            onClick={() => handleDispatchOrder(order)}
-                            disabled={dispatchOrderMutation.isPending}
-                            title="Produto está pronto - clique para despachar ao cliente"
-                          >
-                            <Truck className="h-4 w-4 mr-1" />
-                            {dispatchOrderMutation.isPending ? 'Despachando...' : 'Despachar para Cliente'}
+                          }}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
                           </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Modal - Enviar para Produção */}
       <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
