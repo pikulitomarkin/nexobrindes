@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, FileText, Upload, Plus, Calendar, Receipt } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, FileText, Upload, Plus, Calendar, Receipt, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -121,11 +121,12 @@ export default function FinanceExpenses() {
     }
   };
 
+  const [viewExpenseDialogOpen, setViewExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+
   const handleViewExpense = (expense: any) => {
-    toast({
-      title: "Detalhes da Despesa",
-      description: `${expense.description || expense.name} - R$ ${parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    });
+    setSelectedExpense(expense);
+    setViewExpenseDialogOpen(true);
   };
 
   const totalExpenses = (expenses || [])?.reduce((sum: number, e: any) => sum + parseFloat(e.amount || '0'), 0) || 0;
@@ -272,6 +273,150 @@ export default function FinanceExpenses() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Visualização da Despesa */}
+        <Dialog open={viewExpenseDialogOpen} onOpenChange={setViewExpenseDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Detalhes da Despesa</DialogTitle>
+              <DialogDescription>
+                Informações completas da nota de despesa
+              </DialogDescription>
+            </DialogHeader>
+            {selectedExpense && (
+              <div className="space-y-6">
+                {/* Informações Básicas */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Data</Label>
+                    <p className="text-sm font-semibold">
+                      {selectedExpense.date ? new Date(selectedExpense.date).toLocaleDateString('pt-BR') : 
+                       selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleDateString('pt-BR') : 
+                       'Data não informada'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Valor</Label>
+                    <p className="text-lg font-bold text-red-600">
+                      R$ {parseFloat(selectedExpense.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Categoria</Label>
+                    <div className="flex items-center mt-1">
+                      {getCategoryIcon(selectedExpense.category)}
+                      <span className="ml-2 font-medium">{getCategoryLabel(selectedExpense.category)}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Status</Label>
+                    <div className="mt-1">
+                      <Badge variant={selectedExpense.status === 'approved' ? 'default' : 'secondary'}>
+                        {selectedExpense.status === 'approved' ? 'Aprovada' : 
+                         selectedExpense.status === 'recorded' ? 'Registrada' : 
+                         selectedExpense.status === 'pending' ? 'Pendente' : selectedExpense.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nome da Despesa */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Nome da Despesa</Label>
+                  <p className="mt-1 font-semibold">
+                    {selectedExpense.name || selectedExpense.description || 'Não informado'}
+                  </p>
+                </div>
+
+                {/* Descrição (se houver) */}
+                {selectedExpense.description && selectedExpense.name && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Descrição Adicional</Label>
+                    <p className="mt-1 text-sm text-gray-700">
+                      {selectedExpense.description.replace(selectedExpense.name, '').replace(' - ', '').trim() || 'Nenhuma descrição adicional'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Comprovante/Anexo */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Comprovante</Label>
+                  {selectedExpense.attachmentUrl ? (
+                    <div className="mt-2 p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FileText className="h-5 w-5 text-blue-600 mr-2" />
+                          <span className="text-sm font-medium">Anexo disponível</span>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => window.open(selectedExpense.attachmentUrl, '_blank')}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Anexo
+                        </Button>
+                      </div>
+                      {/* Preview do anexo se for imagem */}
+                      {selectedExpense.attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
+                        <div className="mt-3">
+                          <img 
+                            src={selectedExpense.attachmentUrl} 
+                            alt="Comprovante da despesa"
+                            className="max-w-full h-auto max-h-64 object-contain rounded border"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="flex items-center">
+                        <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-600">Nenhum comprovante anexado</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Informações de Criação */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Criado em</Label>
+                      <p>{selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleString('pt-BR') : 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Criado por</Label>
+                      <p>{selectedExpense.createdBy || 'Sistema'}</p>
+                    </div>
+                  </div>
+
+                  {selectedExpense.approvedBy && (
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mt-2">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500">Aprovado em</Label>
+                        <p>{selectedExpense.approvedAt ? new Date(selectedExpense.approvedAt).toLocaleString('pt-BR') : 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500">Aprovado por</Label>
+                        <p>{selectedExpense.approvedBy}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <Button variant="outline" onClick={() => setViewExpenseDialogOpen(false)}>
+                    Fechar
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
