@@ -3192,22 +3192,49 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
     try {
       const { id } = req.params;
+      const { paidBy, paymentMethod, transactionId, notes } = req.body;
 
-      const updated = await storage.updateProducerPayment(id, {
-        status: 'approved',
-        approvedBy: 'admin-1',
-        approvedAt: new Date()
-      });
-
-      if (!updated) {
-        return res.status(404).json({ error: "Pagamento não encontrado" });
+      // First try to get the payment
+      let payment = await storage.getProducerPayment(id);
+      
+      if (!payment) {
+        // If payment doesn't exist, try to find production order and create payment
+        const productionOrder = await storage.getProductionOrder(id);
+        if (productionOrder && productionOrder.producerValue) {
+          payment = await storage.createProducerPayment({
+            productionOrderId: id,
+            producerId: productionOrder.producerId,
+            amount: productionOrder.producerValue,
+            status: 'pending',
+            notes: productionOrder.producerNotes || null
+          });
+          console.log(`Created producer payment for production order ${id}`);
+        } else {
+          return res.status(404).json({ error: "Pagamento não encontrado" });
+        }
       }
 
-      console.log(`Producer payment ${id} approved successfully`);
+      // Update payment status based on request data
+      const updateData: any = {
+        status: paidBy ? 'paid' : 'approved',
+        approvedBy: 'admin-1',
+        approvedAt: new Date()
+      };
+
+      if (paidBy) {
+        updateData.paidBy = paidBy;
+        updateData.paidAt = new Date();
+        updateData.paymentMethod = paymentMethod || 'manual';
+        updateData.notes = notes || payment.notes;
+      }
+
+      const updated = await storage.updateProducerPayment(payment.id, updateData);
+
+      console.log(`Producer payment ${payment.id} ${paidBy ? 'paid' : 'approved'} successfully`);
       res.json(updated);
     } catch (error) {
-      console.error("Error approving producer payment:", error);
-      res.status(500).json({ error: "Failed to approve producer payment" });
+      console.error("Error processing producer payment:", error);
+      res.status(500).json({ error: "Erro ao processar pagamento do produtor" });
     }
   });
 

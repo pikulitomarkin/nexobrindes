@@ -69,7 +69,7 @@ export default function FinancePayables() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          paidBy: 'current-user-id',
+          paidBy: 'admin-1',
           paymentMethod: data.method,
           transactionId: data.transactionId,
           notes: data.notes
@@ -77,7 +77,8 @@ export default function FinancePayables() {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao registrar pagamento');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao registrar pagamento');
       }
 
       return response.json();
@@ -440,33 +441,30 @@ export default function FinancePayables() {
         <CardHeader>
           <CardTitle>Contas a Pagar ({filteredPayables.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Data
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Tipo
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Descrição
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Beneficiário
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pedido
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Valor
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Status
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Ações
                   </th>
                 </tr>
@@ -474,58 +472,55 @@ export default function FinancePayables() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredPayables.map((payable: any) => (
                   <tr key={payable.id}>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {new Date(payable.dueDate).toLocaleDateString('pt-BR')}
+                    <td className="px-2 py-2 text-xs text-gray-900">
+                      {new Date(payable.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <td className="px-2 py-2 text-xs text-gray-900">
                       <div className="flex items-center">
                         {getTypeIcon(payable.type)}
-                        <span className="ml-2 capitalize">{payable.category || payable.type}</span>
+                        <span className="ml-1 hidden sm:inline">{payable.category || payable.type}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-xs text-gray-900 max-w-xs truncate">
-                      {payable.description}
+                    <td className="px-2 py-2 text-xs text-gray-900">
+                      <div className="max-w-[150px] truncate" title={payable.description}>
+                        {payable.description}
+                      </div>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {payable.beneficiary}
+                    <td className="px-2 py-2 text-xs text-gray-900">
+                      <div className="max-w-[120px] truncate" title={payable.beneficiary}>
+                        {payable.beneficiary}
+                      </div>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
-                      {payable.orderNumber}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                    <td className="px-2 py-2 text-xs text-gray-900 font-semibold">
                       R$ {parseFloat(payable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-2 py-2">
                       {getStatusBadge(payable.status, payable.type)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs font-medium">
+                    <td className="px-2 py-2 text-xs">
                       <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-3 w-3 mr-0.5" />
-                          Ver
-                        </Button>
                         {payable.type === 'producer' && (payable.status === 'approved' || payable.status === 'pending') && (
                           <Button 
                             variant="ghost" 
-                            size="sm" 
+                            size="sm"
+                            className="h-7 px-2"
                             onClick={() => handlePayProducer(payable)}
                           >
-                            <CreditCard className="h-3 w-3 mr-0.5" />
-                            Pagar
+                            <CreditCard className="h-3 w-3" />
                           </Button>
                         )}
                         {payable.type === 'refund' && payable.status === 'pending_definition' && (
                           <Button 
                             variant="ghost" 
-                            size="sm" 
+                            size="sm"
+                            className="h-7 px-2"
                             onClick={() => {
                               setSelectedPayable(payable);
                               setRefundData(prev => ({ ...prev, amount: payable.amount }));
                               setIsRefundDialogOpen(true);
                             }}
                           >
-                            <DollarSign className="h-3 w-3 mr-0.5" />
-                            Definir Valor
+                            <DollarSign className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
