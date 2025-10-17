@@ -115,7 +115,7 @@ export default function ProductionDashboard() {
     updateStatusMutation.mutate({ id: order.id, status });
   };
 
-  
+
 
   const handleSetValue = (order: any) => {
     setSelectedOrder(order);
@@ -125,16 +125,6 @@ export default function ProductionDashboard() {
       setProducerValue("");
     }
     setProducerNotes(order.producerNotes || "");
-
-    // If the value is already set and locked, don't allow editing
-    if (order.producerValueLocked) {
-      toast({
-        title: "Valor já definido",
-        description: "O valor já foi definido e não pode ser alterado",
-        variant: "destructive",
-      });
-      return;
-    }
 
     // If value already exists, go directly to edit dialog
     if (order.producerValue && parseFloat(order.producerValue) > 0) {
@@ -537,7 +527,7 @@ export default function ProductionDashboard() {
                       </div>
                     </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Cliente</Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -545,17 +535,6 @@ export default function ProductionDashboard() {
                         <p className="font-medium">{order.clientName || order.order?.clientName || 'N/A'}</p>
                       </div>
                     </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Tipo de Entrega</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <p className="font-medium">
-                          {order.order?.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
-                        </p>
-                      </div>
-                    </div>
-
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Prazo</Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -577,7 +556,7 @@ export default function ProductionDashboard() {
                     </div>
                   )}
 
-                  
+
 
                   {order.notes && (
                     <div className="mb-4">
@@ -625,28 +604,51 @@ export default function ProductionDashboard() {
           <DialogHeader>
             <DialogTitle>Definir Valor do Serviço</DialogTitle>
             <DialogDescription>
-              Defina o valor que você cobrará pela produção deste pedido
+              Defina o valor que você cobrará por este serviço
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Order Information - Sem valor do pedido */}
+            {selectedOrder && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-2">Informações do Pedido</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-600">Produto:</span>
+                    <p className="font-medium">{selectedOrder.order?.product || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Cliente:</span>
+                    <p className="font-medium">{selectedOrder.clientName || 'N/A'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Prazo:</span>
+                    <p className="font-medium">
+                      {selectedOrder.deadline ? 
+                        new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 
+                        'Não definido'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
-              <Label htmlFor="producer-value">Valor do Serviço (R$)</Label>
+              <Label htmlFor="producer-value">Seu Valor de Serviço (R$)</Label>
               <Input
                 id="producer-value"
                 type="number"
                 step="0.01"
-                min="0.01"
+                placeholder="Ex: 850.00"
                 value={producerValue}
                 onChange={(e) => setProducerValue(e.target.value)}
-                placeholder="0,00"
-                required
               />
             </div>
             <div>
               <Label htmlFor="producer-notes">Observações (Opcional)</Label>
               <Textarea
                 id="producer-notes"
-                placeholder="Descreva o que está incluído no valor (material, mão de obra, etc.)"
+                placeholder="Descreva o que está incluído no valor, materiais, prazo, etc."
                 value={producerNotes}
                 onChange={(e) => setProducerNotes(e.target.value)}
                 rows={3}
@@ -657,11 +659,12 @@ export default function ProductionDashboard() {
             <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={handleSaveValue}
+            <Button 
+              onClick={handleSaveValue} 
               disabled={!producerValue || parseFloat(producerValue) <= 0}
+              className="bg-green-600 hover:bg-green-700"
             >
-              Continuar
+              Definir Valor
             </Button>
           </div>
         </DialogContent>
@@ -734,7 +737,7 @@ export default function ProductionDashboard() {
         </DialogContent>
       </Dialog>
 
-      
+
     </div>
   );
 }
