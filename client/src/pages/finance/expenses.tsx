@@ -22,8 +22,9 @@ export default function FinanceExpenses() {
     category: "",
     description: "",
     amount: "",
-    vendorId: "",
-    orderId: "",
+    attachment: null, // Add state for file upload
+    vendorId: "", // Remove as per new requirement
+    orderId: "",  // Remove as per new requirement
   });
   const { toast } = useToast();
 
@@ -41,13 +42,18 @@ export default function FinanceExpenses() {
 
   const createExpenseMutation = useMutation({
     mutationFn: async (data: any) => {
+      const formData = new FormData();
+      formData.append('date', data.date);
+      formData.append('category', data.category);
+      formData.append('description', data.description);
+      formData.append('amount', data.amount);
+      if (data.attachment) {
+        formData.append('attachment', data.attachment);
+      }
+
       const response = await fetch("/api/finance/expenses", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          createdBy: "current-user-id", // TODO: Get from auth context
-        }),
+        body: formData,
       });
       if (!response.ok) throw new Error("Erro ao criar despesa");
       return response.json();
@@ -60,6 +66,7 @@ export default function FinanceExpenses() {
         category: "",
         description: "",
         amount: "",
+        attachment: null,
         vendorId: "",
         orderId: "",
       });
@@ -85,7 +92,7 @@ export default function FinanceExpenses() {
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.recorded;
-    
+
     return (
       <Badge variant={statusInfo.variant} className="capitalize">
         {statusInfo.label}
@@ -109,8 +116,7 @@ export default function FinanceExpenses() {
     const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
     const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
     const matchesSearch = searchTerm === "" || 
-      expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.vendorName?.toLowerCase().includes(searchTerm.toLowerCase());
+      expense.description?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesCategory && matchesSearch;
   });
 
@@ -197,7 +203,7 @@ export default function FinanceExpenses() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="expense-category">Categoria <span className="text-red-500">*</span></Label>
                 <Select 
@@ -218,10 +224,10 @@ export default function FinanceExpenses() {
               </div>
 
               <div>
-                <Label htmlFor="expense-description">Descrição <span className="text-red-500">*</span></Label>
+                <Label htmlFor="expense-description">Nome da Despesa <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="expense-description"
-                  placeholder="Descreva a despesa detalhadamente..."
+                  placeholder="Nome da despesa..."
                   value={expenseData.description}
                   onChange={(e) => setExpenseData(prev => ({ ...prev, description: e.target.value }))}
                   data-testid="textarea-expense-description"
@@ -230,73 +236,24 @@ export default function FinanceExpenses() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="expense-vendor">Fornecedor (Opcional)</Label>
-                  <Select 
-                    value={expenseData.vendorId} 
-                    onValueChange={(value) => setExpenseData(prev => ({ ...prev, vendorId: value }))}
-                  >
-                    <SelectTrigger data-testid="select-expense-vendor">
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(vendors || [])?.map((vendor: any) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="expense-order">Pedido (Opcional)</Label>
-                  <div className="space-y-2">
-                    <Select 
-                      value={expenseData.orderId} 
-                      onValueChange={(value) => setExpenseData(prev => ({ ...prev, orderId: value }))}
-                    >
-                      <SelectTrigger data-testid="select-expense-order">
-                        <SelectValue placeholder="Selecione o pedido" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="p-2 border-b">
-                          <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
-                            <Input
-                              placeholder="Buscar pedido..."
-                              className="pl-6 text-xs"
-                              onChange={(e) => {
-                                // Filter functionality can be added here if needed
-                              }}
-                            />
-                          </div>
-                        </div>
-                        {(orders || [])?.map((order: any) => (
-                          <SelectItem key={order.id} value={order.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{order.orderNumber}</span>
-                              <span className="text-xs text-gray-500">{order.clientName} - {order.product}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500">
-                      Vincule esta despesa a um pedido específico se aplicável
-                    </p>
-                  </div>
-                </div>
+              <div>
+                <Label htmlFor="expense-attachment">Comprovante (Opcional)</Label>
+                <Input
+                  id="expense-attachment"
+                  type="file"
+                  onChange={(e) => setExpenseData(prev => ({ ...prev, attachment: e.target.files ? e.target.files[0] : null }))}
+                  data-testid="input-expense-attachment"
+                  className="text-lg"
+                />
               </div>
 
-              {/* Informações adicionais */}
+              {/* Removed fields for cliente and produtor as per new requirement */}
+
               <div className="p-4 bg-blue-50 border border-blue-200 rounded">
                 <h4 className="font-medium text-blue-900 mb-2">Informações Importantes</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Todas as despesas passam por aprovação antes de serem contabilizadas</li>
-                  <li>• Anexe comprovantes sempre que possível</li>
-                  <li>• Despesas vinculadas a pedidos facilitam o controle de custos</li>
+                  <li>• Esta nota é apenas para controle interno e não afeta o cálculo do sistema.</li>
+                  <li>• Anexe o comprovante de despesa.</li>
                 </ul>
               </div>
 
@@ -318,7 +275,7 @@ export default function FinanceExpenses() {
         </Dialog>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - These might also need adjustment if they relied on fields that are now removed */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
@@ -393,7 +350,7 @@ export default function FinanceExpenses() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Buscar por descrição ou fornecedor..."
+                  placeholder="Buscar por descrição..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -413,7 +370,7 @@ export default function FinanceExpenses() {
                   <SelectItem value="reimbursed">Reembolsada</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
                   <SelectValue />
@@ -449,16 +406,10 @@ export default function FinanceExpenses() {
                     Categoria
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Descrição
+                    Nome da Despesa
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fornecedor/Pedido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
@@ -477,17 +428,11 @@ export default function FinanceExpenses() {
                         <span className="ml-2 capitalize">{expense.category}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                    <td className="px-6 py-4 text-sm text-gray-900">
                       {expense.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                       R$ {parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {expense.vendorName || expense.orderNumber || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(expense.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
@@ -496,9 +441,14 @@ export default function FinanceExpenses() {
                           Ver
                         </Button>
                         {expense.attachmentUrl && (
-                          <Button variant="ghost" size="sm" data-testid={`button-attachment-${expense.id}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => window.open(expense.attachmentUrl, '_blank')}
+                            data-testid={`button-attachment-${expense.id}`}
+                          >
                             <FileText className="h-4 w-4 mr-1" />
-                            Anexo
+                            Comprovante
                           </Button>
                         )}
                       </div>
