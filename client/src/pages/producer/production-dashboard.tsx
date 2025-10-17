@@ -691,9 +691,11 @@ export default function ProductionDashboard() {
                   <p className="font-medium">{selectedOrder?.clientName || 'N/A'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-gray-600">Valor Total do Pedido</Label>
-                  <p className="text-lg font-bold text-green-600">
-                    R$ {parseFloat(selectedOrder?.order?.totalValue || selectedOrder?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <Label className="text-sm text-gray-600">Prazo</Label>
+                  <p className="font-medium">
+                    {selectedOrder?.deadline ? 
+                      new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 
+                      'Não definido'}
                   </p>
                 </div>
                 <div>
