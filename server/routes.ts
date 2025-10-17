@@ -5474,7 +5474,7 @@ Para mais detalhes, entre em contato conosco!`;
           if (!a.acceptedAt && !b.acceptedAt) return 0;
           if (!a.acceptedAt) return 1;
           if (!b.acceptedAt) return -1;
-          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt.getTime() - new Date(a.acceptedAt).getTime();
+          return new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime();
         });
 
       console.log(`Producer orders for ${producerId}:`, filteredOrders.length, 'orders found');
