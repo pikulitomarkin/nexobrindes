@@ -49,7 +49,7 @@ export default function Login() {
               window.location.href = "/";
               break;
             case "vendor":
-              window.location.href = "/";
+              window.location.href = "/vendor/dashboard";
               break;
             case "client":
               window.location.href = "/client/orders";
