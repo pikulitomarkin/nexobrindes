@@ -4536,30 +4536,27 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/receivables", async (req, res) => {
     try {
       const receivables = await storage.getAccountsReceivable();
+      console.log(`Found ${receivables.length} receivables total`);
 
-      // Enrich receivables with client names
-      const enrichedReceivables = await Promise.all(
-        receivables.map(async (receivable) => {
-          let clientName = receivable.clientName || 'Cliente não identificado';
+      // The receivables already come enriched from storage, just ensure all fields are present
+      const finalReceivables = receivables.map((receivable) => ({
+        id: receivable.id,
+        orderId: receivable.orderId,
+        orderNumber: receivable.orderNumber || (receivable.orderId ? `#${receivable.orderId}` : 'MANUAL'),
+        clientName: receivable.clientName || 'Cliente não identificado',
+        amount: receivable.amount || "0.00",
+        receivedAmount: receivable.receivedAmount || "0.00",
+        status: receivable.status || 'pending',
+        dueDate: receivable.dueDate,
+        createdAt: receivable.createdAt,
+        lastPaymentDate: receivable.lastPaymentDate,
+        isManual: receivable.isManual || false,
+        description: receivable.description,
+        notes: receivable.notes
+      }));
 
-          // Try to get client name from order if not available
-          if (!clientName && receivable.orderId) {
-            const order = await storage.getOrder(receivable.orderId);
-            if (order) {
-              clientName = order.contactName || 'Cliente não identificado';
-            }
-          }
-
-          return {
-            ...receivable,
-            clientName,
-            // Ensure we have the orderNumber field that the frontend expects
-            orderNumber: receivable.orderNumber || (receivable.orderId ? `#${receivable.orderId}` : 'MANUAL')
-          };
-        })
-      );
-
-      res.json(enrichedReceivables);
+      console.log(`Returning ${finalReceivables.length} receivables`);
+      res.json(finalReceivables);
     } catch (error) {
       console.error("Failed to fetch receivables:", error);
       res.status(500).json({ error: "Failed to fetch receivables: " + error.message });
