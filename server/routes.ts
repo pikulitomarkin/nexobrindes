@@ -173,6 +173,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approve and pay producer payment
+  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paidBy, paymentMethod, transactionId, notes } = req.body;
+
+      console.log("Processing producer payment:", id, { paidBy, paymentMethod, transactionId });
+
+      // Update the producer payment status to paid
+      const updatedPayment = await storage.updateProducerPayment(id, {
+        status: 'paid',
+        paidBy: paidBy || 'admin-1',
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        notes: notes || ''
+      });
+
+      if (!updatedPayment) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      console.log("Updated producer payment:", updatedPayment.id, updatedPayment.status);
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error("Error processing producer payment:", error);
+      res.status(500).json({ error: "Erro ao processar pagamento" });
+    }
+  });
+
   // Verify Token (middleware for protected routes)
   app.get("/api/auth/verify", async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -1339,6 +1368,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching accounts receivable:", error);
       res.status(500).json({ error: "Failed to fetch accounts receivable" });
+    }
+  });
+
+  // Get all producer payments
+  app.get("/api/finance/producer-payments", async (req, res) => {
+    try {
+      const producerPayments = await storage.getProducerPayments();
+      console.log(`Found ${producerPayments.length} total producer payments`);
+
+      // Enrich with producer and order information
+      const enrichedPayments = await Promise.all(
+        producerPayments.map(async (payment) => {
+          const producer = await storage.getUser(payment.producerId);
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const order = productionOrder ? await storage.getOrder(productionOrder.orderId) : null;
+
+          return {
+            ...payment,
+            producerName: producer?.name || 'Produtor não encontrado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não encontrado',
+            clientName: order?.contactName || order?.clientName || 'Cliente não encontrado',
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
+  // Get pending producer payments
+  app.get("/api/finance/producer-payments/pending", async (req, res) => {
+    try {
+      const allPayments = await storage.getProducerPayments();
+      console.log(`Found ${allPayments.length} total producer payments`);
+
+      const pendingPayments = allPayments.filter(payment => {
+        const isPending = payment.status === 'pending' || payment.status === 'approved';
+        console.log(`Payment ${payment.id}: status=${payment.status}, isPending=${isPending}`);
+        return isPending;
+      });
+
+      console.log(`Found ${pendingPayments.length} pending producer payments`);
+
+      // Enrich with producer and order information
+      const enrichedPayments = await Promise.all(
+        pendingPayments.map(async (payment) => {
+          const producer = await storage.getUser(payment.producerId);
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const order = productionOrder ? await storage.getOrder(productionOrder.orderId) : null;
+
+          return {
+            ...payment,
+            producerName: producer?.name || 'Produtor não encontrado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não encontrado',
+            clientName: order?.contactName || order?.clientName || 'Cliente não encontrado',
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
     }
   });
 

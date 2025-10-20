@@ -37,11 +37,6 @@ export default function FinancePayables() {
     queryKey: ["/api/finance/overview"],
   });
 
-  // Get pending producer payments
-  const { data: pendingProducerPayments = [] } = useQuery({
-    queryKey: ["/api/finance/producer-payments/pending"]
-  });
-
   // Get all producer payments for payables
   const { data: producerPayments = [] } = useQuery({
     queryKey: ["/api/finance/producer-payments"]
@@ -156,7 +151,8 @@ export default function FinancePayables() {
   const allPayables = [
     // Producer payments
     ...producerPayments.map((payment: any) => ({
-      id: `producer-${payment.id}`,
+      id: payment.id, // Use the actual producer payment ID
+      originalId: `producer-${payment.id}`, // Keep composed ID for display
       type: 'producer',
       dueDate: payment.deadline || payment.createdAt,
       description: `Pagamento Produtor - ${payment.product}`,
@@ -164,7 +160,7 @@ export default function FinancePayables() {
       status: payment.status,
       beneficiary: payment.producerName,
       orderNumber: payment.orderNumber,
-      productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
+      productionOrderId: payment.productionOrderId,
       category: 'Produção'
     })),
 
@@ -267,10 +263,11 @@ export default function FinancePayables() {
 
   const handlePay = () => {
     if (selectedPayable && paymentData.amount && paymentData.method) {
-      // Extract the actual ID from the composed ID
-      const actualId = selectedPayable.id.startsWith('producer-') 
-        ? selectedPayable.id.replace('producer-', '') 
-        : selectedPayable.productionOrderId || selectedPayable.id;
+      // Extract the actual producer payment ID from the composed ID
+      let actualId = selectedPayable.id;
+      if (actualId.startsWith('producer-')) {
+        actualId = actualId.replace('producer-', '');
+      }
       
       payProducerMutation.mutate({
         payableId: actualId,
@@ -507,20 +504,7 @@ export default function FinancePayables() {
                       <div className="flex space-x-1">
                         {payable.type === 'producer' && (payable.status === 'approved' || payable.status === 'pending') && (
                           <Button
-                            onClick={() => {
-                              setSelectedPayable({
-                                ...payable,
-                                // Use productionOrderId for the payment endpoint
-                                id: payable.productionOrderId || payable.id
-                              });
-                              setPaymentData({
-                                amount: payable.amount,
-                                method: "",
-                                transactionId: "",
-                                notes: "",
-                              });
-                              setIsPayDialogOpen(true);
-                            }}
+                            onClick={() => handlePayProducer(payable)}
                             size="sm"
                             className="gradient-bg text-white"
                           >
