@@ -48,13 +48,13 @@ export default function LogisticsDashboard() {
 
 
 
-  // Enviar pedido para produção - automaticamente para todos os produtores envolvidos
+  // Enviar pedido para produtor específico
   const sendToProductionMutation = useMutation({
-    mutationFn: async ({ orderId }: { orderId: string }) => {
+    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId: string }) => {
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ producerId }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -64,12 +64,12 @@ export default function LogisticsDashboard() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] }); // Invalidar a query que busca pedidos separados por produtor
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
       setShowSendToProductionModal(false);
       setSelectedOrder(null);
       toast({
         title: "Sucesso!",
-        description: `Pedido enviado para produção. ${data.productionOrdersCreated} ordem(ns) de produção criada(s) para: ${data.producerNames?.join(', ') || 'produtores'}`,
+        description: `Pedido enviado para produção. ${data.productionOrdersCreated || 1} ordem(ns) de produção criada(s) para: ${data.producerNames?.join(', ') || 'produtor selecionado'}`,
       });
     },
     onError: (error: any) => {
@@ -473,15 +473,44 @@ export default function LogisticsDashboard() {
                             <Eye className="h-4 w-4 mr-1" />
                             Ver
                           </Button>
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => handleSendToProduction(order)}
-                            disabled={sendToProductionMutation.isPending}
-                          >
-                            <Send className="h-4 w-4 mr-1" />
-                            Enviar para Produção
-                          </Button>
+                          <div className="flex gap-2">
+                            {/* Identificar produtores do pedido */}
+                            {(() => {
+                              const producers = new Set<string>();
+                              if (order.items && Array.isArray(order.items)) {
+                                order.items.forEach((item: any) => {
+                                  if (item.producerId && item.producerId !== 'internal') {
+                                    producers.add(item.producerId);
+                                  }
+                                });
+                              }
+                              
+                              if (producers.size === 0) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled
+                                  >
+                                    Sem produtores externos
+                                  </Button>
+                                );
+                              }
+
+                              return Array.from(producers).map((producerId) => (
+                                <Button
+                                  key={producerId}
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
+                                  disabled={sendToProductionMutation.isPending}
+                                >
+                                  <Send className="h-4 w-4 mr-1" />
+                                  Enviar para {producerId === 'producer-1' ? 'Marcenaria' : 'Produtor'}
+                                </Button>
+                              ));
+                            })()}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -696,6 +725,9 @@ export default function LogisticsDashboard() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogDescription>
+              Informações completas do pedido e itens para produção
+            </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-6">
@@ -712,13 +744,32 @@ export default function LogisticsDashboard() {
                       <p>{selectedOrder.clientName}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Produto</label>
-                      <p>{selectedOrder.product}</p>
+                      <label className="text-sm font-medium text-gray-500">Contato</label>
+                      <p className="text-sm text-gray-600">
+                        {selectedOrder.contactPhone && (
+                          <span>Tel: {selectedOrder.contactPhone}<br /></span>
+                        )}
+                        {selectedOrder.contactEmail && (
+                          <span>Email: {selectedOrder.contactEmail}</span>
+                        )}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Descrição</label>
-                      <p className="text-gray-700">{selectedOrder.description}</p>
+                      <label className="text-sm font-medium text-gray-500">Produto Principal</label>
+                      <p className="font-medium">{selectedOrder.product}</p>
                     </div>
+                    {selectedOrder.description && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Descrição</label>
+                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.description}</p>
+                      </div>
+                    )}
+                    {selectedOrder.deadline && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Prazo</label>
+                        <p>{new Date(selectedOrder.deadline).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -735,12 +786,90 @@ export default function LogisticsDashboard() {
                       </p>
                     </div>
                     <div>
+                      <label className="text-sm font-medium text-gray-500">Valor Pago</label>
+                      <p className="text-lg font-semibold text-blue-600">
+                        R$ {parseFloat(selectedOrder.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
                       <label className="text-sm font-medium text-gray-500">Data de Criação</label>
                       <p>{new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Itens do Pedido */}
+              {selectedOrder.items && selectedOrder.items.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Itens para Produção ({selectedOrder.items.length})</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.items.map((item: any, index: number) => {
+                      const isExternal = item.producerId && item.producerId !== 'internal';
+                      return (
+                        <div key={index} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Package className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium">{item.productName}</span>
+                                {isExternal && (
+                                  <Badge variant="outline" className="text-orange-700 border-orange-300">
+                                    Produção Externa
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Quantidade:</span>
+                                  <p className="font-medium">{item.quantity}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Valor Unit.:</span>
+                                  <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                {item.hasItemCustomization && (
+                                  <div className="col-span-2">
+                                    <span className="text-gray-500">Personalização:</span>
+                                    <p className="font-medium text-blue-600">{item.itemCustomizationDescription}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-green-600">
+                                R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Fotos anexadas */}
+              {selectedOrder.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Fotos de Referência ({selectedOrder.budgetPhotos.length})</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {selectedOrder.budgetPhotos.map((photoUrl: string, index: number) => (
+                      <div key={index} className="relative group">
+                        <img 
+                          src={photoUrl} 
+                          alt={`Referência ${index + 1}`}
+                          className="w-full h-24 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
+                          onClick={() => window.open(photoUrl, '_blank')}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
+                          <span className="text-white text-xs opacity-0 group-hover:opacity-100">Ampliar</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

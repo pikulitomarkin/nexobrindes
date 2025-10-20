@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validar personalizações antes de criar o pedido - apenas logar alertas
       let orderWarnings = [];
-      
+
       if (req.body.items && req.body.items.length > 0) {
         console.log("Validando personalizações dos itens:", JSON.stringify(req.body.items, null, 2));
 
@@ -384,13 +384,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("Created order with contact name:", newOrder.contactName);
-      
+
       // Incluir alertas na resposta se existirem
       const response = {
         ...newOrder,
         warnings: orderWarnings.length > 0 ? orderWarnings : undefined
       };
-      
+
       res.json(response);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -878,7 +878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Use userCode as username if username is not provided
       const finalUsername = username || userCode || email;
-      
+
       if (!finalUsername) {
         return res.status(400).json({ error: "Username ou código de usuário é obrigatório" });
       }
@@ -909,8 +909,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         user: {
           ...user,
           userCode: finalUsername // Include userCode in response for display
@@ -1636,12 +1636,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Configure multer for file uploads
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for JSON imports
-  });
-
   // Client profile endpoints
   app.get("/api/clients/profile/:userId", async (req, res) => {
     try {
@@ -1987,7 +1981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validar personalizações antes de criar o orçamento - apenas logar alertas
       let customizationWarnings = [];
-      
+
       if (req.body.items && req.body.items.length > 0) {
         console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
 
@@ -2758,7 +2752,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // First try to get existing producer payment
       let payment = await storage.getProducerPayment(id);
-      
+
       if (!payment) {
         // If payment doesn't exist, try to find production order and create payment
         const productionOrder = await storage.getProductionOrder(id);
@@ -2840,7 +2834,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const allPayments = await storage.getProducerPayments();
       console.log(`Found ${allPayments.length} total producer payments`);
-      
+
       const pendingPayments = allPayments.filter(p => {
         const isPending = ['pending', 'approved'].includes(p.status);
         console.log(`Payment ${p.id}: status=${p.status}, isPending=${isPending}`);
@@ -2906,8 +2900,9 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
       const { id: orderId } = req.params;
+      const { producerId: specificProducerId } = req.body;
 
-      console.log(`Sending order ${orderId} to production`);
+      console.log(`Sending order ${orderId} to production${specificProducerId ? ` for producer ${specificProducerId}` : ' for all producers'}`);
 
       // Get the order with full details
       const order = await storage.getOrder(orderId);
@@ -2958,22 +2953,25 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Check if order has items to determine producers
-      const producersInvolved = new Map<string, any[]>(); // Map producer to their items
+      const producersInvolved = new Set<string>();
 
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
-          if (item.producerId && item.producerId !== 'internal') {
-            if (!producersInvolved.has(item.producerId)) {
-              producersInvolved.set(item.producerId, []);
+      if (specificProducerId) {
+        // Send to specific producer only
+        producersInvolved.add(specificProducerId);
+      } else {
+        // Send to all producers involved in the order
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item: any) => {
+            if (item.producerId && item.producerId !== 'internal') {
+              producersInvolved.add(item.producerId);
             }
-            producersInvolved.get(item.producerId)!.push(item);
-          }
-        });
+          });
+        }
       }
 
       if (producersInvolved.size === 0) {
-        return res.status(400).json({ 
-          error: "Este pedido não possui itens que necessitam de produção externa" 
+        return res.status(400).json({
+          error: "Este pedido não possui itens que necessitam de produção externa"
         });
       }
 
@@ -2981,12 +2979,15 @@ Para mais detalhes, entre em contato conosco!`;
       const productionOrdersCreated = [];
       const producerNames = [];
 
-      for (const [producerId, producerItems] of producersInvolved) {
+      for (const producerId of producersInvolved) {
         // Check if production order already exists
         const existingPOs = await storage.getProductionOrdersByOrder(orderId);
         const alreadyExists = existingPOs.some(po => po.producerId === producerId);
 
         if (!alreadyExists) {
+          // Get items for this specific producer
+          const producerItems = order.items ? order.items.filter((item: any) => item.producerId === producerId) : [];
+
           // Calculate total value for this producer's items
           const producerItemsValue = producerItems.reduce((total, item) => {
             return total + (parseFloat(item.totalPrice) || 0);
@@ -3013,15 +3014,15 @@ Para mais detalhes, entre em contato conosco!`;
               photos: budgetPhotos, // Include budget photos
               totalValue: order.totalValue,
               producerItemsValue: producerItemsValue.toFixed(2),
-              shippingAddress: order.deliveryType === 'pickup' 
-                ? 'Sede Principal - Retirada no Local' 
+              shippingAddress: order.deliveryType === 'pickup'
+                ? 'Sede Principal - Retirada no Local'
                 : (clientDetails?.address || 'Endereço não informado'),
               specialInstructions: order.description || ''
             })
           });
 
           productionOrdersCreated.push(productionOrder);
-          
+
           // Get producer name
           const producer = await storage.getUser(producerId);
           if (producer) {
@@ -3029,6 +3030,8 @@ Para mais detalhes, entre em contato conosco!`;
           }
 
           console.log(`Created detailed production order ${productionOrder.id} for producer ${producerId} with ${producerItems.length} items`);
+        } else {
+          console.log(`Production order already exists for producer ${producerId} on order ${orderId}`);
         }
       }
 
@@ -3953,7 +3956,10 @@ Para mais detalhes, entre em contato conosco!`;
   // Send order to production - automatically create production orders for all producers involved
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
-      const orderId = req.params.id;
+      const { id: orderId } = req.params;
+      const { producerId: specificProducerId } = req.body;
+
+      console.log(`Sending order ${orderId} to production${specificProducerId ? ` for producer ${specificProducerId}` : ' for all producers'}`);
 
       // Get order details
       const order = await storage.getOrder(orderId);
@@ -3961,77 +3967,144 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
-      // Get all unique producers from order items
-      const producersInvolved = new Set<string>();
-      
-      if (order.items && Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
-          if (item.producerId && item.producerId !== 'internal') {
-            producersInvolved.add(item.producerId);
-          }
-        });
-      }
-
-      // If order was converted from budget, also check budget items
+      // Get budget photos if order came from a budget
+      let budgetPhotos = [];
       if (order.budgetId) {
-        const budgetItems = await storage.getBudgetItems(order.budgetId);
-        budgetItems.forEach((item: any) => {
-          if (item.producerId && item.producerId !== 'internal') {
-            producersInvolved.add(item.producerId);
+        const photos = await storage.getBudgetPhotos(order.budgetId);
+        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+        console.log(`Found ${budgetPhotos.length} budget photos for order ${orderId}`);
+      }
+
+      // Get client details
+      let clientDetails = null;
+      if (order.clientId) {
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          clientDetails = {
+            name: clientRecord.name,
+            email: clientRecord.email,
+            phone: clientRecord.phone,
+            address: clientRecord.address
+          };
+        } else {
+          const clientUser = await storage.getUser(order.clientId);
+          if (clientUser) {
+            clientDetails = {
+              name: clientUser.name,
+              email: clientUser.email,
+              phone: clientUser.phone,
+              address: clientUser.address
+            };
           }
-        });
-      }
-
-      if (producersInvolved.size === 0) {
-        return res.status(400).json({ error: "Este pedido não possui itens de produtores terceirizados" });
-      }
-
-      // Update order status to production
-      const updatedOrder = await storage.updateOrder(orderId, {
-        status: 'production'
-      });
-
-      console.log(`Sending order ${orderId} to production with ${producersInvolved.size} producers:`, Array.from(producersInvolved));
-
-      // Create production orders for each producer involved
-      const createdProductionOrders = [];
-      for (const producerId of producersInvolved) {
-        const productionOrder = await storage.createProductionOrder({
-          orderId: updatedOrder.id,
-          producerId: producerId,
-          status: 'pending',
-          deadline: updatedOrder.deadline
-        });
-
-        createdProductionOrders.push(productionOrder);
-        console.log(`Created production order ${productionOrder.id} for producer ${producerId}`);
-      }
-
-      // Get enriched order data
-      const client = await storage.getUser(updatedOrder.clientId);
-      const vendor = await storage.getUser(updatedOrder.vendorId);
-
-      // Get producer names
-      const producerNames = [];
-      for (const producerId of producersInvolved) {
-        const producer = await storage.getUser(producerId);
-        if (producer) {
-          producerNames.push(producer.name);
         }
       }
 
-      const enrichedOrder = {
-        ...updatedOrder,
-        clientName: client?.name || 'Unknown',
-        vendorName: vendor?.name || 'Unknown',
-        producerNames: producerNames,
-        productionOrdersCreated: createdProductionOrders.length
-      };
+      // Use contact details as fallback
+      if (!clientDetails) {
+        clientDetails = {
+          name: order.contactName,
+          email: order.contactEmail,
+          phone: order.contactPhone,
+          address: null
+        };
+      }
 
-      res.json(enrichedOrder);
+      // Determine producers involved
+      const producersInvolved = new Set<string>();
+
+      if (specificProducerId) {
+        // Send to specific producer only
+        producersInvolved.add(specificProducerId);
+      } else {
+        // Send to all producers involved in the order
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item: any) => {
+            if (item.producerId && item.producerId !== 'internal') {
+              producersInvolved.add(item.producerId);
+            }
+          });
+        }
+      }
+
+      if (producersInvolved.size === 0) {
+        return res.status(400).json({
+          error: "Este pedido não possui itens que necessitam de produção externa"
+        });
+      }
+
+      // Create production orders for each producer
+      const productionOrdersCreated = [];
+      const producerNames = [];
+
+      for (const producerId of producersInvolved) {
+        // Check if production order already exists
+        const existingPOs = await storage.getProductionOrdersByOrder(orderId);
+        const alreadyExists = existingPOs.some(po => po.producerId === producerId);
+
+        if (!alreadyExists) {
+          // Get items for this specific producer
+          const producerItems = order.items ? order.items.filter((item: any) => item.producerId === producerId) : [];
+
+          // Create detailed order info for this producer
+          const orderDetails = {
+            orderNumber: order.orderNumber,
+            product: order.product,
+            description: order.description,
+            clientDetails: {
+              name: order.contactName,
+              phone: order.contactPhone,
+              email: order.contactEmail,
+            },
+            shippingAddress: order.deliveryType === 'pickup'
+              ? 'Sede Principal - Retirada no Local'
+              : 'Endereço do cliente',
+            items: producerItems, // Only items for this producer
+            photos: budgetPhotos, // Include budget photos
+            deadline: order.deadline,
+            deliveryDeadline: order.deliveryDeadline
+          };
+
+          const productionOrder = await storage.createProductionOrder({
+            orderId: orderId,
+            producerId: producerId,
+            status: "pending",
+            deadline: order.deadline,
+            deliveryDeadline: order.deliveryDeadline,
+            orderDetails: JSON.stringify(orderDetails)
+          });
+
+          productionOrdersCreated.push(productionOrder);
+
+          // Get producer name
+          const producer = await storage.getUser(producerId);
+          if (producer) {
+            producerNames.push(producer.name);
+          }
+
+          console.log(`Created production order ${productionOrder.id} for producer ${producerId}`);
+        } else {
+          console.log(`Production order already exists for producer ${producerId} on order ${orderId}`);
+        }
+      }
+
+      // Update order status to production if not already
+      if (order.status !== 'production') {
+        await storage.updateOrder(orderId, { status: 'production' });
+      }
+
+      res.json({
+        success: true,
+        message: "Pedido enviado para produção com sucesso",
+        productionOrdersCreated: productionOrdersCreated.length,
+        producerNames: producerNames,
+        orderId: orderId,
+        separatedByProducers: true,
+        producersCount: producersInvolved.size
+      });
+
     } catch (error) {
       console.error("Error sending order to production:", error);
-      res.status(500).json({ error: "Failed to send order to production" });
+      res.status(500).json({ error: "Erro ao enviar pedido para produção: " + error.message });
     }
   });
 
@@ -4042,7 +4115,7 @@ Para mais detalhes, entre em contato conosco!`;
 
     try {
       // Use storage instead of db.update
-      const result = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate, trackingCode);
+      const result = await storage.updateProductionOrderStatus(id, status, notes || '', deliveryDate, trackingCode);
 
       if (!result) {
         return res.status(404).json({ error: "Production order not found" });
@@ -5000,7 +5073,7 @@ Para mais detalhes, entre em contato conosco!`;
       const { clientName, description, amount, dueDate, notes } = req.body;
 
       if (!clientName || !description || !amount || !dueDate) {
-        return res.status(400).json({ error: "Todos os campos obrigatórios devem ser preenchidos" });
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
       }
 
       if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
@@ -5032,83 +5105,6 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error creating manual receivable:", error);
       res.status(500).json({ error: "Erro ao criar conta a receber: " + error.message });
-    }
-  });
-
-  // Manual payment for receivables
-  app.post("/api/receivables/:id/payment", async (req, res) => {
-    try {
-      const { amount, method, transactionId, notes } = req.body;
-      const receivableId = req.params.id;
-
-      console.log("Processing receivable payment:", { receivableId, amount, method });
-
-      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        return res.status(400).json({ error: "Valor deve ser maior que zero" });
-      }
-
-      // Get the receivable
-      const receivables = await storage.getAccountsReceivable();
-      const receivable = receivables.find(r => r.id === receivableId);
-
-      if (!receivable) {
-        console.error("Receivable not found:", receivableId);
-        return res.status(404).json({ error: "Conta a receber não encontrada" });
-      }
-
-      console.log("Found receivable:", receivable);
-
-      // Check if this is a manual receivable or order-based receivable
-      if (receivable.orderId && !receivable.orderId.startsWith('manual-')) {
-        // This is an order-based receivable - create payment for the order
-        const payment = await storage.createPayment({
-          orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: method || "manual",
-          status: "confirmed",
-          transactionId: transactionId || `MANUAL-${Date.now()}`,
-          notes: notes || "",
-          paidAt: new Date()
-        });
-        console.log("Created payment for order:", payment);
-      } else {
-        // This is a manual receivable - just log the payment
-        console.log("Processing manual receivable payment - no order payment needed");
-      }
-
-      // Update the receivable with new received amount
-      const currentReceived = parseFloat(receivable.receivedAmount || '0');
-      const newReceivedAmount = currentReceived + parseFloat(amount);
-      const totalAmount = parseFloat(receivable.amount);
-
-      let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = receivable.status;
-      if (newReceivedAmount >= totalAmount) {
-        newStatus = 'paid';
-      } else if (newReceivedAmount > 0) {
-        newStatus = 'partial';
-      }
-
-      console.log("Updating receivable status:", { newReceivedAmount, totalAmount, newStatus });
-
-      await storage.updateAccountsReceivable(receivableId, {
-        receivedAmount: newReceivedAmount.toFixed(2),
-        status: newStatus,
-        lastPaymentDate: new Date()
-      });
-
-      console.log("Successfully processed receivable payment");
-      res.json({
-        success: true,
-        message: "Pagamento registrado com sucesso",
-        receivable: {
-          ...receivable,
-          receivedAmount: newReceivedAmount.toFixed(2),
-          status: newStatus
-        }
-      });
-    } catch (error) {
-      console.error("Error creating manual payment:", error);
-      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
     }
   });
 
@@ -5766,55 +5762,6 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Failed to approve producer payment:", error);
       res.status(500).json({ error: "Failed to approve producer payment" });
-    }
-  });
-
-  // Producer payment association route
-  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
-    try {
-      const { transactionId, producerPaymentId, amount } = req.body;
-
-      console.log("Associating producer payment:", { transactionId, producerPaymentId, amount });
-
-      // Get the bank transaction
-      const transaction = await storage.getBankTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transação não encontrada" });
-      }
-
-      // Verify this is a debit transaction (outgoing payment)
-      if (parseFloat(transaction.amount) >= 0) {
-        return res.status(400).json({ error: "Esta transação não é uma saída (débito)" });
-      }
-
-      // Get the producer payment
-      const producerPayment = await storage.getProducerPayment(producerPaymentId);
-      if (!producerPayment) {
-        return res.status(404).json({ error: "Pagamento de produtor não encontrado" });
-      }
-
-      // Update producer payment status to paid
-      await storage.updateProducerPayment(producerPaymentId, {
-        status: 'paid',
-        paidAt: new Date(),
-        paymentMethod: 'bank_transfer'
-      });
-
-      // Update bank transaction status
-      await storage.updateBankTransaction(transactionId, {
-        status: 'matched',
-        paidAt: new Date(),
-        notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
-      });
-
-      res.json({
-        success: true,
-        message: "Pagamento de produtor conciliado com sucesso"
-      });
-
-    } catch (error) {
-      console.error("Error associating producer payment:", error);
-      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
     }
   });
 
