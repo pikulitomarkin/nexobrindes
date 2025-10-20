@@ -301,7 +301,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Produto/título é obrigatório" });
       }
 
-      // Validar personalizações antes de criar o pedido
+      // Validar personalizações antes de criar o pedido - apenas logar alertas
+      let orderWarnings = [];
+      
       if (req.body.items && req.body.items.length > 0) {
         console.log("Validando personalizações dos itens:", JSON.stringify(req.body.items, null, 2));
 
@@ -319,12 +321,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
 
               if (itemQty < minQty) {
-                console.log(`BLOQUEADO: ${itemQty} < ${minQty}`);
-                return res.status(400).json({
-                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
-                });
+                console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando pedido mesmo assim`);
+                orderWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
+              } else {
+                console.log(`APROVADO: ${itemQty} >= ${minQty}`);
               }
-              console.log(`APROVADO: ${itemQty} >= ${minQty}`);
             }
           }
         }
@@ -383,7 +384,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("Created order with contact name:", newOrder.contactName);
-      res.json(newOrder);
+      
+      // Incluir alertas na resposta se existirem
+      const response = {
+        ...newOrder,
+        warnings: orderWarnings.length > 0 ? orderWarnings : undefined
+      };
+      
+      res.json(response);
     } catch (error) {
       console.error("Error creating order:", error);
       res.status(500).json({ error: "Failed to create order: " + error.message });
@@ -1955,7 +1963,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      // Validar personalizações antes de criar o orçamento
+      // Validar personalizações antes de criar o orçamento - apenas logar alertas
+      let customizationWarnings = [];
+      
       if (req.body.items && req.body.items.length > 0) {
         console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
 
@@ -1973,12 +1983,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
 
               if (itemQty < minQty) {
-                console.log(`BLOQUEADO: ${itemQty} < ${minQty}`);
-                return res.status(400).json({
-                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades. Item atual tem ${itemQty} unidades.`
-                });
+                console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando orçamento mesmo assim`);
+                customizationWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
+              } else {
+                console.log(`APROVADO: ${itemQty} >= ${minQty}`);
               }
-              console.log(`APROVADO: ${itemQty} >= ${minQty}`);
             }
           }
         }
@@ -2032,7 +2041,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json(newBudget);
+      // Incluir alertas na resposta se existirem
+      const response = {
+        ...newBudget,
+        warnings: customizationWarnings.length > 0 ? customizationWarnings : undefined
+      };
+
+      res.json(response);
     } catch (error) {
       console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
