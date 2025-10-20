@@ -2880,6 +2880,85 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Send order to production - automatically creates production orders for all producers
+  app.post("/api/orders/:id/send-to-production", async (req, res) => {
+    try {
+      const { id: orderId } = req.params;
+
+      console.log(`Sending order ${orderId} to production`);
+
+      // Get the order
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Check if order has items to determine producers
+      const producersInvolved = new Set<string>();
+
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            producersInvolved.add(item.producerId);
+          }
+        });
+      }
+
+      if (producersInvolved.size === 0) {
+        return res.status(400).json({ 
+          error: "Este pedido não possui itens que necessitam de produção externa" 
+        });
+      }
+
+      // Create production orders for each producer
+      const productionOrdersCreated = [];
+      const producerNames = [];
+
+      for (const producerId of producersInvolved) {
+        // Check if production order already exists
+        const existingPOs = await storage.getProductionOrdersByOrder(orderId);
+        const alreadyExists = existingPOs.some(po => po.producerId === producerId);
+
+        if (!alreadyExists) {
+          const productionOrder = await storage.createProductionOrder({
+            orderId: orderId,
+            producerId: producerId,
+            status: "pending",
+            deadline: order.deadline,
+            deliveryDeadline: order.deliveryDeadline,
+          });
+
+          productionOrdersCreated.push(productionOrder);
+          
+          // Get producer name
+          const producer = await storage.getUser(producerId);
+          if (producer) {
+            producerNames.push(producer.name);
+          }
+
+          console.log(`Created production order ${productionOrder.id} for producer ${producerId}`);
+        }
+      }
+
+      // Update order status to production if not already
+      if (order.status !== 'production') {
+        await storage.updateOrder(orderId, { status: 'production' });
+      }
+
+      res.json({
+        success: true,
+        message: "Pedido enviado para produção com sucesso",
+        productionOrdersCreated: productionOrdersCreated.length,
+        producerNames: producerNames,
+        orderId: orderId
+      });
+
+    } catch (error) {
+      console.error("Error sending order to production:", error);
+      res.status(500).json({ error: "Erro ao enviar pedido para produção: " + error.message });
+    }
+  });
+
   // Logistics Routes
   // Get paid orders waiting to be sent to production
   app.get("/api/logistics/paid-orders", async (req, res) => {
