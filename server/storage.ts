@@ -1563,9 +1563,9 @@ export class MemStorage implements IStorage {
     return Array.from(this.productionOrders.values()).filter(po => po.orderId === orderId);
   }
 
-  async createProductionOrder(insertProductionOrder: InsertProductionOrder): Promise<ProductionOrder> {
+  async createProductionOrder(insertProductionOrder: InsertProductionOrder & { orderDetails?: string }): Promise<ProductionOrder> {
     const id = randomUUID();
-    const productionOrder: ProductionOrder = {
+    const productionOrder: ProductionOrder & { orderDetails?: string } = {
       ...insertProductionOrder,
       id,
       status: insertProductionOrder.status || 'pending',
@@ -1580,6 +1580,7 @@ export class MemStorage implements IStorage {
       shippingAddress: insertProductionOrder.shippingAddress || null,
       producerValue: insertProductionOrder.producerValue || '0.00', // Default value
       producerValueLocked: insertProductionOrder.producerValueLocked || false, // Default locked status
+      orderDetails: (insertProductionOrder as any).orderDetails || null, // Store detailed order info
     };
     this.productionOrders.set(id, productionOrder);
     return productionOrder;

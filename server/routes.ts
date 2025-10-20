@@ -2887,19 +2887,64 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Sending order ${orderId} to production`);
 
-      // Get the order
+      // Get the order with full details
       const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
+      // Get budget photos if order came from a budget
+      let budgetPhotos = [];
+      if (order.budgetId) {
+        const photos = await storage.getBudgetPhotos(order.budgetId);
+        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+        console.log(`Found ${budgetPhotos.length} budget photos for order ${orderId}`);
+      }
+
+      // Get client details
+      let clientDetails = null;
+      if (order.clientId) {
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          clientDetails = {
+            name: clientRecord.name,
+            email: clientRecord.email,
+            phone: clientRecord.phone,
+            address: clientRecord.address
+          };
+        } else {
+          const clientUser = await storage.getUser(order.clientId);
+          if (clientUser) {
+            clientDetails = {
+              name: clientUser.name,
+              email: clientUser.email,
+              phone: clientUser.phone,
+              address: clientUser.address
+            };
+          }
+        }
+      }
+
+      // Use contact details as fallback
+      if (!clientDetails) {
+        clientDetails = {
+          name: order.contactName,
+          email: order.contactEmail,
+          phone: order.contactPhone,
+          address: null
+        };
+      }
+
       // Check if order has items to determine producers
-      const producersInvolved = new Set<string>();
+      const producersInvolved = new Map<string, any[]>(); // Map producer to their items
 
       if (order.items && Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
           if (item.producerId && item.producerId !== 'internal') {
-            producersInvolved.add(item.producerId);
+            if (!producersInvolved.has(item.producerId)) {
+              producersInvolved.set(item.producerId, []);
+            }
+            producersInvolved.get(item.producerId)!.push(item);
           }
         });
       }
@@ -2910,22 +2955,47 @@ Para mais detalhes, entre em contato conosco!`;
         });
       }
 
-      // Create production orders for each producer
+      // Create production orders for each producer with their specific items
       const productionOrdersCreated = [];
       const producerNames = [];
 
-      for (const producerId of producersInvolved) {
+      for (const [producerId, producerItems] of producersInvolved) {
         // Check if production order already exists
         const existingPOs = await storage.getProductionOrdersByOrder(orderId);
         const alreadyExists = existingPOs.some(po => po.producerId === producerId);
 
         if (!alreadyExists) {
+          // Calculate total value for this producer's items
+          const producerItemsValue = producerItems.reduce((total, item) => {
+            return total + (parseFloat(item.totalPrice) || 0);
+          }, 0);
+
+          // Create detailed production order
           const productionOrder = await storage.createProductionOrder({
             orderId: orderId,
             producerId: producerId,
             status: "pending",
             deadline: order.deadline,
             deliveryDeadline: order.deliveryDeadline,
+            notes: `Itens para produção: ${producerItems.map(item => `${item.productName} (Qty: ${item.quantity})`).join(', ')}`,
+            // Store additional order details for the producer
+            orderDetails: JSON.stringify({
+              orderNumber: order.orderNumber,
+              product: order.product,
+              description: order.description,
+              clientDetails: clientDetails,
+              deliveryType: order.deliveryType,
+              deadline: order.deadline,
+              deliveryDeadline: order.deliveryDeadline,
+              items: producerItems, // Only items for this producer
+              photos: budgetPhotos, // Include budget photos
+              totalValue: order.totalValue,
+              producerItemsValue: producerItemsValue.toFixed(2),
+              shippingAddress: order.deliveryType === 'pickup' 
+                ? 'Sede Principal - Retirada no Local' 
+                : (clientDetails?.address || 'Endereço não informado'),
+              specialInstructions: order.description || ''
+            })
           });
 
           productionOrdersCreated.push(productionOrder);
@@ -2936,7 +3006,7 @@ Para mais detalhes, entre em contato conosco!`;
             producerNames.push(producer.name);
           }
 
-          console.log(`Created production order ${productionOrder.id} for producer ${producerId}`);
+          console.log(`Created detailed production order ${productionOrder.id} for producer ${producerId} with ${producerItems.length} items`);
         }
       }
 
@@ -2950,7 +3020,9 @@ Para mais detalhes, entre em contato conosco!`;
         message: "Pedido enviado para produção com sucesso",
         productionOrdersCreated: productionOrdersCreated.length,
         producerNames: producerNames,
-        orderId: orderId
+        orderId: orderId,
+        separatedByProducers: true,
+        producersCount: producersInvolved.size
       });
 
     } catch (error) {

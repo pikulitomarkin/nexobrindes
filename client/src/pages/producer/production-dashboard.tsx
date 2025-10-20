@@ -458,103 +458,173 @@ export default function ProductionDashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredOrders.map((order: any) => (
-                <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
-                  {/* Accordion Header - Always Visible */}
-                  <div
-                    className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
-                    onClick={() => {
-                      const element = document.getElementById(`order-${order.id}`);
-                      if (element) {
-                        element.style.display = element.style.display === 'none' ? 'block' : 'none';
-                      }
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-4">
+              {filteredOrders.map((order: any) => {
+                // Parse order details if available
+                let orderDetails = null;
+                try {
+                  orderDetails = order.orderDetails ? JSON.parse(order.orderDetails) : null;
+                } catch (e) {
+                  console.log('Error parsing order details:', e);
+                }
+
+                return (
+                  <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
+                    {/* Accordion Header - Always Visible */}
+                    <div
+                      className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
+                      onClick={() => {
+                        const element = document.getElementById(`order-${order.id}`);
+                        if (element) {
+                          element.style.display = element.style.display === 'none' ? 'block' : 'none';
+                        }
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Package className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {orderDetails?.orderNumber || `#${order.id.slice(-6)}`}
+                              </h3>
+                              <span className="text-sm text-gray-600">
+                                {orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'Cliente N/A'}
+                              </span>
+                            </div>
+                          </div>
+                          {getStatusBadge(order.status)}
+                        </div>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Package className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              #{order.id.slice(-6)}
-                            </h3>
-                            <span className="text-sm text-gray-600">
-                              {order.clientName || order.order?.clientName || 'Cliente N/A'}
-                            </span>
+                          {order.producerValue && (
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-green-600">
+                                R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-xs text-gray-500">Valor definido</p>
+                            </div>
+                          )}
+                          {!order.producerValue && (
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-orange-600">Valor não definido</p>
+                              <p className="text-xs text-gray-500">Defina o valor</p>
+                            </div>
+                          )}
+                          <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
+                            <span className="text-xs text-gray-600">▼</span>
                           </div>
                         </div>
-                        {getStatusBadge(order.status)}
                       </div>
-                      <div className="flex items-center gap-3">
-                        {order.producerValue && (
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">
-                              R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+
+                    {/* Accordion Content - Collapsible */}
+                    <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="text-sm text-gray-600 mb-2">
+                            Pedido: {orderDetails?.orderNumber || order.order?.orderNumber || 'N/A'}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLocation(`/producer/order/${order.id}`)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver Detalhes Completos
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Product Information */}
+                      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-2">Produto Principal</h4>
+                        <p className="text-blue-800">{orderDetails?.product || order.order?.product || 'Produto não especificado'}</p>
+                        {orderDetails?.description && (
+                          <p className="text-sm text-blue-600 mt-1">{orderDetails.description}</p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Cliente</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <User className="h-4 w-4 text-gray-400" />
+                            <div>
+                              <p className="font-medium">{orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'N/A'}</p>
+                              {orderDetails?.clientDetails?.phone && (
+                                <p className="text-xs text-gray-500">{orderDetails.clientDetails.phone}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Prazo</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <p className="font-medium">
+                              {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Não definido'}
                             </p>
-                            <p className="text-xs text-gray-500">Valor definido</p>
                           </div>
-                        )}
-                        {!order.producerValue && (
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-orange-600">Valor não definido</p>
-                            <p className="text-xs text-gray-500">Defina o valor</p>
-                          </div>
-                        )}
-                        <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
-                          <span className="text-xs text-gray-600">▼</span>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Accordion Content - Collapsible */}
-                  <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">
-                          Pedido: {order.order?.orderNumber || 'N/A'}
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setLocation(`/producer/order/${order.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver Detalhes Completos
-                        </Button>
-                      </div>
-                    </div>
+                      {orderDetails?.shippingAddress && (
+                        <div className="mb-4">
+                          <Label className="text-sm font-medium text-gray-500">Endereço de Envio</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <MapPin className="h-4 w-4 text-gray-400" />
+                            <p className="text-sm">{orderDetails.shippingAddress}</p>
+                          </div>
+                        </div>
+                      )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Cliente</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <p className="font-medium">{order.clientName || order.order?.clientName || 'N/A'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Prazo</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <p className="font-medium">
-                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Não definido'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                      {/* Items específicos para este produtor */}
+                      {orderDetails?.items && orderDetails.items.length > 0 && (
+                        <div className="mb-4">
+                          <Label className="text-sm font-medium text-gray-500">Seus Itens para Produzir</Label>
+                          <div className="mt-2 space-y-2">
+                            {orderDetails.items.map((item: any, index: number) => (
+                              <div key={index} className="p-3 bg-gray-50 rounded-lg border">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h5 className="font-medium">{item.productName}</h5>
+                                    <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
+                                    {item.itemCustomizationDescription && (
+                                      <p className="text-sm text-blue-600">Personalização: {item.itemCustomizationDescription}</p>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-medium text-green-600">
+                                    R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                  {order.order?.shippingAddress && (
-                    <div className="mb-4">
-                      <Label className="text-sm font-medium text-gray-500">Endereço de Envio</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <p className="text-sm">{order.order.shippingAddress}</p>
-                      </div>
-                    </div>
-                  )}
+                      {/* Fotos do orçamento/pedido */}
+                      {orderDetails?.photos && orderDetails.photos.length > 0 && (
+                        <div className="mb-4">
+                          <Label className="text-sm font-medium text-gray-500">Fotos de Referência</Label>
+                          <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                            {orderDetails.photos.map((photoUrl: string, index: number) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={photoUrl} 
+                                  alt={`Foto ${index + 1}`}
+                                  className="w-full h-20 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
+                                  onClick={() => window.open(photoUrl, '_blank')}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
+                                  <span className="text-white text-xs opacity-0 group-hover:opacity-100">Clique para ampliar</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
 
 

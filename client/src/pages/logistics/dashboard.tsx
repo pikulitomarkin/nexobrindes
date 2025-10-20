@@ -19,7 +19,7 @@ export default function LogisticsDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  
+
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchNotes, setDispatchNotes] = useState("");
@@ -36,17 +36,17 @@ export default function LogisticsDashboard() {
     },
   });
 
-  // Buscar pedidos em produção para acompanhamento
+  // Buscar pedidos em produção para acompanhamento (já separados por produtor)
   const { data: productionOrders, isLoading: isLoadingProductionOrders } = useQuery({
     queryKey: ["/api/logistics/production-orders"],
     queryFn: async () => {
-      const response = await fetch("/api/logistics/production-orders");
+      const response = await fetch("/api/production-orders");
       if (!response.ok) throw new Error('Failed to fetch production orders');
       return response.json();
     },
   });
 
-  
+
 
   // Enviar pedido para produção - automaticamente para todos os produtores envolvidos
   const sendToProductionMutation = useMutation({
@@ -64,7 +64,7 @@ export default function LogisticsDashboard() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] }); // Invalidar a query que busca pedidos separados por produtor
       setShowSendToProductionModal(false);
       setSelectedOrder(null);
       toast({
