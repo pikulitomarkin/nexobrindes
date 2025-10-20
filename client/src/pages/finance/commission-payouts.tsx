@@ -36,6 +36,11 @@ export default function FinanceCommissionPayouts() {
     queryKey: ["/api/commissions"],
   });
 
+  // Filter commissions that need to be paid (confirmed but not paid yet)
+  const commissionsNeedingPayment = commissions?.filter((commission: any) => 
+    commission.status === 'confirmed' && !commission.paidAt
+  ) || [];
+
   const { data: vendors } = useQuery({
     queryKey: ["/api/vendors"],
   });
@@ -134,12 +139,33 @@ export default function FinanceCommissionPayouts() {
     return type === 'vendor' ? vendors : partners;
   };
 
-  const filteredPayouts = payouts?.filter((payout: any) => {
+  // Combine payouts and pending commissions
+  const allPayoutsAndCommissions = [
+    ...(payouts || []),
+    ...commissionsNeedingPayment.map((commission: any) => ({
+      id: commission.id,
+      commissionId: commission.id,
+      userId: commission.vendorId || commission.partnerId,
+      type: commission.type,
+      amount: commission.amount,
+      status: 'pending',
+      userName: commission.vendorName || commission.partnerName,
+      periodStart: commission.createdAt,
+      periodEnd: commission.createdAt,
+      orderNumber: commission.orderNumber,
+      orderValue: commission.orderValue,
+      createdAt: commission.createdAt,
+      paidAt: null
+    }))
+  ];
+
+  const filteredPayouts = allPayoutsAndCommissions.filter((payout: any) => {
     const matchesStatus = statusFilter === "all" || payout.status === statusFilter;
     const matchesType = typeFilter === "all" || payout.type === typeFilter;
     const matchesSearch = searchTerm === "" || 
       payout.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payout.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+      payout.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payout.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesType && matchesSearch;
   });
 
@@ -154,12 +180,13 @@ export default function FinanceCommissionPayouts() {
     }
   };
 
-  // Calculate summary statistics
-  const totalPayouts = payouts?.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
+  // Calculate summary statistics including commissions
+  const totalCommissionsValue = commissionsNeedingPayment.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const totalPayouts = (payouts?.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0) + totalCommissionsValue;
   const paidPayouts = payouts?.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const pendingPayouts = payouts?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const vendorPayouts = payouts?.filter((p: any) => p.type === 'vendor').length || 0;
-  const partnerPayouts = payouts?.filter((p: any) => p.type === 'partner').length || 0;
+  const pendingPayouts = (payouts?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0) + totalCommissionsValue;
+  const vendorPayouts = (payouts?.filter((p: any) => p.type === 'vendor').length || 0) + commissionsNeedingPayment.filter((c: any) => c.type === 'vendor').length;
+  const partnerPayouts = (payouts?.filter((p: any) => p.type === 'partner').length || 0) + commissionsNeedingPayment.filter((c: any) => c.type === 'partner').length;
 
   if (isLoading) {
     return (
@@ -448,7 +475,8 @@ export default function FinanceCommissionPayouts() {
                 {filteredPayouts?.map((payout: any) => (
                   <tr key={payout.id} data-testid={`row-payout-${payout.id}`}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(payout.periodStart).toLocaleDateString('pt-BR')} - {new Date(payout.periodEnd).toLocaleDateString('pt-BR')}
+                      {payout.orderNumber ? `Pedido ${payout.orderNumber}` : 
+                       new Date(payout.periodStart || payout.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
@@ -457,7 +485,11 @@ export default function FinanceCommissionPayouts() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {payout.userName || payout.userId}
+                      {payout.userName || 
+                       (payout.type === 'vendor' ? 
+                        vendors?.find((v: any) => v.id === payout.userId)?.name : 
+                        partners?.find((p: any) => p.id === payout.userId)?.name) || 
+                       'Nome não encontrado'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                       R$ {parseFloat(payout.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
