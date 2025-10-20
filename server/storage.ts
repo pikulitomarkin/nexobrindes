@@ -2766,7 +2766,7 @@ export class MemStorage implements IStorage {
       if (minimumPayment > 0 && paidValue >= minimumPayment) {
         return 'partial';
       } else if (minimumPayment > 0 && paidValue < minimumPayment) {
-        return 'pending'; // Minimum not met
+        return 'pending';
       } else {
         return 'partial';
       }
@@ -3399,6 +3399,46 @@ export class MemStorage implements IStorage {
     }
   }
 
+  // Create commission payouts for confirmed commissions
+  private async createCommissionPayouts(order: Order): Promise<void> {
+    try {
+      // Get all confirmed commissions for this order
+      const orderCommissions = Array.from(this.commissions.values()).filter(c => 
+        c.orderId === order.id && c.status === 'confirmed'
+      );
+
+      for (const commission of orderCommissions) {
+        const existingPayout = Array.from(this.commissionPayouts.values()).find(p =>
+          p.commissionIds.includes(commission.id)
+        );
+
+        if (!existingPayout) {
+          const user = await this.getUser(commission.vendorId || commission.partnerId || '');
+          if (user) {
+            const payout: CommissionPayout = {
+              id: `payout-${commission.id}`,
+              userId: user.id,
+              type: commission.type || (commission.vendorId ? 'vendor' : 'partner'),
+              description: `Comissão do pedido ${order.orderNumber}`,
+              totalAmount: commission.amount,
+              commissionIds: [commission.id],
+              status: 'pending',
+              paidAt: null,
+              createdAt: new Date(),
+              periodStart: new Date(commission.createdAt),
+              periodEnd: new Date()
+            };
+
+            this.commissionPayouts.set(payout.id, payout);
+            console.log(`Created commission payout ${payout.id} for ${payout.type} ${user.name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error creating commission payouts:', error);
+    }
+  }
+
   // Process commission payments based on order status and payments
   async processCommissionPayments(order: Order, newStatus: string): Promise<void> {
     try {
@@ -3423,6 +3463,9 @@ export class MemStorage implements IStorage {
           console.log(`Confirmed vendor commission ${commission.id} for ready order ${order.orderNumber}`);
         }
       }
+
+      // Create commission payouts for confirmed commissions
+      await this.createCommissionPayouts(order);
 
       // Handle cancellations
       if (newStatus === 'cancelled') {
