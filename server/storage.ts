@@ -790,18 +790,39 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(payment.id, payment);
 
-    // Create commission
+    // Create vendor commission
     const commission: Commission = {
       id: "commission-1",
       vendorId: "vendor-1",
+      partnerId: null,
       orderId: "order-1",
+      type: "vendor",
       percentage: "10.00",
       amount: "245.00",
       status: "pending",
       paidAt: null,
+      orderValue: "2450.00",
+      orderNumber: "#12345",
       createdAt: new Date("2024-11-15")
     };
     this.commissions.set(commission.id, commission);
+
+    // Create partner commission
+    const partnerCommission: Commission = {
+      id: "commission-partner-1",
+      vendorId: null,
+      partnerId: "partner-1",
+      orderId: "order-1",
+      type: "partner",
+      percentage: "15.00",
+      amount: "367.50",
+      status: "confirmed", // Partner commission confirmed when order is confirmed
+      paidAt: null,
+      orderValue: "2450.00",
+      orderNumber: "#12345",
+      createdAt: new Date("2024-11-15")
+    };
+    this.commissions.set(partnerCommission.id, partnerCommission);
 
     // Create additional sample payments for recent orders to show correct values
     const allOrders = Array.from(this.orders.values());
