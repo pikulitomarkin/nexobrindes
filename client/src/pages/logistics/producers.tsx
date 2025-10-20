@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck } from "lucide-react";
+import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package, Truck, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -24,9 +24,23 @@ const producerFormSchema = z.object({
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
 
 export default function LogisticsProducers() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
+  const [isShipmentsModalOpen, setIsShipmentsModalOpen] = useState(false);
+  const [selectedProducerId, setSelectedProducerId] = useState<string | null>(null);
   const [userCode, setUserCode] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    specialty: "",
+    address: "",
+    password: "",
+    username: ""
+  });
+
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const generateUserCode = () => {
     const timestamp = Date.now().toString().slice(-8);
@@ -35,10 +49,10 @@ export default function LogisticsProducers() {
   };
 
   useEffect(() => {
-    if (isCreateDialogOpen) {
+    if (isCreateModalOpen) {
       setUserCode(generateUserCode());
     }
-  }, [isCreateDialogOpen]);
+  }, [isCreateModalOpen]);
 
   const { data: producers, isLoading } = useQuery({
     queryKey: ["/api/producers"],
@@ -49,14 +63,42 @@ export default function LogisticsProducers() {
     },
   });
 
-  // Query para buscar estatísticas de produtos por produtor
-  const { data: productStats } = useQuery({
+  // Get producer statistics
+  const { data: producerStats } = useQuery({
     queryKey: ["/api/logistics/producer-stats"],
     queryFn: async () => {
-      const response = await fetch('/api/logistics/producer-stats');
+      const response = await fetch("/api/logistics/producer-stats");
       if (!response.ok) throw new Error('Failed to fetch producer stats');
       return response.json();
     },
+  });
+
+  // Get producer orders when modal is open
+  const { data: producerOrders } = useQuery({
+    queryKey: ["/api/production-orders/producer", selectedProducerId],
+    queryFn: async () => {
+      if (!selectedProducerId) return [];
+      const response = await fetch(`/api/production-orders/producer/${selectedProducerId}`);
+      if (!response.ok) throw new Error('Failed to fetch producer orders');
+      return response.json();
+    },
+    enabled: !!selectedProducerId && isOrdersModalOpen,
+  });
+
+  // Get producer shipments when modal is open
+  const { data: producerShipments } = useQuery({
+    queryKey: ["/api/production-orders/producer/shipments", selectedProducerId],
+    queryFn: async () => {
+      if (!selectedProducerId) return [];
+      const response = await fetch(`/api/production-orders/producer/${selectedProducerId}`);
+      if (!response.ok) throw new Error('Failed to fetch producer shipments');
+      const orders = await response.json();
+      // Filtrar apenas pedidos que foram enviados ou estão prontos
+      return orders.filter((order: any) => 
+        ['ready', 'shipped', 'delivered', 'completed'].includes(order.status)
+      );
+    },
+    enabled: !!selectedProducerId && isShipmentsModalOpen,
   });
 
   const form = useForm<ProducerFormValues>({
@@ -94,7 +136,7 @@ export default function LogisticsProducers() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/producers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/producer-stats"] });
-      setIsCreateDialogOpen(false);
+      setIsCreateModalOpen(false);
       form.reset();
       toast({
         title: "✅ Produtor Cadastrado com Sucesso!",
@@ -123,6 +165,57 @@ export default function LogisticsProducers() {
     createProducerMutation.mutate(data);
   };
 
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      specialty: "",
+      address: "",
+      password: "",
+      username: ""
+    });
+  };
+
+  const handleViewProducerOrders = (producerId: string) => {
+    setSelectedProducerId(producerId);
+    setIsOrdersModalOpen(true);
+  };
+
+  const handleViewProducerShipments = (producerId: string) => {
+    setSelectedProducerId(producerId);
+    setIsShipmentsModalOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusClasses = {
+      pending: "bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium",
+      accepted: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
+      production: "bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium",
+      ready: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse",
+      shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
+      delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      completed: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+    };
+
+    const statusLabels = {
+      pending: "Pendente",
+      accepted: "Aceito",
+      production: "Em Produção",
+      ready: "Pronto para Expedição",
+      shipped: "Despachado",
+      delivered: "Entregue",
+      completed: "Concluído",
+    };
+
+    return (
+      <span className={statusClasses[status as keyof typeof statusClasses] || "bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium"}>
+        {statusLabels[status as keyof typeof statusLabels] || status}
+      </span>
+    );
+  };
+
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -141,7 +234,7 @@ export default function LogisticsProducers() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Produtores Terceirizados</h1>
           <p className="text-gray-600">Gerencie sua rede de produtores e associe produtos</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
               <Plus className="h-4 w-4 mr-2" />
@@ -266,7 +359,7 @@ export default function LogisticsProducers() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
+                    onClick={() => setIsCreateModalOpen(false)}
                   >
                     Cancelar
                   </Button>
@@ -333,13 +426,25 @@ export default function LogisticsProducers() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
-                      <p className="font-mono font-bold text-gray-900">{producer.username}</p>
+                      <p className="font-mono font-bold text-gray-900">{producer.userCode}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" title="Ver produtos do produtor">
-                        <Package2 className="h-4 w-4" />
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-600 hover:text-blue-600"
+                        onClick={() => handleViewProducerOrders(producer.id)}
+                        title="Ver pedidos do produtor"
+                      >
+                        <Package className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" title="Ver pedidos em produção">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-600 hover:text-green-600"
+                        onClick={() => handleViewProducerShipments(producer.id)}
+                        title="Ver expedições do produtor"
+                      >
                         <Truck className="h-4 w-4" />
                       </Button>
                     </div>
@@ -351,7 +456,7 @@ export default function LogisticsProducers() {
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-gray-600">Catálogo:</span>
                     <div className="flex items-center text-green-600">
-                      <Package2 className="h-4 w-4 mr-1" />
+                      <Package className="h-4 w-4 mr-1" />
                       <span className="font-medium">{stats.activeProducts} ativos de {stats.totalProducts}</span>
                     </div>
                   </div>
@@ -370,12 +475,135 @@ export default function LogisticsProducers() {
             <p className="text-sm text-gray-400 mb-6">
               Cadastre produtores terceirizados para poder importar seus catálogos de produtos
             </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
+            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
               Cadastrar Primeiro Produtor
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Modal - Pedidos do Produtor */}
+      <Dialog open={isOrdersModalOpen} onOpenChange={setIsOrdersModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Pedidos do Produtor - {producers?.find(p => p.id === selectedProducerId)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!producerOrders || producerOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum pedido encontrado</h3>
+                <p className="text-gray-500">Este produtor não possui pedidos ativos.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {producerOrders.map((order: any) => (
+                  <div key={order.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-lg">{order.orderNumber}</h4>
+                        <p className="text-gray-600">{order.product}</p>
+                        <p className="text-sm text-gray-500">Cliente: {order.clientName}</p>
+                      </div>
+                      <div className="text-right">
+                        {getStatusBadge(order.status)}
+                        <p className="text-sm text-gray-500 mt-1">
+                          Prazo: {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {order.notes && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded border">
+                        <p className="text-sm text-gray-700">{order.notes}</p>
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex justify-between text-sm text-gray-600">
+                      <span>Aceito em: {order.acceptedAt ? new Date(order.acceptedAt).toLocaleDateString('pt-BR') : 'Não aceito'}</span>
+                      {order.producerValue && (
+                        <span className="font-medium text-green-600">
+                          Valor: R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal - Expedições do Produtor */}
+      <Dialog open={isShipmentsModalOpen} onOpenChange={setIsShipmentsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Expedições do Produtor - {producers?.find(p => p.id === selectedProducerId)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!producerShipments || producerShipments.length === 0 ? (
+              <div className="text-center py-8">
+                <Truck className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma expedição encontrada</h3>
+                <p className="text-gray-500">Este produtor não possui expedições prontas ou enviadas.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {producerShipments.map((order: any) => (
+                  <div key={order.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-lg">{order.orderNumber}</h4>
+                        <p className="text-gray-600">{order.product}</p>
+                        <p className="text-sm text-gray-500">Cliente: {order.clientName}</p>
+                      </div>
+                      <div className="text-right">
+                        {getStatusBadge(order.status)}
+                        <p className="text-sm text-gray-500 mt-1">
+                          {order.trackingCode && (
+                            <span>Rastreamento: {order.trackingCode}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Endereço:</span>
+                        <p className="font-medium">{order.clientAddress || 'Endereço não informado'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Contato:</span>
+                        <p className="font-medium">{order.clientPhone || 'Telefone não informado'}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex justify-between text-sm text-gray-600">
+                      <span>
+                        {order.status === 'ready' && 'Pronto desde: '}
+                        {order.status === 'shipped' && 'Enviado em: '}
+                        {order.status === 'delivered' && 'Entregue em: '}
+                        {order.status === 'completed' && 'Concluído em: '}
+                        {order.completedAt ? new Date(order.completedAt).toLocaleDateString('pt-BR') : 'N/A'}
+                      </span>
+                      {order.deliveryDeadline && (
+                        <span>
+                          Prazo de entrega: {new Date(order.deliveryDeadline).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
