@@ -2710,7 +2710,7 @@ export class MemStorage implements IStorage {
         if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
           updatedReceivable.status = 'partial';
         } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
-          updatedReceivable.status = 'pending'; // Minimum not met
+          updatedReceivable.status = 'pending';
         } else {
           updatedReceivable.status = 'partial';
         }

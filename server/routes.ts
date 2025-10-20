@@ -3704,6 +3704,45 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Routes by role
+  app.get("/api/budgets/client/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const budgets = await storage.getBudgetsByClient(clientId);
+
+      // Enrich with vendor names and items
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          const vendor = await storage.getUser(budget.vendorId);
+          
+          // Get budget items with product details
+          const items = await storage.getBudgetItems(budget.id);
+          const enrichedItems = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              const producer = item.producerId ? await storage.getUser(item.producerId) : null;
+              return {
+                ...item,
+                productName: product?.name || 'Produto não encontrado',
+                producerName: producer?.name || null
+              };
+            })
+          );
+
+          return {
+            ...budget,
+            vendorName: vendor?.name || 'Unknown',
+            items: enrichedItems
+          };
+        })
+      );
+
+      res.json(enrichedBudgets);
+    } catch (error) {
+      console.error("Error fetching client budgets:", error);
+      res.status(500).json({ error: "Failed to fetch client budgets" });
+    }
+  });
+
   app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
     try {
       const { vendorId } = req.params;
