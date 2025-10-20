@@ -478,21 +478,41 @@ export class MemStorage implements IStorage {
     };
     this.users.set(clientUser.id, clientUser);
 
-    // Producer user
-    const producerUser = {
+    // Producer user 1 - Marcenaria
+    const producerUser1 = {
       id: "producer-1",
       username: "produtor1",
       password: "123456",
       name: "Marcenaria Santos",
       email: "contato@marcenariasantos.com",
-      phone: null,
+      phone: "(11) 98765-4321",
+      address: "Rua das Madeiras, 123, São Paulo, SP",
+      specialty: "Móveis sob medida em madeira maciça",
       vendorId: null,
       role: "producer",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.users.set(producerUser.id, producerUser);
+    this.users.set(producerUser1.id, producerUser1);
+
+    // Producer user 2 - Metalúrgica
+    const producerUser2 = {
+      id: "producer-2",
+      username: "produtor2",
+      password: "123456",
+      name: "Metalúrgica Silva",
+      email: "contato@metalurgicasilva.com",
+      phone: "(11) 99876-5432",
+      address: "Av. Industrial, 456, São Paulo, SP",
+      specialty: "Estruturas metálicas e móveis em aço",
+      vendorId: null,
+      role: "producer",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.users.set(producerUser2.id, producerUser2);
 
     // Partner user with same credentials as admin
     const partnerUser = {
@@ -881,8 +901,9 @@ export class MemStorage implements IStorage {
     ];
     mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
 
-    // Initialize mock products
+    // Initialize mock products - 2 produtos para cada produtor
     mockProducts = [
+      // Produtos da Marcenaria Santos (producer-1)
       {
         id: 'product-1',
         name: 'Mesa de Jantar Clássica',
@@ -891,29 +912,55 @@ export class MemStorage implements IStorage {
         basePrice: '2500.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1', // Added producerId
+        producerId: 'producer-1',
         createdAt: new Date().toISOString()
       },
       {
         id: 'product-2',
-        name: 'Cadeira Estofada',
-        description: 'Cadeira com estofado em couro sintético',
+        name: 'Guarda-Roupa 6 Portas',
+        description: 'Guarda-roupa em madeira MDF com espelhos',
         category: 'Móveis',
-        basePrice: '450.00',
+        basePrice: '1890.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1', // Added producerId
+        producerId: 'producer-1',
+        createdAt: new Date().toISOString()
+      },
+      
+      // Produtos da Metalúrgica Silva (producer-2)
+      {
+        id: 'product-3',
+        name: 'Mesa de Centro Metálica',
+        description: 'Mesa de centro com estrutura em aço e tampo de vidro',
+        category: 'Móveis',
+        basePrice: '890.00',
+        unit: 'un',
+        isActive: true,
+        producerId: 'producer-2',
         createdAt: new Date().toISOString()
       },
       {
-        id: 'product-3',
-        name: 'Estante Modular',
-        description: 'Estante com módulos personalizáveis',
+        id: 'product-4',
+        name: 'Estante Industrial',
+        description: 'Estante em estrutura metálica estilo industrial',
         category: 'Móveis',
-        basePrice: '1200.00',
-        unit: 'm',
+        basePrice: '1450.00',
+        unit: 'un',
         isActive: true,
-        producerId: 'internal', // Example of internal product
+        producerId: 'producer-2',
+        createdAt: new Date().toISOString()
+      },
+      
+      // Produto interno (para exemplo)
+      {
+        id: 'product-5',
+        name: 'Almofada Decorativa',
+        description: 'Almofada decorativa em tecido premium',
+        category: 'Decoração',
+        basePrice: '85.00',
+        unit: 'un',
+        isActive: true,
+        producerId: 'internal',
         createdAt: new Date().toISOString()
       }
     ];
