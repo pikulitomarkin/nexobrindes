@@ -478,7 +478,7 @@ export default function FinanceCommissionPayouts() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => markAsPaidMutation.mutate(payout.id)}
+                            onClick={() => markAsPaidMutation.mutate(payout.commissionId || payout.id)}
                             disabled={markAsPaidMutation.isPending}
                             data-testid={`button-mark-paid-${payout.id}`}
                           >

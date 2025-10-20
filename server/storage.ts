@@ -98,7 +98,7 @@ export interface IStorage {
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
-  updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
+  updateCommissionStatus(id: string, status: string, paidAt?: Date): Promise<Commission | undefined>;
   deductPartnerCommission(partnerId: string, amount: string): Promise<void>;
   updateCommissionsByOrderStatus(orderId: string, orderStatus: string): Promise<void>;
 
@@ -1916,19 +1916,21 @@ export class MemStorage implements IStorage {
   }
 
   // Update commission status
-  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
-    const commission = this.commissions.get(id);
-    if (!commission) return undefined;
-
-    commission.status = status;
-    if (status === 'paid') {
-      commission.paidAt = new Date();
-    } else if (status === 'deducted') {
-      commission.deductedAt = new Date();
+  async updateCommissionStatus(commissionId: string, status: string, paidAt?: Date): Promise<Commission | undefined> {
+    const commission = this.commissions.get(commissionId);
+    if (commission) {
+      commission.status = status;
+      if (status === 'paid') {
+        commission.paidAt = paidAt || new Date();
+      } else if (status === 'cancelled') {
+        commission.paidAt = null;
+      }
+      this.commissions.set(commissionId, commission);
+      console.log(`Updated commission ${commissionId} to status ${status}${status === 'paid' ? ' with paidAt: ' + commission.paidAt : ''}`);
+      return commission;
     }
-
-    this.commissions.set(id, commission);
-    return commission;
+    console.log(`Commission ${commissionId} not found for status update`);
+    return null;
   }
 
   // Update commissions based on order status
