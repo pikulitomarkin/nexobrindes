@@ -124,9 +124,18 @@ app.patch('/api/finance/commission-payouts/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Check if this is a commission ID (starts with commission-)
-    if (id.startsWith('commission-')) {
-      const commissionId = id.replace('commission-', '');
+    console.log(`Attempting to mark payout as paid: ${id}`);
+
+    // Check if this is a commission ID (starts with commission- or comm-)
+    if (id.startsWith('commission-') || id.startsWith('comm-')) {
+      let commissionId = id;
+      if (id.startsWith('commission-')) {
+        commissionId = id.replace('commission-', '');
+      } else if (id.startsWith('comm-')) {
+        commissionId = id; // Keep the full ID for direct commission lookups
+      }
+
+      console.log(`Processing commission ID: ${commissionId}`);
 
       // Update the commission status to paid
       const updatedCommission = await actualStorage.updateCommissionStatus(
@@ -136,14 +145,16 @@ app.patch('/api/finance/commission-payouts/:id', async (req, res) => {
       );
 
       if (!updatedCommission) {
+        console.log(`Commission not found: ${commissionId}`);
         return res.status(404).json({ error: 'Commission not found' });
       }
 
-      console.log(`Marked commission ${commissionId} as paid`);
+      console.log(`Successfully marked commission ${commissionId} as paid`);
       res.json({ 
         ...updatedCommission, 
-        id: `commission-${updatedCommission.id}`,
-        status: 'paid'
+        id: id, // Return the original ID format
+        status: 'paid',
+        paidAt: new Date()
       });
     } else {
       // Regular payout update

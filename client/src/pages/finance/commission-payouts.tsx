@@ -143,8 +143,9 @@ export default function FinanceCommissionPayouts() {
   const allPayoutsAndCommissions = [
     ...(payouts || []),
     ...commissionsNeedingPayment.map((commission: any) => ({
-      id: commission.id,
+      id: `commission-${commission.id}`,
       commissionId: commission.id,
+      originalCommissionId: commission.id,
       userId: commission.vendorId || commission.partnerId,
       type: commission.type,
       amount: commission.amount,
@@ -510,7 +511,7 @@ export default function FinanceCommissionPayouts() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => markAsPaidMutation.mutate(payout.commissionId || payout.id)}
+                            onClick={() => markAsPaidMutation.mutate(payout.originalCommissionId || payout.commissionId || payout.id)}
                             disabled={markAsPaidMutation.isPending}
                             data-testid={`button-mark-paid-${payout.id}`}
                           >
