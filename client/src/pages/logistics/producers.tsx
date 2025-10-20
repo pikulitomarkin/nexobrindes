@@ -379,7 +379,7 @@ export default function LogisticsProducers() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {producers?.map((producer: any) => {
-          const stats = productStats?.find((stat: any) => stat.producerId === producer.id);
+          const stats = producerStats?.find((stat: any) => stat.producerId === producer.id);
 
           return (
             <Card key={producer.id} className="hover:shadow-lg transition-shadow">
