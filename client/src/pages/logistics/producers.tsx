@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,24 +75,46 @@ export default function LogisticsProducers() {
     mutationFn: async (data: ProducerFormValues) => {
       const producerData = {
         ...data,
-        username: userCode
+        username: userCode, // Usar o userCode gerado como username
+        userCode: userCode
       };
+      console.log('Creating producer with data:', producerData);
       const response = await fetch("/api/producers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(producerData),
       });
-      if (!response.ok) throw new Error("Erro ao criar produtor");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error creating producer:', errorData);
+        throw new Error(errorData.error || "Erro ao criar produtor");
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/producers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/producer-stats"] });
       setIsCreateDialogOpen(false);
       form.reset();
       toast({
-        title: "Sucesso!",
-        description: `Produtor criado com sucesso! Código de acesso: ${userCode}`,
+        title: "✅ Produtor Cadastrado com Sucesso!",
+        description: (
+          <div className="space-y-1">
+            <p><strong>Username:</strong> {userCode}</p>
+            <p><strong>Senha:</strong> {data.password}</p>
+            <p className="text-xs opacity-75">O produtor pode usar essas credenciais para fazer login</p>
+          </div>
+        ),
+        duration: 10000, // Mostrar por mais tempo para copiar as credenciais
+      });
+      console.log('Producer created successfully:', data);
+    },
+    onError: (error: any) => {
+      console.error('Producer creation failed:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao criar produtor",
+        variant: "destructive",
       });
     },
   });
@@ -136,22 +157,25 @@ export default function LogisticsProducers() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <FormLabel className="text-orange-700">Código de Acesso do Produtor</FormLabel>
+                      <FormLabel className="text-blue-700">Código de Login do Produtor</FormLabel>
                       <div className="flex items-center space-x-2 mt-1">
-                        <User className="h-4 w-4 text-orange-600" />
-                        <span className="font-mono font-bold text-orange-800">{userCode}</span>
+                        <User className="h-4 w-4 text-blue-600" />
+                        <span className="font-mono font-bold text-blue-800 bg-white px-2 py-1 rounded border">{userCode}</span>
                       </div>
-                      <p className="text-xs text-orange-600 mt-1">Este código será usado para login no sistema</p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        <strong>Username para login:</strong> {userCode}
+                      </p>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => setUserCode(generateUserCode())}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-100"
+                      className="border-blue-300 text-blue-600 hover:bg-blue-100"
+                      title="Gerar novo código"
                     >
                       <RefreshCw className="h-4 w-4" />
                     </Button>
@@ -263,7 +287,7 @@ export default function LogisticsProducers() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {producers?.map((producer: any) => {
           const stats = productStats?.find((stat: any) => stat.producerId === producer.id);
-          
+
           return (
             <Card key={producer.id} className="hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
@@ -278,7 +302,7 @@ export default function LogisticsProducers() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center text-sm text-gray-600">
                     <Phone className="h-4 w-4 mr-2" />

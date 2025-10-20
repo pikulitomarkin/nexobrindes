@@ -872,31 +872,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/producers", async (req, res) => {
     try {
-      const { name, email, phone, specialty, address, password, username } = req.body;
+      const { name, email, phone, specialty, address, password, username, userCode } = req.body;
+
+      console.log('Creating producer with request data:', { name, email, phone, specialty, address, username: username || userCode, hasPassword: !!password });
+
+      // Use userCode as username if username is not provided
+      const finalUsername = username || userCode || email;
+      
+      if (!finalUsername) {
+        return res.status(400).json({ error: "Username ou código de usuário é obrigatório" });
+      }
 
       // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username || email);
+      const existingUser = await storage.getUserByUsername(finalUsername);
       if (existingUser) {
+        console.log('Username already exists:', finalUsername);
         return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
       }
 
       // Create user with role producer including specialty and address
       const user = await storage.createUser({
-        username: username || email,
+        username: finalUsername,
         password: password,
         role: "producer",
         name,
-        email,
-        phone,
-        specialty,
-        address,
+        email: email || null,
+        phone: phone || null,
+        specialty: specialty || null,
+        address: address || null,
         isActive: true
       });
 
-      res.json({ success: true, user });
+      console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
+
+      res.json({ 
+        success: true, 
+        user: {
+          ...user,
+          userCode: finalUsername // Include userCode in response for display
+        }
+      });
     } catch (error) {
       console.error('Error creating producer:', error);
-      res.status(500).json({ error: "Failed to create producer" });
+      res.status(500).json({ error: "Failed to create producer: " + error.message });
     }
   });
 
