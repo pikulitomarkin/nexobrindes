@@ -1227,23 +1227,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/commissions", async (req, res) => {
     try {
       const commissions = await storage.getAllCommissions();
+      console.log(`Found ${commissions.length} total commissions`);
 
       // Enrich with user names
       const enrichedCommissions = await Promise.all(
         commissions.map(async (commission) => {
           let vendorName = null;
           let partnerName = null;
+          let beneficiaryName = null;
           let orderValue = commission.orderValue;
           let orderNumber = commission.orderNumber;
 
           if (commission.vendorId) {
             const vendor = await storage.getUser(commission.vendorId);
             vendorName = vendor?.name;
+            beneficiaryName = vendor?.name;
           }
 
           if (commission.partnerId) {
             const partner = await storage.getUser(commission.partnerId);
             partnerName = partner?.name;
+            beneficiaryName = partner?.name;
           }
 
           // Enrich with order data if missing
@@ -1255,16 +1259,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          console.log(`Commission ${commission.id}: type=${commission.type}, status=${commission.status}, amount=${commission.amount}, beneficiary=${beneficiaryName}`);
+
           return {
             ...commission,
             vendorName,
             partnerName,
+            beneficiaryName,
             orderValue,
-            orderNumber
+            orderNumber,
+            percentage: commission.percentage,
+            rate: commission.percentage
           };
         })
       );
 
+      console.log(`Returning ${enrichedCommissions.length} enriched commissions`);
       res.json(enrichedCommissions);
     } catch (error) {
       console.error("Error fetching commissions:", error);
@@ -1315,6 +1325,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating commission status:", error);
       res.status(500).json({ error: "Failed to update commission status" });
+    }
+  });
+
+  // Force commission creation for orders that don't have them
+  app.post("/api/commissions/force-create", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const allCommissions = await storage.getAllCommissions();
+      let createdCount = 0;
+
+      console.log(`Checking ${orders.length} orders for missing commissions...`);
+
+      for (const order of orders) {
+        // Skip cancelled orders
+        if (order.status === 'cancelled') continue;
+
+        // Check if order already has commissions
+        const orderCommissions = allCommissions.filter(c => c.orderId === order.id);
+        if (orderCommissions.length > 0) {
+          console.log(`Order ${order.orderNumber} already has ${orderCommissions.length} commissions`);
+          continue;
+        }
+
+        console.log(`Creating missing commissions for order ${order.orderNumber}`);
+
+        // Create vendor commission
+        if (order.vendorId) {
+          const vendorCommission = await storage.createCommission({
+            vendorId: order.vendorId,
+            partnerId: null,
+            orderId: order.id,
+            type: 'vendor',
+            percentage: '10.00',
+            amount: (parseFloat(order.totalValue) * 0.10).toFixed(2),
+            status: 'confirmed', // Set as confirmed since order is already created
+            orderValue: order.totalValue,
+            orderNumber: order.orderNumber
+          });
+          createdCount++;
+          console.log(`Created vendor commission: ${vendorCommission.id}`);
+        }
+
+        // Create partner commissions
+        const partners = await storage.getPartners();
+        for (const partner of partners) {
+          const partnerCommission = await storage.createCommission({
+            vendorId: null,
+            partnerId: partner.id,
+            orderId: order.id,
+            type: 'partner',
+            percentage: '15.00',
+            amount: (parseFloat(order.totalValue) * 0.15).toFixed(2),
+            status: 'confirmed',
+            orderValue: order.totalValue,
+            orderNumber: order.orderNumber
+          });
+          createdCount++;
+          console.log(`Created partner commission: ${partnerCommission.id}`);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Created ${createdCount} missing commissions`,
+        createdCount 
+      });
+    } catch (error) {
+      console.error("Error forcing commission creation:", error);
+      res.status(500).json({ error: "Failed to force commission creation" });
     }
   });
 

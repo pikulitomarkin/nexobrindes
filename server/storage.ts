@@ -2787,7 +2787,7 @@ export class MemStorage implements IStorage {
       if (minimumPayment > 0 && paidValue >= minimumPayment) {
         return 'partial';
       } else if (minimumPayment > 0 && paidValue < minimumPayment) {
-        return 'pending'; // Minimum not met
+        return 'pending';
       } else {
         return 'partial';
       }
@@ -3354,66 +3354,55 @@ export class MemStorage implements IStorage {
       console.log(`Calculating commissions for order ${order.orderNumber}`);
 
       const orderValue = parseFloat(order.totalValue);
-
-      // Get commission settings
       const settings = await this.getCommissionSettings();
-      const defaultVendorRate = parseFloat(settings?.vendorCommissionRate || '10.00');
-      const defaultPartnerRate = parseFloat(settings?.partnerCommissionRate || '15.00');
 
-      // Get vendor commission rate from vendor profile, fallback to default
-      let vendorRate = defaultVendorRate;
+      // Create vendor commission
       if (order.vendorId) {
-        const vendor = await this.getVendor(order.vendorId);
-        if (vendor) {
-          vendorRate = parseFloat(vendor.commissionRate || defaultVendorRate.toString());
-        }
-      }
-
-      // Create vendor commission (to be paid when order is completed)
-      const vendorCommission: Commission = {
-        id: `comm-vendor-${order.id}`,
-        vendorId: order.vendorId,
-        partnerId: null,
-        orderId: order.id,
-        type: 'vendor',
-        percentage: vendorRate.toFixed(2),
-        amount: ((orderValue * vendorRate) / 100).toFixed(2),
-        status: 'pending', // Will be confirmed when order is completed
-        orderValue: order.totalValue,
-        orderNumber: order.orderNumber,
-        createdAt: new Date()
-      };
-
-      this.commissions.set(vendorCommission.id, vendorCommission);
-
-      // Create partner commission for all active partners (to be confirmed immediately on payment)
-      const allUsers = Array.from(this.users.values());
-      const partners = allUsers.filter(user => user.role === 'partner' && user.isActive);
-
-      for (const partner of partners) {
-        const partnerInfo = await this.getPartner(partner.id);
-        let partnerRate = defaultPartnerRate;
-        if (partnerInfo) {
-          partnerRate = parseFloat(partnerInfo.commissionRate || defaultPartnerRate.toString());
-        }
-
-        const partnerCommission: Commission = {
-          id: `comm-partner-${partner.id}-${order.id}`,
-          vendorId: null,
-          partnerId: partner.id,
+        const vendorCommission: Commission = {
+          id: randomUUID(),
+          vendorId: order.vendorId,
+          partnerId: null,
           orderId: order.id,
-          type: 'partner',
-          percentage: partnerRate.toFixed(2),
-          amount: ((orderValue * partnerRate) / 100).toFixed(2),
-          status: 'pending', // Will be confirmed when payment is received
+          type: 'vendor',
+          percentage: settings?.vendorCommissionRate || '10.00',
+          amount: (orderValue * parseFloat(settings?.vendorCommissionRate || '10.00') / 100).toFixed(2),
+          status: 'pending', // Vendor commission starts as pending, becomes confirmed when order is ready
+          paidAt: null,
+          deductedAt: null,
           orderValue: order.totalValue,
           orderNumber: order.orderNumber,
           createdAt: new Date()
         };
-
-        this.commissions.set(partnerCommission.id, partnerCommission);
+        this.commissions.set(vendorCommission.id, vendorCommission);
+        console.log(`Created vendor commission: ${vendorCommission.id} - ${vendorCommission.amount} for vendor ${order.vendorId}`);
       }
 
+      // Create partner commission for all partners
+      const partners = await this.getPartners();
+      console.log(`Found ${partners.length} partners to create commissions for`);
+
+      for (const partner of partners) {
+        const partnerCommission: Commission = {
+          id: randomUUID(),
+          vendorId: null,
+          partnerId: partner.id,
+          orderId: order.id,
+          type: 'partner',
+          percentage: settings?.partnerCommissionRate || '15.00',
+          amount: (orderValue * parseFloat(settings?.partnerCommissionRate || '15.00') / 100).toFixed(2),
+          status: 'confirmed', // Partner commission is confirmed immediately when order is confirmed
+          paidAt: null,
+          deductedAt: null,
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber,
+          createdAt: new Date()
+        };
+        this.commissions.set(partnerCommission.id, partnerCommission);
+        console.log(`Created partner commission: ${partnerCommission.id} - ${partnerCommission.amount} for partner ${partner.id}`);
+      }
+
+      const totalCommissions = this.commissions.size;
+      console.log(`Total commissions in system after creation: ${totalCommissions}`);
       console.log(`Created commissions for order ${order.orderNumber}: 1 vendor + ${partners.length} partners`);
     } catch (error) {
       console.error(`Error calculating commissions for order ${order.orderNumber}:`, error);
