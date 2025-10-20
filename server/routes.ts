@@ -803,6 +803,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          // Get budget photos and items if order was converted from budget
+          let budgetPhotos = [];
+          let budgetItems = [];
+          if (order?.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
+          }
+
           return {
             ...po,
             orderNumber: order?.orderNumber || `PO-${po.id}`,
@@ -812,8 +837,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
+            // Incluir fotos e itens do orçamento quando disponíveis
+            photos: budgetPhotos,
+            items: budgetItems.length > 0 ? budgetItems : (order?.items || []),
             order: order ? {
-              ...order,
+              id: order.id,
+              orderNumber: order.orderNumber,
+              product: order.product,
+              description: order.description,
+              status: order.status,
+              deadline: order.deadline,
+              deliveryDeadline: order.deliveryDeadline,
               clientName: clientName,
               clientAddress: clientAddress,
               clientPhone: clientPhone,
@@ -821,7 +855,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               shippingAddress: order.deliveryType === 'pickup'
                 ? 'Sede Principal - Retirada no Local'
                 : (clientAddress || 'Endereço não informado'),
-              deliveryType: order.deliveryType || 'delivery'
+              deliveryType: order.deliveryType || 'delivery',
+              // Incluir apenas os detalhes necessários para produção, SEM VALORES
+              items: order.items || [],
+              contactName: order.contactName,
+              contactPhone: order.contactPhone,
+              contactEmail: order.contactEmail,
+              // NÃO incluir valores financeiros
+              // totalValue, paidValue, downPayment, etc. são omitidos intencionalmente
             } : null
           };
         })
