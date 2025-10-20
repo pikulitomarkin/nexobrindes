@@ -926,7 +926,7 @@ export class MemStorage implements IStorage {
         producerId: 'producer-1',
         createdAt: new Date().toISOString()
       },
-      
+
       // Produtos da Metalúrgica Silva (producer-2)
       {
         id: 'product-3',
@@ -950,7 +950,7 @@ export class MemStorage implements IStorage {
         producerId: 'producer-2',
         createdAt: new Date().toISOString()
       },
-      
+
       // Produto interno (para exemplo)
       {
         id: 'product-5',
@@ -3268,22 +3268,27 @@ export class MemStorage implements IStorage {
   }
 
   async updateProducerPayment(id: string, data: Partial<InsertProducerPayment & { paidBy?: string; paidAt?: Date; paymentMethod?: string }>): Promise<ProducerPayment | undefined> {
-    const existing = this.producerPayments.get(id);
-    if (!existing) return undefined;
+    const payment = this.producerPayments.get(id);
+    if (!payment) return undefined;
 
-    const updated: ProducerPayment = {
-      ...existing,
+    const updatedPayment = {
+      ...payment,
       ...data,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
-    this.producerPayments.set(id, updated);
-    console.log(`Updated producer payment ${id}:`, {
-      status: updated.status,
-      amount: updated.amount,
-      paidAt: updated.paidAt,
-      paymentMethod: updated.paymentMethod
-    });
-    return updated;
+
+    this.producerPayments.set(id, updatedPayment);
+
+    // If payment is marked as paid, update the production order
+    if (data.status === 'paid' && payment.productionOrderId) {
+      const productionOrder = this.productionOrders.get(payment.productionOrderId);
+      if (productionOrder) {
+        productionOrder.producerPaymentStatus = 'paid';
+        this.productionOrders.set(payment.productionOrderId, productionOrder);
+      }
+    }
+
+    return updatedPayment;
   }
 
   async getProducerPayment(id: string): Promise<ProducerPayment | undefined> {

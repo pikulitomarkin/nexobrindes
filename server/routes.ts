@@ -1515,6 +1515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productionOrders = await storage.getProductionOrders();
       const bankTransactions = await storage.getBankTransactions();
       const expenseNotes = await storage.getExpenseNotes();
+      const producerPayments = await storage.getProducerPayments();
 
       // Contas a Receber - soma dos valores pendentes dos pedidos
       const receivables = orders
@@ -1526,21 +1527,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + Math.max(0, remaining);
         }, 0);
 
-      // Contas a Pagar - separado por categorias
-      const producers = productionOrders
-        .filter(po =>
-          po.producerValue &&
-          parseFloat(po.producerValue) > 0 &&
-          (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
-        )
-        .reduce((total, po) => total + parseFloat(po.producerValue || '0'), 0);
+      // Contas a Pagar - usando producer payments como fonte principal
+      const producers = producerPayments
+        .filter(payment => payment.status === 'pending' || payment.status === 'approved')
+        .reduce((total, payment) => total + parseFloat(payment.amount || '0'), 0);
 
       const expenses = expenseNotes
         .filter(expense => expense.status === 'approved' && !expense.reimbursedAt)
         .reduce((total, expense) => total + parseFloat(expense.amount), 0);
 
       const commissions = allCommissions
-        .filter(c => c.status === 'confirmed' && !c.paidAt)
+        .filter(c => (c.status === 'confirmed' || c.status === 'pending') && !c.paidAt)
         .reduce((total, c) => total + parseFloat(c.amount), 0);
 
       const refunds = orders

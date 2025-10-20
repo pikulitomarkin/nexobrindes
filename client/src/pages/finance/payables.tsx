@@ -149,20 +149,22 @@ export default function FinancePayables() {
 
   // Combine all payables
   const allPayables = [
-    // Producer payments
-    ...producerPayments.map((payment: any) => ({
-      id: payment.id, // Use the actual producer payment ID
-      originalId: `producer-${payment.id}`, // Keep composed ID for display
-      type: 'producer',
-      dueDate: payment.deadline || payment.createdAt,
-      description: `Pagamento Produtor - ${payment.product}`,
-      amount: payment.amount,
-      status: payment.status,
-      beneficiary: payment.producerName,
-      orderNumber: payment.orderNumber,
-      productionOrderId: payment.productionOrderId,
-      category: 'Produção'
-    })),
+    // Producer payments - only show pending and approved
+    ...producerPayments
+      .filter((payment: any) => payment.status === 'pending' || payment.status === 'approved')
+      .map((payment: any) => ({
+        id: payment.id, // Use the actual producer payment ID
+        originalId: `producer-${payment.id}`, // Keep composed ID for display
+        type: 'producer',
+        dueDate: payment.deadline || payment.createdAt,
+        description: `Pagamento Produtor - ${payment.product || 'Produto'}`,
+        amount: payment.amount,
+        status: payment.status,
+        beneficiary: payment.producerName,
+        orderNumber: payment.orderNumber,
+        productionOrderId: payment.productionOrderId,
+        category: 'Produção'
+      })),
 
     // Approved expenses not reimbursed
     ...expenses
@@ -179,9 +181,9 @@ export default function FinancePayables() {
         orderNumber: expense.orderNumber || '-'
       })),
 
-    // Confirmed commissions not paid
+    // Confirmed and pending commissions not paid
     ...commissions
-      .filter((commission: any) => commission.status === 'confirmed' && !commission.paidAt)
+      .filter((commission: any) => (commission.status === 'confirmed' || commission.status === 'pending') && !commission.paidAt)
       .map((commission: any) => ({
         id: `commission-${commission.id}`,
         type: 'commission',
@@ -263,11 +265,8 @@ export default function FinancePayables() {
 
   const handlePay = () => {
     if (selectedPayable && paymentData.amount && paymentData.method) {
-      // Extract the actual producer payment ID from the composed ID
-      let actualId = selectedPayable.id;
-      if (actualId.startsWith('producer-')) {
-        actualId = actualId.replace('producer-', '');
-      }
+      // Use the direct ID for producer payments (no prefix extraction needed anymore)
+      const actualId = selectedPayable.id;
       
       payProducerMutation.mutate({
         payableId: actualId,
@@ -290,11 +289,31 @@ export default function FinancePayables() {
     }
   };
 
-  const breakdown = overview?.payablesBreakdown || {
-    producers: 0,
-    expenses: 0,
-    commissions: 0,
-    refunds: 0
+  // Calculate real-time totals from actual data
+  const producersTotal = producerPayments
+    .filter((p: any) => p.status === 'pending' || p.status === 'approved')
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+
+  const expensesTotal = expenses
+    .filter((expense: any) => expense.status === 'approved' && !expense.reimbursedAt)
+    .reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0);
+
+  const commissionsTotal = commissions
+    .filter((c: any) => (c.status === 'confirmed' || c.status === 'pending') && !c.paidAt)
+    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+
+  const refundsTotal = orders
+    .filter((order: any) => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+    .reduce((sum: number, order: any) => {
+      const refundAmount = order.refundAmount ? parseFloat(order.refundAmount) : parseFloat(order.paidValue || '0');
+      return sum + refundAmount;
+    }, 0);
+
+  const breakdown = {
+    producers: producersTotal,
+    expenses: expensesTotal,
+    commissions: commissionsTotal,
+    refunds: refundsTotal
   };
 
   const totalPayables = breakdown.producers + breakdown.expenses + breakdown.commissions + breakdown.refunds;
