@@ -3097,11 +3097,11 @@ Para mais detalhes, entre em contato conosco!`;
         // OR if total paid >= total value AND status is confirmed/paid
         const hasSomePayment = actualPaidValue > 0;
         const isFullyPaid = actualPaidValue >= totalValue;
-        
+
         // Check if order already has production orders created
         const productionOrders = await storage.getProductionOrdersByOrder(order.id);
         const hasProductionOrders = productionOrders && productionOrders.length > 0;
-        
+
         const statusAllowsProduction = ['confirmed', 'paid'].includes(order.status) ||
           (order.status === 'production' && !hasProductionOrders); // In production but no production orders created yet
 
@@ -3538,13 +3538,11 @@ Para mais detalhes, entre em contato conosco!`;
         updateData.notes = notes;
       }
 
-      const updated = await storage.updateProducerPayment(id, updateData);
+      await db.update(productionOrders)
+        .set(updateData)
+        .where(eq(productionOrders.id, id));
 
-      if (!updated) {
-        return res.status(404).json({ error: "Pagamento não encontrado" });
-      }
-
-      res.json(updated);
+      res.json({ success: true });
     } catch (error) {
       console.error("Error updating producer payment:", error);
       res.status(500).json({ error: "Failed to update producer payment" });
@@ -5122,51 +5120,72 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       const { amount, method, transactionId, notes } = req.body;
 
+      console.log(`Registering payment for receivable: ${id}`, { amount, method, transactionId, notes });
+
       if (!amount || parseFloat(amount) <= 0) {
-        return res.status(400).json({ error: "Valor de pagamento inválido" });
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
       }
 
-      // Get the receivable
-      const receivables = await storage.getAccountsReceivable();
-      const receivable = receivables.find(r => r.id === id);
-      
+      // Get all receivables to find the one we're updating
+      const allReceivables = await storage.getAccountsReceivable();
+      const receivable = allReceivables.find(r => r.id === id);
+
       if (!receivable) {
         return res.status(404).json({ error: "Conta a receber não encontrada" });
       }
 
-      // Create payment record
-      const payment = await storage.createPayment({
-        orderId: receivable.orderId || id,
-        amount: parseFloat(amount).toFixed(2),
-        method: method || 'manual',
-        status: 'confirmed',
-        transactionId: transactionId || `MANUAL-${Date.now()}`,
-        notes: notes || ''
-      });
-
-      // Update receivable received amount
       const currentReceived = parseFloat(receivable.receivedAmount || "0");
-      const newReceived = currentReceived + parseFloat(amount);
-      const totalAmount = parseFloat(receivable.amount);
-      
-      await storage.updateAccountsReceivablePayment(id, {
-        receivedAmount: newReceived.toFixed(2),
-        status: newReceived >= totalAmount ? 'paid' : 'partial',
-        lastPaymentDate: new Date()
-      });
+      const paymentAmount = parseFloat(amount);
+      const newReceivedAmount = (currentReceived + paymentAmount).toFixed(2);
 
-      // If there's an associated order, update its paid value
-      if (receivable.orderId) {
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const currentPaid = parseFloat(order.paidValue || "0");
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: (currentPaid + parseFloat(amount)).toFixed(2)
-          });
+      // Update receivable status based on new amount
+      const totalAmount = parseFloat(receivable.amount);
+      const minimumPayment = parseFloat(receivable.minimumPayment || "0");
+      let newStatus = receivable.status;
+
+      if (parseFloat(newReceivedAmount) >= totalAmount) {
+        newStatus = 'paid';
+      } else if (parseFloat(newReceivedAmount) > 0) {
+        // Check if minimum payment requirement is met
+        if (minimumPayment > 0 && parseFloat(newReceivedAmount) >= minimumPayment) {
+          newStatus = 'partial';
+        } else if (minimumPayment > 0 && parseFloat(newReceivedAmount) < minimumPayment) {
+          newStatus = 'pending'; // Minimum not met
+        } else {
+          newStatus = 'partial';
         }
       }
 
-      res.json({ success: true, payment });
+      // Update the receivable
+      await storage.updateAccountsReceivable(id, {
+        receivedAmount: newReceivedAmount,
+        status: newStatus
+      });
+
+      // If it's an order-based receivable, also create a payment record
+      if (receivable.orderId && !receivable.isManual) {
+        // Create payment record
+        await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: paymentAmount.toFixed(2),
+          method: method || "manual",
+          status: "confirmed",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        });
+
+        console.log(`Created payment record for order ${receivable.orderId}: ${paymentAmount}`);
+      }
+
+      console.log(`Payment registered successfully for receivable ${id}: ${paymentAmount}`);
+
+      res.json({
+        success: true,
+        message: "Pagamento registrado com sucesso",
+        newReceivedAmount: newReceivedAmount,
+        newStatus: newStatus
+      });
     } catch (error) {
       console.error("Error registering payment:", error);
       res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
