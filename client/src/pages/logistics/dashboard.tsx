@@ -19,7 +19,7 @@ export default function LogisticsDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [selectedProducer, setSelectedProducer] = useState<string>("");
+  
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchNotes, setDispatchNotes] = useState("");
@@ -46,36 +46,37 @@ export default function LogisticsDashboard() {
     },
   });
 
-  // Buscar produtores
-  const { data: producers } = useQuery({
-    queryKey: ["/api/producers"],
-    queryFn: async () => {
-      const response = await fetch('/api/producers');
-      if (!response.ok) throw new Error('Failed to fetch producers');
-      return response.json();
-    },
-  });
+  
 
-  // Enviar pedido para produção
+  // Enviar pedido para produção - automaticamente para todos os produtores envolvidos
   const sendToProductionMutation = useMutation({
-    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId: string }) => {
+    mutationFn: async ({ orderId }: { orderId: string }) => {
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ producerId }),
+        body: JSON.stringify({}),
       });
-      if (!response.ok) throw new Error("Erro ao enviar para produção");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao enviar para produção");
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
       setShowSendToProductionModal(false);
       setSelectedOrder(null);
-      setSelectedProducer("");
       toast({
         title: "Sucesso!",
-        description: "Pedido enviado para produção",
+        description: `Pedido enviado para produção. ${data.productionOrdersCreated} ordem(ns) de produção criada(s) para: ${data.producerNames?.join(', ') || 'produtores'}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao enviar pedido para produção",
+        variant: "destructive",
       });
     },
   });
@@ -116,8 +117,8 @@ export default function LogisticsDashboard() {
   };
 
   const confirmSendToProduction = () => {
-    if (selectedOrder && selectedProducer) {
-      sendToProductionMutation.mutate({ orderId: selectedOrder.id, producerId: selectedProducer });
+    if (selectedOrder) {
+      sendToProductionMutation.mutate({ orderId: selectedOrder.id });
     }
   };
 
@@ -631,35 +632,49 @@ export default function LogisticsDashboard() {
       <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enviar para Produção</DialogTitle>
+            <DialogTitle>Confirmar Envio para Produção</DialogTitle>
             <DialogDescription>
-              Selecione o produtor que receberá este pedido para produção.
+              Este pedido será enviado automaticamente para todos os produtores responsáveis pelos itens do pedido.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="producer-select">Produtor Responsável</Label>
-              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produtor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {producers?.map((producer: any) => (
-                    <SelectItem key={producer.id} value={producer.id}>
-                      {producer.name} - {producer.specialty}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Informações do Pedido</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-blue-700">Pedido:</span>
+                    <p className="font-medium">{selectedOrder.orderNumber}</p>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Cliente:</span>
+                    <p className="font-medium">{selectedOrder.clientName}</p>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Valor:</span>
+                    <p className="font-medium text-green-600">
+                      R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Produto:</span>
+                    <p className="font-medium">{selectedOrder.product}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <p className="text-sm text-green-800">
+                  <strong>✓ Processamento Automático:</strong> O sistema criará ordens de produção separadas para cada produtor envolvido nos itens deste pedido.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex gap-2 pt-4">
             <Button
               variant="outline"
               onClick={() => {
                 setShowSendToProductionModal(false);
                 setSelectedOrder(null);
-                setSelectedProducer("");
               }}
               className="flex-1"
             >
@@ -667,10 +682,10 @@ export default function LogisticsDashboard() {
             </Button>
             <Button
               onClick={confirmSendToProduction}
-              disabled={sendToProductionMutation.isPending || !selectedProducer}
-              className="flex-1"
+              disabled={sendToProductionMutation.isPending}
+              className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              {sendToProductionMutation.isPending ? 'Enviando...' : 'Enviar para Produção'}
+              {sendToProductionMutation.isPending ? 'Processando...' : 'Confirmar Envio'}
             </Button>
           </div>
         </DialogContent>

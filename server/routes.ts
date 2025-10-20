@@ -3777,44 +3777,82 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Send order to production
+  // Send order to production - automatically create production orders for all producers involved
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
       const orderId = req.params.id;
-      const { producerId } = req.body;
 
-      if (!producerId) {
-        return res.status(400).json({ error: "Producer ID is required" });
-      }
-
-      // Update order status to production and assign producer
-      const updatedOrder = await storage.updateOrder(orderId, {
-        status: 'production',
-        producerId: producerId
-      });
-
-      if (!updatedOrder) {
+      // Get order details
+      const order = await storage.getOrder(orderId);
+      if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
-      // Create production order for the selected producer
-      await storage.createProductionOrder({
-        orderId: updatedOrder.id,
-        producerId: producerId,
-        status: 'pending',
-        deadline: updatedOrder.deadline
+      // Get all unique producers from order items
+      const producersInvolved = new Set<string>();
+      
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            producersInvolved.add(item.producerId);
+          }
+        });
+      }
+
+      // If order was converted from budget, also check budget items
+      if (order.budgetId) {
+        const budgetItems = await storage.getBudgetItems(order.budgetId);
+        budgetItems.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            producersInvolved.add(item.producerId);
+          }
+        });
+      }
+
+      if (producersInvolved.size === 0) {
+        return res.status(400).json({ error: "Este pedido não possui itens de produtores terceirizados" });
+      }
+
+      // Update order status to production
+      const updatedOrder = await storage.updateOrder(orderId, {
+        status: 'production'
       });
+
+      console.log(`Sending order ${orderId} to production with ${producersInvolved.size} producers:`, Array.from(producersInvolved));
+
+      // Create production orders for each producer involved
+      const createdProductionOrders = [];
+      for (const producerId of producersInvolved) {
+        const productionOrder = await storage.createProductionOrder({
+          orderId: updatedOrder.id,
+          producerId: producerId,
+          status: 'pending',
+          deadline: updatedOrder.deadline
+        });
+
+        createdProductionOrders.push(productionOrder);
+        console.log(`Created production order ${productionOrder.id} for producer ${producerId}`);
+      }
 
       // Get enriched order data
       const client = await storage.getUser(updatedOrder.clientId);
       const vendor = await storage.getUser(updatedOrder.vendorId);
-      const producer = await storage.getUser(producerId);
+
+      // Get producer names
+      const producerNames = [];
+      for (const producerId of producersInvolved) {
+        const producer = await storage.getUser(producerId);
+        if (producer) {
+          producerNames.push(producer.name);
+        }
+      }
 
       const enrichedOrder = {
         ...updatedOrder,
         clientName: client?.name || 'Unknown',
         vendorName: vendor?.name || 'Unknown',
-        producerName: producer?.name || null
+        producerNames: producerNames,
+        productionOrdersCreated: createdProductionOrders.length
       };
 
       res.json(enrichedOrder);
