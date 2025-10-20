@@ -33,7 +33,7 @@ export default function ProductionDashboard() {
     queryKey: ["/api/production-orders/producer", producerId],
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<any>({
     queryKey: ["/api/producer", producerId, "stats"],
   });
 
@@ -189,7 +189,7 @@ export default function ProductionDashboard() {
     updateValueMutation.mutate({
       id: selectedOrder.id,
       value: numericValue.toFixed(2),
-      notes: producerNotes.trim() || null,
+      notes: producerNotes.trim() || undefined,
     });
   };
 
@@ -277,7 +277,7 @@ export default function ProductionDashboard() {
     }
   };
 
-  const filteredOrders = productionOrders?.filter((order: any) => {
+  const filteredOrders = (productionOrders as any[] || []).filter((order: any) => {
     if (statusFilter !== "all" && order.status !== statusFilter) return false;
     if (periodFilter !== "all" && order.deadline) {
       const orderDate = new Date(order.deadline);
@@ -289,7 +289,7 @@ export default function ProductionDashboard() {
       if (periodFilter === "month" && daysDiff > 30) return false;
     }
     return true;
-  }) || [];
+  });
 
   if (isLoading) {
     return (
@@ -322,7 +322,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-blue-700">Ordens Ativas</p>
                 <p className="text-3xl font-bold text-blue-900 mt-2">
-                  {stats?.activeOrders || filteredOrders.filter(o => !['completed', 'rejected'].includes(o.status)).length}
+                  {stats?.activeOrders || filteredOrders.filter((o: any) => !['completed', 'rejected'].includes(o.status)).length}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">Total em andamento</p>
               </div>
@@ -339,7 +339,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-yellow-700">Aguardando</p>
                 <p className="text-3xl font-bold text-yellow-900 mt-2">
-                  {filteredOrders.filter(o => o.status === 'pending').length}
+                  {filteredOrders.filter((o: any) => o.status === 'pending').length}
                 </p>
                 <p className="text-xs text-yellow-600 mt-1">Pendentes de aceite</p>
               </div>
@@ -356,7 +356,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-purple-700">Em Produção</p>
                 <p className="text-3xl font-bold text-purple-900 mt-2">
-                  {filteredOrders.filter(o => ['accepted', 'production'].includes(o.status)).length}
+                  {filteredOrders.filter((o: any) => ['accepted', 'production'].includes(o.status)).length}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">Sendo produzidas</p>
               </div>
@@ -373,7 +373,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-green-700">Prontos</p>
                 <p className="text-3xl font-bold text-green-900 mt-2">
-                  {filteredOrders.filter(o => ['ready', 'shipped', 'delivered', 'completed'].includes(o.status)).length}
+                  {filteredOrders.filter((o: any) => ['ready', 'shipped', 'delivered', 'completed'].includes(o.status)).length}
                 </p>
                 <p className="text-xs text-green-600 mt-1">Finalizados pela produção</p>
               </div>
@@ -390,7 +390,7 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-green-700">A Receber</p>
                 <p className="text-2xl font-bold text-green-900 mt-2">
-                  R$ {(producerPayments?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((producerPayments as any[] || []).filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-green-600 mt-1">Pagamentos pendentes</p>
               </div>
@@ -626,43 +626,42 @@ export default function ProductionDashboard() {
                         </div>
                       )}
 
+                      {order.notes && (
+                        <div className="mb-4">
+                          <Label className="text-sm font-medium text-gray-500">Observações</Label>
+                          <div className="mt-1 p-3 bg-gray-50 border rounded">
+                            <p className="text-sm">{order.notes}</p>
+                            {order.lastNoteAt && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                Última atualização: {new Date(order.lastNoteAt).toLocaleString('pt-BR')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
-
-                  {order.notes && (
-                    <div className="mb-4">
-                      <Label className="text-sm font-medium text-gray-500">Observações</Label>
-                      <div className="mt-1 p-3 bg-gray-50 border rounded">
-                        <p className="text-sm">{order.notes}</p>
-                        {order.lastNoteAt && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            Última atualização: {new Date(order.lastNoteAt).toLocaleString('pt-BR')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>Produto: {order.order?.product || 'N/A'}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSetValue(order)}
-                          className="flex items-center gap-1"
-                          disabled={order.producerValue && parseFloat(order.producerValue) > 0}
-                        >
-                          <DollarSign className="h-4 w-4" />
-                          {order.producerValue ? 'Valor Definido' : 'Definir Valor'}
-                        </Button>
-                        {getNextAction(order)}
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span>Produto: {order.order?.product || 'N/A'}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSetValue(order)}
+                            className="flex items-center gap-1"
+                            disabled={order.producerValue && parseFloat(order.producerValue) > 0}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                            {order.producerValue ? 'Valor Definido' : 'Definir Valor'}
+                          </Button>
+                          {getNextAction(order)}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
