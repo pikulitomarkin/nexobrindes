@@ -15,6 +15,9 @@ import ClientDashboard from "@/pages/dashboards/client-dashboard";
 import ProducerDashboard from "@/pages/dashboards/producer-dashboard";
 import PartnerDashboard from "@/pages/dashboards/partner-dashboard";
 
+// Home page
+import Home from "@/pages/home";
+
 // Admin imports
 import AdminOrders from "@/pages/admin/orders";
 import AdminBudgets from "@/pages/admin/budgets";
@@ -138,6 +141,9 @@ function App() {
           </div>
         }>
           <Switch>
+            {/* Home Route */}
+            <Route path="/" component={Home} />
+            
             {/* Login Route */}
             <Route path="/login" component={Login} />
 
@@ -146,8 +152,7 @@ function App() {
               <MainLayout>
                 <Switch>
                   {/* Admin Routes */}
-                  <Route path="/" component={AdminDashboard} />
-                  <Route path="/admin" component={AdminDashboard} />
+                  <Route path="/admin" component={AdminDashboard} /></old_str>
                   <Route path="/admin/dashboard" component={AdminDashboard} />
                   <Route path="/admin/orders" component={AdminOrders} />
                   <Route path="/admin/budgets" component={AdminBudgets} />
@@ -222,8 +227,8 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
 
-            {/* Catch-all for unauthenticated users */}
-            <Route path="/:rest*" component={Login} />
+            {/* Catch-all for not found pages */}
+            <Route component={NotFound} />
           </Switch>
         </Suspense>
         <Toaster />
