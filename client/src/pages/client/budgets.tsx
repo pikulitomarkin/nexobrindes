@@ -21,8 +21,8 @@ export default function ClientBudgets() {
       return response.json();
     },
     enabled: !!currentUser.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
-    refetchOnWindowFocus: true, // Refetch when user returns to the page
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
 
   // Buscar solicitações de orçamento
@@ -39,9 +39,9 @@ export default function ClientBudgets() {
       return data;
     },
     enabled: !!currentUser.id,
-    refetchInterval: 10000, // Refetch every 10 seconds (more frequent)
-    refetchOnWindowFocus: true, // Refetch when user returns to the page
-    retry: 3, // Retry failed requests
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
+    retry: 3,
   });
 
   const getStatusBadge = (status: string, type: 'budget' | 'request') => {
@@ -269,7 +269,7 @@ export default function ClientBudgets() {
                       <div className="flex space-x-2">
                         {budget.status === 'sent' && (
                           <>
-                            <Button size="sm" className="gradient-bg text-white">
+                            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white">
                               <CheckCircle className="h-4 w-4 mr-1" />
                               Aprovar Orçamento
                             </Button>
