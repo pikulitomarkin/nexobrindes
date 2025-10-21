@@ -1752,7 +1752,7 @@ export default function VendorBudgets() {
                     <div>
                       <p className="font-medium">{budget.title}</p>
                       <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      <p className="text-sm text-green-600">Total: R$ {budget.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-sm text-green-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button 
