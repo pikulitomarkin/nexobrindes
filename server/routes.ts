@@ -6,6 +6,14 @@ import path from 'path';
 import { storage } from "./storage";
 import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
+
 // Mock requireAuth middleware for demonstration purposes
 // In a real application, this would verify JWT tokens or session
 const requireAuth = async (req: any, res: any, next: any) => {
