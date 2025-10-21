@@ -1085,7 +1085,7 @@ export class MemStorage implements IStorage {
       const paidValue = parseFloat(order.paidValue);
       const remainingAmount = totalValue - paidValue;
 
-      let status: 'pending' | 'partial' | 'paid' = 'pending';
+      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
       if (paidValue >= totalValue) {
         status = 'paid';
       } else if (paidValue > 0) {
@@ -1848,150 +1848,108 @@ export class MemStorage implements IStorage {
   }
 
   // Update order paid value based on confirmed payments
-  private async updateOrderPaidValue(orderId: string): Promise<void> {
-    const order = this.orders.get(orderId);
+  async updateOrderPaidValue(orderId: string, receivedAmount?: string): Promise<void> {
+    const payments = await this.getPaymentsByOrder(orderId);
+    const totalPaid = payments
+      .filter(payment => payment.status === 'confirmed')
+      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+
+    const order = await this.getOrder(orderId);
     if (!order) return;
 
-    const orderPayments = Array.from(this.payments.values())
-      .filter(payment => payment.orderId === orderId && payment.status === 'confirmed');
+    const newPaidValue = receivedAmount !== undefined ? receivedAmount : totalPaid.toFixed(2);
 
-    const totalPaid = orderPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+    if (newPaidValue !== order.paidValue) {
+      await this.updateOrder(orderId, { paidValue: newPaidValue });
 
-    const updatedOrder = {
-      ...order,
-      paidValue: totalPaid.toFixed(2),
-      updatedAt: new Date()
-    };
+      // Update corresponding AccountsReceivable entry
+      const receivableId = `ar-${orderId}`;
+      const receivable = this.accountsReceivable.get(receivableId);
 
-    this.orders.set(orderId, updatedOrder);
+      if (receivable) {
+        const totalValue = parseFloat(receivable.amount);
+        const minimumPayment = parseFloat(receivable.minimumPayment || 0);
+        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
 
-    // Also update accounts receivable
-    const receivableId = `ar-${orderId}`;
-    const receivable = this.accountsReceivable.get(receivableId);
-    if (receivable) {
-      const totalValue = parseFloat(order.totalValue);
-      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+        if (parseFloat(newPaidValue) >= totalValue) {
+          status = 'paid';
+        } else if (parseFloat(newPaidValue) > 0) {
+          // Check if minimum payment requirement is met
+          if (minimumPayment > 0 && parseFloat(newPaidValue) >= minimumPayment) {
+            status = 'partial';
+          } else if (minimumPayment > 0 && parseFloat(newPaidValue) < minimumPayment) {
+            status = 'pending'; // Minimum not met
+          } else {
+            status = 'partial'; // No minimum requirement
+          }
+        } else {
+          status = minimumPayment > 0 ? 'pending' : 'open';
+        }
 
-      if (totalPaid >= totalValue) {
-        status = 'paid';
-      } else if (totalPaid > 0) {
-        status = 'partial';
+        // Check if overdue
+        const dueDate = order.deadline ? new Date(order.deadline) : null;
+        if (dueDate && new Date() > dueDate && status !== 'paid') {
+          status = 'overdue';
+        }
+
+        await this.updateAccountsReceivable(receivableId, {
+          receivedAmount: parseFloat(newPaidValue).toFixed(2),
+          status: status
+        });
       }
-
-      const updatedReceivable = {
-        ...receivable,
-        receivedAmount: totalPaid.toFixed(2),
-        status,
-        updatedAt: new Date()
-      };
-
-      this.accountsReceivable.set(receivableId, updatedReceivable);
     }
   }
 
   // Calculate and create commissions for an order
-  private async calculateCommissions(order: Order): Promise<void> {
-    console.log(`Calculating commissions for order ${order.orderNumber}`);
+  async calculateCommissions(order: Order): Promise<void> {
+    try {
+      // Get vendor commission settings
+      const vendor = await this.getVendor(order.vendorId);
+      const commissionSettings = await this.getCommissionSettings();
 
-    // Get vendor commission rate
-    const vendor = await this.getVendor(order.vendorId);
-    const vendorCommissionRate = vendor?.commissionRate ? parseFloat(vendor.commissionRate) : 10.0;
+      const vendorRate = vendor?.commissionRate || commissionSettings?.vendorCommissionRate || '10.00';
+      const orderValue = parseFloat(order.totalValue);
+      const commissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
 
-    // Create vendor commission
-    const vendorCommissionAmount = (parseFloat(order.totalValue) * vendorCommissionRate) / 100;
+      // Create vendor commission
+      const vendorCommission: Commission = {
+        id: `commission-${order.id}-vendor`,
+        vendorId: order.vendorId,
+        orderId: order.id,
+        percentage: vendorRate,
+        amount: commissionAmount.toFixed(2),
+        status: 'pending',
+        type: 'vendor',
+        orderValue: order.totalValue,
+        orderNumber: order.orderNumber,
+        paidAt: null,
+        createdAt: new Date()
+      };
 
-    const vendorCommission: Commission = {
-      id: randomUUID(),
-      vendorId: order.vendorId,
-      partnerId: null,
-      orderId: order.id,
-      type: 'vendor',
-      percentage: vendorCommissionRate.toFixed(2),
-      amount: vendorCommissionAmount.toFixed(2),
-      status: 'pending', // Will be updated when order status changes
-      paidAt: null,
-      deductedAt: null,
-      orderValue: order.totalValue,
-      orderNumber: order.orderNumber,
-      createdAt: new Date()
-    };
+      this.commissions.set(vendorCommission.id, vendorCommission);
 
-    this.commissions.set(vendorCommission.id, vendorCommission);
-    console.log(`Created vendor commission: ${vendorCommission.amount} for order ${order.orderNumber}`);
-
-    // Create partner commission if there are active partners
-    const partners = await this.getPartners();
-    if (partners.length > 0) {
-      // Use the first active partner for simplicity
-      const activePartner = partners.find(p => p.isActive);
-      if (activePartner) {
-        const partnerCommissionRate = 15.0; // Default partner rate
-        const partnerCommissionAmount = (parseFloat(order.totalValue) * partnerCommissionRate) / 100;
-
-        const partnerCommission: Commission = {
-          id: randomUUID(),
-          vendorId: null,
-          partnerId: activePartner.id,
-          orderId: order.id,
-          type: 'partner',
-          percentage: partnerCommissionRate.toFixed(2),
-          amount: partnerCommissionAmount.toFixed(2),
-          status: 'pending',
-          paidAt: null,
-          deductedAt: null,
-          orderValue: order.totalValue,
-          orderNumber: order.orderNumber,
-          createdAt: new Date()
-        };
-
-        this.commissions.set(partnerCommission.id, partnerCommission);
-        console.log(`Created partner commission: ${partnerCommission.amount} for order ${order.orderNumber}`);
-      }
+      console.log(`Created vendor commission: ${commissionAmount.toFixed(2)} for order ${order.orderNumber}`);
+    } catch (error) {
+      console.error('Error calculating commissions:', error);
     }
   }
 
   // Process commission payments based on order status
-  private async processCommissionPayments(order: Order, newStatus: string): Promise<void> {
-    console.log(`Processing commission payments for order ${order.orderNumber}, new status: ${newStatus}`);
+  async processCommissionPayments(order: Order, status: string): Promise<void> {
+    try {
+      if (status === 'completed' || status === 'delivered') {
+        // Update vendor commissions to paid when order is completed
+        const vendorCommissions = Array.from(this.commissions.values())
+          .filter(c => c.orderId === order.id && c.vendorId && c.status === 'pending');
 
-    const orderCommissions = Array.from(this.commissions.values())
-      .filter(c => c.orderId === order.id);
-
-    for (const commission of orderCommissions) {
-      let shouldUpdateStatus = false;
-      let newCommissionStatus = commission.status;
-
-      // Vendor commissions: confirmed when order is completed/ready
-      if (commission.type === 'vendor' && ['completed', 'ready', 'shipped', 'delivered'].includes(newStatus)) {
-        if (commission.status === 'pending') {
-          newCommissionStatus = 'confirmed';
-          shouldUpdateStatus = true;
+        for (const commission of vendorCommissions) {
+          commission.status = 'paid';
+          commission.paidAt = new Date();
+          this.commissions.set(commission.id, commission);
         }
       }
-
-      // Partner commissions: confirmed when order starts production
-      if (commission.type === 'partner' && ['production', 'confirmed'].includes(newStatus)) {
-        if (commission.status === 'pending') {
-          newCommissionStatus = 'confirmed';
-          shouldUpdateStatus = true;
-        }
-      }
-
-      // Cancel commissions if order is cancelled
-      if (newStatus === 'cancelled') {
-        newCommissionStatus = 'cancelled';
-        shouldUpdateStatus = true;
-      }
-
-      if (shouldUpdateStatus) {
-        const updatedCommission = {
-          ...commission,
-          status: newCommissionStatus,
-          updatedAt: new Date()
-        };
-        this.commissions.set(commission.id, updatedCommission);
-        console.log(`Updated commission ${commission.id} status to: ${newCommissionStatus}`);
-      }
+    } catch (error) {
+      console.error('Error processing commission payments:', error);
     }
   }
 
@@ -2607,91 +2565,89 @@ export class MemStorage implements IStorage {
   }
 
   async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
-    const budget = this.budgets.get(budgetId);
-    if (!budget) {
-      throw new Error('Budget not found');
-    }
+    try {
+      const budget = this.budgets.get(budgetId);
+      if (!budget) {
+        throw new Error("Orçamento não encontrado");
+      }
 
-    // Generate order number
-    const orderNumber = `PED-${Date.now()}`;
-
-    // Create order data from budget
-    const orderData = {
-      orderNumber,
-      clientId: budget.clientId || "", // Use clientId from budget if available
-      vendorId: budget.vendorId,
-      producerId: producerId || null,
-      budgetId: budget.id,
-      product: budget.title,
-      description: budget.description || "",
-      totalValue: typeof budget.totalValue === 'number' ? budget.totalValue.toFixed(2) : budget.totalValue.toString(),
-      status: 'confirmed',
-      deadline: budget.deliveryDeadline,
-      deliveryDeadline: budget.deliveryDeadline,
-      // Always preserve contact information from budget - this is essential
-      contactName: budget.contactName || "Cliente do Orçamento",
-      contactPhone: budget.contactPhone || "",
-      contactEmail: budget.contactEmail || "",
-      deliveryType: budget.deliveryType || "delivery",
-      items: Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId) || [],
-      paymentMethodId: "",
-      shippingMethodId: "",
-      installments: 1,
-      downPayment: 0,
-      remainingAmount: 0,
-      shippingCost: 0,
-      hasDiscount: budget.hasDiscount || false,
-      discountType: budget.discountType || "percentage",
-      discountPercentage: budget.discountPercentage || 0,
-      discountValue: budget.discountValue || 0
-    };
-
-    console.log(`Converting budget ${budgetId} to order with contactName: ${orderData.contactName}`);
-
-    // Create the order
-    const order = await this.createOrder(orderData);
-
-    // Update budget status to converted
-    budget.status = 'converted';
-    this.budgets.set(budgetId, budget);
-
-    // Create production orders for each producer involved in the order
-    const producersInvolved = new Set<string>();
-
-    // Get all producers from order items
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach((item: any) => {
-        if (item.producerId && item.producerId !== 'internal') {
-          producersInvolved.add(item.producerId);
-        }
+      console.log(`Converting budget to order with data:`, {
+        budgetId,
+        orderNumber: `PED-${Date.now()}`,
+        contactName: budget.contactName,
+        clientId: budget.clientId,
+        itemsCount: budget.items?.length || 0,
+        totalValue: budget.totalValue
       });
-    }
 
-    // If a specific producer was provided, include it
-    if (producerId && producerId !== 'internal') {
-      producersInvolved.add(producerId);
-    }
-
-    // Create production orders for each producer
-    for (const pId of producersInvolved) {
-      const productionOrder = {
-        id: `po-${Date.now()}-${pId}`,
-        orderId: order.id,
-        producerId: pId,
-        status: 'pending',
-        deadline: order.deadline,
-        acceptedAt: null,
-        completedAt: null,
-        notes: null,
-        deliveryDeadline: order.deliveryDeadline,
-        hasUnreadNotes: false,
-        lastNoteAt: null,
-        producerValue: null
+      // Create order from budget data
+      const orderData = {
+        orderNumber: `PED-${Date.now()}`,
+        clientId: budget.clientId,
+        vendorId: budget.vendorId,
+        budgetId: budgetId,
+        product: budget.title,
+        description: budget.description || '',
+        totalValue: budget.totalValue?.toFixed(2) || '0.00',
+        status: 'pending' as const,
+        contactName: budget.contactName,
+        contactPhone: budget.contactPhone,
+        contactEmail: budget.contactEmail,
+        deliveryType: budget.deliveryType || 'delivery',
+        deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+        items: budget.items || [],
+        paymentMethodId: budget.paymentMethodId || '',
+        shippingMethodId: budget.shippingMethodId || '',
+        installments: budget.installments || 1,
+        downPayment: budget.downPayment || 0,
+        remainingAmount: budget.remainingAmount || 0,
+        shippingCost: budget.shippingCost || 0,
+        hasDiscount: budget.hasDiscount || false,
+        discountType: budget.discountType || 'percentage',
+        discountPercentage: budget.discountPercentage || 0,
+        discountValue: budget.discountValue || 0
       };
-      this.productionOrders.set(productionOrder.id, productionOrder);
-    }
 
-    return order;
+      const order = await this.createOrder(orderData);
+
+      // Update budget status
+      budget.status = 'converted';
+      this.budgets.set(budgetId, budget);
+
+      // Create production orders if needed
+      if (budget.items && Array.isArray(budget.items)) {
+        const producersMap = new Map<string, any[]>();
+
+        budget.items.forEach((item: any) => {
+          const itemProducerId = item.producerId || producerId || 'internal';
+          if (!producersMap.has(itemProducerId)) {
+            producersMap.set(itemProducerId, []);
+          }
+          producersMap.get(itemProducerId)!.push(item);
+        });
+
+        for (const [pId, items] of producersMap.entries()) {
+          if (pId !== 'internal') {
+            const productionOrder = {
+              orderId: order.id,
+              producerId: pId,
+              status: 'pending' as const,
+              deadline: orderData.deadline,
+              notes: `Produção de ${items.length} itens do orçamento ${budget.budgetNumber}`,
+              deliveryDeadline: orderData.deadline,
+              orderDetails: JSON.stringify(items)
+            };
+
+            await this.createProductionOrder(productionOrder);
+          }
+        }
+      }
+
+      return order;
+    } catch (error) {
+      console.error('Error in convertBudgetToOrder:', error);
+      throw error;
+    }
   }
 
 

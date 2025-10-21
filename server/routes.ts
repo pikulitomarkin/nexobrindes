@@ -134,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fs.writeFileSync(filepath, req.file.buffer);
 
       const url = `/uploads/${filename}`;
-      
+
       console.log(`File uploaded successfully: ${filename}`);
       res.json({ url });
     } catch (error) {
@@ -174,14 +174,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const budget = await storage.getBudget(id);
-      
+
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
       // Get budget items
       const items = await storage.getBudgetItems(id);
-      
+
       // Get budget photos
       const photos = await storage.getBudgetPhotos(id);
 
@@ -1018,7 +1018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...po,
             orderNumber: order?.orderNumber || `PO-${po.id}`,
             product: order?.product || 'Produto não informado',
-            clientName: clientName, // Always use contactName, never fallback
+            clientName: clientName,
             clientAddress: clientAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
@@ -2771,7 +2771,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vendorName: vendor?.name || 'Vendedor não atribuído',
             productName: productSummary, // Para compatibilidade com a interface
             productSummary: productSummary,
-            totalProducts: totalProducts,
             totalEstimatedValue: request.totalEstimatedValue || 0
           };
         })
@@ -3031,56 +3030,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const { id } = req.params;
+      const { producerId } = req.body;
 
-      const budget = await storage.getBudget(id);
-      if (!budget) {
+      console.log(`Converting budget ${id} to order for client ${req.body.clientId}`);
+
+      const order = await storage.convertBudgetToOrder(id, producerId);
+      if (!order) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      if (budget.status !== 'approved') {
-        return res.status(400).json({ error: "Apenas orçamentos aprovados podem ser convertidos em pedidos" });
-      }
-
-      const orderData = {
-        budgetId: id,
-        clientId: budget.clientId,
-        vendorId: budget.vendorId,
-        contactName: budget.contactName,
-        contactPhone: budget.contactPhone,
-        contactEmail: budget.contactEmail,
-        product: budget.title,
-        description: budget.description,
-        totalValue: budget.totalValue,
-        deliveryDeadline: budget.deliveryDeadline,
-        deliveryType: budget.deliveryType,
-        items: budget.items,
-        paymentMethodId: budget.paymentMethodId,
-        shippingMethodId: budget.shippingMethodId,
-        installments: budget.installments,
-        downPayment: budget.downPayment,
-        remainingAmount: budget.remainingAmount,
-        shippingCost: budget.shippingCost,
-        hasDiscount: budget.hasDiscount,
-        discountType: budget.discountType,
-        discountPercentage: budget.discountPercentage,
-        discountValue: budget.discountValue,
-        status: 'confirmed'
-      };
-
-      const order = await storage.createOrder(orderData);
-
-      // Update budget status to converted
-      await storage.updateBudget(id, {
-        status: 'converted',
-        convertedAt: new Date(),
-        orderId: order.id
-      });
-
-      console.log(`Budget ${id} converted to order ${order.id}`);
-      res.json({ success: true, order });
+      res.json(order);
     } catch (error) {
-      console.error("Error converting budget to order:", error);
-      res.status(500).json({ error: "Erro ao converter orçamento em pedido" });
+      console.error("Error converting budget to order:", error.message);
+      res.status(500).json({ error: "Erro ao converter orçamento em pedido: " + (error?.message || 'Erro desconhecido') });
     }
   });
 
@@ -3828,14 +3790,13 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich with client information
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
-          // Always use contactName as primary client identifier
-          let clientName = order.contactName;
+          let clientName = order.contactName || 'Cliente não identificado';
           let clientAddress = null;
           let clientPhone = order.contactPhone;
           let clientEmail = order.contactEmail;
 
-          // Only if contactName is missing, try to get from client record
-          if (!clientName && order.clientId) {
+          // Get client details if available
+          if (order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
