@@ -739,12 +739,12 @@ export default function AdminBudgets() {
                                 <Label htmlFor={`admin-general-customization-value-${index}`}>Valor Unitário (R$)</Label>
                                 <Input
                                   id={`admin-general-customization-value-${index}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={item.generalCustomizationValue || 0}
-                                  onChange={(e) => updateAdminBudgetItem(index, 'generalCustomizationValue', parseFloat(e.target.value) || 0)}
-                                  placeholder="0,00"
+                                  value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
+                                  onChange={(e) => {
+                                    const value = parseCurrencyValue(e.target.value);
+                                    updateAdminBudgetItem(index, 'generalCustomizationValue', value);
+                                  }}
+                                  placeholder="R$ 0,00"
                                 />
                               </div>
                             </div>
