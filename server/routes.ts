@@ -166,11 +166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Valor deve ser maior que zero" });
       }
 
+      // Only update the producer value, don't create payment yet
       const updatedPO = await storage.updateProductionOrderValue(id, value, notes, false);
       if (!updatedPO) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
+      console.log(`Updated producer value for production order ${id} to R$ ${value} - payment will be created when marked as ready`);
       res.json(updatedPO);
     } catch (error) {
       console.error("Error updating producer value:", error);
@@ -4437,8 +4439,9 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(404).json({ error: "Production order not found" });
       }
 
-      // Update the main order status to match production status
+      // Get production order details
       const productionOrder = await storage.getProductionOrder(id);
+      
       if (productionOrder) {
         let orderStatus = 'production'; // Default
 
@@ -4454,6 +4457,20 @@ Para mais detalhes, entre em contato conosco!`;
             break;
           case 'ready':
             orderStatus = 'ready';
+            // Create producer payment only when marked as ready
+            if (productionOrder.producerValue && parseFloat(productionOrder.producerValue) > 0) {
+              const existingPayment = await storage.getProducerPaymentByProductionOrderId(id);
+              if (!existingPayment) {
+                await storage.createProducerPayment({
+                  productionOrderId: id,
+                  producerId: productionOrder.producerId,
+                  amount: productionOrder.producerValue,
+                  status: 'pending',
+                  notes: productionOrder.producerNotes || null
+                });
+                console.log(`Created producer payment for production order ${id} when marked as ready - R$ ${productionOrder.producerValue}`);
+              }
+            }
             break;
           case 'shipped':
             orderStatus = 'shipped';

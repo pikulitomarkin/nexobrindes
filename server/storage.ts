@@ -242,6 +242,7 @@ export interface IStorage {
   // Producer Payments
   getProducerPayments(): Promise<ProducerPayment[]>;
   getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]>;
+  getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined>;
   createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment>;
   updateProducerPayment(id: string, data: Partial<InsertProducerPayment>): Promise<ProducerPayment | undefined>;
   getProducerPayment(id: string): Promise<ProducerPayment | undefined>;
@@ -3260,7 +3261,12 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    return Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
+    const payments = Array.from(this.producerPayments.values()).filter(p => p.producerId === producerId);
+    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
+    return Array.from(this.producerPayments.values()).find(p => p.productionOrderId === productionOrderId);
   }
 
   async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
