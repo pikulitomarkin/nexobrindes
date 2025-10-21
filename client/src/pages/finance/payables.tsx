@@ -62,8 +62,8 @@ export default function FinancePayables() {
 
   // Mutation for paying producer and manual payables
   const payProducerMutation = useMutation({
-    mutationFn: async ({ payableId, isProducer }: { payableId: string; isProducer?: boolean }) => {
-      if (isProducer) {
+    mutationFn: async ({ payableId, payableType }: { payableId: string; payableType: string }) => {
+      if (payableType === 'producer') {
         // Para pagamentos de produtores, usar a API específica
         const response = await fetch(`/api/finance/producer-payments/${payableId}/pay`, {
           method: "POST",
@@ -235,19 +235,21 @@ export default function FinancePayables() {
 
   // Combine all payables
   const allPayables = [
-    // Producer payments
-    ...producerPayments.map((payment: any) => ({
-      id: `producer-${payment.id}`,
-      type: 'producer',
-      dueDate: payment.deadline || payment.createdAt,
-      description: `Pagamento Produtor - ${payment.product}`,
-      amount: payment.amount,
-      status: payment.status,
-      beneficiary: payment.producerName,
-      orderNumber: payment.orderNumber,
-      productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
-      category: 'Produção'
-    })),
+    // Producer payments - apenas pagamentos aprovados e não pagos
+    ...producerPayments
+      .filter((payment: any) => payment.status === 'approved' || payment.status === 'pending')
+      .map((payment: any) => ({
+        id: `producer-${payment.id}`,
+        type: 'producer',
+        dueDate: payment.deadline || payment.createdAt,
+        description: `Pagamento Produtor - ${payment.product || 'Produção'}`,
+        amount: payment.amount,
+        status: payment.status,
+        beneficiary: payment.producerName,
+        orderNumber: payment.orderNumber,
+        productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
+        category: 'Produção'
+      })),
 
     // Approved expenses not reimbursed
     ...expenses
@@ -421,18 +423,13 @@ export default function FinancePayables() {
           transactionId: paymentData.transactionId,
           notes: paymentData.notes
         });
-      } else {
+      } else if (selectedPayable.type === 'producer') {
         // Handle producer payment
-        const actualId = selectedPayable.id.startsWith('producer-') 
-          ? selectedPayable.id.replace('producer-', '') 
-          : selectedPayable.productionOrderId || selectedPayable.id;
+        const actualId = selectedPayable.actualId || selectedPayable.id.replace('producer-', '');
 
         payProducerMutation.mutate({
           payableId: actualId,
-          amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
-          method: paymentData.method,
-          transactionId: paymentData.transactionId,
-          notes: paymentData.notes
+          payableType: 'producer'
         });
       }
     }
@@ -687,8 +684,9 @@ export default function FinancePayables() {
                             onClick={() => {
                               setSelectedPayable({
                                 ...payable,
-                                // Use productionOrderId for the payment endpoint
-                                id: payable.productionOrderId || payable.id
+                                // Use the original producer payment ID (remove prefix)
+                                actualId: payable.id.replace('producer-', ''),
+                                payableType: 'producer'
                               });
                               setPaymentData({
                                 amount: payable.amount,
@@ -746,7 +744,10 @@ export default function FinancePayables() {
                         {payable.type === 'manual' && payable.status === 'pending' && (
                           <Button
                             onClick={() => {
-                              setSelectedPayable(payable);
+                              setSelectedPayable({
+                                ...payable,
+                                payableType: 'manual'
+                              });
                               setPaymentData({
                                 amount: payable.amount,
                                 method: "",
