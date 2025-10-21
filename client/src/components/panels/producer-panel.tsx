@@ -24,10 +24,7 @@ export default function ProducerPanel() {
     enabled: !!producerId,
   });
 
-  const { data: paymentStats, isLoading: paymentsLoading } = useQuery({
-    queryKey: ["/api/producer-payments/producer", producerId],
-    enabled: !!producerId,
-  });
+  
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -53,7 +50,7 @@ export default function ProducerPanel() {
     );
   };
 
-  if (statsLoading || ordersLoading || paymentsLoading) {
+  if (statsLoading || ordersLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -150,7 +147,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">A Receber</p>
                 <p className="text-2xl font-bold text-green-600">
-                  R$ {((paymentStats?.totalPendingPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalPendingPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
@@ -166,7 +163,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Recebido</p>
                 <p className="text-2xl font-bold text-emerald-600">
-                  R$ {((paymentStats?.totalReceivedPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalReceivedPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <CheckCircle className="h-6 w-6 text-emerald-600" />
@@ -180,7 +177,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Serviços</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  R$ {((paymentStats?.totalServicesValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalServicesValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <Package className="h-6 w-6 text-blue-600" />

@@ -21,7 +21,11 @@ export default function ProducerReceivables() {
 
   const { data: producerPayments = [], isLoading } = useQuery({
     queryKey: ["/api/producer-payments/producer", producerId],
+    enabled: !!producerId,
   });
+
+  console.log('Producer Receivables - Producer ID:', producerId);
+  console.log('Producer Receivables - Payments Data:', producerPayments);
 
   const getStatusBadge = (status: string) => {
     const statusMap = {

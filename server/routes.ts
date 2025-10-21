@@ -1415,7 +1415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if this is a manual receivable or order-based
       const receivables = await storage.getAccountsReceivable();
       const receivable = receivables.find(r => r.id === id);
-      
+
       if (!receivable) {
         return res.status(404).json({ error: "Conta a receber não encontrada" });
       }
@@ -1437,7 +1437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
         const newReceivedAmount = currentReceived + parseFloat(amount);
-        
+
         await storage.updateAccountsReceivable(id, {
           receivedAmount: newReceivedAmount.toFixed(2),
           status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'
@@ -2251,7 +2251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Sort by creation date (newest first)
-      enrichedBudgets.sort((a, b) => 
+      enrichedBudgets.sort((a, b) =>
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
 
@@ -2266,10 +2266,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
       console.log(`Fetching quote requests for client: ${clientId}`);
-      
+
       const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
       console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}:`, quoteRequests.map(qr => ({ id: qr.id, productName: qr.productName, status: qr.status })));
-      
+
       // Enrich with vendor names
       const enrichedRequests = await Promise.all(
         quoteRequests.map(async (request) => {
@@ -2564,7 +2564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update budget status to 'sent' with proper timestamp
-      const updatedBudget = await storage.updateBudget(req.params.id, { 
+      const updatedBudget = await storage.updateBudget(req.params.id, {
         status: 'sent',
         updatedAt: new Date()
       });
@@ -3120,27 +3120,65 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
     try {
       const { producerId } = req.params;
-      const payments = await storage.getProducerPaymentsByProducer(producerId);
+      console.log(`Fetching payments for producer: ${producerId}`);
 
-      // Enrich with production order data
-      const enrichedPayments = await Promise.all(
-        payments.map(async (payment) => {
-          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-          let order = null;
+      // Get all production orders for this producer
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      console.log(`Found ${productionOrders.length} production orders for producer ${producerId}`);
 
-          if (productionOrder) {
-            order = await storage.getOrder(productionOrder.orderId);
+      // Get existing producer payments
+      const existingPayments = await storage.getProducerPaymentsByProducer(producerId);
+      console.log(`Found ${existingPayments.length} existing payments`);
+
+      // Create payments data from production orders that have values
+      const allPayments = [];
+
+      for (const po of productionOrders) {
+        if (po.producerValue && parseFloat(po.producerValue) > 0) {
+          // Check if payment already exists for this production order
+          let payment = existingPayments.find(p => p.productionOrderId === po.id);
+
+          if (!payment) {
+            // Create implicit payment record from production order
+            const order = await storage.getOrder(po.orderId);
+            let clientName = order?.contactName || 'Cliente não identificado';
+
+            // Try to get client name if not available in order
+            if (!clientName && order?.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+
+            payment = {
+              id: `implicit-${po.id}`,
+              productionOrderId: po.id,
+              producerId: producerId,
+              amount: po.producerValue,
+              status: po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered' || po.status === 'completed' ? 'pending' : 'draft',
+              createdAt: po.acceptedAt || new Date(),
+              notes: po.producerNotes || null,
+              productionOrder: po,
+              order: order
+            };
+          } else {
+            // Enrich existing payment with production order and order data
+            payment.productionOrder = po;
+            payment.order = await storage.getOrder(po.orderId);
           }
 
-          return {
-            ...payment,
-            productionOrder,
-            order
-          };
-        })
-      );
+          allPayments.push(payment);
+        }
+      }
 
-      res.json(enrichedPayments);
+      console.log(`Returning ${allPayments.length} total payments for producer ${producerId}`);
+      res.json(allPayments);
     } catch (error) {
       console.error("Error fetching producer payments:", error);
       res.status(500).json({ error: "Failed to fetch producer payments" });
@@ -4444,7 +4482,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Get production order details
       const productionOrder = await storage.getProductionOrder(id);
-      
+
       if (productionOrder) {
         let orderStatus = 'production'; // Default
 
@@ -4628,7 +4666,8 @@ Para mais detalhes, entre em contato conosco!`;
         return res.status(400).json({ error: "Current password is incorrect" });
       }
 
-      const updatedUser = await storage.updateUser(id, {
+      // Update password
+      await storage.updateUser(id, {
         password: newPassword
       });
 
@@ -5400,60 +5439,6 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Failed to update receivable:", error);
       res.status(500).json({ error: "Failed to update receivable" });
-    }
-  });
-
-  // Create manual receivable
-  app.post("/api/finance/receivables/manual", async (req, res) => {
-    try {
-      const { clientName, description, amount, dueDate, notes } = req.body;
-
-      if (!clientName || !description || !amount || !dueDate) {
-        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
-      }
-
-      if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        return res.status(400).json({ error: "Valor deve ser maior que zero" });
-      }
-
-      // Create a manual receivable entry
-      const receivableId = `manual-${Date.now()}`;
-      const receivable = {
-        id: receivableId,
-        orderId: null, // Manual receivables don't have order IDs
-        orderNumber: `MANUAL-${Date.now()}`,
-        clientName: clientName,
-        description: description,
-        amount: parseFloat(amount).toFixed(2),
-        receivedAmount: "0.00",
-        status: 'pending' as const,
-        dueDate: new Date(dueDate),
-        createdAt: new Date(),
-        notes: notes || "",
-        isManual: true
-      };
-
-      // Store in accounts receivable
-      await storage.createAccountsReceivable(receivable);
-
-      console.log("Created manual receivable:", receivable);
-      res.json({ success: true, receivable });
-    } catch (error) {
-      console.error("Error creating manual receivable:", error);
-      res.status(500).json({ error: "Erro ao criar conta a receber: " + error.message });
-    }
-  });
-
-  // Payment allocation routes
-  app.post("/api/finance/receivables/:id/allocate-payment", async (req, res) => {
-    try {
-      const { paymentId, amount } = req.body;
-      const allocation = await storage.allocatePaymentToReceivable(paymentId, req.params.id, amount);
-      res.json(allocation);
-    } catch (error) {
-      console.error("Failed to allocate payment:", error);
-      res.status(500).json({ error: "Failed to allocate payment" });
-    }
   });
 
   // Expense Notes routes
@@ -5469,22 +5454,24 @@ Para mais detalhes, entre em contato conosco!`;
 
   app.post("/api/finance/expenses", async (req, res) => {
     try {
-      const { date, category, name, description, amount, vendorId, orderId } = req.body;
+      const { name, amount, category, date, description, status, createdBy } = req.body;
 
-      if (!name || !amount || !category) {
+      if (!name || !amount || !category || !date) {
         return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
       }
 
       const newExpense = await storage.createExpenseNote({
-        date: date ? new Date(date) : new Date(),
-        category,
-        name: name,
-        description: description || name,
+        date: new Date(date),
+        category: category,
+        description: name + (description ? ` - ${description}` : ''),
         amount: parseFloat(amount).toFixed(2),
-        vendorId: vendorId || null,
-        orderId: orderId || null,
-        status: "pending",
-        attachmentUrl: null
+        vendorId: null, // Notas de despesa não têm vendedor associado
+        orderId: null,  // Não estão associadas a pedidos
+        attachmentUrl: null,
+        status: status || 'recorded',
+        approvedBy: null,
+        approvedAt: null,
+        createdBy: createdBy || 'admin-1'
       });
 
       res.json(newExpense);
@@ -5983,27 +5970,33 @@ Para mais detalhes, entre em contato conosco!`;
             const order = await storage.getOrder(po.orderId);
             const producer = await storage.getUser(po.producerId);
 
-            let clientName = 'Unknown';
-            if (order) {
-              const client = await storage.getClient(order.clientId);
-              if (client) {
-                clientName = client.name;
+            let clientName = order?.contactName || 'Cliente não identificado';
+
+            // Try to get client name if not available in order
+            if (!clientName && order?.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
               }
             }
 
             return {
-              id: po.id,
+              id: `implicit-${po.id}`, // Unique ID for implicit payments
               productionOrderId: po.id,
               producerId: po.producerId,
               producerName: producer?.name || 'Unknown',
               amount: po.producerValue,
               status: po.producerPaymentStatus || 'pending',
-              orderNumber: order?.orderNumber || 'Unknown',
-              product: order?.product || po.product || 'Unknown',
-              clientName: clientName,
-              deadline: po.deadline,
-              notes: po.producerNotes,
-              createdAt: po.acceptedAt || new Date()
+              createdAt: po.acceptedAt || new Date(),
+              notes: po.producerNotes || null,
+              productionOrder: po,
+              order: order,
+              clientName: clientName
             };
           })
       );
