@@ -936,6 +936,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics Routes
+  // Get paid orders waiting to be sent to production
+  app.get("/api/logistics/paid-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      
+      // Orders that are confirmed and paid but not yet sent to production
+      const paidOrders = orders.filter(order => 
+        order.status === 'confirmed' || order.status === 'pending'
+      );
+
+      const enrichedOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          const client = order.clientId ? await storage.getClient(order.clientId) : null;
+          const vendor = order.vendorId ? await storage.getUser(order.vendorId) : null;
+          const payments = await storage.getPaymentsByOrder(order.id);
+          
+          return {
+            ...order,
+            clientName: client?.name || order.contactName || 'Cliente não informado',
+            vendorName: vendor?.name || 'Vendedor não informado',
+            payments: payments.filter(p => p.status === 'confirmed')
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching paid orders:", error);
+      res.status(500).json({ error: "Failed to fetch paid orders" });
+    }
+  });
+
+  // Dispatch order to client
+  app.post("/api/logistics/dispatch-order", async (req, res) => {
+    try {
+      const { productionOrderId, orderId, notes, trackingCode } = req.body;
+
+      // Update production order
+      await storage.updateProductionOrder(productionOrderId, {
+        status: 'shipped',
+        trackingCode: trackingCode || '',
+        notes: notes || ''
+      });
+
+      // Update main order
+      await storage.updateOrder(orderId, {
+        status: 'shipped',
+        trackingCode: trackingCode || ''
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error dispatching order:", error);
+      res.status(500).json({ error: "Failed to dispatch order" });
+    }
+  });
+
+  // Get producer statistics
+  app.get("/api/logistics/producer-stats", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const producers = users.filter(u => u.role === 'producer');
+      const products = await storage.getProducts();
+
+      const stats = producers.map(producer => {
+        const producerProducts = products.filter(p => p.producerId === producer.id);
+        return {
+          producerId: producer.id,
+          producerName: producer.name,
+          productCount: producerProducts.length
+        };
+      });
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching producer stats:", error);
+      res.status(500).json({ error: "Failed to fetch producer stats" });
+    }
+  });
+
   app.post("/api/producers", async (req, res) => {
     try {
       const { name, email, phone, specialty, address, password, username, userCode } = req.body;
