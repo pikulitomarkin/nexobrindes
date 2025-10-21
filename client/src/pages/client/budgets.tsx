@@ -32,7 +32,6 @@ export default function ClientBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/client", clientId] });
       setViewBudgetDialogOpen(false);
       setClientObservations('');
-      setBudgetToView(null);
       toast({
         title: "Sucesso!",
         description: variables.status === 'approved' ? 
@@ -329,13 +328,35 @@ export default function ClientBudgets() {
                       <div className="flex space-x-2">
                         {budget.status === 'sent' && (
                           <>
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white" 
+                              onClick={() => approveBudgetMutation.mutate({ 
+                                budgetId: budget.id, 
+                                status: 'approved',
+                                observations: '' 
+                              })}
+                              disabled={approveBudgetMutation.isPending}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Aceitar
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => approveBudgetMutation.mutate({ 
+                                budgetId: budget.id, 
+                                status: 'rejected',
+                                observations: '' 
+                              })}
+                              disabled={approveBudgetMutation.isPending}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Rejeitar
+                            </Button>
                             <Button size="sm" className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white" onClick={() => handleViewDetails(budget)}>
                               <Eye className="h-4 w-4 mr-1" />
                               Ver Detalhes
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => handleViewDetails(budget)}>
-                              <X className="h-4 w-4 mr-1" />
-                              Rejeitar
                             </Button>
                           </>
                         )}
