@@ -414,16 +414,27 @@ export const quoteRequests = pgTable("quote_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").references(() => users.id).notNull(),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
-  productId: varchar("product_id").references(() => products.id).notNull(),
-  productName: text("product_name").notNull(),
-  quantity: integer("quantity").notNull(),
-  observations: text("observations"),
   contactName: text("contact_name").notNull(),
   whatsapp: text("whatsapp"),
   email: text("email"),
+  observations: text("observations"), // Observações gerais do orçamento
+  totalEstimatedValue: decimal("total_estimated_value", { precision: 10, scale: 2 }).default('0.00'),
   status: text("status").notNull().default('pending'), // 'pending', 'reviewing', 'quoted', 'rejected'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const quoteRequestItems = pgTable("quote_request_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteRequestId: varchar("quote_request_id").references(() => quoteRequests.id).notNull(),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
+  category: text("category"),
+  imageLink: text("image_link"),
+  observations: text("observations"), // Observações específicas do produto
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Insert schemas
@@ -454,6 +465,7 @@ export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts
 export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProducerPaymentSchema = createInsertSchema(producerPayments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertQuoteRequestItemSchema = createInsertSchema(quoteRequestItems).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -508,3 +520,5 @@ export type ProducerPayment = typeof producerPayments.$inferSelect;
 export type InsertProducerPayment = z.infer<typeof insertProducerPaymentSchema>;
 export type QuoteRequest = typeof quoteRequests.$inferSelect;
 export type InsertQuoteRequest = z.infer<typeof insertQuoteRequestSchema>;
+export type QuoteRequestItem = typeof quoteRequestItems.$inferSelect;
+export type InsertQuoteRequestItem = z.infer<typeof insertQuoteRequestItemSchema>;

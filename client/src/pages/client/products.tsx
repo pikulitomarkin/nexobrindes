@@ -71,7 +71,7 @@ export default function ClientProducts() {
 
   const requestQuoteMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch("/api/quote-requests", {
+      const response = await fetch("/api/quote-requests/consolidated", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -86,7 +86,7 @@ export default function ClientProducts() {
       setCart([]);
       toast({
         title: "Sucesso!",
-        description: "Solicitação de orçamento enviada com sucesso!",
+        description: `Orçamento consolidado enviado com ${cart.length} produto(s)!`,
       });
     },
   });
@@ -193,37 +193,28 @@ export default function ClientProducts() {
       return;
     }
 
-    // Criar uma solicitação para cada produto no carrinho
-    const promises = cart.map(item => 
-      requestQuoteMutation.mutateAsync({
-        clientId: currentUser.id,
-        vendorId: clientProfile?.vendorId,
+    // Criar um único orçamento consolidado com todos os produtos
+    const consolidatedQuote = {
+      clientId: currentUser.id,
+      vendorId: clientProfile?.vendorId,
+      contactName: quoteForm.contactName,
+      whatsapp: quoteForm.whatsapp,
+      email: quoteForm.email,
+      observations: quoteForm.observations,
+      status: "pending",
+      products: cart.map(item => ({
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
-        observations: `${item.observations ? `Observações do produto: ${item.observations}\n` : ''}${quoteForm.observations ? `Observações gerais: ${quoteForm.observations}` : ''}`,
-        contactName: quoteForm.contactName,
-        whatsapp: quoteForm.whatsapp,
-        email: quoteForm.email,
-        status: "pending"
-      })
-    );
+        basePrice: item.basePrice,
+        category: item.category,
+        imageLink: item.imageLink,
+        observations: item.observations
+      })),
+      totalEstimatedValue: getTotalValue()
+    };
 
-    Promise.all(promises).then(() => {
-      toast({
-        title: "Sucesso!",
-        description: `Orçamento solicitado para ${cart.length} produto(s) diferentes!`,
-      });
-      setCart([]);
-      setIsQuoteDialogOpen(false);
-      resetForm();
-    }).catch((error) => {
-      toast({
-        title: "Erro",
-        description: "Erro ao solicitar orçamento. Tente novamente.",
-        variant: "destructive"
-      });
-    });
+    requestQuoteMutation.mutate(consolidatedQuote);
   };
 
   const filteredProducts = products.filter((product: any) => {

@@ -1174,7 +1174,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Quote Requests routes
+  // Quote Requests routes - Consolidated version
+  app.post("/api/quote-requests/consolidated", async (req, res) => {
+    try {
+      const quoteRequestData = req.body;
+
+      if (!quoteRequestData.clientId || !quoteRequestData.vendorId || !quoteRequestData.products || quoteRequestData.products.length === 0) {
+        return res.status(400).json({ error: "Dados obrigatórios não fornecidos" });
+      }
+
+      console.log("Creating consolidated quote request:", {
+        clientId: quoteRequestData.clientId,
+        vendorId: quoteRequestData.vendorId,
+        contactName: quoteRequestData.contactName,
+        productCount: quoteRequestData.products.length,
+        totalValue: quoteRequestData.totalEstimatedValue
+      });
+
+      const newQuoteRequest = await storage.createConsolidatedQuoteRequest(quoteRequestData);
+      res.json(newQuoteRequest);
+    } catch (error) {
+      console.error("Error creating consolidated quote request:", error);
+      res.status(500).json({ error: "Failed to create consolidated quote request" });
+    }
+  });
+
+  // Quote Requests routes - Legacy single product version (manter para compatibilidade)
   app.post("/api/quote-requests", async (req, res) => {
     try {
       const quoteRequestData = req.body;
@@ -1216,6 +1241,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating quote request status:", error);
       res.status(500).json({ error: "Failed to update quote request status" });
+    }
+  });
+
+  // Convert quote request to official budget
+  app.post("/api/quote-requests/:id/convert-to-budget", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Converting quote request ${id} to official budget`);
+
+      const quoteRequest = await storage.getQuoteRequestById(id);
+      if (!quoteRequest) {
+        return res.status(404).json({ error: "Solicitação de orçamento não encontrada" });
+      }
+
+      // Criar orçamento oficial baseado na solicitação
+      const budgetData = {
+        clientId: quoteRequest.clientId,
+        vendorId: quoteRequest.vendorId,
+        contactName: quoteRequest.contactName,
+        contactPhone: quoteRequest.whatsapp,
+        contactEmail: quoteRequest.email,
+        title: `Orçamento baseado na solicitação`,
+        description: quoteRequest.observations || "",
+        validUntil: null,
+        deliveryDeadline: null,
+        deliveryType: "delivery",
+        hasDiscount: false,
+        discountType: "percentage",
+        discountPercentage: 0,
+        discountValue: 0,
+        items: quoteRequest.products ? quoteRequest.products.map((product: any) => ({
+          productId: product.productId,
+          productName: product.productName,
+          producerId: 'internal', // Pode ser ajustado conforme necessário
+          quantity: product.quantity,
+          unitPrice: parseFloat(product.basePrice),
+          totalPrice: parseFloat(product.basePrice) * product.quantity,
+          hasItemCustomization: false,
+          selectedCustomizationId: "",
+          itemCustomizationValue: 0,
+          itemCustomizationDescription: "",
+          additionalCustomizationNotes: product.observations || "",
+          customizationPhoto: "",
+          hasGeneralCustomization: false,
+          generalCustomizationName: "",
+          generalCustomizationValue: 0,
+          hasItemDiscount: false,
+          itemDiscountType: "percentage",
+          itemDiscountPercentage: 0,
+          itemDiscountValue: 0,
+          productWidth: "",
+          productHeight: "",
+          productDepth: ""
+        })) : [],
+        totalValue: quoteRequest.totalEstimatedValue || 0
+      };
+
+      const newBudget = await storage.createBudget(budgetData);
+      
+      // Processar itens do orçamento
+      for (const item of budgetData.items) {
+        await storage.createBudgetItem(newBudget.id, item);
+      }
+
+      // Marcar a solicitação como convertida
+      await storage.updateQuoteRequestStatus(id, "quoted");
+
+      console.log(`Successfully converted quote request ${id} to budget ${newBudget.id}`);
+      res.json({ 
+        success: true, 
+        budget: newBudget,
+        message: "Solicitação convertida em orçamento oficial com sucesso!"
+      });
+    } catch (error) {
+      console.error("Error converting quote request to budget:", error);
+      res.status(500).json({ error: "Erro ao converter solicitação em orçamento: " + error.message });
     }
   });
 

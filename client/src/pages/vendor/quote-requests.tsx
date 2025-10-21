@@ -1,18 +1,18 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MessageSquare, Phone, Mail, Package, Clock, CheckCircle, X, Eye, FileText } from "lucide-react";
+import { MessageSquare, Clock, User, Package, Phone, Mail, CheckCircle, X, Eye, FileText, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 
 export default function VendorQuoteRequests() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const vendorId = user.id;
+  const currentUser = user; // Renamed for clarity, assuming 'user' from localStorage is the current vendor
+  const vendorId = currentUser.id;
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -28,8 +28,8 @@ export default function VendorQuoteRequests() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ requestId, status }: { requestId: string; status: string }) => {
-      const response = await fetch(`/api/quote-requests/${requestId}/status`, {
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await fetch(`/api/quote-requests/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -42,6 +42,25 @@ export default function VendorQuoteRequests() {
       toast({
         title: "Sucesso!",
         description: "Status atualizado com sucesso",
+      });
+    },
+  });
+
+  const convertToBudgetMutation = useMutation({
+    mutationFn: async (quoteRequestId: string) => {
+      const response = await fetch(`/api/quote-requests/${quoteRequestId}/convert-to-budget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao converter em orçamento");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      toast({
+        title: "Sucesso!",
+        description: "Solicitação convertida em orçamento oficial! Agora você pode editá-lo na aba de Orçamentos.",
       });
     },
   });
@@ -71,10 +90,6 @@ export default function VendorQuoteRequests() {
   const handleViewDetails = (request: any) => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
-  };
-
-  const handleStatusUpdate = (requestId: string, status: string) => {
-    updateStatusMutation.mutate({ requestId, status });
   };
 
   const filteredRequests = quoteRequests?.filter((request: any) => {
@@ -147,17 +162,36 @@ export default function VendorQuoteRequests() {
         {filteredRequests.map((request: any) => (
           <Card key={request.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <CardTitle className="text-xl text-gray-900 mb-2">
-                    {request.productName}
-                  </CardTitle>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    {request.productCount > 1 ? (
+                      <span className="flex items-center gap-2">
+                        <ShoppingCart className="h-5 w-5 text-blue-600" />
+                        Orçamento com {request.productCount} produtos
+                      </span>
+                    ) : (
+                      request.productName
+                    )}
+                  </h3>
                   <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center gap-1">
+                      <User className="h-4 w-4" />
+                      {request.contactName}
+                    </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       {new Date(request.createdAt).toLocaleDateString('pt-BR')}
                     </span>
-                    <span>Qtd: {request.quantity}</span>
+                    <span className="flex items-center gap-1">
+                      <Package className="h-4 w-4" />
+                      {request.productCount > 1 ? `${request.productCount} produtos` : `Qtd: ${request.quantity}`}
+                    </span>
+                    {request.totalEstimatedValue > 0 && (
+                      <span className="flex items-center gap-1 font-medium text-green-600">
+                        Valor estimado: R$ {parseFloat(request.totalEstimatedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -166,79 +200,137 @@ export default function VendorQuoteRequests() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Informações do Cliente</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Nome:</strong> {request.contactName}</p>
-                    {request.whatsapp && (
-                      <p className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {request.whatsapp}
-                      </p>
-                    )}
-                    {request.email && (
-                      <p className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {request.email}
-                      </p>
-                    )}
+              {/* Lista de produtos (se for orçamento consolidado) */}
+              {request.products && request.products.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 mb-2">Produtos solicitados:</p>
+                  <div className="space-y-2">
+                    {request.products.map((product: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          {product.imageLink && (
+                            <img src={product.imageLink} alt={product.productName} className="w-8 h-8 object-cover rounded" />
+                          )}
+                          <div>
+                            <span className="font-medium">{product.productName}</span>
+                            {product.category && (
+                              <span className="text-gray-500 ml-2">({product.category})</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div>Qtd: {product.quantity}</div>
+                          <div className="text-gray-500">R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Observações</h4>
-                  <p className="text-sm text-gray-600 line-clamp-3">
-                    {request.observations || "Nenhuma observação adicional"}
+              )}
+
+              {request.observations && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Observações gerais:</strong> {request.observations}
                   </p>
                 </div>
-              </div>
+              )}
+
+              {/* Observações específicas dos produtos */}
+              {request.products && request.products.some((p: any) => p.observations) && (
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-800 mb-2">Observações específicas dos produtos:</p>
+                  <div className="space-y-1">
+                    {request.products.filter((p: any) => p.observations).map((product: any, index: number) => (
+                      <div key={index} className="text-sm">
+                        <strong>{product.productName}:</strong> {product.observations}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
 
               <div className="flex justify-between items-center pt-4 border-t">
-                <div className="flex space-x-2">
-                  {request.status === "pending" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleStatusUpdate(request.id, "reviewing")}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Marcar como Analisando
-                    </Button>
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                  {request.whatsapp && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-4 w-4" />
+                      {request.whatsapp}
+                    </span>
                   )}
-                  
-                  {(request.status === "pending" || request.status === "reviewing") && (
+                  {request.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="h-4 w-4" />
+                      {request.email}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex space-x-2">
+                  {request.status === 'pending' && (
                     <>
-                      <Link href={`/vendor/budgets?product=${request.productId}&client=${request.clientId}&quantity=${request.quantity}&notes=${encodeURIComponent(request.observations || '')}`}>
-                        <Button size="sm" className="gradient-bg text-white">
-                          <FileText className="h-4 w-4 mr-1" />
-                          Criar Orçamento
-                        </Button>
-                      </Link>
-                      
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
+                        onClick={() => convertToBudgetMutation.mutate(request.id)}
+                        disabled={convertToBudgetMutation.isPending}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        {convertToBudgetMutation.isPending ? 'Convertendo...' : 'Converter em Orçamento'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white"
+                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'reviewing' })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Aceitar Análise
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleStatusUpdate(request.id, "rejected")}
-                        disabled={updateStatusMutation.isPending}
                         className="text-red-600 border-red-300 hover:bg-red-50"
+                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
+                        disabled={updateStatusMutation.isPending}
                       >
                         <X className="h-4 w-4 mr-1" />
                         Rejeitar
                       </Button>
                     </>
                   )}
+
+                  {request.status === 'reviewing' && (
+                    <>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
+                        onClick={() => convertToBudgetMutation.mutate(request.id)}
+                        disabled={convertToBudgetMutation.isPending}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        {convertToBudgetMutation.isPending ? 'Convertendo...' : 'Converter em Orçamento'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'quoted' })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Finalizar Análise
+                      </Button>
+                    </>
+                  )}
+
+                  {request.status === 'quoted' && (
+                    <div className="flex items-center text-green-600">
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      <span className="text-sm font-medium">Orçamento enviado</span>
+                    </div>
+                  )}
                 </div>
-                
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleViewDetails(request)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Ver Detalhes
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -287,7 +379,7 @@ export default function VendorQuoteRequests() {
                   {getStatusBadge(selectedRequest.status)}
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">Informações de Contato</h4>
                 <div className="space-y-2">
@@ -300,7 +392,7 @@ export default function VendorQuoteRequests() {
                   )}
                 </div>
               </div>
-              
+
               {selectedRequest.observations && (
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-2">Observações</h4>
@@ -309,7 +401,7 @@ export default function VendorQuoteRequests() {
                   </div>
                 </div>
               )}
-              
+
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">Data da Solicitação</h4>
                 <p className="text-gray-600">

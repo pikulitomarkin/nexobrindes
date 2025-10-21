@@ -51,6 +51,11 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
+// Helper function to generate IDs (replace with a more robust solution if needed)
+function generateId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
 // Mock data for orders, budgets, and products (to be replaced with actual storage operations)
 let mockOrders: Order[] = [];
 let mockBudgets: any[] = [];
@@ -249,9 +254,11 @@ export interface IStorage {
   getProducerPayment(id: string): Promise<ProducerPayment | undefined>;
 
   // Quote Requests
+  createConsolidatedQuoteRequest(data: any): Promise<any>; // New method for consolidated requests
   createQuoteRequest(data: any): Promise<any>;
   getQuoteRequestsByVendor(vendorId: string): Promise<any[]>;
   getQuoteRequestsByClient(clientId: string): Promise<any[]>;
+  getQuoteRequestById(id: string): Promise<any>; // New method to get a quote request by its ID
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
 
   // Logistics - Get paid orders that are ready to be sent to production
@@ -2141,7 +2148,7 @@ export class MemStorage implements IStorage {
     // Get all products as array
     let query = Array.from(this.products.values());
     console.log(`Storage: Initial query has ${query.length} products`);
-    
+
     // Log some sample products for debugging
     console.log(`Storage: Sample products:`, query.slice(0, 3).map(p => ({ 
       id: p.id, 
@@ -2196,7 +2203,7 @@ export class MemStorage implements IStorage {
     const products = query.slice(startIndex, endIndex);
 
     console.log(`Storage: Returning ${products.length} products (page ${page}/${totalPages})`);
-    
+
     // Enrich with producer names
     const enrichedProducts = await Promise.all(
       products.map(async (product) => {
@@ -3526,290 +3533,119 @@ export class MemStorage implements IStorage {
   }
 
   // Quote Requests methods
-  async createQuoteRequest(data: any): Promise<any> {
-    const newQuoteRequest = {
-      id: `qr-${Date.now()}`,
+  async createConsolidatedQuoteRequest(data: any) {
+    const id = generateId("quote-req");
+    const quoteRequest = {
+      id,
+      clientId: data.clientId,
+      vendorId: data.vendorId,
+      contactName: data.contactName,
+      whatsapp: data.whatsapp || "",
+      email: data.email || "",
+      observations: data.observations || "",
+      totalEstimatedValue: data.totalEstimatedValue || 0,
+      status: data.status || "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      products: data.products || []
+    };
+
+    // Salvar o orçamento principal
+    this.quoteRequests.push(quoteRequest);
+
+    console.log(`Created consolidated quote request ${id} with ${data.products.length} products`);
+    return quoteRequest;
+  }
+
+  async createQuoteRequest(data: any) {
+    const id = generateId("quote-req");
+    const quoteRequest = {
+      id,
       ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.quoteRequests.push(newQuoteRequest);
-    return newQuoteRequest;
-  }
-
-  async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
-    return this.quoteRequests.filter(request => request.vendorId === vendorId);
-  }
-
-  async getQuoteRequestsByClient(clientId: string): Promise<any[]> {
-    return this.quoteRequests.filter(request => request.clientId === clientId);
-  }
-
-  async updateQuoteRequestStatus(id: string, status: string): Promise<any> {
-    const requestIndex = this.quoteRequests.findIndex(request => request.id === id);
-    if (requestIndex === -1) {
-      return null;
-    }
-
-    this.quoteRequests[requestIndex] = {
-      ...this.quoteRequests[requestIndex],
-      status,
-      updatedAt: new Date().toISOString()
-    };
-
-    return this.quoteRequests[requestIndex];
-  }
-
-  // Automatic commission calculation and processing methods
-  async calculateCommissions(order: Order): Promise<void> {
-    try {
-      console.log(`Calculating commissions for order ${order.orderNumber}`);
-
-      const orderValue = parseFloat(order.totalValue);
-
-      // Get commission settings
-      const settings = await this.getCommissionSettings();
-      const defaultVendorRate = parseFloat(settings?.vendorCommissionRate || '10.00');
-      const defaultPartnerRate = parseFloat(settings?.partnerCommissionRate || '15.00');
-
-      // Get vendor commission rate from vendor profile, fallback to default
-      let vendorRate = defaultVendorRate;
-      if (order.vendorId) {
-        const vendor = await this.getVendor(order.vendorId);
-        if (vendor) {
-          vendorRate = parseFloat(vendor.commissionRate || defaultVendorRate.toString());
-        }
-      }
-
-      // Create vendor commission (to be paid when order is completed)
-      const vendorCommission: Commission = {
-        id: `comm-vendor-${order.id}`,
-        vendorId: order.vendorId,
-        partnerId: null,
-        orderId: order.id,
-        type: 'vendor',
-        percentage: vendorRate.toFixed(2),
-        amount: ((orderValue * vendorRate) / 100).toFixed(2),
-        status: 'pending', // Will be confirmed when order is completed
-        orderValue: order.totalValue,
-        orderNumber: order.orderNumber,
-        createdAt: new Date()
-      };
-
-      this.commissions.set(vendorCommission.id, vendorCommission);
-
-      // Create partner commission for all active partners (to be confirmed immediately on payment)
-      const allUsers = Array.from(this.users.values());
-      const partners = allUsers.filter(user => user.role === 'partner' && user.isActive);
-
-      for (const partner of partners) {
-        const partnerInfo = await this.getPartner(partner.id);
-        let partnerRate = defaultPartnerRate;
-        if (partnerInfo) {
-          partnerRate = parseFloat(partnerInfo.commissionRate || defaultPartnerRate.toString());
-        }
-
-        const partnerCommission: Commission = {
-          id: `comm-partner-${partner.id}-${order.id}`,
-          vendorId: null,
-          partnerId: partner.id,
-          orderId: order.id,
-          type: 'partner',
-          percentage: partnerRate.toFixed(2),
-          amount: ((orderValue * partnerRate) / 100).toFixed(2),
-          status: 'pending', // Will be confirmed when payment is received
-          orderValue: order.totalValue,
-          orderNumber: order.orderNumber,
-          createdAt: new Date()
-        };
-
-        this.commissions.set(partnerCommission.id, partnerCommission);
-      }
-
-      console.log(`Created commissions for order ${order.orderNumber}: 1 vendor + ${partners.length} partners`);
-    } catch (error) {
-      console.error(`Error calculating commissions for order ${order.orderNumber}:`, error);
-    }
-  }
-
-  // Process commission payments based on order status and payments
-  async processCommissionPayments(order: Order, newStatus: string): Promise<void> {
-    try {
-      console.log(`Processing commission payments for order ${order.orderNumber}, status: ${newStatus}`);
-
-      const orderCommissions = Array.from(this.commissions.values()).filter(c => c.orderId === order.id);
-
-      // Process partner commissions (confirmed immediately when order is created/confirmed)
-      if (['confirmed', 'production'].includes(newStatus)) {
-        const partnerCommissionsToConfirm = orderCommissions.filter(c => c.type === 'partner' && c.status === 'pending');
-        for (const commission of partnerCommissionsToConfirm) {
-          // Apply pending deductions first, then confirm
-          await this.applyPendingDeductions(commission.partnerId!, commission);
-        }
-      }
-
-      // Process vendor commissions (confirmed only when order is ready/shipped/delivered/completed)
-      if (['ready', 'shipped', 'delivered', 'completed'].includes(newStatus)) {
-        const vendorCommissionsToConfirm = orderCommissions.filter(c => c.type === 'vendor' && c.status === 'pending');
-        for (const commission of vendorCommissionsToConfirm) {
-          await this.updateCommissionStatus(commission.id, 'confirmed');
-          console.log(`Confirmed vendor commission ${commission.id} for ready order ${order.orderNumber}`);
-        }
-      }
-
-      // Handle cancellations
-      if (newStatus === 'cancelled') {
-        await this.handleOrderCancellation(order, orderCommissions);
-      }
-
-    } catch (error) {
-      console.error(`Error processing commission payments for order ${order.orderNumber}:`, error);
-    }
-  }
-
-  // Handle order cancellation logic
-  async handleOrderCancellation(order: Order, commissions: Commission[]): Promise<void> {
-    try {
-      console.log(`Handling cancellation for order ${order.orderNumber}`);
-
-      // Vendor commissions: Cancel them since they only get paid when order is ready
-      const vendorCommissions = commissions.filter(c => c.type === 'vendor');
-      for (const commission of vendorCommissions) {
-        if (commission.status === 'confirmed') {
-          // If somehow already confirmed, mark as cancelled
-          await this.updateCommissionStatus(commission.id, 'cancelled');
-          console.log(`Cancelled confirmed vendor commission for cancelled order ${order.orderNumber}: ${commission.id}`);
-        } else {
-          // Just cancel pending commission
-          await this.updateCommissionStatus(commission.id, 'cancelled');
-          console.log(`Cancelled pending vendor commission for cancelled order ${order.orderNumber}: ${commission.id}`);
-        }
-      }
-
-      // Partner commissions: Create deductions for future orders if already confirmed
-      const partnerCommissions = commissions.filter(c => c.type === 'partner');
-      for (const commission of partnerCommissions) {
-        if (commission.status === 'confirmed') {
-          // Create deduction for future partner commissions
-          await this.createPartnerDeduction(commission);
-          console.log(`Created deduction for partner ${commission.partnerId} from cancelled order ${order.orderNumber}`);
-        } else {
-          // Just cancel if still pending
-          await this.updateCommissionStatus(commission.id, 'cancelled');
-          console.log(`Cancelled pending partner commission for cancelled order ${order.orderNumber}: ${commission.id}`);
-        }
-      }
-
-    } catch (error) {
-      console.error(`Error handling order cancellation for order ${order.orderNumber}:`, error);
-    }
-  }
-
-  // Create partner deduction for cancelled orders
-  async createPartnerDeduction(originalCommission: Commission): Promise<void> {
-    const deduction: Commission = {
-      id: `deduction-${originalCommission.id}`,
-      vendorId: null,
-      partnerId: originalCommission.partnerId,
-      orderId: originalCommission.orderId,
-      type: 'partner', // Still a partner commission type, but represents a deduction
-      percentage: originalCommission.percentage,
-      amount: `-${originalCommission.amount}`, // Negative amount for deduction
-      status: 'pending', // Will be applied to future commissions
-      orderValue: originalCommission.orderValue,
-      orderNumber: `DEDUCTION-${originalCommission.orderNumber}`, // Mark as deduction
-      createdAt: new Date()
-    };
-
-    this.commissions.set(deduction.id, deduction);
-  }
-
-  // Apply pending deductions to new commissions
-  async applyPendingDeductions(partnerId: string, newCommission: Commission): Promise<void> {
-    try {
-      const pendingDeductions = Array.from(this.commissions.values()).filter(
-        c => c.partnerId === partnerId &&
-        c.status === 'pending' &&
-        c.orderNumber?.startsWith('DEDUCTION-') && // Ensure it's a deduction record
-        parseFloat(c.amount) < 0 // Negative amounts are deductions
-      );
-
-      if (pendingDeductions.length === 0) {
-        // No deductions, confirm commission normally
-        await this.updateCommissionStatus(newCommission.id, 'confirmed');
-        return;
-      }
-
-      let remainingCommission = parseFloat(newCommission.amount);
-
-      // Sort deductions by creation date to apply older ones first
-      pendingDeductions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-      for (const deduction of pendingDeductions) {
-        if (remainingCommission <= 0) break; // Commission fully used up
-
-        const deductionAmount = Math.abs(parseFloat(deduction.amount));
-
-        if (remainingCommission >= deductionAmount) {
-          // Can fully apply this deduction
-          remainingCommission -= deductionAmount;
-          await this.updateCommissionStatus(deduction.id, 'deducted'); // Mark deduction as used
-          console.log(`Applied full deduction ${deduction.id} to commission ${newCommission.id}`);
-        } else {
-          // Partial deduction
-          const partialDeductionApplied = remainingCommission;
-          remainingCommission = 0;
-
-          // Update deduction amount to the remaining part that wasn't used
-          const updatedDeductionAmount = -(deductionAmount - partialDeductionApplied);
-          await this.updateCommissionStatus(deduction.id, 'partially_deducted'); // Mark as partially used
-          // Update the amount of the deduction record itself
-          const updatedDeduction = {
-            ...deduction,
-            amount: updatedDeductionAmount.toFixed(2)
-          };
-          this.commissions.set(deduction.id, updatedDeduction);
-          console.log(`Applied partial deduction of ${partialDeductionApplied.toFixed(2)} from ${deduction.id} to commission ${newCommission.id}`);
-          break; // No more commission left to deduct from
-        }
-      }
-
-      // Update commission with final amount after deductions
-      if (remainingCommission > 0) {
-        const updatedCommission = {
-          ...newCommission,
-          amount: remainingCommission.toFixed(2),
-          status: 'confirmed' as const
-        };
-        this.commissions.set(newCommission.id, updatedCommission);
-        console.log(`Commission ${newCommission.id} confirmed with remaining amount: ${remainingCommission.toFixed(2)}`);
-      } else {
-        // Commission fully consumed by deductions
-        await this.updateCommissionStatus(newCommission.id, 'deducted');
-        console.log(`Commission ${newCommission.id} fully consumed by deductions`);
-      }
-
-    } catch (error) {
-      console.error(`Error applying pending deductions for partner ${partnerId}:`, error);
-    }
-  }
-
-  // Added method to create financial notes
-  async createFinancialNote(note: any): Promise<any> {
-    const newNote = {
-      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...note,
       createdAt: new Date(),
       updatedAt: new Date()
     };
+    this.quoteRequests.push(quoteRequest);
+    return quoteRequest;
+  }
 
-    if (!this.mockData.financialNotes) {
-      this.mockData.financialNotes = [];
+  async getQuoteRequestsByVendor(vendorId: string) {
+    const requests = this.quoteRequests.filter(request => request.vendorId === vendorId);
+
+    // Enriquecer cada orçamento com informações dos produtos
+    const enrichedRequests = requests.map(request => {
+      if (request.products && request.products.length > 0) {
+        // Orçamento consolidado
+        return {
+          ...request,
+          productCount: request.products.length,
+          productNames: request.products.map(p => p.productName).join(", "),
+          // Para compatibilidade com código existente, usar o primeiro produto
+          productId: request.products[0]?.productId || null,
+          productName: request.products.length > 1
+            ? `${request.products[0]?.productName} e mais ${request.products.length - 1} produto(s)`
+            : request.products[0]?.productName || "Produtos diversos",
+          quantity: request.products.reduce((total, p) => total + p.quantity, 0)
+        };
+      } else {
+        // Orçamento antigo (single product)
+        return {
+          ...request,
+          productCount: 1,
+          productNames: request.productName || "Produto não especificado"
+        };
+      }
+    });
+
+    console.log(`Found ${enrichedRequests.length} quote requests for vendor ${vendorId}`);
+    return enrichedRequests;
+  }
+
+  async getQuoteRequestsByClient(clientId: string) {
+    console.log(`Searching quote requests for client: ${clientId}`);
+    const requests = this.quoteRequests.filter(request => request.clientId === clientId);
+
+    // Enriquecer cada orçamento com informações dos produtos
+    const enrichedRequests = requests.map(request => {
+      if (request.products && request.products.length > 0) {
+        // Orçamento consolidado
+        return {
+          ...request,
+          productCount: request.products.length,
+          productNames: request.products.map(p => p.productName).join(", "),
+          // Para compatibilidade com código existente, usar o primeiro produto
+          productId: request.products[0]?.productId || null,
+          productName: request.products.length > 1
+            ? `${request.products[0]?.productName} e mais ${request.products.length - 1} produto(s)`
+            : request.products[0]?.productName || "Produtos diversos",
+          quantity: request.products.reduce((total, p) => total + p.quantity, 0)
+        };
+      } else {
+        // Orçamento antigo (single product)
+        return {
+          ...request,
+          productCount: 1,
+          productNames: request.productName || "Produto não especificado"
+        };
+      }
+    });
+
+    console.log(`Found ${enrichedRequests.length} quote requests for client ${clientId}`);
+    return enrichedRequests;
+  }
+
+  async getQuoteRequestById(id: string) {
+    return this.quoteRequests.find(r => r.id === id);
+  }
+
+  async updateQuoteRequestStatus(id: string, status: string) {
+    const request = this.quoteRequests.find(r => r.id === id);
+    if (request) {
+      request.status = status;
+      request.updatedAt = new Date();
+      return request;
     }
-
-    this.mockData.financialNotes.push(newNote);
-    return newNote;
+    return null;
   }
 
   // Logistics - Get paid orders that are ready to be sent to production
