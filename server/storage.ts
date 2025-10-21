@@ -470,14 +470,14 @@ export class MemStorage implements IStorage {
     };
     this.users.set(vendorUser.id, vendorUser);
 
-    // Client users
+    // Client user
     const clientUser = {
       id: "client-1",
-      username: "CLI123ABCD",
+      username: "cliente1",
       password: "123456",
       name: "João Silva",
-      email: "joao@gmail.com",
-      phone: "(11) 98765-4321",
+      email: "joao.silva@email.com",
+      phone: null,
       vendorId: null,
       role: "client",
       isActive: true,
@@ -485,66 +485,6 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(clientUser.id, clientUser);
-
-    const clientUser2 = {
-      id: "client-2",
-      username: "CLI456EFGH",
-      password: "123456",
-      name: "Maria Santos",
-      email: "maria@gmail.com",
-      phone: "(11) 99876-5432",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser2.id, clientUser2);
-
-    const clientUser3 = {
-      id: "client-3",
-      username: "CLI789IJKL",
-      password: "123456",
-      name: "Carlos Pereira",
-      email: "carlos@email.com",
-      phone: "(11) 98765-1234",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser3.id, clientUser3);
-
-    const clientUser4 = {
-      id: "client-4",
-      username: "CLI012MNOP",
-      password: "123456",
-      name: "Ana Costa",
-      email: "ana@email.com",
-      phone: "(11) 91234-5678",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser4.id, clientUser4);
-
-    const clientUser5 = {
-      id: "client-5",
-      username: "CLI345QRST",
-      password: "123456",
-      name: "Roberto Lima",
-      email: "roberto@email.com",
-      phone: "(11) 95678-9012",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser5.id, clientUser5);
 
     // Producer user
     const producerUser = {
@@ -694,7 +634,7 @@ export class MemStorage implements IStorage {
     };
     this.partners.set(partner.id, partner);
 
-    // Create sample clients with userCode
+    // Create sample clients
     const sampleClient: Client = {
       id: "client-1",
       userId: "client-1",
@@ -705,7 +645,6 @@ export class MemStorage implements IStorage {
       cpfCnpj: "123.456.789-00",
       address: "Rua das Flores, 123, São Paulo, SP",
       vendorId: "vendor-1",
-      userCode: "CLI123ABCD",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -723,82 +662,11 @@ export class MemStorage implements IStorage {
       cpfCnpj: "987.654.321-00",
       address: "Av. Paulista, 456, São Paulo, SP",
       vendorId: "vendor-1",
-      userCode: "CLI456EFGH",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
     this.clients.set(sampleClient2.id, sampleClient2);
-
-    // Create more test clients for the vendor
-    const sampleClient3: Client = {
-      id: "client-3",
-      userId: "client-3", 
-      name: "Carlos Pereira",
-      email: "carlos@email.com",
-      phone: "(11) 98765-1234",
-      whatsapp: "(11) 98765-1234",
-      cpfCnpj: "456.789.123-00",
-      address: "Rua Augusta, 789, São Paulo, SP",
-      vendorId: "vendor-1",
-      userCode: "CLI789IJKL",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient3.id, sampleClient3);
-
-    const sampleClient4: Client = {
-      id: "client-4",
-      userId: "client-4",
-      name: "Ana Costa",
-      email: "ana@email.com",
-      phone: "(11) 91234-5678",
-      whatsapp: "(11) 91234-5678",
-      cpfCnpj: "789.123.456-00",
-      address: "Rua Oscar Freire, 321, São Paulo, SP",
-      vendorId: "vendor-1",
-      userCode: "CLI012MNOP",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient4.id, sampleClient4);
-
-    const sampleClient5: Client = {
-      id: "client-5",
-      userId: "client-5",
-      name: "Roberto Lima",
-      email: "roberto@email.com",
-      phone: "(11) 95678-9012",
-      whatsapp: "(11) 95678-9012",
-      cpfCnpj: "321.654.987-00",
-      address: "Av. Faria Lima, 567, São Paulo, SP",
-      vendorId: "vendor-1",
-      userCode: "CLI345QRST",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient5.id, sampleClient5);
-
-    // Create more test clients for the vendor
-    const sampleClient3: Client = {
-      id: "client-3",
-      userId: "client-3", 
-      name: "Carlos Pereira",
-      email: "carlos@email.com",
-      phone: "(11) 98765-1234",
-      whatsapp: "(11) 98765-1234",
-      cpfCnpj: "456.789.123-00",
-      address: "Rua Augusta, 789, São Paulo, SP",
-      vendorId: "vendor-1",
-      userCode: "CLI789ABCD",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient3.id, sampleClient3);
 
     // Create sample orders
     mockOrders = [
@@ -1652,50 +1520,7 @@ export class MemStorage implements IStorage {
     const filteredClients = allClients.filter(client => client.vendorId === vendorId);
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
-    // Enrich clients with user info and stats
-    const enrichedClients = await Promise.all(
-      filteredClients.map(async (client) => {
-        // Get user info
-        const user = client.userId ? await this.getUser(client.userId) : null;
-        
-        // Count orders for this client - use both client.id and client.userId
-        let clientOrders: Order[] = [];
-        try {
-          if (client.userId) {
-            const ordersByUserId = await this.getOrdersByClient(client.userId);
-            clientOrders = [...clientOrders, ...ordersByUserId];
-          }
-          if (client.id !== client.userId) {
-            const ordersByClientId = await this.getOrdersByClient(client.id);
-            clientOrders = [...clientOrders, ...ordersByClientId];
-          }
-          
-          // Remove duplicates
-          clientOrders = clientOrders.filter((order, index, self) => 
-            index === self.findIndex(o => o.id === order.id)
-          );
-        } catch (error) {
-          console.log(`Error getting orders for client ${client.id}:`, error);
-          clientOrders = [];
-        }
-
-        const ordersCount = clientOrders.length;
-        const totalSpent = clientOrders
-          .filter(order => order.status !== 'cancelled')
-          .reduce((total, order) => total + parseFloat(order.totalValue || '0'), 0);
-
-        return {
-          ...client,
-          userCode: user?.username || client.username || client.userCode || 'N/A',
-          username: user?.username || client.username || client.userCode || 'N/A',
-          ordersCount,
-          totalSpent
-        };
-      })
-    );
-
-    console.log(`Storage: Returning ${enrichedClients.length} enriched clients`);
-    return enrichedClients;
+    return filteredClients;
   }
 
   // Production Order methods
@@ -3450,34 +3275,23 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    console.log(`Getting producer payments for producer: ${producerId}`);
-    const payments = Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
-    console.log(`Found ${payments.length} producer payments:`, payments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
-    return payments;
+    const payments = Array.from(this.producerPayments.values()).filter(p => p.producerId === producerId);
+    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
-    return Array.from(this.producerPayments.values()).find(payment => payment.productionOrderId === productionOrderId);
+    return Array.from(this.producerPayments.values()).find(p => p.productionOrderId === productionOrderId);
   }
 
   async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
-    const id = randomUUID();
-    const payment: ProducerPayment = {
+    const newPayment: ProducerPayment = {
+      id: randomUUID(),
       ...data,
-      id,
-      status: data.status || 'pending',
-      approvedBy: data.approvedBy || null,
-      approvedAt: data.approvedAt || null,
-      paidBy: data.paidBy || null,
-      paidAt: data.paidAt || null,
-      paymentMethod: data.paymentMethod || null,
-      notes: data.notes || null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    this.producerPayments.set(id, payment);
-    console.log(`Storage: Created producer payment ${id} for producer ${payment.producerId} - R$ ${payment.amount}`);
-    return payment;
+    this.producerPayments.set(newPayment.id, newPayment);
+    return newPayment;
   }
 
   async updateProducerPayment(id: string, data: Partial<InsertProducerPayment & { paidBy?: string; paidAt?: Date; paymentMethod?: string }>): Promise<ProducerPayment | undefined> {
