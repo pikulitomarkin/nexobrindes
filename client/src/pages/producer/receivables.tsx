@@ -63,6 +63,9 @@ export default function ProducerReceivables() {
   // A Receber = Pendente + Aprovado
   const totalToReceive = totalPending + totalApproved;
 
+  console.log('Producer payments data:', producerPayments);
+  console.log('Totals:', { totalPending, totalApproved, totalReceived, totalToReceive });
+
   if (isLoading) {
     return (
       <div className="p-8">

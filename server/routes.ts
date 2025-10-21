@@ -1723,6 +1723,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get producer payments
+  app.get("/api/producer-payments/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
+      
+      // Enrich with order and production order details
+      const enrichedPayments = await Promise.all(
+        producerPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          const order = productionOrder ? await storage.getOrder(productionOrder.orderId) : null;
+          
+          return {
+            ...payment,
+            productionOrder,
+            order
+          };
+        })
+      );
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments" });
+    }
+  });
+
   // Products
   app.get("/api/products", async (req, res) => {
     try {

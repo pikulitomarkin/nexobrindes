@@ -3275,7 +3275,10 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    return Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
+    console.log(`Getting producer payments for producer: ${producerId}`);
+    const payments = Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
+    console.log(`Found ${payments.length} producer payments:`, payments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
+    return payments;
   }
 
   async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
@@ -3283,14 +3286,23 @@ export class MemStorage implements IStorage {
   }
 
   async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
-    const newPayment: ProducerPayment = {
-      id: randomUUID(),
+    const id = randomUUID();
+    const payment: ProducerPayment = {
       ...data,
+      id,
+      status: data.status || 'pending',
+      approvedBy: data.approvedBy || null,
+      approvedAt: data.approvedAt || null,
+      paidBy: data.paidBy || null,
+      paidAt: data.paidAt || null,
+      paymentMethod: data.paymentMethod || null,
+      notes: data.notes || null,
       createdAt: new Date(),
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
-    this.producerPayments.set(newPayment.id, newPayment);
-    return newPayment;
+    this.producerPayments.set(id, payment);
+    console.log(`Storage: Created producer payment ${id} for producer ${payment.producerId} - R$ ${payment.amount}`);
+    return payment;
   }
 
   async updateProducerPayment(id: string, data: Partial<InsertProducerPayment & { paidBy?: string; paidAt?: Date; paymentMethod?: string }>): Promise<ProducerPayment | undefined> {
