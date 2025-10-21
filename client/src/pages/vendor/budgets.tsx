@@ -530,6 +530,7 @@ export default function VendorBudgets() {
 
   const handleEditBudget = (budget: any) => {
     console.log('Editing budget:', budget);
+    console.log('Budget items:', budget.items);
 
     // Pre-populate form with existing budget data
     setVendorBudgetForm({
@@ -575,24 +576,24 @@ export default function VendorBudgets() {
           quantity: parseInt(item.quantity) || 1,
           unitPrice: parseFloat(item.unitPrice) || 0,
           totalPrice: parseFloat(item.totalPrice) || 0,
-          // Item Customization - preserve existing values
-          hasItemCustomization: Boolean(item.hasItemCustomization),
+          // Item Customization - preserve existing values with fallback check
+          hasItemCustomization: Boolean(item.hasItemCustomization || item.selectedCustomizationId || item.itemCustomizationValue > 0),
           selectedCustomizationId: item.selectedCustomizationId || "",
           itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
           // Product dimensions
-          productWidth: item.productWidth || "",
-          productHeight: item.productHeight || "",
-          productDepth: item.productDepth || "",
+          productWidth: item.productWidth ? item.productWidth.toString() : "",
+          productHeight: item.productHeight ? item.productHeight.toString() : "",
+          productDepth: item.productDepth ? item.productDepth.toString() : "",
           // Item discount
-          hasItemDiscount: Boolean(item.hasItemDiscount),
+          hasItemDiscount: Boolean(item.hasItemDiscount || item.itemDiscountPercentage > 0 || item.itemDiscountValue > 0),
           itemDiscountType: item.itemDiscountType || "percentage",
           itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
           itemDiscountValue: parseFloat(item.itemDiscountValue || 0),
-          // General Customization - preserve existing values
-          hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
+          // General Customization - preserve existing values with fallback check
+          hasGeneralCustomization: Boolean(item.hasGeneralCustomization || item.generalCustomizationName || item.generalCustomizationValue > 0),
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
         };
