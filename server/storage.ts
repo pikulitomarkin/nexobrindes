@@ -230,6 +230,7 @@ export interface IStorage {
   // Manual Payables
   createManualPayable(data: any): Promise<any>;
   getManualPayables(): Promise<any[]>;
+  updateManualPayable(id: string, updates: any): Promise<any>;
 
   // Customization Options
   createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
@@ -2720,6 +2721,19 @@ export class MemStorage implements IStorage {
   // Get manual payables
   async getManualPayables(): Promise<any[]> {
     return this.mockData.manualPayables || [];
+  }
+
+  async updateManualPayable(id: string, updates: any) {
+    const index = this.mockData.manualPayables.findIndex(p => p.id === id);
+    if (index !== -1) {
+      this.mockData.manualPayables[index] = {
+        ...this.mockData.manualPayables[index],
+        ...updates,
+        updatedAt: new Date()
+      };
+      return this.mockData.manualPayables[index];
+    }
+    return null;
   }
 
   getAll(table: string): any[] {

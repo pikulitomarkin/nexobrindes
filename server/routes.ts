@@ -1477,6 +1477,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get manual payables endpoint
+  app.get("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const payables = await storage.getManualPayables();
+      res.json(payables);
+    } catch (error) {
+      console.error("Error fetching manual payables:", error);
+      res.status(500).json({ error: "Erro ao buscar contas a pagar manuais: " + error.message });
+    }
+  });
+
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {
@@ -1546,7 +1557,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + refundAmount;
         }, 0);
 
-      const payables = producers + expenses + commissions + refunds;
+      // Incluir contas a pagar manuais
+      const manualPayables = await storage.getManualPayables();
+      const manualPayablesAmount = manualPayables
+        .filter(payable => payable.status === 'pending')
+        .reduce((total, payable) => total + parseFloat(payable.amount), 0);
+
+      const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
 
       // Saldo em Conta - transações bancárias não conciliadas (entrada - saída)
       const bankBalance = bankTransactions.reduce((total, txn) => {
@@ -1588,7 +1605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           producers: producers,
           expenses: expenses,
           commissions: commissions,
-          refunds: refunds
+          refunds: refunds,
+          manual: manualPayablesAmount
         },
         balance: bankBalance,
         pendingCommissions: pendingCommissions,

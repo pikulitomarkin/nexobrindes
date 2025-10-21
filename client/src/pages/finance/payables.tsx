@@ -224,6 +224,11 @@ export default function FinancePayables() {
     }
   };
 
+  // Fetch manual payables
+  const { data: manualPayables = [] } = useQuery({
+    queryKey: ["/api/finance/payables/manual"],
+  });
+
   // Combine all payables
   const allPayables = [
     // Producer payments
@@ -284,7 +289,20 @@ export default function FinancePayables() {
         category: 'Estorno',
         orderNumber: order.orderNumber,
         originalOrder: order
-      }))
+      })),
+
+    // Manual payables
+    ...manualPayables.map((payable: any) => ({
+      id: `manual-${payable.id}`,
+      type: 'manual',
+      dueDate: payable.dueDate,
+      description: payable.description,
+      amount: payable.amount,
+      status: payable.status,
+      beneficiary: payable.beneficiary,
+      category: payable.category,
+      orderNumber: 'MANUAL'
+    }))
   ];
 
   const getStatusBadge = (status: string, type?: string) => {
@@ -312,6 +330,7 @@ export default function FinancePayables() {
       expense: <Receipt className="h-4 w-4" />,
       commission: <Users className="h-4 w-4" />,
       refund: <RefreshCw className="h-4 w-4" />,
+      manual: <CreditCard className="h-4 w-4" />,
     };
 
     return iconMap[type as keyof typeof iconMap] || iconMap.expense;
@@ -371,10 +390,11 @@ export default function FinancePayables() {
     producers: 0,
     expenses: 0,
     commissions: 0,
-    refunds: 0
+    refunds: 0,
+    manual: 0
   };
 
-  const totalPayables = breakdown.producers + breakdown.expenses + breakdown.commissions + breakdown.refunds;
+  const totalPayables = breakdown.producers + breakdown.expenses + breakdown.commissions + breakdown.refunds + breakdown.manual;
 
   if (isLoading) {
     return (
@@ -455,9 +475,9 @@ export default function FinancePayables() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-600">Comissões + Estornos</p>
+                <p className="text-xs font-medium text-gray-600">Comissões + Manuais</p>
                 <p className="text-xl font-bold gradient-text">
-                  R$ {(breakdown.commissions + breakdown.refunds).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(breakdown.commissions + breakdown.manual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -509,6 +529,7 @@ export default function FinancePayables() {
                   <SelectItem value="expense">Despesas</SelectItem>
                   <SelectItem value="commission">Comissões</SelectItem>
                   <SelectItem value="refund">Estornos</SelectItem>
+                  <SelectItem value="manual">Manuais</SelectItem>
                 </SelectContent>
               </Select>
 
