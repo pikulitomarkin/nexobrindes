@@ -18,15 +18,19 @@ export default function VendorPanel() {
       if (!response.ok) throw new Error('Failed to fetch vendor info');
       return response.json();
     },
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
   const { data: orders, isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/orders/vendor", vendorId],
+    queryKey: ["/api/vendors", vendorId, "orders"],
     queryFn: async () => {
-      const response = await fetch(`/api/orders/vendor/${vendorId}`);
+      const response = await fetch(`/api/vendors/${vendorId}/orders`);
       if (!response.ok) throw new Error('Failed to fetch vendor orders');
       return response.json();
     },
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
   const copyToClipboard = async (text: string) => {
@@ -92,49 +96,97 @@ export default function VendorPanel() {
       </div>
 
       {/* Vendor Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Vendas do Mês</h3>
-            <p className="text-3xl font-bold gradient-text">
-              R$ {(vendorInfo?.monthlySales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-sm text-green-600 mt-1">Vendas deste mês</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">Vendas do Mês</h3>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {(vendorInfo?.monthlySales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-green-50 p-3 rounded-full">
+                <DollarSign className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Comissões</h3>
-            <p className="text-3xl font-bold gradient-text">
-              R$ {(vendorInfo?.totalCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-sm text-blue-600 mt-1">
-              {vendorInfo?.confirmedOrders || 0} pedidos confirmados
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">Total Pedidos</h3>
+                <p className="text-2xl font-bold gradient-text">
+                  {vendorInfo?.totalOrders || orders?.length || 0}
+                </p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-full">
+                <ShoppingCart className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Link de Vendas</h3>
-            <div className="flex items-center space-x-2">
-              <Input
-                value={vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`}
-                readOnly
-                className="flex-1 text-sm"
-              />
-              <Button
-                onClick={() => copyToClipboard(vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`)}
-                className="gradient-bg text-white"
-                size="sm"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">Comissões</h3>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {(vendorInfo?.totalCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-orange-50 p-3 rounded-full">
+                <DollarSign className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-hover">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">Confirmados</h3>
+                <p className="text-2xl font-bold gradient-text">
+                  {vendorInfo?.confirmedOrders || 0}
+                </p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-full">
+                <Package className="h-6 w-6 text-purple-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Link de Vendas - Separado */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-900">Seu Link de Vendas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2">
+            <Input
+              value={vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`}
+              readOnly
+              className="flex-1"
+            />
+            <Button
+              onClick={() => copyToClipboard(vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`)}
+              className="gradient-bg text-white"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copiar
+            </Button>
+          </div>
+          <p className="text-sm text-gray-600 mt-2">
+            Compartilhe este link com seus clientes para que eles possam fazer pedidos diretamente
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

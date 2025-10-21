@@ -1073,7 +1073,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName || 'Cliente não identificado';
+          
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const client = await storage.getUser(order.clientId);
+            if (client) {
+              clientName = client.name;
+            }
+          }
+
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Get budget photos and items if order was converted from budget
@@ -1110,7 +1120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: client?.name || 'Unknown',
+            clientName: clientName,
             producerName: producer?.name || null,
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
@@ -1130,29 +1140,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendor/:userId/info", async (req, res) => {
     try {
       const { userId } = req.params;
+      console.log(`Getting vendor info for: ${userId}`);
+      
       const vendor = await storage.getVendor(userId);
       const orders = await storage.getOrdersByVendor(userId);
       const commissions = await storage.getCommissionsByVendor(userId);
 
+      console.log(`Found ${orders.length} orders, ${commissions.length} commissions for vendor ${userId}`);
+
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+
       const monthlySales = orders
         .filter(order => {
           if (!order.createdAt) return false;
-          const orderMonth = new Date(order.createdAt).getMonth();
-          const currentMonth = new Date().getMonth();
-          return orderMonth === currentMonth;
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
         })
-        .reduce((total, order) => total + parseFloat(order.totalValue), 0);
+        .reduce((total, order) => total + parseFloat(order.totalValue || '0'), 0);
 
       const totalCommissions = commissions
-        .reduce((total, commission) => total + parseFloat(commission.amount), 0);
+        .filter(commission => commission.status !== 'cancelled')
+        .reduce((total, commission) => total + parseFloat(commission.amount || '0'), 0);
 
-      res.json({
-        vendor,
+      const confirmedOrders = orders.filter(o => 
+        o.status !== 'pending' && o.status !== 'cancelled'
+      ).length;
+
+      const vendorInfo = {
+        vendor: vendor || {
+          salesLink: `https://vendas.erp.com/v/${userId}`,
+          commissionRate: "10.00",
+          isActive: true
+        },
         monthlySales,
         totalCommissions,
-        confirmedOrders: orders.filter(o => o.status !== 'pending').length
-      });
+        confirmedOrders,
+        totalOrders: orders.length,
+        pendingOrders: orders.filter(o => o.status === 'pending').length
+      };
+
+      console.log(`Returning vendor info:`, vendorInfo);
+      res.json(vendorInfo);
     } catch (error) {
+      console.error("Error fetching vendor info:", error);
       res.status(500).json({ error: "Failed to fetch vendor info" });
     }
   });

@@ -668,6 +668,24 @@ export class MemStorage implements IStorage {
     };
     this.clients.set(sampleClient2.id, sampleClient2);
 
+    // Create more test clients for the vendor
+    const sampleClient3: Client = {
+      id: "client-3",
+      userId: "client-3", 
+      name: "Carlos Pereira",
+      email: "carlos@email.com",
+      phone: "(11) 98765-1234",
+      whatsapp: "(11) 98765-1234",
+      cpfCnpj: "456.789.123-00",
+      address: "Rua Augusta, 789, São Paulo, SP",
+      vendorId: "vendor-1",
+      userCode: "CLI789ABCD",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.clients.set(sampleClient3.id, sampleClient3);
+
     // Create sample orders
     mockOrders = [
       {
@@ -1526,8 +1544,27 @@ export class MemStorage implements IStorage {
         // Get user info
         const user = client.userId ? await this.getUser(client.userId) : null;
         
-        // Count orders for this client
-        const clientOrders = await this.getOrdersByClient(client.userId || client.id);
+        // Count orders for this client - use both client.id and client.userId
+        let clientOrders: Order[] = [];
+        try {
+          if (client.userId) {
+            const ordersByUserId = await this.getOrdersByClient(client.userId);
+            clientOrders = [...clientOrders, ...ordersByUserId];
+          }
+          if (client.id !== client.userId) {
+            const ordersByClientId = await this.getOrdersByClient(client.id);
+            clientOrders = [...clientOrders, ...ordersByClientId];
+          }
+          
+          // Remove duplicates
+          clientOrders = clientOrders.filter((order, index, self) => 
+            index === self.findIndex(o => o.id === order.id)
+          );
+        } catch (error) {
+          console.log(`Error getting orders for client ${client.id}:`, error);
+          clientOrders = [];
+        }
+
         const ordersCount = clientOrders.length;
         const totalSpent = clientOrders
           .filter(order => order.status !== 'cancelled')
@@ -1535,14 +1572,15 @@ export class MemStorage implements IStorage {
 
         return {
           ...client,
-          userCode: user?.username || client.username || 'N/A',
-          username: user?.username || client.username || 'N/A',
+          userCode: user?.username || client.username || client.userCode || 'N/A',
+          username: user?.username || client.username || client.userCode || 'N/A',
           ordersCount,
           totalSpent
         };
       })
     );
 
+    console.log(`Storage: Returning ${enrichedClients.length} enriched clients`);
     return enrichedClients;
   }
 
