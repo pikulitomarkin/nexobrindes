@@ -124,12 +124,15 @@ export default function AdminOrders() {
 
   const cancelOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}/cancel`, {
-        method: "PATCH",
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "cancelled" }),
       });
-      if (!response.ok) throw new Error("Failed to cancel order");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to cancel order");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -142,10 +145,10 @@ export default function AdminOrders() {
         description: "Pedido cancelado com sucesso! Comissões e valores foram atualizados." 
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({ 
         title: "Erro", 
-        description: "Erro ao cancelar pedido. Tente novamente.",
+        description: error.message || "Erro ao cancelar pedido. Tente novamente.",
         variant: "destructive" 
       });
     },
@@ -182,13 +185,24 @@ export default function AdminOrders() {
     mutationFn: async (orderId: string) => {
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-      if (!response.ok) throw new Error("Failed to send to production");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to send to production");
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({ title: "Sucesso", description: "Pedido enviado para produção!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro", 
+        description: error.message || "Erro ao enviar pedido para produção.",
+        variant: "destructive" 
+      });
     },
   });
 
@@ -488,6 +502,7 @@ export default function AdminOrders() {
                               setSelectedOrderId(order.id);
                               setShowOrderDetails(true);
                             }}
+                            title="Ver detalhes do pedido"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -495,6 +510,7 @@ export default function AdminOrders() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setEditingOrder(order)}
+                            title="Editar pedido"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -515,6 +531,8 @@ export default function AdminOrders() {
                               variant="ghost"
                               size="sm"
                               onClick={() => sendToProductionMutation.mutate(order.id)}
+                              disabled={sendToProductionMutation.isPending}
+                              title="Enviar para produção"
                             >
                               <Package className="h-4 w-4" />
                             </Button>
@@ -522,7 +540,7 @@ export default function AdminOrders() {
                           {order.status !== 'cancelled' && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-800">
+                                <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-800" title="Cancelar pedido">
                                   <X className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>
@@ -542,8 +560,9 @@ export default function AdminOrders() {
                                   <AlertDialogAction 
                                     onClick={() => cancelOrderMutation.mutate(order.id)}
                                     className="bg-orange-600 hover:bg-orange-700"
+                                    disabled={cancelOrderMutation.isPending}
                                   >
-                                    Cancelar Pedido
+                                    {cancelOrderMutation.isPending ? "Cancelando..." : "Cancelar Pedido"}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -551,7 +570,7 @@ export default function AdminOrders() {
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800" title="Excluir pedido permanentemente">
                                 <Trash className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -559,13 +578,23 @@ export default function AdminOrders() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
+                                  Tem certeza que deseja excluir permanentemente este pedido? Esta ação:
+                                  <br />• Remove completamente o pedido do sistema
+                                  <br />• Remove todas as comissões relacionadas
+                                  <br />• Remove todos os pagamentos relacionados
+                                  <br />• Esta ação NÃO PODE ser desfeita
+                                  <br /><br />
+                                  <strong>Recomendamos cancelar o pedido ao invés de excluir.</strong>
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOrderMutation.mutate(order.id)}>
-                                  Excluir
+                                <AlertDialogAction 
+                                  onClick={() => deleteOrderMutation.mutate(order.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled={deleteOrderMutation.isPending}
+                                >
+                                  {deleteOrderMutation.isPending ? "Excluindo..." : "Excluir Permanentemente"}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

@@ -455,6 +455,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
+      // If order is being cancelled, update related commissions
+      if (updateData.status === 'cancelled') {
+        console.log(`Order ${id} cancelled - updating related commissions and payments`);
+        await storage.updateCommissionsByOrderStatus(id, 'cancelled');
+      }
+
       console.log(`Order ${id} updated successfully`);
       res.json(updatedOrder);
     } catch (error) {
