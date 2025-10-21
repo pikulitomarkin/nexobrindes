@@ -1243,6 +1243,8 @@ export class MemStorage implements IStorage {
 
     console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
     this.clients.set(id, client);
+    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
+    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
     return client;
   }
 
@@ -1514,6 +1516,7 @@ export class MemStorage implements IStorage {
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
     console.log(`Storage: getClientsByVendor for vendorId: ${vendorId}`);
+    console.log(`Storage: this.clients size: ${this.clients.size}`);
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
