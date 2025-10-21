@@ -56,17 +56,11 @@ export default function VendorClients() {
   }, [isCreateDialogOpen]);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ["/api/vendors/clients", vendorId],
+    queryKey: ["/api/vendor/clients", vendorId],
     queryFn: async () => {
-      console.log(`Fetching clients for vendor: ${vendorId}`);
       const response = await fetch(`/api/vendors/${vendorId}/clients`);
-      if (!response.ok) {
-        console.error(`Failed to fetch clients: ${response.status} ${response.statusText}`);
-        throw new Error('Failed to fetch clients');
-      }
-      const data = await response.json();
-      console.log(`Received ${data.length} clients:`, data);
-      return data;
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
     },
   });
 
@@ -110,7 +104,8 @@ export default function VendorClients() {
       return response.json();
     },
     onSuccess: (newClient) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors/clients", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
       form.reset();

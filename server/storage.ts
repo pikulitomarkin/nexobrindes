@@ -341,26 +341,6 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    },
-    {
-      id: "pm-4",
-      name: "Depósito Bancário",
-      type: "bank_transfer",
-      maxInstallments: 1,
-      installmentInterest: "0.00",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "pm-5",
-      name: "Dinheiro",
-      type: "cash",
-      maxInstallments: 1,
-      installmentInterest: "0.00",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
     }
   ];
 
@@ -379,17 +359,6 @@ export class MemStorage implements IStorage {
     },
     {
       id: "sm-2",
-      name: "Correios SEDEX",
-      type: "calculated",
-      basePrice: "0.00",
-      freeShippingThreshold: "200.00",
-      estimatedDays: 3,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "sm-3",
       name: "Transportadora",
       type: "fixed",
       basePrice: "25.00",
@@ -400,34 +369,12 @@ export class MemStorage implements IStorage {
       updatedAt: new Date().toISOString()
     },
     {
-      id: "sm-4",
-      name: "Entrega Local",
-      type: "fixed",
-      basePrice: "15.00",
-      freeShippingThreshold: "100.00",
-      estimatedDays: 1,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "sm-5",
+      id: "sm-3",
       name: "Frete Grátis",
       type: "free",
       basePrice: "0.00",
       freeShippingThreshold: "0.00",
       estimatedDays: 7,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "sm-6",
-      name: "Retirada no Local",
-      type: "pickup",
-      basePrice: "0.00",
-      freeShippingThreshold: "0.00",
-      estimatedDays: 0,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -490,7 +437,6 @@ export class MemStorage implements IStorage {
   private createTestUsers() {
     // Override existing users with test users
     this.users.clear();
-    this.clients.clear();
 
     // Admin user
     const adminUser = {
@@ -524,36 +470,21 @@ export class MemStorage implements IStorage {
     };
     this.users.set(vendorUser.id, vendorUser);
 
-    // Client users
-    const clientUser1 = {
+    // Client user
+    const clientUser = {
       id: "client-1",
       username: "cliente1",
       password: "123456",
       name: "João Silva",
       email: "joao.silva@email.com",
-      phone: "(11) 98765-4321",
+      phone: null,
       vendorId: null,
       role: "client",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.users.set(clientUser1.id, clientUser1);
-
-    const clientUser2 = {
-      id: "client-2", 
-      username: "cliente2",
-      password: "123456",
-      name: "Maria Santos",
-      email: "maria.santos@email.com", 
-      phone: "(11) 99876-5432",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser2.id, clientUser2);
+    this.users.set(clientUser.id, clientUser);
 
     // Producer user
     const producerUser = {
@@ -602,41 +533,6 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(logisticsUser.id, logisticsUser);
-
-    // Create client records linked to vendor-1
-    const sampleClient1: Client = {
-      id: "client-record-1",
-      userId: "client-1",
-      name: "João Silva", 
-      email: "joao.silva@email.com",
-      phone: "(11) 98765-4321",
-      whatsapp: "(11) 98765-4321",
-      cpfCnpj: "123.456.789-00",
-      address: "Rua das Flores, 123, São Paulo, SP",
-      vendorId: "vendor-1", // Linked to vendor-1
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient1.id, sampleClient1);
-
-    const sampleClient2: Client = {
-      id: "client-record-2",
-      userId: "client-2", 
-      name: "Maria Santos",
-      email: "maria.santos@email.com",
-      phone: "(11) 99876-5432",
-      whatsapp: "(11) 99876-5432", 
-      cpfCnpj: "987.654.321-00",
-      address: "Av. Paulista, 456, São Paulo, SP",
-      vendorId: "vendor-1", // Linked to vendor-1
-      isActive: true,
-      createdAt: new Date(), 
-      updatedAt: new Date()
-    };
-    this.clients.set(sampleClient2.id, sampleClient2);
-
-    console.log(`Created ${this.clients.size} test clients for vendor vendor-1`);
   }
 
   private initializeData() {
@@ -1621,51 +1517,11 @@ export class MemStorage implements IStorage {
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
     console.log(`Storage: getClientsByVendor for vendorId: ${vendorId}`);
     console.log(`Storage: this.clients size: ${this.clients.size}`);
-    
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
-    // Filter clients by vendorId
-    const filteredClients = allClients.filter(client => {
-      const matches = client.vendorId === vendorId;
-      if (matches) {
-        console.log(`Storage: Client ${client.name} matches vendor ${vendorId}`);
-      }
-      return matches;
-    });
-
-    console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ 
-      id: c.id, 
-      name: c.name, 
-      vendorId: c.vendorId,
-      userId: c.userId 
-    })));
-
-    // If no clients found, check if we need to create default clients for this vendor
-    if (filteredClients.length === 0) {
-      console.log(`Storage: No clients found for vendor ${vendorId}, creating sample client`);
-      
-      // Create a sample client for this vendor
-      const sampleClient = {
-        id: `client-sample-${vendorId}`,
-        userId: `user-sample-${vendorId}`,
-        name: "Cliente Exemplo",
-        email: "cliente@exemplo.com",
-        phone: "(11) 99999-9999",
-        whatsapp: "(11) 99999-9999",
-        cpfCnpj: "123.456.789-00",
-        address: "Rua Exemplo, 123",
-        vendorId: vendorId,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      this.clients.set(sampleClient.id, sampleClient);
-      console.log(`Storage: Created sample client for vendor ${vendorId}`);
-      
-      return [sampleClient];
-    }
+    const filteredClients = allClients.filter(client => client.vendorId === vendorId);
+    console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
     return filteredClients;
   }
@@ -2364,10 +2220,6 @@ export class MemStorage implements IStorage {
   // Budget methods
   async getBudgets(): Promise<any[]> {
     return Array.from(this.budgets.values());
-  }
-
-  async getBudgetsByVendor(vendorId: string): Promise<any[]> {
-    return Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
   }
 
   async getBudget(id: string): Promise<any> {

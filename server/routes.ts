@@ -936,87 +936,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logistics Routes
-  // Get paid orders waiting to be sent to production
-  app.get("/api/logistics/paid-orders", async (req, res) => {
-    try {
-      const orders = await storage.getOrders();
-      
-      // Orders that are confirmed and paid but not yet sent to production
-      const paidOrders = orders.filter(order => 
-        order.status === 'confirmed' || order.status === 'pending'
-      );
-
-      const enrichedOrders = await Promise.all(
-        paidOrders.map(async (order) => {
-          const client = order.clientId ? await storage.getClient(order.clientId) : null;
-          const vendor = order.vendorId ? await storage.getUser(order.vendorId) : null;
-          const payments = await storage.getPaymentsByOrder(order.id);
-          
-          return {
-            ...order,
-            clientName: client?.name || order.contactName || 'Cliente não informado',
-            vendorName: vendor?.name || 'Vendedor não informado',
-            payments: payments.filter(p => p.status === 'confirmed')
-          };
-        })
-      );
-
-      res.json(enrichedOrders);
-    } catch (error) {
-      console.error("Error fetching paid orders:", error);
-      res.status(500).json({ error: "Failed to fetch paid orders" });
-    }
-  });
-
-  // Dispatch order to client
-  app.post("/api/logistics/dispatch-order", async (req, res) => {
-    try {
-      const { productionOrderId, orderId, notes, trackingCode } = req.body;
-
-      // Update production order
-      await storage.updateProductionOrder(productionOrderId, {
-        status: 'shipped',
-        trackingCode: trackingCode || '',
-        notes: notes || ''
-      });
-
-      // Update main order
-      await storage.updateOrder(orderId, {
-        status: 'shipped',
-        trackingCode: trackingCode || ''
-      });
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error dispatching order:", error);
-      res.status(500).json({ error: "Failed to dispatch order" });
-    }
-  });
-
-  // Get producer statistics
-  app.get("/api/logistics/producer-stats", async (req, res) => {
-    try {
-      const users = await storage.getUsers();
-      const producers = users.filter(u => u.role === 'producer');
-      const products = await storage.getProducts();
-
-      const stats = producers.map(producer => {
-        const producerProducts = products.filter(p => p.producerId === producer.id);
-        return {
-          producerId: producer.id,
-          producerName: producer.name,
-          productCount: producerProducts.length
-        };
-      });
-
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching producer stats:", error);
-      res.status(500).json({ error: "Failed to fetch producer stats" });
-    }
-  });
-
   app.post("/api/producers", async (req, res) => {
     try {
       const { name, email, phone, specialty, address, password, username, userCode } = req.body;
@@ -1275,68 +1194,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching vendor orders:", error);
       res.status(500).json({ error: "Failed to fetch vendor orders" });
-    }
-  });
-
-  // Get all clients
-  app.get("/api/clients", async (req, res) => {
-    try {
-      const clients = await storage.getClients();
-      res.json(clients);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-      res.status(500).json({ error: "Failed to fetch clients" });
-    }
-  });
-
-  // Create a new client
-  app.post("/api/clients", async (req, res) => {
-    try {
-      const clientData = req.body;
-      console.log(`Creating client with data:`, clientData);
-
-      const newClient = await storage.createClient(clientData);
-      console.log(`Client created successfully:`, newClient);
-
-      res.json(newClient);
-    } catch (error) {
-      console.error("Error creating client:", error);
-      res.status(500).json({ error: "Failed to create client" });
-    }
-  });
-
-  // Get clients for a specific vendor
-  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      console.log(`Fetching clients for vendor: ${vendorId}`);
-
-      const clients = await storage.getClientsByVendor(vendorId);
-      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-
-      // Enrich with user data if available
-      const enrichedClients = await Promise.all(
-        clients.map(async (client) => {
-          if (client.userId) {
-            const user = await storage.getUser(client.userId);
-            return {
-              ...client,
-              user: user ? {
-                id: user.id,
-                username: user.username,
-                email: user.email
-              } : null
-            };
-          }
-          return client;
-        })
-      );
-
-      console.log(`Returning ${enrichedClients.length} enriched clients`);
-      res.json(enrichedClients);
-    } catch (error) {
-      console.error("Error fetching vendor clients:", error);
-      res.status(500).json({ error: "Failed to fetch vendor clients" });
     }
   });
 
@@ -1826,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + refundAmount;
         }, 0);
 
-      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0).length}, total: ${refunds}`);
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
@@ -1838,10 +1695,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
-
+      
       console.log('Payables breakdown:', {
         producers,
-        expenses,
+        expenses, 
         commissions,
         refunds,
         manualPayables: manualPayablesAmount,
@@ -2356,20 +2213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgets = await storage.getBudgets();
       res.json(budgets);
     } catch (error) {
-      console.error("Error fetching budgets:", error);
       res.status(500).json({ error: "Failed to fetch budgets" });
-    }
-  });
-
-  // Get budgets by vendor
-  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      const budgets = await storage.getBudgetsByVendor(vendorId);
-      res.json(budgets);
-    } catch (error) {
-      console.error("Error fetching vendor budgets:", error);
-      res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
   });
 
@@ -3053,26 +2897,6 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete budget photo" });
-    }
-  });
-
-  // Payment Methods Routes (for frontend)
-  app.get("/api/payment-methods", async (req, res) => {
-    try {
-      const paymentMethods = await storage.getPaymentMethods();
-      res.json(paymentMethods);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch payment methods" });
-    }
-  });
-
-  // Shipping Methods Routes (for frontend)
-  app.get("/api/shipping-methods", async (req, res) => {
-    try {
-      const shippingMethods = await storage.getShippingMethods();
-      res.json(shippingMethods);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch shipping methods" });
     }
   });
 
@@ -5193,7 +5017,7 @@ Para mais detalhes, entre em contato conosco!`;
 
             let clientName = order?.contactName || 'Cliente não identificado';
 
-            // If client name is not available in order, try to get it from client record
+            // Try to get client name if not available in order
             if (!clientName && order?.clientId) {
               const clientRecord = await storage.getClient(order.clientId);
               if (clientRecord) {
@@ -5428,7 +5252,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Validate transactions structure
-      for (let i = 0; i < transactions.length; i++) {
+      for      let i = 0; i < transactions.length; i++) {
         const transaction = transactions[i];
         if (!transaction || typeof transaction !== 'object') {
           console.error(`Transaction ${i} is not an object:`, transaction);

@@ -41,12 +41,12 @@ export default function Login() {
           description: `Bem-vindo, ${data.user.name}!`,
         });
 
-        // Redirecionar baseado no role
+        // Wait a moment for localStorage to be set, then redirect
         setTimeout(() => {
           const { role } = data.user;
           switch (role) {
             case "admin":
-              window.location.href = "/admin/dashboard";
+              window.location.href = "/";
               break;
             case "vendor":
               window.location.href = "/vendor/dashboard";
@@ -67,7 +67,7 @@ export default function Login() {
               window.location.href = "/partner/clients";
               break;
             default:
-              window.location.href = "/admin/dashboard";
+              window.location.href = "/dashboard";
           }
         }, 100);
       } else {
