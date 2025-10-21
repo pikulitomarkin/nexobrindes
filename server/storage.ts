@@ -3275,12 +3275,11 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    const payments = Array.from(this.producerPayments.values()).filter(p => p.producerId === producerId);
-    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return Array.from(this.producerPayments.values()).filter(payment => payment.producerId === producerId);
   }
 
   async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
-    return Array.from(this.producerPayments.values()).find(p => p.productionOrderId === productionOrderId);
+    return Array.from(this.producerPayments.values()).find(payment => payment.productionOrderId === productionOrderId);
   }
 
   async createProducerPayment(data: InsertProducerPayment): Promise<ProducerPayment> {
