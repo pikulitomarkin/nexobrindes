@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,22 +41,27 @@ export default function ProducerReceivables() {
 
   const filteredPayments = producerPayments.filter((payment: any) => {
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       payment.order?.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.productionOrder?.product?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
+  // Calculate correct totals
   const totalPending = producerPayments
-    .filter((p: any) => p.status === 'pending' || p.status === 'approved')
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    .filter((p: any) => p.status === 'pending')
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+
+  const totalApproved = producerPayments
+    .filter((p: any) => p.status === 'approved')
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
 
   const totalReceived = producerPayments
     .filter((p: any) => p.status === 'paid')
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
 
-  const pendingCount = producerPayments.filter((p: any) => p.status === 'pending').length;
-  const approvedCount = producerPayments.filter((p: any) => p.status === 'approved').length;
+  // A Receber = Pendente + Aprovado
+  const totalToReceive = totalPending + totalApproved;
 
   if (isLoading) {
     return (
@@ -66,10 +70,9 @@ export default function ProducerReceivables() {
           <div className="h-8 bg-gray-200 rounded w-1/3"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+              <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
             ))}
           </div>
-          <div className="h-64 bg-gray-200 rounded-lg"></div>
         </div>
       </div>
     );
@@ -84,65 +87,65 @@ export default function ProducerReceivables() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card className="card-hover">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">A Receber</p>
-                <p className="text-2xl font-bold gradient-text">
-                  R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm font-medium text-blue-700">A Receber</p>
+                <p className="text-2xl font-bold text-blue-900 mt-2">
+                  R$ {totalToReceive.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
+                <p className="text-xs text-blue-600 mt-1">Pendente + Aprovado</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Já Recebido</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="text-sm font-medium text-green-700">Já Recebido</p>
+                <p className="text-2xl font-bold text-green-900 mt-2">
                   R$ {totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
+                <p className="text-xs text-green-600 mt-1">Pagamentos confirmados</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-3xl font-bold gradient-text">
-                  {pendingCount}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
+              <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover">
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aprovados</p>
-                <p className="text-3xl font-bold gradient-text">
-                  {approvedCount}
-                </p>
+                <p className="text-sm font-medium text-yellow-700">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-900 mt-2">{producerPayments.filter((p: any) => p.status === 'pending').length}</p>
+                <p className="text-xs text-yellow-600 mt-1">Aguardando aprovação</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Package className="h-6 w-6 text-purple-600" />
+              <div className="h-12 w-12 bg-yellow-600 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-700">Aprovados</p>
+                <p className="text-2xl font-bold text-purple-900 mt-2">{producerPayments.filter((p: any) => p.status === 'approved').length}</p>
+                <p className="text-xs text-purple-600 mt-1">Prontos para pagamento</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                <Package className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -150,132 +153,127 @@ export default function ProducerReceivables() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por pedido ou produto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="approved">Aprovado</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="rejected">Rejeitado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por pedido ou produto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-80"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Todos Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Status</SelectItem>
+            <SelectItem value="pending">Pendente</SelectItem>
+            <SelectItem value="approved">Aprovado</SelectItem>
+            <SelectItem value="paid">Pago</SelectItem>
+            <SelectItem value="rejected">Rejeitado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      {/* Payments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Meus Pagamentos ({filteredPayments.length})</CardTitle>
+      {/* Payments List */}
+      <Card className="shadow-lg border-0">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+          <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            Meus Pagamentos
+            <Badge variant="outline" className="ml-2">
+              {filteredPayments.length} {filteredPayments.length === 1 ? 'pagamento' : 'pagamentos'}
+            </Badge>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           {filteredPayments.length === 0 ? (
             <div className="text-center py-12">
               <DollarSign className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum pagamento encontrado</h3>
-              <p className="text-gray-500">Não há pagamentos que correspondam aos filtros selecionados.</p>
+              <p className="text-gray-500">
+                {searchTerm || statusFilter !== "all"
+                  ? "Não há pagamentos que correspondam aos filtros selecionados."
+                  : "Você ainda não possui pagamentos registrados."}
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
               {filteredPayments.map((payment: any) => (
-                <div key={payment.id} className="border rounded-lg p-6 hover:shadow-sm transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                        Pedido: {payment.order?.orderNumber || 'N/A'}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Produto: {payment.productionOrder?.product || payment.order?.product || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-600 mb-1">
-                        R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </div>
-                      {getStatusBadge(payment.status)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Data de Criação</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <p className="text-sm">
-                          {new Date(payment.createdAt).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
-
-                    {payment.approvedAt && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Aprovado em</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <CheckCircle className="h-4 w-4 text-blue-400" />
-                          <p className="text-sm">
-                            {new Date(payment.approvedAt).toLocaleDateString('pt-BR')}
+                <div key={payment.id} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all duration-200 bg-white">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {payment.order?.orderNumber || payment.productionOrder?.orderNumber || `#${payment.id.slice(-6)}`}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {payment.productionOrder?.product || payment.order?.product || 'Serviço de produção'}
                           </p>
                         </div>
                       </div>
-                    )}
 
-                    {payment.paidAt && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Pago em</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <DollarSign className="h-4 w-4 text-green-400" />
-                          <p className="text-sm">
-                            {new Date(payment.paidAt).toLocaleDateString('pt-BR')}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <Label className="text-gray-500">Valor</Label>
+                          <p className="font-semibold text-lg text-green-600">
+                            R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-gray-500">Status</Label>
+                          <div className="mt-1">
+                            {getStatusBadge(payment.status)}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-gray-500">Data</Label>
+                          <p className="font-medium">
+                            {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
                           </p>
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {payment.paymentMethod && (
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-500">Método de Pagamento</p>
-                      <p className="text-sm mt-1 capitalize">{payment.paymentMethod}</p>
+                      {payment.notes && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <Label className="text-sm text-gray-600">Observações</Label>
+                          <p className="text-sm text-gray-800 mt-1">{payment.notes}</p>
+                        </div>
+                      )}
+
+                      {payment.status === 'paid' && payment.paidAt && (
+                        <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">
+                              Pago em {new Date(payment.paidAt).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                          {payment.paymentMethod && (
+                            <p className="text-sm text-green-700 mt-1">
+                              Método: {payment.paymentMethod.toUpperCase()}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {payment.notes && (
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-500">Observações</p>
-                      <div className="mt-1 p-3 bg-gray-50 border rounded">
-                        <p className="text-sm">{payment.notes}</p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedPaymentForDetails(payment)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Detalhes
+                      </Button>
                     </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setSelectedPaymentForDetails(payment)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Ver Detalhes
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -284,192 +282,81 @@ export default function ProducerReceivables() {
         </CardContent>
       </Card>
 
-      {/* Modal de Detalhes do Pedido */}
+      {/* Payment Details Dialog */}
       <Dialog open={!!selectedPaymentForDetails} onOpenChange={() => setSelectedPaymentForDetails(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogTitle>Detalhes do Pagamento</DialogTitle>
             <DialogDescription>
-              Informações completas sobre o pedido e pagamentos
+              Informações completas sobre este pagamento
             </DialogDescription>
           </DialogHeader>
-          
           {selectedPaymentForDetails && (
             <div className="space-y-6">
-              {/* Informações Básicas do Pedido */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
-                      <p className="text-lg font-bold">
-                        {selectedPaymentForDetails.order?.orderNumber || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Produto</label>
-                      <p className="font-medium">
-                        {selectedPaymentForDetails.productionOrder?.product || selectedPaymentForDetails.order?.product || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Descrição</label>
-                      <p className="text-gray-700">
-                        {selectedPaymentForDetails.order?.description || 'Sem descrição'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Status do Pagamento</label>
-                      <div className="mt-1">
-                        {getStatusBadge(selectedPaymentForDetails.status)}
-                      </div>
-                    </div>
-                  </div>
+                  <Label className="text-sm font-medium text-gray-500">Pedido</Label>
+                  <p className="font-semibold">
+                    {selectedPaymentForDetails.order?.orderNumber || selectedPaymentForDetails.productionOrder?.orderNumber || 'N/A'}
+                  </p>
                 </div>
-
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Valores e Datas</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Meu Serviço</label>
-                      <p className="text-2xl font-bold text-green-600">
-                        R$ {parseFloat(selectedPaymentForDetails.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Data de Criação</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <p className="text-sm">
-                          {new Date(selectedPaymentForDetails.createdAt).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedPaymentForDetails.approvedAt && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Aprovado em</label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <CheckCircle className="h-4 w-4 text-blue-400" />
-                          <p className="text-sm">
-                            {new Date(selectedPaymentForDetails.approvedAt).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedPaymentForDetails.paidAt && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Pago em</label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <DollarSign className="h-4 w-4 text-green-400" />
-                          <p className="text-sm">
-                            {new Date(selectedPaymentForDetails.paidAt).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                  <Label className="text-sm font-medium text-gray-500">Status</Label>
+                  <div className="mt-1">
+                    {getStatusBadge(selectedPaymentForDetails.status)}
                   </div>
                 </div>
               </div>
 
-              {/* Informações do Cliente */}
-              {selectedPaymentForDetails.order && (
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Valor do Pagamento</Label>
+                <p className="text-2xl font-bold text-green-600">
+                  R$ {parseFloat(selectedPaymentForDetails.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {selectedPaymentForDetails.productionOrder && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Informações do Cliente</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <Label className="text-sm text-gray-500">Nome</Label>
-                        <p className="font-medium">
-                          {selectedPaymentForDetails.order.clientName || 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedPaymentForDetails.order.clientPhone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <Label className="text-sm text-gray-500">Telefone</Label>
-                          <p className="font-medium">{selectedPaymentForDetails.order.clientPhone}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedPaymentForDetails.order.clientEmail && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <Label className="text-sm text-gray-500">E-mail</Label>
-                          <p className="font-medium">{selectedPaymentForDetails.order.clientEmail}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedPaymentForDetails.order.shippingAddress && (
-                      <div className="flex items-center gap-2 md:col-span-2 lg:col-span-3">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <Label className="text-sm text-gray-500">Endereço de Entrega</Label>
-                          <p className="font-medium">{selectedPaymentForDetails.order.shippingAddress}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <Label className="text-sm font-medium text-gray-500">Produto/Serviço</Label>
+                  <p className="font-medium">{selectedPaymentForDetails.productionOrder.product}</p>
                 </div>
               )}
 
-              {/* Método de Pagamento */}
-              {selectedPaymentForDetails.paymentMethod && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Informações de Pagamento</h3>
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div>
-                      <Label className="text-sm text-gray-600">Método de Pagamento</Label>
-                      <p className="font-medium text-blue-800 capitalize">
-                        {selectedPaymentForDetails.paymentMethod}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Observações */}
               {selectedPaymentForDetails.notes && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Observações</h3>
-                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <p className="text-gray-800">{selectedPaymentForDetails.notes}</p>
-                  </div>
+                  <Label className="text-sm font-medium text-gray-500">Observações</Label>
+                  <p className="text-gray-800 bg-gray-50 p-3 rounded-lg">{selectedPaymentForDetails.notes}</p>
                 </div>
               )}
 
-              {/* Status e Progresso */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Progresso do Pagamento</h3>
-                <div className="space-y-3">
-                  {[
-                    { status: 'pending', label: 'Pendente', completed: true },
-                    { status: 'approved', label: 'Aprovado', completed: selectedPaymentForDetails.status === 'approved' || selectedPaymentForDetails.status === 'paid' },
-                    { status: 'paid', label: 'Pago', completed: selectedPaymentForDetails.status === 'paid' }
-                  ].map((step, index) => (
-                    <div key={step.status} className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span className={`text-sm ${step.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                        {step.label}
-                      </span>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-gray-500">Data de Criação</Label>
+                  <p className="font-medium">
+                    {selectedPaymentForDetails.createdAt ? new Date(selectedPaymentForDetails.createdAt).toLocaleString('pt-BR') : 'N/A'}
+                  </p>
                 </div>
+                {selectedPaymentForDetails.paidAt && (
+                  <div>
+                    <Label className="text-gray-500">Data do Pagamento</Label>
+                    <p className="font-medium text-green-600">
+                      {new Date(selectedPaymentForDetails.paidAt).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Botões de Ação */}
-              <div className="flex justify-end pt-4 border-t">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedPaymentForDetails(null)}
-                >
-                  Fechar
-                </Button>
-              </div>
+              {selectedPaymentForDetails.status === 'paid' && selectedPaymentForDetails.paymentMethod && (
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800">Pagamento Confirmado</span>
+                  </div>
+                  <p className="text-sm text-green-700">
+                    Método: {selectedPaymentForDetails.paymentMethod.toUpperCase()}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
