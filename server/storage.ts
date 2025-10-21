@@ -2386,7 +2386,11 @@ export class MemStorage implements IStorage {
       customizationPhoto: itemData.customizationPhoto || '',
       productWidth: itemData.productWidth || null,
       productHeight: itemData.productHeight || null,
-      productDepth: itemData.productDepth || null
+      productDepth: itemData.productDepth || null,
+      // New fields for general customization
+      hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+      generalCustomizationName: itemData.generalCustomizationName || "",
+      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || "0"),
     };
     this.budgetItems.push(newItem);
 
@@ -2405,7 +2409,11 @@ export class MemStorage implements IStorage {
     const updatedItem = {
       ...this.budgetItems[itemIndex],
       ...itemData,
-      customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : this.budgetItems[itemIndex].customizationPhoto
+      customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : this.budgetItems[itemIndex].customizationPhoto,
+      // Ensure general customization fields are correctly updated or set
+      hasGeneralCustomization: itemData.hasGeneralCustomization !== undefined ? itemData.hasGeneralCustomization : this.budgetItems[itemIndex].hasGeneralCustomization,
+      generalCustomizationName: itemData.generalCustomizationName !== undefined ? itemData.generalCustomizationName : this.budgetItems[itemIndex].generalCustomizationName,
+      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue) : this.budgetItems[itemIndex].generalCustomizationValue,
     };
     this.budgetItems[itemIndex] = updatedItem;
 
@@ -2589,6 +2597,12 @@ export class MemStorage implements IStorage {
       if (item.hasItemCustomization) {
         const customizationValue = parseFloat(item.itemCustomizationValue || '0');
         return sum + basePrice + customizationValue;
+      }
+
+      // Add general customization value if applicable
+      if (item.hasGeneralCustomization) {
+        const generalCustomizationValue = parseFloat(item.generalCustomizationValue || '0');
+        return sum + basePrice + generalCustomizationValue;
       }
 
       return sum + basePrice;

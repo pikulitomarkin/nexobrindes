@@ -215,7 +215,11 @@ export default function VendorBudgets() {
       hasItemDiscount: false,
       itemDiscountType: "percentage",
       itemDiscountPercentage: 0,
-      itemDiscountValue: 0
+      itemDiscountValue: 0,
+      // General Customization Fields
+      hasGeneralCustomization: false,
+      generalCustomizationName: "",
+      generalCustomizationValue: 0,
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -234,6 +238,8 @@ export default function VendorBudgets() {
         // Recalculate totalPrice based on unitPrice and quantity, excluding customization for now
         item.totalPrice = item.unitPrice * quantity;
       } else if (field === 'itemCustomizationValue') {
+        item[field] = parseFloat(value) || 0;
+      } else if (field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
       }
        else {
@@ -272,8 +278,9 @@ export default function VendorBudgets() {
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-    let subtotal = basePrice + customizationValue;
+    const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+    let subtotal = basePrice + itemCustomizationValue + generalCustomizationValue;
 
     // Aplicar desconto do item
     if (item.hasItemDiscount) {
@@ -559,7 +566,11 @@ export default function VendorBudgets() {
           hasItemDiscount: item.hasItemDiscount || false,
           itemDiscountType: item.itemDiscountType || "percentage",
           itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
-          itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+          itemDiscountValue: parseFloat(item.itemDiscountValue || 0),
+          // General Customization Fields
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
         };
       }),
       paymentMethodId: budget.paymentMethodId || "",
@@ -1443,7 +1454,8 @@ export default function VendorBudgets() {
                             const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
                               const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
                               const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                              return total + basePrice + customizationValue;
+                              const generalCustomizationValue = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                              return total + basePrice + customizationValue + generalCustomizationValue;
                             }, 0);
 
                             if (vendorBudgetForm.discountType === 'percentage') {
@@ -1468,8 +1480,9 @@ export default function VendorBudgets() {
                     <span>R$ {(() => {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
                         const basePrice = item.unitPrice * item.quantity;
-                        const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                        return total + basePrice + customizationValue;
+                        const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                        const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+                        return total + basePrice + itemCustomizationValue + generalCustomizationValue;
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     })()}</span>
@@ -1480,8 +1493,9 @@ export default function VendorBudgets() {
                       <span>- R$ {(() => {
                         const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
                           const basePrice = item.unitPrice * item.quantity;
-                          const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                          return total + basePrice + customizationValue;
+                          const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                          const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+                          return total + basePrice + itemCustomizationValue + generalCustomizationValue;
                         }, 0);
 
                         if (vendorBudgetForm.discountType === 'percentage') {
@@ -1892,6 +1906,14 @@ export default function VendorBudgets() {
                                 )}
                               </div>
                             )}
+                            {item.hasGeneralCustomization && (
+                              <div className="mt-2 p-2 bg-green-50 rounded text-sm">
+                                <span className="font-medium text-green-800">{item.generalCustomizationName}:</span>
+                                <span className="ml-2 text-green-600">
+                                  (+R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                </span>
+                              </div>
+                            )}
                             {(item.productWidth || item.productHeight || item.productDepth) && (
                               <div className="mt-2 text-sm text-gray-500">
                                 <span className="font-medium">Dimensões:</span>
@@ -2037,6 +2059,31 @@ export default function VendorBudgets() {
                                 const productTotal = parseFloat(item.unitPrice) * parseInt(item.quantity);
                                 const customizationTotal = (item.customizationQuantity || 0) * parseFloat(item.itemCustomizationValue || 0);
                                 return (productTotal + customizationTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {item.hasGeneralCustomization && (
+                        <div className="mt-3 p-3 bg-green-50 rounded">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium">Nome da Personalização Geral</Label>
+                              <p>{item.generalCustomizationName || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium">Valor Unit. Personalização Geral</Label>
+                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-green-200">
+                            <Label className="text-sm font-medium">Total do Item (Produto + Personalização Geral)</Label>
+                            <p className="font-semibold text-lg">
+                              R$ {(() => {
+                                const productTotal = parseFloat(item.unitPrice) * parseInt(item.quantity);
+                                const generalCustomizationTotal = (item.quantity || 0) * parseFloat(item.generalCustomizationValue || 0);
+                                return (productTotal + generalCustomizationTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                               })()}
                             </p>
                           </div>

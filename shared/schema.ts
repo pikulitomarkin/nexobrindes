@@ -210,6 +210,11 @@ export const budgetItems = pgTable("budget_items", {
   itemCustomizationDescription: text("item_customization_description"),
   customizationPhoto: text("customization_photo"),
 
+  // Campos para personalização geral
+  hasGeneralCustomization: boolean("has_general_customization").default(false),
+  generalCustomizationName: text("general_customization_name"), // Nome da personalização
+  generalCustomizationValue: decimal("general_customization_value", { precision: 10, scale: 2 }).default('0.00'), // Valor por unidade
+
   // Campos para tamanho do produto (em cm)
   productWidth: decimal("product_width", { precision: 8, scale: 2 }), // Largura em cm
   productHeight: decimal("product_height", { precision: 8, scale: 2 }), // Altura em cm

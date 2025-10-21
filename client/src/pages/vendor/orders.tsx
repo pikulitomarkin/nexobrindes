@@ -232,6 +232,9 @@ export default function VendorOrders() {
       itemCustomizationDescription: "",
       additionalCustomizationNotes: "",
       customizationPhoto: "",
+      hasGeneralCustomization: false,
+      generalCustomizationName: "",
+      generalCustomizationValue: 0,
       productWidth: "",
       productHeight: "",
       productDepth: "",
@@ -295,7 +298,8 @@ export default function VendorOrders() {
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
     const customizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-    let subtotal = basePrice + customizationValue;
+    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+    let subtotal = basePrice + customizationValue + generalCustomizationValue;
 
     // Aplicar desconto do item
     if (item.hasItemDiscount) {
@@ -539,6 +543,9 @@ export default function VendorOrders() {
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
           productWidth: item.productWidth || "",
           productHeight: item.productHeight || "",
           productDepth: item.productDepth || "",

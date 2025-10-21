@@ -99,6 +99,9 @@ export default function AdminBudgets() {
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
       additionalCustomizationNotes: "",
+      hasGeneralCustomization: false,
+      generalCustomizationName: "",
+      generalCustomizationValue: 0,
       productWidth: "",
       productHeight: "",
       productDepth: ""
@@ -140,7 +143,8 @@ export default function AdminBudgets() {
     const subtotal = adminBudgetForm.items.reduce((total, item) => {
       const basePrice = item.unitPrice * item.quantity;
       const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-      return total + basePrice + customizationValue;
+      const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+      return total + basePrice + customizationValue + generalCustomizationValue;
     }, 0);
 
     // Apply discount
@@ -160,7 +164,8 @@ export default function AdminBudgets() {
   const calculateAdminItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
     const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-    return basePrice + customizationValue;
+    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+    return basePrice + customizationValue + generalCustomizationValue;
   };
 
   const calculateAdminTotalWithShipping = () => {
