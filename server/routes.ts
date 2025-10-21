@@ -2664,15 +2664,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Fetching quote requests for client: ${clientId}`);
 
       const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
-      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}:`, quoteRequests.map(qr => ({ id: qr.id, productName: qr.productName, status: qr.status })));
+      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}`);
 
-      // Enrich with vendor names
+      // Enrich with vendor names and product details
       const enrichedRequests = await Promise.all(
         quoteRequests.map(async (request) => {
           const vendor = request.vendorId ? await storage.getUser(request.vendorId) : null;
+          
+          // Para solicitações consolidadas, criar um resumo dos produtos
+          let productSummary = 'Produtos solicitados';
+          let totalProducts = 1;
+          
+          if (request.products && Array.isArray(request.products)) {
+            totalProducts = request.products.length;
+            if (totalProducts === 1) {
+              productSummary = request.products[0].productName;
+            } else {
+              productSummary = `${totalProducts} produtos solicitados`;
+            }
+          } else if (request.productName) {
+            productSummary = request.productName;
+          }
+
           return {
             ...request,
-            vendorName: vendor?.name || null
+            vendorName: vendor?.name || 'Vendedor não atribuído',
+            productName: productSummary, // Para compatibilidade com a interface
+            productSummary: productSummary,
+            totalProducts: totalProducts,
+            totalEstimatedValue: request.totalEstimatedValue || 0
           };
         })
       );

@@ -29,19 +29,29 @@ export default function ClientBudgets() {
   const { data: quoteRequests, isLoading: requestsLoading, refetch: refetchQuoteRequests } = useQuery({
     queryKey: ["/api/quote-requests/client", currentUser.id],
     queryFn: async () => {
-      const response = await fetch(`/api/quote-requests/client/${currentUser.id}`);
-      if (!response.ok) {
-        console.error('Failed to fetch quote requests:', response.status, response.statusText);
-        throw new Error('Failed to fetch quote requests');
+      try {
+        console.log(`Fetching quote requests for client: ${currentUser.id}`);
+        const response = await fetch(`/api/quote-requests/client/${currentUser.id}`);
+        if (!response.ok) {
+          console.error('Failed to fetch quote requests:', response.status, response.statusText);
+          // Se der erro 404 ou similar, retornar array vazio em vez de erro
+          if (response.status === 404) {
+            return [];
+          }
+          throw new Error(`Failed to fetch quote requests: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Quote requests fetched:', data);
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Error fetching quote requests:', error);
+        return []; // Retornar array vazio em caso de erro
       }
-      const data = await response.json();
-      console.log('Quote requests fetched:', data);
-      return data;
     },
     enabled: !!currentUser.id,
     refetchInterval: 10000,
     refetchOnWindowFocus: true,
-    retry: 3,
+    retry: 1, // Reduzir retry para evitar spam
   });
 
   const getStatusBadge = (status: string, type: 'budget' | 'request') => {
@@ -153,8 +163,20 @@ export default function ClientBudgets() {
                 <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{request.productName}</h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                      <h3 className="font-semibold text-gray-900">
+                        {request.productSummary || request.productName || 'Solicitação de Orçamento'}
+                      </h3>
+                      {request.totalProducts > 1 && (
+                        <p className="text-sm text-blue-600 mt-1">
+                          {request.totalProducts} produtos solicitados
+                        </p>
+                      )}
+                      {request.totalEstimatedValue > 0 && (
+                        <p className="text-sm text-green-600 font-medium mt-1">
+                          Valor estimado: R$ {parseFloat(request.totalEstimatedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           {new Date(request.createdAt).toLocaleDateString('pt-BR')}
