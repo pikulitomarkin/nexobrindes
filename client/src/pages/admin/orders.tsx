@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash, Send, Package, AlertCircle, Check } from "lucide-react";
+import { Plus, Eye, Edit, Trash, Send, Package, AlertCircle, Check, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
@@ -34,6 +34,10 @@ export default function AdminOrders() {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -118,6 +122,35 @@ export default function AdminOrders() {
     },
   });
 
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!response.ok) throw new Error("Failed to cancel order");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({ 
+        title: "Sucesso", 
+        description: "Pedido cancelado com sucesso! Comissões e valores foram atualizados." 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Erro", 
+        description: "Erro ao cancelar pedido. Tente novamente.",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const acknowledgeNotesMutation = useMutation({
     mutationFn: async (orderId: string) => {
       // First get production orders for this order
@@ -194,6 +227,21 @@ export default function AdminOrders() {
       </span>
     );
   };
+
+  // Filter orders based on search and filters
+  const filteredOrders = orders?.filter((order: any) => {
+    const matchesSearch = searchTerm === "" || 
+      order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesVendor = vendorFilter === "all" || order.vendorId === vendorFilter;
+    const matchesClient = clientFilter === "all" || order.clientId === clientFilter;
+    
+    return matchesSearch && matchesStatus && matchesVendor && matchesClient;
+  });
 
   if (ordersLoading) {
     return (
@@ -306,10 +354,67 @@ export default function AdminOrders() {
           </Dialog>
         </div>
 
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar por número, cliente ou produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pending">Aguardando</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="production">Em Produção</SelectItem>
+                  <SelectItem value="shipped">Enviado</SelectItem>
+                  <SelectItem value="delivered">Entregue</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por vendedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Vendedores</SelectItem>
+                  {vendors?.map((vendor: any) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Clientes</SelectItem>
+                  {clients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Orders List */}
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Pedidos</CardTitle>
+            <CardTitle>Lista de Pedidos ({filteredOrders?.length || 0})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -343,7 +448,7 @@ export default function AdminOrders() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {orders?.map((order: any) => (
+                  {filteredOrders?.map((order: any) => (
                     <tr key={order.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         <div className="flex items-center gap-2">
@@ -413,6 +518,36 @@ export default function AdminOrders() {
                             >
                               <Package className="h-4 w-4" />
                             </Button>
+                          )}
+                          {order.status !== 'cancelled' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-800">
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar cancelamento</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja cancelar este pedido? Esta ação irá:
+                                    <br />• Cancelar o pedido
+                                    <br />• Remover comissões relacionadas
+                                    <br />• Atualizar valores do sistema
+                                    <br />Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Não Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => cancelOrderMutation.mutate(order.id)}
+                                    className="bg-orange-600 hover:bg-orange-700"
+                                  >
+                                    Cancelar Pedido
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
