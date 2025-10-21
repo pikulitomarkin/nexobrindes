@@ -20,7 +20,7 @@ export default function ProducerReceivables() {
   const producerId = user.id;
 
   const { data: producerPayments = [], isLoading } = useQuery({
-    queryKey: ["/api/producer-payments/producer", producerId],
+    queryKey: ["/api/finance/producer-payments/producer", producerId],
     enabled: !!producerId,
   });
 
@@ -53,15 +53,16 @@ export default function ProducerReceivables() {
   });
 
   const totalPending = producerPayments
-    .filter((p: any) => p.status === 'pending' || p.status === 'approved')
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    .filter((p: any) => ['pending', 'approved'].includes(p.status))
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
 
   const totalReceived = producerPayments
     .filter((p: any) => p.status === 'paid')
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
 
   const pendingCount = producerPayments.filter((p: any) => p.status === 'pending').length;
   const approvedCount = producerPayments.filter((p: any) => p.status === 'approved').length;
+  const totalSum = totalPending + totalReceived;
 
   if (isLoading) {
     return (
@@ -87,7 +88,7 @@ export default function ProducerReceivables() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -151,6 +152,23 @@ export default function ProducerReceivables() {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="card-hover bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Total Geral</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  R$ {totalSum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">A receber + Recebido</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -208,8 +226,13 @@ export default function ProducerReceivables() {
                         Pedido: {payment.order?.orderNumber || 'N/A'}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Produto: {payment.productionOrder?.product || payment.order?.product || 'N/A'}
+                        Produto: {payment.order?.product || payment.productionOrder?.product || 'N/A'}
                       </p>
+                      {payment.order && (
+                        <p className="text-xs text-gray-500">
+                          Cliente: {payment.order.clientName || 'N/A'}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-green-600 mb-1">

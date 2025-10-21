@@ -3141,19 +3141,34 @@ Para mais detalhes, entre em contato conosco!`;
           if (!payment) {
             // Create implicit payment record from production order
             const order = await storage.getOrder(po.orderId);
+            
+            // Always use contactName from order as primary client identifier
             let clientName = order?.contactName || 'Cliente não identificado';
 
-            // Try to get client name if not available in order
+            // Only if contactName is missing, try to get from client record
             if (!clientName && order?.clientId) {
               const clientRecord = await storage.getClient(order.clientId);
               if (clientRecord) {
                 clientName = clientRecord.name;
               } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  clientName = clientUser.name;
+                const clientByUserId = await storage.getClientByUserId(order.clientId);
+                if (clientByUserId) {
+                  clientName = clientByUserId.name;
+                } else {
+                  const clientUser = await storage.getUser(order.clientId);
+                  if (clientUser) {
+                    clientName = clientUser.name;
+                  }
                 }
               }
+            }
+
+            // Determine status based on production order status
+            let paymentStatus = 'pending';
+            if (po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered' || po.status === 'completed') {
+              paymentStatus = po.producerPaymentStatus || 'pending';
+            } else {
+              paymentStatus = 'draft';
             }
 
             payment = {
@@ -3161,16 +3176,43 @@ Para mais detalhes, entre em contato conosco!`;
               productionOrderId: po.id,
               producerId: producerId,
               amount: po.producerValue,
-              status: po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered' || po.status === 'completed' ? 'pending' : 'draft',
+              status: paymentStatus,
               createdAt: po.acceptedAt || new Date(),
               notes: po.producerNotes || null,
               productionOrder: po,
-              order: order
+              order: {
+                ...order,
+                clientName: clientName
+              }
             };
           } else {
             // Enrich existing payment with production order and order data
+            const order = await storage.getOrder(po.orderId);
+            let clientName = order?.contactName || 'Cliente não identificado';
+
+            // Get client name using the same logic
+            if (!clientName && order?.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientByUserId = await storage.getClientByUserId(order.clientId);
+                if (clientByUserId) {
+                  clientName = clientByUserId.name;
+                } else {
+                  const clientUser = await storage.getUser(order.clientId);
+                  if (clientUser) {
+                    clientName = clientUser.name;
+                  }
+                }
+              }
+            }
+
             payment.productionOrder = po;
-            payment.order = await storage.getOrder(po.orderId);
+            payment.order = {
+              ...order,
+              clientName: clientName
+            };
           }
 
           allPayments.push(payment);
