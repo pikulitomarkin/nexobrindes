@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck } from "lucide-react";
+import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -26,6 +26,9 @@ type ProducerFormValues = z.infer<typeof producerFormSchema>;
 export default function LogisticsProducers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [userCode, setUserCode] = useState("");
+  const [selectedProducerId, setSelectedProducerId] = useState<string | null>(null);
+  const [showProducerProducts, setShowProducerProducts] = useState(false);
+  const [showProducerOrders, setShowProducerOrders] = useState(false);
   const { toast } = useToast();
 
   const generateUserCode = () => {
@@ -57,6 +60,30 @@ export default function LogisticsProducers() {
       if (!response.ok) throw new Error('Failed to fetch producer stats');
       return response.json();
     },
+  });
+
+  // Query para buscar produtos do produtor selecionado
+  const { data: producerProducts } = useQuery({
+    queryKey: ["/api/products/producer", selectedProducerId],
+    queryFn: async () => {
+      if (!selectedProducerId) return [];
+      const response = await fetch(`/api/products/producer/${selectedProducerId}`);
+      if (!response.ok) throw new Error('Failed to fetch producer products');
+      return response.json();
+    },
+    enabled: !!selectedProducerId && showProducerProducts,
+  });
+
+  // Query para buscar pedidos do produtor selecionado
+  const { data: producerOrders } = useQuery({
+    queryKey: ["/api/production-orders/producer", selectedProducerId],
+    queryFn: async () => {
+      if (!selectedProducerId) return [];
+      const response = await fetch(`/api/production-orders/producer/${selectedProducerId}`);
+      if (!response.ok) throw new Error('Failed to fetch producer orders');
+      return response.json();
+    },
+    enabled: !!selectedProducerId && showProducerOrders,
   });
 
   const form = useForm<ProducerFormValues>({
@@ -336,10 +363,26 @@ export default function LogisticsProducers() {
                       <p className="font-mono font-bold text-gray-900">{producer.username}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" title="Ver produtos do produtor">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Ver produtos do produtor"
+                        onClick={() => {
+                          setSelectedProducerId(producer.id);
+                          setShowProducerProducts(true);
+                        }}
+                      >
                         <Package2 className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" title="Ver pedidos em produção">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Ver pedidos em produção"
+                        onClick={() => {
+                          setSelectedProducerId(producer.id);
+                          setShowProducerOrders(true);
+                        }}
+                      >
                         <Truck className="h-4 w-4" />
                       </Button>
                     </div>
@@ -376,6 +419,161 @@ export default function LogisticsProducers() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para mostrar produtos do produtor */}
+      <Dialog open={showProducerProducts} onOpenChange={(open) => {
+        setShowProducerProducts(open);
+        if (!open) {
+          setSelectedProducerId(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Produtos do Produtor</DialogTitle>
+            <DialogDescription>
+              {selectedProducerId && producers?.find((p: any) => p.id === selectedProducerId)?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {producerProducts && producerProducts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {producerProducts.map((product: any) => (
+                  <Card key={product.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                          <p className="text-sm text-gray-600 mt-1">{product.description}</p>
+                        </div>
+                        <Package className="h-6 w-6 text-gray-400 flex-shrink-0 ml-2" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Preço:</span>
+                          <p className="font-medium text-green-600">
+                            R$ {parseFloat(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Categoria:</span>
+                          <p className="font-medium">{product.category || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Dimensões:</span>
+                          <p className="font-medium text-xs">
+                            {product.width && product.height && product.depth 
+                              ? `${product.width}×${product.height}×${product.depth}cm`
+                              : 'N/A'
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Status:</span>
+                          <p className={`font-medium text-xs ${product.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                            {product.isActive ? 'Ativo' : 'Inativo'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500">Nenhum produto encontrado para este produtor</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para mostrar pedidos do produtor */}
+      <Dialog open={showProducerOrders} onOpenChange={(open) => {
+        setShowProducerOrders(open);
+        if (!open) {
+          setSelectedProducerId(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pedidos em Produção</DialogTitle>
+            <DialogDescription>
+              {selectedProducerId && producers?.find((p: any) => p.id === selectedProducerId)?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {producerOrders && producerOrders.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pedido
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cliente
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Produto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prazo
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {producerOrders.map((order: any) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                          <div className="text-xs text-gray-500">#{order.id.slice(-6)}</div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.clientName}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-900">
+                          {order.product}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            order.status === 'ready' ? 'bg-green-100 text-green-800' :
+                            order.status === 'production' ? 'bg-blue-100 text-blue-800' :
+                            order.status === 'accepted' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {order.status === 'ready' ? 'Pronto' :
+                             order.status === 'production' ? 'Em Produção' :
+                             order.status === 'accepted' ? 'Aceito' :
+                             order.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          R$ {parseFloat(order.producerValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500">Nenhum pedido encontrado para este produtor</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

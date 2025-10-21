@@ -357,6 +357,7 @@ export default function AdminClients() {
                           setShowOrders(true);
                         }}
                         title="Ver Pedidos"
+                        className="hover:bg-blue-50 hover:text-blue-600"
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
