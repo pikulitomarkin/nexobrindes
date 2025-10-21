@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText } from "lucide-react";
 import { useState } from "react";
-import { Label } from "@/components/ui/label"; // Assuming Label is from shadcn/ui and needs to be imported
-import { useToast } from "@/components/ui/use-toast"; // Assuming useToast is from shadcn/ui
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ClientBudgets() {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
