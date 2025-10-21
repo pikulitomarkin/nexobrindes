@@ -498,6 +498,21 @@ export default function LogisticsDashboard() {
                                 );
                               }
 
+                              // Verificar se o pedido já foi enviado para produção
+                              if (order.status === 'production') {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled
+                                    className="text-gray-500"
+                                  >
+                                    <Send className="h-4 w-4 mr-1" />
+                                    Já enviado para produção
+                                  </Button>
+                                );
+                              }
+
                               return Array.from(producers).map((producerId) => (
                                 <Button
                                   key={producerId}
@@ -507,7 +522,7 @@ export default function LogisticsDashboard() {
                                   disabled={sendToProductionMutation.isPending}
                                 >
                                   <Send className="h-4 w-4 mr-1" />
-                                  Enviar para {producerId === 'producer-1' ? 'Marcenaria' : 'Produtor'}
+                                  {sendToProductionMutation.isPending ? 'Enviando...' : `Enviar para ${producerId === 'producer-1' ? 'Marcenaria' : 'Produtor'}`}
                                 </Button>
                               ));
                             })()}
