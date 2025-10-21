@@ -101,7 +101,7 @@ export default function ProducerPanel() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -148,6 +148,36 @@ export default function ProducerPanel() {
                 </p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Recebido</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  R$ {((stats?.totalReceived || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <CheckCircle className="h-6 w-6 text-emerald-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total de Serviços</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats?.totalOrders || 0}
+                </p>
+              </div>
+              <Package className="h-6 w-6 text-blue-600" />
             </div>
           </CardContent>
         </Card>

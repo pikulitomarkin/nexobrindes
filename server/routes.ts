@@ -1701,16 +1701,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeOrders = productionOrders.filter(po => po.status === 'production' || po.status === 'accepted').length;
       const pendingOrders = productionOrders.filter(po => po.status === 'pending').length;
       const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
+      const totalOrders = productionOrders.length;
 
       const pendingPayments = producerPayments
         .filter(p => p.status === 'pending' || p.status === 'approved')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      const totalReceived = producerPayments
+        .filter(p => p.status === 'paid')
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
       res.json({
         activeOrders,
         pendingOrders,
         completedOrders,
-        pendingPayments
+        totalOrders,
+        pendingPayments,
+        totalReceived
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch producer stats" });

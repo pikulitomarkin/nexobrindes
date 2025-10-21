@@ -315,7 +315,7 @@ export default function ProductionDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -390,12 +390,29 @@ export default function ProductionDashboard() {
               <div>
                 <p className="text-sm font-medium text-green-700">A Receber</p>
                 <p className="text-2xl font-bold text-green-900 mt-2">
-                  R$ {((producerPayments as any[] || []).filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((producerPayments as any[] || []).filter((p: any) => p.status === 'pending' || p.status === 'approved').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-green-600 mt-1">Pagamentos pendentes</p>
+                <p className="text-xs text-green-600 mt-1">Pagamentos pendentes e aprovados</p>
               </div>
               <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-emerald-700">Já Recebido</p>
+                <p className="text-2xl font-bold text-emerald-900 mt-2">
+                  R$ {((producerPayments as any[] || []).filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-emerald-600 mt-1">Total recebido</p>
+              </div>
+              <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
               </div>
             </div>
           </CardContent>
