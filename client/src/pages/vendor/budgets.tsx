@@ -235,15 +235,23 @@ export default function VendorBudgets() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
-        // Recalculate totalPrice based on unitPrice and quantity, excluding customization for now
-        item.totalPrice = item.unitPrice * quantity;
-      } else if (field === 'itemCustomizationValue') {
+        // Recalculate totalPrice based on all components
+        item.totalPrice = calculateItemTotal({ ...item, quantity });
+      } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
-      } else if (field === 'generalCustomizationValue') {
-        item[field] = parseFloat(value) || 0;
-      }
-       else {
+        // Recalculate totalPrice when customization values change
+        item.totalPrice = calculateItemTotal({ ...item, [field]: parseFloat(value) || 0 });
+      } else if (field === 'hasItemCustomization' || field === 'hasGeneralCustomization') {
+        item[field] = Boolean(value);
+        // Recalculate totalPrice when customization flags change
+        item.totalPrice = calculateItemTotal({ ...item, [field]: Boolean(value) });
+      } else {
         item[field] = value;
+        
+        // If it's a discount-related field, recalculate totalPrice
+        if (field.includes('Discount') || field.includes('discount')) {
+          item.totalPrice = calculateItemTotal({ ...item, [field]: value });
+        }
       }
 
       newItems[index] = item;
@@ -278,17 +286,22 @@ export default function VendorBudgets() {
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+    
+    // Item customization (valor por unidade personalizada)
+    const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+    
+    // General customization (valor por unidade aplicado à quantidade total)
+    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+    
     let subtotal = basePrice + itemCustomizationValue + generalCustomizationValue;
 
-    // Aplicar desconto do item
+    // Aplicar desconto do item (sobre o preço base apenas)
     if (item.hasItemDiscount) {
       if (item.itemDiscountType === 'percentage') {
-        const discountAmount = (basePrice * (item.itemDiscountPercentage || 0)) / 100;
+        const discountAmount = (basePrice * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
         subtotal = subtotal - discountAmount;
       } else if (item.itemDiscountType === 'value') {
-        subtotal = subtotal - (item.itemDiscountValue || 0);
+        subtotal = subtotal - (parseFloat(item.itemDiscountValue) || 0);
       }
     }
 
@@ -545,7 +558,15 @@ export default function VendorBudgets() {
           producerId = 'internal';
         }
 
-        console.log(`Mapping budget item ${item.productName}: producerId=${producerId}`);
+        console.log(`Mapping budget item ${item.productName}: producerId=${producerId}`, {
+          hasItemCustomization: item.hasItemCustomization,
+          selectedCustomizationId: item.selectedCustomizationId,
+          itemCustomizationValue: item.itemCustomizationValue,
+          itemCustomizationDescription: item.itemCustomizationDescription,
+          hasGeneralCustomization: item.hasGeneralCustomization,
+          generalCustomizationName: item.generalCustomizationName,
+          generalCustomizationValue: item.generalCustomizationValue
+        });
 
         return {
           productId: item.productId,
@@ -554,21 +575,24 @@ export default function VendorBudgets() {
           quantity: parseInt(item.quantity) || 1,
           unitPrice: parseFloat(item.unitPrice) || 0,
           totalPrice: parseFloat(item.totalPrice) || 0,
-          hasItemCustomization: item.hasItemCustomization || false,
+          // Item Customization - preserve existing values
+          hasItemCustomization: Boolean(item.hasItemCustomization),
           selectedCustomizationId: item.selectedCustomizationId || "",
           itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
+          // Product dimensions
           productWidth: item.productWidth || "",
           productHeight: item.productHeight || "",
           productDepth: item.productDepth || "",
-          hasItemDiscount: item.hasItemDiscount || false,
+          // Item discount
+          hasItemDiscount: Boolean(item.hasItemDiscount),
           itemDiscountType: item.itemDiscountType || "percentage",
           itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
           itemDiscountValue: parseFloat(item.itemDiscountValue || 0),
-          // General Customization Fields
-          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          // General Customization - preserve existing values
+          hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
         };
@@ -579,7 +603,7 @@ export default function VendorBudgets() {
       downPayment: parseFloat(budget.downPayment || 0),
       remainingAmount: parseFloat(budget.remainingAmount || 0),
       shippingCost: parseFloat(budget.shippingCost || 0),
-      hasDiscount: budget.hasDiscount || false,
+      hasDiscount: Boolean(budget.hasDiscount),
       discountType: budget.discountType || "percentage",
       discountPercentage: parseFloat(budget.discountPercentage || 0),
       discountValue: parseFloat(budget.discountValue || 0)
