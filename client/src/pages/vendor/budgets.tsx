@@ -15,6 +15,8 @@ import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+// Import Badge component
+import { Badge } from "@/components/ui/badge";
 
 export default function VendorBudgets() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -1935,73 +1937,93 @@ export default function VendorBudgets() {
               </div>
 
               {/* Budget Items */}              
+              {/* Itens do Orçamento */}
               {budgetToView.items && budgetToView.items.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
+                  <h3 className="text-lg font-semibold mb-4">Itens do Orçamento ({budgetToView.items.length})</h3>
                   <div className="space-y-3">
                     {budgetToView.items.map((item: any, index: number) => (
-                      <div key={index} className={`border rounded-lg p-4 ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
-                        <div className="flex items-start justify-between">
+                      <div key={index} className="p-4 rounded-lg border bg-gray-50">
+                        <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
-                            {/* Producer Name Header */}                            
-                            <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
-                              <div className="flex items-center gap-2">
-                                <Factory className="h-4 w-4 text-gray-600" />
-                                <span className="text-sm font-medium text-gray-700">
-                                  Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
-                                    producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
-                                </span>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Package className="h-4 w-4 text-gray-500" />
+                              <span className="font-medium">{item.productName}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500">Quantidade:</span>
+                                <p className="font-medium">{item.quantity}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Valor Unit.:</span>
+                                <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Dimensões:</span>
+                                <p className="font-medium">
+                                  {item.productWidth && item.productHeight && item.productDepth ? 
+                                    `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                                    'Não informado'
+                                  }
+                                </p>
                               </div>
                             </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
 
-                            <h4 className="font-medium text-gray-900">
-                              {item.productName || 'Produto não encontrado'}
-                            </h4>
-                            <div className="grid grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
-                              <div>
-                                <span className="font-medium">Quantidade:</span> {item.quantity}
-                              </div>
-                              <div>
-                                <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                              <div>
-                                <span className="font-medium">Subtotal:</span> R$ {(parseFloat(item.unitPrice || 0) * parseInt(item.quantity || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
-                              <div>
-                                <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </div>
+                        {/* Personalização do Item */}
+                        {item.hasItemCustomization && (
+                          <div className="bg-blue-50 p-3 rounded mb-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-blue-700 font-medium">🎨 Personalização do Item</span>
                             </div>
-                            {item.hasItemCustomization && (
-                              <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                                <span className="font-medium text-blue-800">Personalização:</span> {item.itemCustomizationDescription || 'Personalização aplicada'}
-                                {item.itemCustomizationValue && (
-                                  <span className="ml-2 text-blue-600">
-                                    (+R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                  </span>
-                                )}
-                              </div>
+                            <p className="text-blue-600 font-medium">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                            {item.itemCustomizationValue > 0 && (
+                              <p className="text-sm text-blue-500">
+                                Valor: +R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
                             )}
-                            {item.hasGeneralCustomization && (
-                              <div className="mt-2 p-2 bg-green-50 rounded text-sm">
-                                <span className="font-medium text-green-800">{item.generalCustomizationName}:</span>
-                                <span className="ml-2 text-green-600">
-                                  (+R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
-                                </span>
-                              </div>
+                            {item.additionalCustomizationNotes && (
+                              <p className="text-sm text-blue-500 mt-1">
+                                <strong>Observações:</strong> {item.additionalCustomizationNotes}
+                              </p>
                             )}
-                            {(item.productWidth || item.productHeight || item.productDepth) && (
-                              <div className="mt-2 text-sm text-gray-500">
-                                <span className="font-medium">Dimensões:</span>
-                                {item.productWidth && ` L: ${item.productWidth}cm`}
-                                {item.productHeight && ` A: ${item.productHeight}cm`}
-                                {item.productDepth && ` P: ${item.productDepth}cm`}
+                            {item.customizationPhoto && (
+                              <div className="mt-2">
+                                <span className="text-xs text-blue-600 block mb-1">Imagem de referência:</span>
+                                <img 
+                                  src={item.customizationPhoto} 
+                                  alt="Personalização do produto" 
+                                  className="w-20 h-20 object-cover rounded border cursor-pointer"
+                                  onClick={() => window.open(item.customizationPhoto, '_blank')}
+                                />
                               </div>
                             )}
                           </div>
-                        </div>
+                        )}
+
+                        {/* Personalização Geral */}
+                        {item.hasGeneralCustomization && (
+                          <div className="bg-green-50 p-3 rounded">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-green-700 font-medium">✨ Personalização Geral</span>
+                            </div>
+                            <p className="text-green-600 font-medium">{item.generalCustomizationName || 'Personalização geral'}</p>
+                            {item.generalCustomizationValue > 0 && (
+                              <p className="text-sm text-green-500">
+                                Valor: +R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))
-                  }
+                    ))}
                   </div>
                 </div>
               )}

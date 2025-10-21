@@ -14,6 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+// Import Badge from shadcn/ui for the logistics dashboard
+import { Badge } from "@/components/ui/badge";
+
 
 export default function VendorOrders() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -885,7 +888,7 @@ export default function VendorOrders() {
                           <div className="flex items-center gap-2">
                             <Factory className="h-4 w-4 text-gray-600" />
                             <span className="text-sm font-medium text-gray-700">
-                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' :
                                 producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
                             </span>
                           </div>
@@ -1228,8 +1231,8 @@ export default function VendorOrders() {
                       {/* Producer Selection */}
                       <div>
                         <Label>Selecionar Produtor</Label>
-                        <Select 
-                          value={selectedProducerId || ""} 
+                        <Select
+                          value={selectedProducerId || ""}
                           onValueChange={setSelectedProducerId}
                         >
                           <SelectTrigger>
@@ -1264,7 +1267,7 @@ export default function VendorOrders() {
                         <div className="border rounded-lg p-4 bg-gray-50">
                           <div className="mb-3">
                             <h4 className="font-medium text-gray-800">
-                              {selectedProducerId === 'internal' ? 'Produtos Internos' : 
+                              {selectedProducerId === 'internal' ? 'Produtos Internos' :
                                 producers?.find((p: any) => p.id === selectedProducerId)?.name}
                             </h4>
                           </div>
@@ -1272,8 +1275,8 @@ export default function VendorOrders() {
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                             {(() => {
                               const producerProducts = productsByProducer[selectedProducerId] || [];
-                              const filteredProducts = producerProducts.filter((product: any) => 
-                                !orderProductSearch || 
+                              const filteredProducts = producerProducts.filter((product: any) =>
+                                !orderProductSearch ||
                                 product.name.toLowerCase().includes(orderProductSearch.toLowerCase())
                               );
 
@@ -1289,9 +1292,9 @@ export default function VendorOrders() {
                               }
 
                               return filteredProducts.map((product: any) => (
-                                <div 
-                                  key={product.id} 
-                                  className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors" 
+                                <div
+                                  key={product.id}
+                                  className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors"
                                   onClick={() => addProductToOrder(product, selectedProducerId)}
                                 >
                                   <div className="flex items-center gap-3">
@@ -1631,8 +1634,8 @@ export default function VendorOrders() {
                   <div className="flex justify-between text-sm">
                     <span>Valor do Frete:</span>
                     <span>
-                      {vendorOrderForm.deliveryType === "pickup" ? 
-                        "R$ 0,00" : 
+                      {vendorOrderForm.deliveryType === "pickup" ?
+                        "R$ 0,00" :
                         `R$ ${(parseFloat(vendorOrderForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
@@ -2095,146 +2098,101 @@ export default function VendorOrders() {
                 </div>
               </div>
 
-              {/* Products List */}
+              {/* Itens do Pedido */}
               {selectedOrder.items && selectedOrder.items.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Produtos do Pedido ({selectedOrder.items.length})</h3>
-                  <div className="space-y-4">
-                    {selectedOrder.items.map((item, index) => (
-                      <Card key={index} className={`border ${index % 2 === 0 ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
-                        <CardContent className="p-4">
-                          {/* Producer Name Header */}
-                          <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
-                            <div className="flex items-center gap-2">
-                              <Factory className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">
-                                Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
-                                  producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Product Image */}
-                            <div className="flex items-center justify-center">
-                              {item.customizationPhoto ? (
-                                <img
-                                  src={item.customizationPhoto}
-                                  alt={`Personalização ${item.productName}`}
-                                  className="w-24 h-24 object-cover rounded-lg border"
-                                />
-                              ) : (
-                                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center">
-                                  <Package className="h-8 w-8 text-gray-400" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Product Details */}
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-lg">{item.productName}</h4>
-                              <div className="grid grid-cols-2 gap-2 text-sm">
+                  <h3 className="text-lg font-semibold mb-4">Itens do Pedido ({selectedOrder.items.length})</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.items.map((item: any, index: number) => {
+                      const isExternal = item.producerId && item.producerId !== 'internal';
+                      return (
+                        <div key={index} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Package className="h-4 w-4 text-gray-500" />
+                                <span className="font-medium">{item.productName}</span>
+                                {isExternal && (
+                                  <Badge variant="outline" className="text-orange-700 border-orange-300">
+                                    Produção Externa
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-3 gap-4 text-sm">
                                 <div>
                                   <span className="text-gray-500">Quantidade:</span>
-                                  <span className="ml-1 font-medium">{item.quantity}</span>
+                                  <p className="font-medium">{item.quantity}</p>
                                 </div>
                                 <div>
-                                  <span className="text-gray-500">Preço Unit.:</span>
-                                  <span className="ml-1 font-medium">R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                  <span className="text-gray-500">Valor Unit.:</span>
+                                  <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                                 </div>
-                                {item.productWidth && (
-                                  <div>
-                                    <span className="text-gray-500">Largura:</span>
-                                    <span className="ml-1">{item.productWidth} cm</span>
-                                  </div>
-                                )}
-                                {item.productHeight && (
-                                  <div>
-                                    <span className="text-gray-500">Altura:</span>
-                                    <span className="ml-1">{item.productHeight} cm</span>
-                                  </div>
-                                )}
-                                {item.productDepth && (
-                                  <div>
-                                    <span className="text-gray-500">Profundidade:</span>
-                                    <span className="ml-1">{item.productDepth} cm</span>
-                                  </div>
-                                )}
+                                <div>
+                                  <span className="text-gray-500">Dimensões:</span>
+                                  <p className="font-medium">
+                                    {item.productWidth && item.productHeight && item.productDepth ?
+                                      `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
+                                      'Não informado'
+                                    }
+                                  </p>
+                                </div>
                               </div>
-
-                              {/* Customization Info */}
-                              {item.hasItemCustomization && (
-                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                                  <h5 className="font-medium text-blue-800 mb-2">Personalização</h5>
-                                  {item.itemCustomizationDescription && (
-                                    <p className="text-sm text-blue-700 mb-1">{item.itemCustomizationDescription}</p>
-                                  )}
-                                  <p className="text-sm">
-                                    <span className="text-blue-600">Valor da personalização:</span>
-                                    <span className="ml-1 font-medium">R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                  </p>
-                                  {item.additionalCustomizationNotes && (
-                                    <p className="text-sm text-blue-700 mt-1">
-                                      <strong>Observações:</strong> {item.additionalCustomizationNotes}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Discount Info */}
-                              {item.hasItemDiscount && (
-                                <div className="bg-orange-50 p-2 rounded-lg border border-orange-200">
-                                  <p className="text-sm">
-                                    <span className="text-orange-600">Desconto aplicado:</span>
-                                    <span className="ml-1 font-medium">
-                                      {item.itemDiscountType === 'percentage'
-                                        ? `${item.itemDiscountPercentage}%`
-                                        : `R$ ${parseFloat(item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                    </span>
-                                  </p>
-                                </div>
-                              )}
                             </div>
-
-                            {/* Pricing Summary */}
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <h5 className="font-semibold mb-3">Resumo do Item</h5>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span>Subtotal ({item.quantity}x):</span>
-                                  <span>R$ {(parseFloat(item.unitPrice) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                {item.hasItemCustomization && parseFloat(item.itemCustomizationValue || 0) > 0 && (
-                                  <div className="flex justify-between text-blue-600">
-                                    <span>Personalização:</span>
-                                    <span>+ R$ {(parseFloat(item.itemCustomizationValue) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                  </div>
-                                )}
-                                {item.hasItemDiscount && (
-                                  <div className="flex justify-between text-orange-600">
-                                    <span>Desconto:</span>
-                                    <span>
-                                      - R$ {(() => {
-                                        const basePrice = parseFloat(item.unitPrice) * item.quantity;
-                                        if (item.itemDiscountType === 'percentage') {
-                                          return ((basePrice * parseFloat(item.itemDiscountPercentage || 0)) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                                        } else {
-                                          return parseFloat(item.itemDiscountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                                        }
-                                      })()}
-                                    </span>
-                                  </div>
-                                )}
-                                <Separator />
-                                <div className="flex justify-between font-semibold text-lg">
-                                  <span>Total do Item:</span>
-                                  <span className="text-green-600">R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                              </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-green-600">
+                                R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+
+                          {/* Personalização do Item */}
+                          {item.hasItemCustomization && (
+                            <div className="bg-blue-50 p-3 rounded mb-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-blue-700 font-medium">🎨 Personalização do Item</span>
+                              </div>
+                              <p className="text-blue-600 font-medium">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                              {item.itemCustomizationValue > 0 && (
+                                <p className="text-sm text-blue-500">
+                                  Valor: +R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                                </p>
+                              )}
+                              {item.additionalCustomizationNotes && (
+                                <p className="text-sm text-blue-500 mt-1">
+                                  <strong>Observações:</strong> {item.additionalCustomizationNotes}
+                                </p>
+                              )}
+                              {item.customizationPhoto && (
+                                <div className="mt-2">
+                                  <span className="text-xs text-blue-600 block mb-1">Imagem de referência:</span>
+                                  <img
+                                    src={item.customizationPhoto}
+                                    alt="Personalização do produto"
+                                    className="w-20 h-20 object-cover rounded border cursor-pointer"
+                                    onClick={() => window.open(item.customizationPhoto, '_blank')}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Personalização Geral */}
+                          {item.hasGeneralCustomization && (
+                            <div className="bg-green-50 p-3 rounded">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-green-700 font-medium">✨ Personalização Geral</span>
+                              </div>
+                              <p className="text-green-600 font-medium">{item.generalCustomizationName || 'Personalização geral'}</p>
+                              {item.generalCustomizationValue > 0 && (
+                                <p className="text-sm text-green-500">
+                                  Valor: +R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

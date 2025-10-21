@@ -12,6 +12,7 @@ import { Package, Send, Eye, Search, Truck, Clock, CheckCircle, AlertTriangle, S
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "react-router-dom"; // Import useLocation
+import { Badge } from "@/components/ui/badge"; // Import Badge component
 
 export default function LogisticsDashboard() {
   const location = window.location.pathname; // Get current location
@@ -484,7 +485,7 @@ export default function LogisticsDashboard() {
                                   }
                                 });
                               }
-                              
+
                               if (producers.size === 0) {
                                 return (
                                   <Button
@@ -810,41 +811,68 @@ export default function LogisticsDashboard() {
                       const isExternal = item.producerId && item.producerId !== 'internal';
                       return (
                         <div key={index} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Package className="h-4 w-4 text-gray-500" />
-                                <span className="font-medium">{item.productName}</span>
-                                {isExternal && (
-                                  <Badge variant="outline" className="text-orange-700 border-orange-300">
-                                    Produção Externa
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-500">Quantidade:</span>
-                                  <p className="font-medium">{item.quantity}</p>
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Package className="h-4 w-4 text-gray-500" />
+                                  <span className="font-medium">{item.productName}</span>
+                                  {isExternal && (
+                                    <Badge variant="outline" className="text-orange-700 border-orange-300">
+                                      Produção Externa
+                                    </Badge>
+                                  )}
                                 </div>
-                                <div>
-                                  <span className="text-gray-500">Valor Unit.:</span>
-                                  <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                </div>
-                                {item.hasItemCustomization && (
-                                  <div className="col-span-2">
-                                    <span className="text-gray-500">Personalização:</span>
-                                    <p className="font-medium text-blue-600">{item.itemCustomizationDescription}</p>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-500">Quantidade:</span>
+                                    <p className="font-medium">{item.quantity}</p>
                                   </div>
-                                )}
+                                  <div>
+                                    <span className="text-gray-500">Especificações:</span>
+                                    <p className="font-medium">
+                                      {item.productWidth && item.productHeight && item.productDepth ? 
+                                        `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                                        'Não informado'
+                                      }
+                                    </p>
+                                  </div>
+
+                                  {/* Personalização do Item */}
+                                  {item.hasItemCustomization && (
+                                    <div className="col-span-2 bg-blue-50 p-2 rounded">
+                                      <span className="text-blue-700 font-medium">Personalização do Item:</span>
+                                      <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                                      {item.additionalCustomizationNotes && (
+                                        <p className="text-sm text-blue-500 mt-1">Obs: {item.additionalCustomizationNotes}</p>
+                                      )}
+                                      {item.customizationPhoto && (
+                                        <div className="mt-2">
+                                          <img 
+                                            src={item.customizationPhoto} 
+                                            alt="Personalização" 
+                                            className="w-16 h-16 object-cover rounded border"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Personalização Geral */}
+                                  {item.hasGeneralCustomization && (
+                                    <div className="col-span-2 bg-green-50 p-2 rounded">
+                                      <span className="text-green-700 font-medium">Personalização Geral:</span>
+                                      <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-green-600">
-                                R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-green-600">
+                                  R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
                       );
                     })}
                   </div>
