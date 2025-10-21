@@ -60,49 +60,51 @@ export default function FinancePayables() {
     queryKey: ["/api/orders"],
   });
 
-  // Mutation for paying producer
+  // Mutation for paying producer and manual payables
   const payProducerMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch(`/api/finance/producer-payments/${data.payableId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          paidBy: 'admin-1',
-          paymentMethod: data.method,
-          transactionId: data.transactionId,
-          notes: data.notes
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao registrar pagamento');
+    mutationFn: async ({ payableId, isProducer }: { payableId: string; isProducer?: boolean }) => {
+      if (isProducer) {
+        // Para pagamentos de produtores, usar a API específica
+        const response = await fetch(`/api/finance/producer-payments/${payableId}/pay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentMethod: "manual",
+            notes: "Pagamento processado via painel financeiro",
+            transactionId: `PAY-PRODUCER-${Date.now()}`
+          }),
+        });
+        if (!response.ok) throw new Error("Erro ao processar pagamento do produtor");
+        return response.json();
+      } else {
+        // Para contas a pagar manuais
+        const response = await fetch(`/api/finance/payables/manual/${payableId}/pay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentMethod: "manual",
+            notes: "Pagamento processado via painel financeiro",
+            transactionId: `PAY-${Date.now()}`
+          }),
+        });
+        if (!response.ok) throw new Error("Erro ao processar pagamento");
+        return response.json();
       }
-
-      return response.json();
     },
-    onSuccess: () => {
-      setIsPayDialogOpen(false);
-      setPaymentData({
-        amount: "",
-        method: "",
-        transactionId: "",
-        notes: "",
-      });
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
       toast({
         title: "Sucesso!",
-        description: "Pagamento registrado com sucesso",
+        description: variables.isProducer ? "Pagamento do produtor processado com sucesso" : "Pagamento processado com sucesso",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
     },
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível registrar o pagamento",
+        description: error.message || "Não foi possível processar o pagamento",
         variant: "destructive",
       });
     },
@@ -447,7 +449,7 @@ export default function FinancePayables() {
     }
   };
 
-  
+
 
   const breakdown = overview?.payablesBreakdown || {
     producers: 0,

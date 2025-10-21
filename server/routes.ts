@@ -156,6 +156,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Process producer payment
+  app.post("/api/finance/producer-payments/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes, transactionId } = req.body;
+
+      console.log(`Processing payment for producer payment: ${id}`, { paymentMethod, notes, transactionId });
+
+      // Update the producer payment status to paid
+      const updatedPayment = await storage.updateProducerPayment(id, {
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        notes: notes || null,
+        transactionId: transactionId || null
+      });
+
+      if (!updatedPayment) {
+        return res.status(404).json({ error: "Pagamento do produtor não encontrado" });
+      }
+
+      console.log(`Producer payment ${id} marked as paid successfully`);
+
+      res.json({
+        success: true,
+        payment: updatedPayment,
+        message: "Pagamento do produtor registrado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error processing producer payment:", error);
+      res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
+    }
+  });
+
   // Update producer value for production order
   app.patch("/api/production-orders/:id/value", async (req, res) => {
     try {
