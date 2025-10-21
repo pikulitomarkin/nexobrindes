@@ -375,9 +375,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Generate order number
-      const orderNumber = `PED-${Date.now()}`;
-
       // Handle clientId - use the provided clientId if exists, otherwise create order without client link
       let finalClientId = null;
       if (orderData.clientId && orderData.clientId !== "") {
@@ -1698,7 +1695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Payables breakdown:', {
         producers,
-        expenses, 
+        expenses,
         commissions,
         refunds,
         manualPayables: manualPayablesAmount,
@@ -5151,7 +5148,7 @@ Para mais detalhes, entre em contato conosco!`;
       const clients = await storage.getClients();
       const users = await storage.getUsers();
 
-      // Enrich production orders with order and client data
+      // Enrich production orders with order and client information
       const productionOrdersList = await Promise.all(
         productionOrders
           .map(async po => {
@@ -5181,7 +5178,7 @@ Para mais detalhes, entre em contato conosco!`;
                   console.log(`Found user record:`, clientUser);
                   clientName = clientUser.name;
                 } else {
-                  console.log(`No client found for ID: ${order.clientId}`);
+                  console.log(`Noclient found for ID: ${order.clientId}`);
                 }
               }
             }
@@ -5229,7 +5226,7 @@ Para mais detalhes, entre em contato conosco!`;
       res.json(filteredOrders);
     } catch (error) {
       console.error("Error fetching producer production orders:", error);
-      res.status(500).json({ error: "Failed to fetch production orders" });
+      res.status(500).json({ error: "Failed to fetch producer production orders" });
     }
   });
 
@@ -5252,7 +5249,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Validate transactions structure
-      for      let i = 0; i < transactions.length; i++) {
+      for (let i = 0; i < transactions.length; i++) {
         const transaction = transactions[i];
         if (!transaction || typeof transaction !== 'object') {
           console.error(`Transaction ${i} is not an object:`, transaction);
@@ -5359,69 +5356,95 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Get paid orders for logistics (orders that received payment but not sent to production yet)
+  // Get paid orders for logistics (orders that are paid but not yet sent to production)
   app.get("/api/logistics/paid-orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
-      const payments = await storage.getPayments();
 
-      // Filter orders that are paid but not yet sent to production
+      // Filter orders that are paid but not yet in production
       const paidOrders = orders.filter(order => {
-        // Check if order has confirmed payments
-        const orderPayments = payments.filter(p => p.orderId === order.id && p.status === 'confirmed');
-        const totalPaid = orderPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const totalValue = parseFloat(order.totalValue);
+        const paidValue = parseFloat(order.paidValue || '0');
+        const downPayment = parseFloat(order.downPayment || '0');
+        const shippingCost = parseFloat(order.shippingCost || '0');
 
-        // Consider paid if has confirmed payments or budget down payment
-        const hasPaidValue = parseFloat(order.paidValue || '0') > 0 || totalPaid > 0;
+        // Check if minimum payment (down payment + shipping) is paid
+        const minimumRequired = downPayment + shippingCost;
+        const hasMinimumPayment = minimumRequired > 0 ? paidValue >= minimumRequired : paidValue > 0;
 
-        // Include orders that are paid but status is still 'confirmed' (not yet in production)
-        return hasPaidValue && (order.status === 'confirmed' || order.status === 'paid');
+        return (
+          order.status !== 'cancelled' &&
+          order.status !== 'pending' &&
+          hasMinimumPayment &&
+          order.status !== 'production' // Not yet sent to production
+        );
       });
 
-      // Enrich with client names and payment info
+      // Enrich with client information
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
+          // Always use contactName as primary client identifier
           let clientName = order.contactName;
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
 
+          // Only if contactName is missing, try to get from client record
           if (!clientName && order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
+              clientAddress = clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
             } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 clientName = clientByUserId.name;
+                clientAddress = clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
               } else {
                 const clientUser = await storage.getUser(order.clientId);
                 if (clientUser) {
                   clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
                 }
               }
             }
           }
 
+          // If still no name, use a descriptive message
           if (!clientName) {
-            clientName = "Cliente não identificado";
+            clientName = "Nome não informado";
           }
 
-          // Get last payment date
-          const orderPayments = payments.filter(p => p.orderId === order.id && p.status === 'confirmed');
-          const lastPaymentDate = orderPayments.length > 0 
-            ? orderPayments.sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0].paidAt
-            : null;
+          // Get payment information
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const lastPayment = payments
+            .filter(p => p.status === 'confirmed')
+            .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
 
           return {
             ...order,
-            clientName,
-            lastPaymentDate
+            clientName: clientName,
+            clientAddress: clientAddress,
+            clientPhone: clientPhone,
+            clientEmail: clientEmail,
+            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
+            shippingAddress: order.deliveryType === 'pickup'
+              ? 'Sede Principal - Retirada no Local'
+              : (clientAddress || 'Endereço não informado')
           };
         })
       );
 
-      console.log(`Found ${enrichedOrders.length} paid orders awaiting production`);
+      console.log(`Found ${enrichedOrders.length} paid orders ready for production`);
       res.json(enrichedOrders);
     } catch (error) {
-      console.error("Error fetching paid orders for logistics:", error);
+      console.error("Error fetching paid orders:", error);
       res.status(500).json({ error: "Failed to fetch paid orders" });
     }
   });
@@ -5436,44 +5459,79 @@ Para mais detalhes, entre em contato conosco!`;
           const order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          let clientName = order?.contactName;
+          if (!order) {
+            return null; // Skip if order doesn't exist
+          }
 
-          if (!clientName && order?.clientId) {
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName;
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
+              clientAddress = clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
             } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 clientName = clientByUserId.name;
+                clientAddress = clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
               } else {
                 const clientUser = await storage.getUser(order.clientId);
                 if (clientUser) {
                   clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
                 }
               }
             }
           }
 
+          // If still no name, use a descriptive message
           if (!clientName) {
-            clientName = "Cliente não identificado";
+            clientName = "Nome não informado";
           }
 
           return {
             ...po,
-            orderNumber: order?.orderNumber || `PO-${po.id}`,
-            product: order?.product || 'Produto não informado',
-            clientName,
+            orderNumber: order.orderNumber || `PO-${po.id}`,
+            product: order.product || 'Produto não informado',
+            clientName: clientName,
+            clientAddress: clientAddress,
+            clientPhone: clientPhone,
+            clientEmail: clientEmail,
             producerName: producer?.name || null,
-            order: order
+            order: {
+              ...order,
+              clientName: clientName,
+              clientAddress: clientAddress,
+              clientPhone: clientPhone,
+              clientEmail: clientEmail,
+              shippingAddress: order.deliveryType === 'pickup'
+                ? 'Sede Principal - Retirada no Local'
+                : (clientAddress || 'Endereço não informado'),
+              deliveryType: order.deliveryType || 'delivery'
+            }
           };
         })
       );
 
-      console.log(`Found ${enrichedOrders.length} production orders for logistics tracking`);
-      res.json(enrichedOrders);
+      // Filter out null entries
+      const validOrders = enrichedOrders.filter(order => order !== null);
+
+      console.log(`Returning ${validOrders.length} enriched production orders`);
+      res.json(validOrders);
     } catch (error) {
-      console.error("Error fetching production orders for logistics:", error);
+      console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
     }
   });
@@ -5486,8 +5544,8 @@ Para mais detalhes, entre em contato conosco!`;
       // Update production order to shipped status
       if (productionOrderId) {
         await storage.updateProductionOrderStatus(
-          productionOrderId, 
-          'shipped', 
+          productionOrderId,
+          'shipped',
           notes || 'Produto despachado para o cliente',
           null,
           trackingCode
@@ -5521,6 +5579,7 @@ Para mais detalhes, entre em contato conosco!`;
       const budgets = await storage.getBudgetsByVendor(vendorId);
       res.json(budgets);
     } catch (error) {
+      console.error("Error fetching vendor budgets:", error);
       res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
   });
