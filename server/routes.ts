@@ -1759,23 +1759,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/payments", async (req, res) => {
     try {
       const payments = await storage.getPayments();
+      const orders = await storage.getOrders();
 
       const enrichedPayments = await Promise.all(
         payments.map(async (payment) => {
-          const order = await storage.getOrder(payment.orderId);
-          const client = order ? await storage.getUser(order.clientId) : null;
+          const order = orders.find(o => o.id === payment.orderId);
+          let clientName = 'Cliente não identificado';
+
+          if (order) {
+            // Use contactName as primary source
+            clientName = order.contactName;
+
+            // If contactName is missing, try to get from client record
+            if (!clientName && order.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientByUserId = await storage.getClientByUserId(order.clientId);
+                if (clientByUserId) {
+                  clientName = clientByUserId.name;
+                } else {
+                  const clientUser = await storage.getUser(order.clientId);
+                  if (clientUser) {
+                    clientName = clientUser.name;
+                  }
+                }
+              }
+            }
+          }
 
           return {
             ...payment,
-            orderNumber: order?.orderNumber || 'Unknown',
-            clientName: client?.name || 'Unknown',
-            description: `${payment.method.toUpperCase()} - ${client?.name || 'Unknown'}`
+            orderNumber: order?.orderNumber || `#${payment.orderId?.slice(-6)}`,
+            clientName: clientName,
+            description: `${payment.method?.toUpperCase() || 'PAGAMENTO'} - ${clientName}`,
+            orderValue: order?.totalValue || '0.00'
           };
         })
       );
 
+      // Sort by payment date (most recent first)
+      enrichedPayments.sort((a, b) => {
+        const dateA = new Date(a.paidAt || a.createdAt);
+        const dateB = new Date(b.paidAt || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
       res.json(enrichedPayments);
     } catch (error) {
+      console.error("Error fetching finance payments:", error);
       res.status(500).json({ error: "Failed to fetch payments" });
     }
   });

@@ -1,290 +1,302 @@
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, CreditCard, TrendingUp, Calendar, CheckCircle } from "lucide-react";
+import { DollarSign, TrendingUp, CreditCard, FileText, Plus, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export default function FinancePayments() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [methodFilter, setMethodFilter] = useState("all");
-
+export default function PaymentsHistory() {
   const { data: payments, isLoading } = useQuery({
     queryKey: ["/api/finance/payments"],
+    queryFn: async () => {
+      const response = await fetch("/api/finance/payments");
+      if (!response.ok) throw new Error('Failed to fetch payments');
+      return response.json();
+    },
   });
 
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      pending: { label: "Pendente", variant: "secondary" as const },
-      confirmed: { label: "Confirmado", variant: "default" as const },
-      failed: { label: "Falha", variant: "destructive" as const },
-      cancelled: { label: "Cancelado", variant: "outline" as const },
-    };
-
-    const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
-    return (
-      <Badge variant={statusInfo.variant} className="capitalize">
-        {statusInfo.label}
-      </Badge>
-    );
-  };
-
-  const getMethodIcon = (method: string) => {
-    const iconMap = {
-      pix: <DollarSign className="h-4 w-4" />,
-      credit_card: <CreditCard className="h-4 w-4" />,
-      bank_transfer: <TrendingUp className="h-4 w-4" />,
-      boleto: <Calendar className="h-4 w-4" />,
-      cash: <CheckCircle className="h-4 w-4" />,
-    };
-
-    return iconMap[method as keyof typeof iconMap] || iconMap.pix;
-  };
-
-  const filteredPayments = (payments || [])?.filter((payment: any) => {
-    const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
-    const matchesMethod = methodFilter === "all" || payment.method === methodFilter;
-    const matchesSearch = searchTerm === "" || 
-      payment.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.transactionId?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesMethod && matchesSearch;
+  const { data: orders } = useQuery({
+    queryKey: ["/api/orders"],
+    queryFn: async () => {
+      const response = await fetch("/api/orders");
+      if (!response.ok) throw new Error('Failed to fetch orders');
+      return response.json();
+    },
   });
 
-  // Calculate summary statistics
-  const totalPayments = (payments || [])?.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const confirmedPayments = (payments || [])?.filter((p: any) => p.status === 'confirmed').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const pendingPayments = (payments || [])?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const thisMonthPayments = (payments || [])?.filter((p: any) => {
-    const paymentDate = new Date(p.createdAt);
-    const now = new Date();
-    return paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear();
-  }).reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
+  const { data: commissions } = useQuery({
+    queryKey: ["/api/commissions"],
+    queryFn: async () => {
+      const response = await fetch("/api/commissions");
+      if (!response.ok) throw new Error('Failed to fetch commissions');
+      return response.json();
+    },
+  });
+
+  const { data: expenses } = useQuery({
+    queryKey: ["/api/finance/expenses"],
+    queryFn: async () => {
+      const response = await fetch("/api/finance/expenses");
+      if (!response.ok) throw new Error('Failed to fetch expenses');
+      return response.json();
+    },
+  });
 
   if (isLoading) {
     return (
       <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="grid grid-cols-4 gap-6 mb-8">
-            {[...Array(4)].map((_, i) => (
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
             ))}
           </div>
-          <div className="h-64 bg-gray-200 rounded-xl"></div>
         </div>
       </div>
     );
   }
 
+  // Calcular métricas reais
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  // Receita Total do mês atual
+  const monthlyRevenue = orders?.filter((order: any) => {
+    if (!order.createdAt || order.status === 'cancelled') return false;
+    const orderDate = new Date(order.createdAt);
+    return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+  }).reduce((total: number, order: any) => total + parseFloat(order.totalValue || '0'), 0) || 0;
+
+  // Custos de Produção (pagamentos para produtores aprovados)
+  const productionCosts = expenses?.filter((expense: any) => 
+    expense.category === 'material' || expense.category === 'production'
+  ).reduce((total: number, expense: any) => total + parseFloat(expense.amount || '0'), 0) || 0;
+
+  // Comissões Pendentes
+  const pendingCommissions = commissions?.filter((commission: any) => 
+    commission.status === 'pending' || commission.status === 'confirmed'
+  ).reduce((total: number, commission: any) => total + parseFloat(commission.amount || '0'), 0) || 0;
+
+  // Despesas do Mês
+  const monthlyExpenses = expenses?.filter((expense: any) => {
+    if (!expense.createdAt) return false;
+    const expenseDate = new Date(expense.createdAt);
+    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+  }).reduce((total: number, expense: any) => total + parseFloat(expense.amount || '0'), 0) || 0;
+
+  // Lucro Líquido
+  const netProfit = monthlyRevenue - productionCosts - pendingCommissions - monthlyExpenses;
+
+  // Atividades recentes (últimos pagamentos e transações)
+  const recentActivities = [];
+
+  // Adicionar pagamentos recentes
+  if (payments && payments.length > 0) {
+    payments.slice(0, 3).forEach((payment: any) => {
+      recentActivities.push({
+        type: 'payment',
+        description: `Pagamento recebido - ${payment.orderNumber || 'Pedido'}`,
+        amount: parseFloat(payment.amount || '0'),
+        time: payment.paidAt || payment.createdAt,
+        positive: true
+      });
+    });
+  }
+
+  // Adicionar despesas recentes
+  if (expenses && expenses.length > 0) {
+    expenses.filter((expense: any) => expense.status === 'approved').slice(0, 2).forEach((expense: any) => {
+      recentActivities.push({
+        type: 'expense',
+        description: expense.description || 'Nova despesa registrada',
+        amount: parseFloat(expense.amount || '0'),
+        time: expense.createdAt,
+        positive: false
+      });
+    });
+  }
+
+  // Ordenar atividades por data (mais recente primeiro)
+  recentActivities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Pagamentos</h1>
-        <p className="text-gray-600">Controle geral de todos os pagamentos do sistema</p>
+    <div className="p-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Histórico de Pagamentos</h1>
+          <p className="text-gray-600 mt-2">Visualização de todos os pagamentos do sistema</p>
+        </div>
+        <Button className="bg-blue-600 hover:bg-blue-700">
+          <Download className="h-4 w-4 mr-2" />
+          Exportar Relatório
+        </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total de Pagamentos</p>
-                <p className="text-2xl font-bold gradient-text">
-                  R$ {totalPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Confirmados</p>
-                <p className="text-2xl font-bold gradient-text">
-                  R$ {confirmedPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold gradient-text">
-                  R$ {pendingPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Este Mês</p>
-                <p className="text-2xl font-bold gradient-text">
-                  R$ {thisMonthPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por pedido, cliente ou transação..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="confirmed">Confirmado</SelectItem>
-                  <SelectItem value="failed">Falha</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={methodFilter} onValueChange={setMethodFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Métodos</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="credit_card">Cartão</SelectItem>
-                  <SelectItem value="bank_transfer">TED/DOC</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="cash">Dinheiro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Payments Table */}
-      <Card>
+      {/* Resumo do Mês */}
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Histórico de Pagamentos ({filteredPayments?.length || 0})</CardTitle>
+          <CardTitle className="text-xl font-bold">Resumo do Mês</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pedido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Método
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID Transação
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments?.map((payment: any) => (
-                  <tr key={payment.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : new Date(payment.createdAt).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {payment.orderNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payment.clientName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        {getMethodIcon(payment.method)}
-                        <span className="ml-2 capitalize">
-                          {payment.method === 'pix' ? 'PIX' :
-                           payment.method === 'credit_card' ? 'Cartão' :
-                           payment.method === 'bank_transfer' ? 'TED/DOC' :
-                           payment.method === 'boleto' ? 'Boleto' :
-                           payment.method === 'cash' ? 'Dinheiro' : payment.method}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                      R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(payment.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                      {payment.transactionId || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver Detalhes
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-600">Receita Total</p>
+              <p className="text-2xl font-bold text-green-600">
+                R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-600">Custos de Produção</p>
+              <p className="text-2xl font-bold text-red-600">
+                R$ {productionCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-600">Comissões Pendentes</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-600">Despesas do Mês</p>
+              <p className="text-2xl font-bold text-orange-600">
+                R$ {monthlyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-semibold text-gray-700">Lucro Líquido</p>
+              <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Atividades Recentes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold">Atividades Recentes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentActivities.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivities.map((activity, index) => (
+                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      activity.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {activity.type === 'payment' ? (
+                        <DollarSign className={`h-5 w-5 ${activity.positive ? 'text-green-600' : 'text-red-600'}`} />
+                      ) : (
+                        <FileText className="h-5 w-5 text-orange-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{activity.description}</p>
+                      <p className="text-sm text-gray-500">
+                        {activity.time ? new Date(activity.time).toLocaleString('pt-BR') : 'Data não disponível'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-semibold ${activity.positive ? 'text-green-600' : 'text-red-600'}`}>
+                      {activity.positive ? '+' : '-'} R$ {activity.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <Badge variant="outline" className="text-xs">
+                      {activity.type === 'payment' ? 'Recebimento' : 'Despesa'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-4">Nenhuma atividade recente encontrada</p>
+              <p className="text-sm text-gray-400">
+                Os pagamentos e transações aparecerão aqui conforme forem processados
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lista Completa de Pagamentos */}
+      {payments && payments.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold">Todos os Pagamentos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Data
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Pedido
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cliente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Método
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Valor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {payments.map((payment: any) => (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 
+                         new Date(payment.createdAt).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {payment.orderNumber || `#${payment.orderId?.slice(-6)}`}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {payment.clientName || 'Cliente não identificado'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <Badge variant="outline">
+                          {payment.method?.toUpperCase() || 'N/A'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                        R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge className={`${
+                          payment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {payment.status === 'confirmed' ? 'Confirmado' :
+                           payment.status === 'pending' ? 'Pendente' : 'Cancelado'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
