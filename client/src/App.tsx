@@ -152,7 +152,7 @@ function App() {
               <MainLayout>
                 <Switch>
                   {/* Admin Routes */}
-                  <Route path="/admin" component={AdminDashboard} />
+                  <Route path="/admin" component={AdminDashboard} /></old_str>
                   <Route path="/admin/dashboard" component={AdminDashboard} />
                   <Route path="/admin/orders" component={AdminOrders} />
                   <Route path="/admin/budgets" component={AdminBudgets} />

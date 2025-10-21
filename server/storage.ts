@@ -2132,47 +2132,6 @@ export class MemStorage implements IStorage {
     return this.products.delete(id);
   }
 
-  // Safe deletion methods for test data cleanup
-  async deleteOrder(orderId: string): Promise<boolean> {
-    return this.orders.delete(orderId);
-  }
-
-  async deleteProductionOrder(productionOrderId: string): Promise<boolean> {
-    return this.productionOrders.delete(productionOrderId);
-  }
-
-  async deletePayment(paymentId: string): Promise<boolean> {
-    return this.payments.delete(paymentId);
-  }
-
-  async deleteCommission(commissionId: string): Promise<boolean> {
-    return this.commissions.delete(commissionId);
-  }
-
-  async getPaymentsByOrder(orderId: string): Promise<any[]> {
-    return Array.from(this.payments.values()).filter(payment => payment.orderId === orderId);
-  }
-
-  async getCommissionsByOrder(orderId: string): Promise<any[]> {
-    return Array.from(this.commissions.values()).filter(commission => commission.orderId === orderId);
-  }
-
-  async getManualPayables(): Promise<any[]> {
-    return Array.from(this.manualPayables.values());
-  }
-
-  async getManualReceivables(): Promise<any[]> {
-    return Array.from(this.manualReceivables.values());
-  }
-
-  async deleteManualPayable(payableId: string): Promise<boolean> {
-    return this.manualPayables.delete(payableId);
-  }
-
-  async deleteManualReceivable(receivableId: string): Promise<boolean> {
-    return this.manualReceivables.delete(receivableId);
-  }
-
   async importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }> {
     let imported = 0;
     const errors: any[] = [];
