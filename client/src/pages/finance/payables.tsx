@@ -200,7 +200,9 @@ export default function FinancePayables() {
         title: "Sucesso!",
         description: "Conta a pagar criada com sucesso",
       });
+      // Invalidate all related queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
     },
     onError: (error: any) => {
       toast({
@@ -356,20 +358,81 @@ export default function FinancePayables() {
     setIsPayDialogOpen(true);
   };
 
+  // Mutation for paying manual payables
+  const payManualPayableMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/finance/payables/manual/${data.payableId}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          paymentMethod: data.method,
+          transactionId: data.transactionId,
+          notes: data.notes
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao registrar pagamento');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsPayDialogOpen(false);
+      setPaymentData({
+        amount: "",
+        method: "",
+        transactionId: "",
+        notes: "",
+      });
+      toast({
+        title: "Sucesso!",
+        description: "Pagamento registrado com sucesso",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível registrar o pagamento",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handlePay = () => {
     if (selectedPayable && paymentData.amount && paymentData.method) {
-      // Extract the actual ID from the composed ID
-      const actualId = selectedPayable.id.startsWith('producer-') 
-        ? selectedPayable.id.replace('producer-', '') 
-        : selectedPayable.productionOrderId || selectedPayable.id;
+      if (selectedPayable.type === 'manual') {
+        // Handle manual payable payment
+        const actualId = selectedPayable.id.startsWith('manual-') 
+          ? selectedPayable.id.replace('manual-', '') 
+          : selectedPayable.id;
 
-      payProducerMutation.mutate({
-        payableId: actualId,
-        amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
-        method: paymentData.method,
-        transactionId: paymentData.transactionId,
-        notes: paymentData.notes
-      });
+        payManualPayableMutation.mutate({
+          payableId: actualId,
+          method: paymentData.method,
+          transactionId: paymentData.transactionId,
+          notes: paymentData.notes
+        });
+      } else {
+        // Handle producer payment
+        const actualId = selectedPayable.id.startsWith('producer-') 
+          ? selectedPayable.id.replace('producer-', '') 
+          : selectedPayable.productionOrderId || selectedPayable.id;
+
+        payProducerMutation.mutate({
+          payableId: actualId,
+          amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
+          method: paymentData.method,
+          transactionId: paymentData.transactionId,
+          notes: paymentData.notes
+        });
+      }
     }
   };
 

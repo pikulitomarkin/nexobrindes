@@ -1481,10 +1481,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/payables/manual", async (req, res) => {
     try {
       const payables = await storage.getManualPayables();
+      console.log(`Returning ${payables.length} manual payables to frontend`);
       res.json(payables);
     } catch (error) {
       console.error("Error fetching manual payables:", error);
       res.status(500).json({ error: "Erro ao buscar contas a pagar manuais: " + error.message });
+    }
+  });
+
+  // Pay manual payable endpoint
+  app.post("/api/finance/payables/manual/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes, transactionId } = req.body;
+
+      console.log(`Processing payment for manual payable: ${id}`, { paymentMethod, notes, transactionId });
+
+      // Update the manual payable status to paid
+      const updatedPayable = await storage.updateManualPayable(id, {
+        status: 'paid',
+        paidBy: 'admin-1', // Could be req.user.id in real auth
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        paymentNotes: notes || null,
+        transactionId: transactionId || null
+      });
+
+      if (!updatedPayable) {
+        return res.status(404).json({ error: "Conta a pagar não encontrada" });
+      }
+
+      console.log(`Manual payable ${id} marked as paid successfully`);
+
+      res.json({
+        success: true,
+        payable: updatedPayable,
+        message: "Pagamento registrado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error processing manual payable payment:", error);
+      res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
     }
   });
 
@@ -1559,9 +1595,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
+      console.log(`Found ${manualPayables.length} manual payables:`, manualPayables.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
       const manualPayablesAmount = manualPayables
         .filter(payable => payable.status === 'pending')
         .reduce((total, payable) => total + parseFloat(payable.amount || '0'), 0);
+
+      console.log(`Manual payables total: ${manualPayablesAmount}`);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
 
