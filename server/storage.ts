@@ -2697,11 +2697,11 @@ export class MemStorage implements IStorage {
       type: 'manual',
       beneficiary: data.beneficiary,
       description: data.description,
-      amount: data.amount,
-      dueDate: data.dueDate,
+      amount: parseFloat(data.amount).toFixed(2),
+      dueDate: new Date(data.dueDate),
       category: data.category || 'Outros',
       status: 'pending',
-      notes: data.notes,
+      notes: data.notes || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -2712,7 +2712,7 @@ export class MemStorage implements IStorage {
     }
 
     this.mockData.manualPayables.push(payable);
-    console.log(`Created manual payable: ${payable.id} for ${payable.beneficiary} - ${payable.amount}`);
+    console.log(`Created manual payable: ${payable.id} for ${payable.beneficiary} - R$ ${payable.amount}`);
     console.log(`Total manual payables: ${this.mockData.manualPayables.length}`);
 
     return payable;

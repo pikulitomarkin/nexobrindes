@@ -394,7 +394,16 @@ export default function FinancePayables() {
     manual: 0
   };
 
-  const totalPayables = breakdown.producers + breakdown.expenses + breakdown.commissions + breakdown.refunds + breakdown.manual;
+  // Ensure breakdown values are numbers
+  const safeBreakdown = {
+    producers: Number(breakdown.producers) || 0,
+    expenses: Number(breakdown.expenses) || 0,
+    commissions: Number(breakdown.commissions) || 0,
+    refunds: Number(breakdown.refunds) || 0,
+    manual: Number(breakdown.manual) || 0
+  };
+
+  const totalPayables = safeBreakdown.producers + safeBreakdown.expenses + safeBreakdown.commissions + safeBreakdown.refunds + safeBreakdown.manual;
 
   if (isLoading) {
     return (
@@ -445,7 +454,7 @@ export default function FinancePayables() {
               <div>
                 <p className="text-xs font-medium text-gray-600">Produtores</p>
                 <p className="text-xl font-bold gradient-text">
-                  R$ {breakdown.producers.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {safeBreakdown.producers.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -461,7 +470,7 @@ export default function FinancePayables() {
               <div>
                 <p className="text-xs font-medium text-gray-600">Despesas</p>
                 <p className="text-xl font-bold gradient-text">
-                  R$ {breakdown.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {safeBreakdown.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -477,7 +486,7 @@ export default function FinancePayables() {
               <div>
                 <p className="text-xs font-medium text-gray-600">Comissões + Manuais</p>
                 <p className="text-xl font-bold gradient-text">
-                  R$ {(breakdown.commissions + breakdown.manual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(safeBreakdown.commissions + safeBreakdown.manual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -625,9 +634,66 @@ export default function FinancePayables() {
                               setIsPayDialogOpen(true);
                             }}
                             size="sm"
-                            className="gradient-bg text-white"
+                            className="gradient-bg text-white h-7 px-2"
                           >
-                            <DollarSign className="h-4 w-4 mr-2" />
+                            <DollarSign className="h-3 w-3 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
+                        {payable.type === 'expense' && payable.status === 'approved' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setPaymentData({
+                                amount: payable.amount,
+                                method: "",
+                                transactionId: "",
+                                notes: "",
+                              });
+                              setIsPayDialogOpen(true);
+                            }}
+                            size="sm"
+                            className="gradient-bg text-white h-7 px-2"
+                          >
+                            <DollarSign className="h-3 w-3 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
+                        {payable.type === 'commission' && payable.status === 'confirmed' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setPaymentData({
+                                amount: payable.amount,
+                                method: "",
+                                transactionId: "",
+                                notes: "",
+                              });
+                              setIsPayDialogOpen(true);
+                            }}
+                            size="sm"
+                            className="gradient-bg text-white h-7 px-2"
+                          >
+                            <DollarSign className="h-3 w-3 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
+                        {payable.type === 'manual' && payable.status === 'pending' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setPaymentData({
+                                amount: payable.amount,
+                                method: "",
+                                transactionId: "",
+                                notes: "",
+                              });
+                              setIsPayDialogOpen(true);
+                            }}
+                            size="sm"
+                            className="gradient-bg text-white h-7 px-2"
+                          >
+                            <DollarSign className="h-3 w-3 mr-1" />
                             Pagar
                           </Button>
                         )}
@@ -643,9 +709,28 @@ export default function FinancePayables() {
                             }}
                           >
                             <DollarSign className="h-3 w-3" />
+                            Definir
                           </Button>
                         )}
-                        {/* Add other actions here if needed, e.g., edit, delete */}
+                        {payable.type === 'refund' && payable.status === 'defined' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedPayable(payable);
+                              setPaymentData({
+                                amount: payable.amount,
+                                method: "",
+                                transactionId: "",
+                                notes: "",
+                              });
+                              setIsPayDialogOpen(true);
+                            }}
+                            size="sm"
+                            className="gradient-bg text-white h-7 px-2"
+                          >
+                            <DollarSign className="h-3 w-3 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

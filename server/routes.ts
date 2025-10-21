@@ -1561,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const manualPayables = await storage.getManualPayables();
       const manualPayablesAmount = manualPayables
         .filter(payable => payable.status === 'pending')
-        .reduce((total, payable) => total + parseFloat(payable.amount), 0);
+        .reduce((total, payable) => total + parseFloat(payable.amount || '0'), 0);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
 
@@ -1602,11 +1602,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivables: receivables,
         payables: payables,
         payablesBreakdown: {
-          producers: producers,
-          expenses: expenses,
-          commissions: commissions,
-          refunds: refunds,
-          manual: manualPayablesAmount
+          producers: Number(producers) || 0,
+          expenses: Number(expenses) || 0,
+          commissions: Number(commissions) || 0,
+          refunds: Number(refunds) || 0,
+          manual: Number(manualPayablesAmount) || 0
         },
         balance: bankBalance,
         pendingCommissions: pendingCommissions,
