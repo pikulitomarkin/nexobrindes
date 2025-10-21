@@ -5252,7 +5252,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Validate transactions structure
-      for      let i = 0; i < transactions.length; i++) {
+      for (let i = 0; i < transactions.length; i++) {
         const transaction = transactions[i];
         if (!transaction || typeof transaction !== 'object') {
           console.error(`Transaction ${i} is not an object:`, transaction);
