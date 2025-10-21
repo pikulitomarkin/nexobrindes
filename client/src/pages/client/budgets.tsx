@@ -13,7 +13,7 @@ export default function ClientBudgets() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Buscar orçamentos do cliente
-  const { data: budgets, isLoading: budgetsLoading } = useQuery({
+  const { data: budgets, isLoading: budgetsLoading, refetch: refetchBudgets } = useQuery({
     queryKey: ["/api/budgets/client", currentUser.id],
     queryFn: async () => {
       const response = await fetch(`/api/budgets/client/${currentUser.id}`);
@@ -21,10 +21,12 @@ export default function ClientBudgets() {
       return response.json();
     },
     enabled: !!currentUser.id,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch when user returns to the page
   });
 
   // Buscar solicitações de orçamento
-  const { data: quoteRequests, isLoading: requestsLoading } = useQuery({
+  const { data: quoteRequests, isLoading: requestsLoading, refetch: refetchQuoteRequests } = useQuery({
     queryKey: ["/api/quote-requests/client", currentUser.id],
     queryFn: async () => {
       const response = await fetch(`/api/quote-requests/client/${currentUser.id}`);
@@ -32,6 +34,8 @@ export default function ClientBudgets() {
       return response.json();
     },
     enabled: !!currentUser.id,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch when user returns to the page
   });
 
   const getStatusBadge = (status: string, type: 'budget' | 'request') => {
@@ -51,7 +55,7 @@ export default function ClientBudgets() {
       };
 
       return (
-        <Badge className={`${requestStatusClasses[status as keyof typeof requestStatusClasses]} border-0`}>
+        <Badge className={`${requestStatusClasses[status as keyof typeof requestStatusClasses] || "bg-gray-100 text-gray-800"} border-0`}>
           {requestStatusLabels[status as keyof typeof requestStatusLabels] || status}
         </Badge>
       );
@@ -67,14 +71,14 @@ export default function ClientBudgets() {
 
     const budgetStatusLabels = {
       draft: "Rascunho",
-      sent: "Enviado",
+      sent: "Enviado para Análise",
       approved: "Aprovado",
       rejected: "Rejeitado",
       converted: "Convertido em Pedido",
     };
 
     return (
-      <Badge className={`${budgetStatusClasses[status as keyof typeof budgetStatusClasses]} border-0`}>
+      <Badge className={`${budgetStatusClasses[status as keyof typeof budgetStatusClasses] || "bg-gray-100 text-gray-800"} border-0`}>
         {budgetStatusLabels[status as keyof typeof budgetStatusLabels] || status}
       </Badge>
     );
@@ -103,7 +107,20 @@ export default function ClientBudgets() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Orçamentos</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">Meus Orçamentos</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              refetchBudgets();
+              refetchQuoteRequests();
+            }}
+            disabled={budgetsLoading || requestsLoading}
+          >
+            {budgetsLoading || requestsLoading ? "Atualizando..." : "Atualizar"}
+          </Button>
+        </div>
         <p className="text-gray-600">Acompanhe suas solicitações de orçamento e propostas recebidas</p>
       </div>
 

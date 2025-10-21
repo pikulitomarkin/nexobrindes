@@ -2183,6 +2183,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Also check if contactName matches user info (fallback for orders created from budgets)
+        if (!shouldInclude && budget.contactName) {
+          try {
+            const user = await storage.getUser(clientId);
+            if (user && user.name === budget.contactName) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
         if (shouldInclude) {
           budgets.push(budget);
         }
@@ -2213,13 +2225,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
 
+          // Ensure all budget fields are properly set
           return {
             ...budget,
+            status: budget.status || 'draft', // Ensure status is always present
             vendorName: vendor?.name || 'Vendedor',
             items: enrichedItems,
-            photos: photos
+            photos: photos,
+            // Make sure these timestamps are properly formatted
+            createdAt: budget.createdAt,
+            updatedAt: budget.updatedAt,
+            validUntil: budget.validUntil,
+            deliveryDeadline: budget.deliveryDeadline
           };
         })
+      );
+
+      // Sort by creation date (newest first)
+      enrichedBudgets.sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
 
       res.json(enrichedBudgets);
@@ -2526,8 +2550,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Update budget status to 'sent'
-      await storage.updateBudget(req.params.id, { status: 'sent' });
+      // Update budget status to 'sent' with proper timestamp
+      const updatedBudget = await storage.updateBudget(req.params.id, { 
+        status: 'sent',
+        updatedAt: new Date()
+      });
+
+      console.log(`Budget ${req.params.id} status updated to 'sent' for client ${budget.clientId || budget.contactName}`);
 
       // Generate WhatsApp message
       const message = `Olá ${clientName}! 👋
@@ -2550,7 +2579,8 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({
         success: true,
         whatsappUrl,
-        message: "Orçamento marcado como enviado"
+        message: "Orçamento marcado como enviado e disponível no painel do cliente",
+        budget: updatedBudget
       });
     } catch (error) {
       console.error('Error sending budget via WhatsApp:', error);
