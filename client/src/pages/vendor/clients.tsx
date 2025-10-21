@@ -110,8 +110,7 @@ export default function VendorClients() {
       return response.json();
     },
     onSuccess: (newClient) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/clients", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
       form.reset();
