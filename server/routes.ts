@@ -110,7 +110,6 @@ async function parseOFXBuffer(buffer: Buffer) {
 function generateId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).substring(2, 15)}`;
 }
-}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
@@ -4142,6 +4141,213 @@ Para mais detalhes, entre em contato conosco!`;
       res.json(settings);
     } catch (error) {
       res.status(500).json({ error: "Failed to update commission settings" });
+    }
+  });
+
+  // Client routes
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+      console.log(`Found ${clients.length} clients`);
+      
+      // Enrich with user data if needed
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const user = client.userId ? await storage.getUser(client.userId) : null;
+          return {
+            ...client,
+            userEmail: user?.email,
+            userPhone: user?.phone,
+            isActive: user?.isActive ?? true
+          };
+        })
+      );
+
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Failed to fetch clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log(`Creating client with data:`, clientData);
+      
+      const newClient = await storage.createClient(clientData);
+      console.log(`Client created successfully:`, newClient);
+      
+      res.json(newClient);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ error: "Failed to create client: " + error.message });
+    }
+  });
+
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      console.log(`Updating client ${id} with data:`, updateData);
+
+      const updatedClient = await storage.updateClient(id, updateData);
+      if (!updatedClient) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
+      console.log(`Client ${id} updated successfully`);
+      res.json(updatedClient);
+    } catch (error) {
+      console.error("Error updating client:", error);
+      res.status(500).json({ error: "Erro ao atualizar cliente: " + error.message });
+    }
+  });
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const deleted = await storage.deleteClient(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
+      console.log(`Client ${id} deleted successfully`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      res.status(500).json({ error: "Erro ao deletar cliente: " + error.message });
+    }
+  });
+
+  // Get orders by producer
+  app.get("/api/orders/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      console.log(`Fetching orders for producer: ${producerId}`);
+
+      // Get production orders for this producer
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      const orderIds = productionOrders.map(po => po.orderId);
+
+      // Get the actual orders
+      const orders = await storage.getOrders();
+      const producerOrders = orders.filter(order => orderIds.includes(order.id));
+
+      // Enrich with client and vendor data
+      const enrichedOrders = await Promise.all(
+        producerOrders.map(async (order) => {
+          let clientName = order.contactName || 'Cliente não identificado';
+          
+          // Try to get client name if not available
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                clientName = clientUser.name;
+              }
+            }
+          }
+
+          const vendor = await storage.getUser(order.vendorId);
+          
+          // Get corresponding production order
+          const productionOrder = productionOrders.find(po => po.orderId === order.id);
+
+          return {
+            ...order,
+            clientName,
+            vendorName: vendor?.name || 'Unknown',
+            productionOrder
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedOrders.length} orders for producer ${producerId}`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching producer orders:", error);
+      res.status(500).json({ error: "Failed to fetch producer orders" });
+    }
+  });
+
+  // Get production orders by producer
+  app.get("/api/production-orders/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      console.log(`Fetching production orders for producer: ${producerId}`);
+
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+
+      // Enrich with order and client data
+      const enrichedOrders = await Promise.all(
+        productionOrders.map(async (po) => {
+          const order = await storage.getOrder(po.orderId);
+          
+          if (!order) {
+            return null;
+          }
+
+          let clientName = order.contactName || 'Cliente não identificado';
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+
+          // Try to get client details if not available
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+              clientAddress = clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
+            } else {
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                clientName = clientUser.name;
+                clientPhone = clientUser.phone || order.contactPhone;
+                clientEmail = clientUser.email || order.contactEmail;
+                clientAddress = clientUser.address;
+              }
+            }
+          }
+
+          return {
+            ...po,
+            orderNumber: order.orderNumber || `PO-${po.id}`,
+            product: order.product || 'Produto não informado',
+            clientName,
+            clientAddress,
+            clientPhone,
+            clientEmail,
+            order: {
+              ...order,
+              clientName,
+              clientAddress,
+              clientPhone,
+              clientEmail,
+              shippingAddress: order.deliveryType === 'pickup'
+                ? 'Sede Principal - Retirada no Local'
+                : (clientAddress || 'Endereço não informado'),
+              deliveryType: order.deliveryType || 'delivery'
+            }
+          };
+        })
+      );
+
+      // Filter out null entries
+      const validOrders = enrichedOrders.filter(order => order !== null);
+
+      console.log(`Found ${validOrders.length} production orders for producer ${producerId}`);
+      res.json(validOrders);
+    } catch (error) {
+      console.error("Error fetching production orders by producer:", error);
+      res.status(500).json({ error: "Failed to fetch production orders by producer" });
     }
   });
 
