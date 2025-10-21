@@ -231,67 +231,55 @@ export default function FinanceReceivables() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="panel-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Saldo a Receber</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="panel-stat-label">Saldo a Receber</p>
+                <p className="panel-stat-value">
                   R$ {totalToReceive.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
+              <DollarSign className="h-6 w-6 text-blue-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="panel-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Já Recebido</p>
-                <p className="text-2xl font-bold gradient-text">
+                <p className="panel-stat-label">Já Recebido</p>
+                <p className="panel-stat-value">
                   R$ {totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="panel-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aguardando Entrada</p>
-                <p className="text-3xl font-bold gradient-text">
-                  {awaitingEntryCount}
-                </p>
+                <p className="panel-stat-label">Aguardando Entrada</p>
+                <p className="panel-stat-value text-yellow-600">{awaitingEntryCount}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
-              </div>
+              <Clock className="h-6 w-6 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="panel-card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Entrada Recebida</p>
-                <p className="text-3xl font-bold gradient-text">
-                  {partiallyPaidCount}
-                </p>
+                <p className="panel-stat-label">Entrada Recebida</p>
+                <p className="panel-stat-value text-green-600">{partiallyPaidCount}</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
-              </div>
+              <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -332,13 +320,15 @@ export default function FinanceReceivables() {
 
       {/* Receivables Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle>Pedidos a Receber ({filteredReceivables.length})</CardTitle>
+            <CardTitle className="panel-section-title">
+              Pedidos a Receber ({filteredReceivables.length})
+            </CardTitle>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-bg text-white">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button className="gradient-bg text-white panel-button" size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
                   Nova Conta a Receber
                 </Button>
               </DialogTrigger>
@@ -359,7 +349,7 @@ export default function FinanceReceivables() {
                       onChange={(e) => setNewReceivableData(prev => ({ ...prev, clientName: e.target.value }))}
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="description">Descrição *</Label>
                     <Input
@@ -424,34 +414,34 @@ export default function FinanceReceivables() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full panel-table">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Vencimento
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Pedido
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Cliente
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Valor Total
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Entrada+Frete
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Recebido
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Saldo
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Status
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="panel-table th">
                     Ações
                   </th>
                 </tr>
@@ -461,22 +451,22 @@ export default function FinanceReceivables() {
                   const minimumPayment = parseFloat(receivable.minimumPayment || 0);
                   const paidAmount = parseFloat(receivable.paidAmount || 0);
                   const isMinimumMet = paidAmount >= minimumPayment;
-                  
+
                   return (
                     <tr key={receivable.id} className={!isMinimumMet && minimumPayment > 0 ? 'bg-red-50' : ''}>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                      <td className="panel-table td">
                         {new Date(receivable.dueDate).toLocaleDateString('pt-BR')}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                      <td className="panel-table td font-medium">
                         {receivable.orderNumber}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 max-w-[120px] truncate">
+                      <td className="panel-table td max-w-[120px] truncate">
                         {receivable.clientName}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                      <td className="panel-table td font-semibold">
                         R$ {parseFloat(receivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold">
+                      <td className="panel-table td font-semibold">
                         <span className={isMinimumMet ? 'text-green-600' : 'text-red-600'}>
                           R$ {minimumPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
@@ -486,18 +476,18 @@ export default function FinanceReceivables() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                      <td className="panel-table td font-semibold">
                         R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900 font-semibold">
+                      <td className="panel-table td font-semibold">
                         R$ {(parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="panel-table td">
                         {getStatusBadge(receivable.status)}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
+                      <td className="panel-table td space-x-1">
                         <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm" className="h-7 px-2">
+                          <Button variant="ghost" size="sm" className="h-7 px-2 panel-button">
                             <Eye className="h-3 w-3 mr-1" />
                             Ver
                           </Button>
@@ -505,7 +495,7 @@ export default function FinanceReceivables() {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              className={`h-7 px-2 ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
+                              className={`h-7 px-2 panel-button ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
                               onClick={() => {
                                 setSelectedReceivable(receivable);
                                 // Suggest minimum payment if not met, otherwise remaining amount

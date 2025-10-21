@@ -104,7 +104,7 @@
   }
   
   .status-badge {
-    @apply px-3 py-1 rounded-full text-xs font-medium;
+    @apply px-2 py-1 rounded-full text-xs font-medium;
   }
   
   .status-pending {
@@ -125,5 +125,42 @@
   
   .status-confirmed {
     @apply bg-green-100 text-green-800;
+  }
+
+  /* Compact panel styles */
+  .panel-title {
+    @apply text-xl font-semibold text-gray-900 mb-1;
+  }
+  
+  .panel-subtitle {
+    @apply text-sm text-gray-600 mb-3;
+  }
+  
+  .panel-card {
+    @apply p-4;
+  }
+  
+  .panel-stat-value {
+    @apply text-xl font-bold gradient-text;
+  }
+  
+  .panel-stat-label {
+    @apply text-xs font-medium text-gray-600 mb-1;
+  }
+  
+  .panel-table th {
+    @apply px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+  
+  .panel-table td {
+    @apply px-4 py-2 whitespace-nowrap text-sm text-gray-900;
+  }
+  
+  .panel-button {
+    @apply text-sm px-3 py-1;
+  }
+  
+  .panel-section-title {
+    @apply text-lg font-semibold text-gray-900 mb-2;
   }
 }
