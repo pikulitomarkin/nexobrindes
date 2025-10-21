@@ -33,7 +33,7 @@ export default function ClientProducts() {
   const [showCart, setShowCart] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20); // 20 produtos por página
+  const [pageSize] = useState(50); // 50 produtos por página
   const { toast } = useToast();
 
   // Estado do formulário de solicitação
@@ -45,9 +45,9 @@ export default function ClientProducts() {
   });
 
   const { data: productsData, isLoading } = useQuery({
-    queryKey: ["/api/products", { limit: 9999 }],
+    queryKey: ["/api/products", { limit: 50000 }],
     queryFn: async () => {
-      const response = await fetch('/api/products?limit=9999');
+      const response = await fetch('/api/products?limit=50000');
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
