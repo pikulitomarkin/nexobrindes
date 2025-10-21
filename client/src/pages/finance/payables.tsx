@@ -224,7 +224,6 @@ export default function FinancePayables() {
     }
   };
 
-
   // Combine all payables
   const allPayables = [
     // Producer payments
@@ -366,11 +365,7 @@ export default function FinancePayables() {
     }
   };
 
-  const handleCreatePayable = (newPayableData: any) => {
-    // Here you would typically have form data from the dialog
-    // For now, let's assume newPayableData contains all necessary fields
-    createPayableMutation.mutate(newPayableData);
-  };
+  
 
   const breakdown = overview?.payablesBreakdown || {
     producers: 0,
