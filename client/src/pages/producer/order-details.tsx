@@ -308,40 +308,149 @@ export default function ProducerOrderDetails() {
           </Card>
 
           {/* Items */}
-          {productionOrder.items && productionOrder.items.length > 0 && (
+          {productionOrder.order?.items && productionOrder.order.items.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Itens do Pedido</CardTitle>
+                <CardTitle>Itens do Pedido para Produção</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {productionOrder.items.map((item: any, index: number) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">{item.product?.name || 'Produto'}</h4>
-                        <span className="font-semibold text-green-600">
-                          R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3 text-sm text-gray-600">
-                        <div>
-                          <span className="font-medium">Quantidade:</span> {item.quantity}
+                  {productionOrder.order.items.map((item: any, index: number) => (
+                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-lg text-gray-900">{item.productName || 'Produto'}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Package className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">Quantidade: <strong>{item.quantity}</strong></span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </div>
-                        <div>
-                          <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <div className="text-right">
+                          <div className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            Item #{index + 1}
+                          </div>
                         </div>
                       </div>
-                      {item.hasItemCustomization && (
-                        <div className="mt-2 p-2 bg-yellow-50 rounded">
-                          <p className="text-sm"><strong>Personalização:</strong> {item.itemCustomizationDescription}</p>
-                          <p className="text-sm"><strong>Valor adicional:</strong> R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+
+                      {/* Dimensões do Produto */}
+                      {(item.productWidth || item.productHeight || item.productDepth) && (
+                        <div className="mb-3 p-3 bg-white rounded border">
+                          <h5 className="font-medium text-gray-700 mb-2">Dimensões Especificadas:</h5>
+                          <div className="grid grid-cols-3 gap-3 text-sm">
+                            {item.productWidth && (
+                              <div>
+                                <span className="text-gray-600">Largura:</span>
+                                <span className="font-medium ml-1">{item.productWidth} cm</span>
+                              </div>
+                            )}
+                            {item.productHeight && (
+                              <div>
+                                <span className="text-gray-600">Altura:</span>
+                                <span className="font-medium ml-1">{item.productHeight} cm</span>
+                              </div>
+                            )}
+                            {item.productDepth && (
+                              <div>
+                                <span className="text-gray-600">Profundidade:</span>
+                                <span className="font-medium ml-1">{item.productDepth} cm</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
+
+                      {/* Personalização do Item */}
+                      {item.hasItemCustomization && (
+                        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                          <h5 className="font-medium text-blue-800 mb-2">Personalização do Item:</h5>
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Tipo:</span>
+                              <span className="ml-2 text-sm">{item.itemCustomizationDescription || 'Personalização específica'}</span>
+                            </div>
+                            {item.additionalCustomizationNotes && (
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Observações:</span>
+                                <p className="ml-2 text-sm text-gray-600 mt-1">{item.additionalCustomizationNotes}</p>
+                              </div>
+                            )}
+                            {item.customizationPhoto && (
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Imagem de Referência:</span>
+                                <div className="mt-2">
+                                  <img
+                                    src={item.customizationPhoto}
+                                    alt="Personalização"
+                                    className="w-24 h-24 object-cover rounded border cursor-pointer hover:opacity-75"
+                                    onClick={() => window.open(item.customizationPhoto, '_blank')}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Personalização Geral */}
+                      {item.hasGeneralCustomization && (
+                        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded">
+                          <h5 className="font-medium text-green-800 mb-2">Personalização Geral:</h5>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Nome:</span>
+                              <span className="ml-2 text-sm">{item.generalCustomizationName || 'Personalização geral'}</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Aplicar em todas as {item.quantity} unidades
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Desconto do Item */}
+                      {item.hasItemDiscount && (
+                        <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded">
+                          <h5 className="font-medium text-orange-800 mb-1">Desconto Aplicado:</h5>
+                          <div className="text-sm text-gray-600">
+                            {item.itemDiscountType === 'percentage' 
+                              ? `${item.itemDiscountPercentage}% de desconto`
+                              : `Desconto fixo aplicado`
+                            }
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resumo de Produção */}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Para produzir:</span>
+                            <span className="font-bold text-gray-900 ml-2">{item.quantity} unidade(s)</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Produtor:</span>
+                            <span className="font-medium text-blue-600 ml-2">
+                              {item.producerId === 'internal' ? 'Produção Interna' : 'Você'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Descrição Geral do Pedido */}
+          {productionOrder.order?.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Descrição do Pedido</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-700 leading-relaxed">{productionOrder.order.description}</p>
                 </div>
               </CardContent>
             </Card>
