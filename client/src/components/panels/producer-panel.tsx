@@ -24,6 +24,11 @@ export default function ProducerPanel() {
     enabled: !!producerId,
   });
 
+  const { data: paymentStats, isLoading: paymentsLoading } = useQuery({
+    queryKey: ["/api/producer-payments/producer", producerId],
+    enabled: !!producerId,
+  });
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: "Aguardando", className: "bg-yellow-100 text-yellow-800" },
@@ -48,7 +53,7 @@ export default function ProducerPanel() {
     );
   };
 
-  if (statsLoading || ordersLoading) {
+  if (statsLoading || ordersLoading || paymentsLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -65,6 +70,7 @@ export default function ProducerPanel() {
   }
 
   console.log('ProducerPanel - Production Orders Data:', productionOrders);
+  console.log('ProducerPanel - Payment Stats Data:', paymentStats);
   console.log('ProducerPanel - Raw data structure:', JSON.stringify(productionOrders, null, 2));
 
   const activeOrders = productionOrders?.filter((order: any) => 
@@ -144,7 +150,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">A Receber</p>
                 <p className="text-2xl font-bold text-green-600">
-                  R$ {((stats?.pendingPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((paymentStats?.totalPendingPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
@@ -160,7 +166,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Recebido</p>
                 <p className="text-2xl font-bold text-emerald-600">
-                  R$ {((stats?.totalReceived || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((paymentStats?.totalReceivedPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <CheckCircle className="h-6 w-6 text-emerald-600" />
@@ -174,7 +180,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Serviços</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {stats?.totalOrders || 0}
+                  R$ {((paymentStats?.totalServicesValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <Package className="h-6 w-6 text-blue-600" />
