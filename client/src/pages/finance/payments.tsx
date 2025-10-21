@@ -2,14 +2,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, CreditCard, FileText, Plus, Download } from "lucide-react";
+import { DollarSign, TrendingUp, CreditCard, FileText, Plus, Download, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PaymentsHistory() {
   const { data: payments, isLoading } = useQuery({
     queryKey: ["/api/finance/payments"],
     queryFn: async () => {
-      const response = await fetch("/api/finance/payments");
+      const response = await fetch("/api/finance/payments", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch payments');
       return response.json();
     },
@@ -18,7 +22,11 @@ export default function PaymentsHistory() {
   const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
     queryFn: async () => {
-      const response = await fetch("/api/orders");
+      const response = await fetch("/api/orders", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch orders');
       return response.json();
     },
@@ -27,7 +35,11 @@ export default function PaymentsHistory() {
   const { data: commissions } = useQuery({
     queryKey: ["/api/commissions"],
     queryFn: async () => {
-      const response = await fetch("/api/commissions");
+      const response = await fetch("/api/commissions", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch commissions');
       return response.json();
     },
@@ -36,8 +48,25 @@ export default function PaymentsHistory() {
   const { data: expenses } = useQuery({
     queryKey: ["/api/finance/expenses"],
     queryFn: async () => {
-      const response = await fetch("/api/finance/expenses");
+      const response = await fetch("/api/finance/expenses", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch expenses');
+      return response.json();
+    },
+  });
+
+  const { data: producerPayments } = useQuery({
+    queryKey: ["/api/finance/producer-payments"],
+    queryFn: async () => {
+      const response = await fetch("/api/finance/producer-payments", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch producer payments');
       return response.json();
     },
   });
@@ -61,17 +90,17 @@ export default function PaymentsHistory() {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
-  // Receita Total do mês atual
-  const monthlyRevenue = orders?.filter((order: any) => {
-    if (!order.createdAt || order.status === 'cancelled') return false;
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-  }).reduce((total: number, order: any) => total + parseFloat(order.totalValue || '0'), 0) || 0;
+  // Receita Total do mês atual (baseado em pagamentos confirmados)
+  const monthlyRevenue = payments?.filter((payment: any) => {
+    if (!payment.paidAt || payment.status !== 'confirmed') return false;
+    const paymentDate = new Date(payment.paidAt);
+    return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+  }).reduce((total: number, payment: any) => total + parseFloat(payment.amount || '0'), 0) || 0;
 
-  // Custos de Produção (pagamentos para produtores aprovados)
-  const productionCosts = expenses?.filter((expense: any) => 
-    expense.category === 'material' || expense.category === 'production'
-  ).reduce((total: number, expense: any) => total + parseFloat(expense.amount || '0'), 0) || 0;
+  // Custos de Produção (baseado em pagamentos de produtores)
+  const productionCosts = (producerPayments || [])?.filter((payment: any) => 
+    payment.status === 'paid'
+  ).reduce((total: number, payment: any) => total + parseFloat(payment.amount || '0'), 0) || 0;
 
   // Comissões Pendentes
   const pendingCommissions = commissions?.filter((commission: any) => 
@@ -80,8 +109,8 @@ export default function PaymentsHistory() {
 
   // Despesas do Mês
   const monthlyExpenses = expenses?.filter((expense: any) => {
-    if (!expense.createdAt) return false;
-    const expenseDate = new Date(expense.createdAt);
+    if (!expense.createdAt && !expense.date) return false;
+    const expenseDate = new Date(expense.createdAt || expense.date);
     return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
   }).reduce((total: number, expense: any) => total + parseFloat(expense.amount || '0'), 0) || 0;
 
@@ -89,36 +118,83 @@ export default function PaymentsHistory() {
   const netProfit = monthlyRevenue - productionCosts - pendingCommissions - monthlyExpenses;
 
   // Atividades recentes (últimos pagamentos e transações)
-  const recentActivities = [];
+  const recentActivities: any[] = [];
 
-  // Adicionar pagamentos recentes
+  // Adicionar pagamentos recentes confirmados
   if (payments && payments.length > 0) {
-    payments.slice(0, 3).forEach((payment: any) => {
-      recentActivities.push({
-        type: 'payment',
-        description: `Pagamento recebido - ${payment.orderNumber || 'Pedido'}`,
-        amount: parseFloat(payment.amount || '0'),
-        time: payment.paidAt || payment.createdAt,
-        positive: true
+    payments
+      .filter((payment: any) => payment.status === 'confirmed')
+      .sort((a: any, b: any) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())
+      .slice(0, 5)
+      .forEach((payment: any) => {
+        recentActivities.push({
+          type: 'payment',
+          description: `Recebimento - ${payment.clientName || 'Cliente'} (${payment.orderNumber || 'Pedido'})`,
+          amount: parseFloat(payment.amount || '0'),
+          time: payment.paidAt || payment.createdAt,
+          positive: true,
+          method: payment.method?.toUpperCase() || 'MANUAL'
+        });
       });
-    });
   }
 
-  // Adicionar despesas recentes
+  // Adicionar despesas recentes aprovadas
   if (expenses && expenses.length > 0) {
-    expenses.filter((expense: any) => expense.status === 'approved').slice(0, 2).forEach((expense: any) => {
-      recentActivities.push({
-        type: 'expense',
-        description: expense.description || 'Nova despesa registrada',
-        amount: parseFloat(expense.amount || '0'),
-        time: expense.createdAt,
-        positive: false
+    expenses
+      .filter((expense: any) => expense.status === 'approved' || expense.status === 'recorded')
+      .sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
+      .slice(0, 3)
+      .forEach((expense: any) => {
+        recentActivities.push({
+          type: 'expense',
+          description: `Despesa - ${expense.name || expense.description || 'Nova despesa'}`,
+          amount: parseFloat(expense.amount || '0'),
+          time: expense.createdAt || expense.date,
+          positive: false,
+          category: expense.category
+        });
       });
-    });
   }
 
-  // Ordenar atividades por data (mais recente primeiro)
+  // Adicionar pagamentos de comissões recentes
+  if (commissions && commissions.length > 0) {
+    commissions
+      .filter((commission: any) => commission.status === 'paid' && commission.paidAt)
+      .sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
+      .slice(0, 2)
+      .forEach((commission: any) => {
+        recentActivities.push({
+          type: 'commission',
+          description: `Comissão Paga - ${commission.vendorName || 'Vendedor'}`,
+          amount: parseFloat(commission.amount || '0'),
+          time: commission.paidAt,
+          positive: false
+        });
+      });
+  }
+
+  // Adicionar pagamentos de produtores recentes
+  if (producerPayments && producerPayments.length > 0) {
+    producerPayments
+      .filter((payment: any) => payment.status === 'paid' && payment.paidAt)
+      .sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
+      .slice(0, 2)
+      .forEach((payment: any) => {
+        recentActivities.push({
+          type: 'producer_payment',
+          description: `Pagamento Produtor - ${payment.producerName || 'Produtor'}`,
+          amount: parseFloat(payment.amount || '0'),
+          time: payment.paidAt,
+          positive: false
+        });
+      });
+  }
+
+  // Ordenar todas as atividades por data (mais recente primeiro)
   recentActivities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+  // Limitar a 10 atividades mais recentes
+  const limitedActivities = recentActivities.slice(0, 10);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -183,37 +259,67 @@ export default function PaymentsHistory() {
           <CardTitle className="text-xl font-bold">Atividades Recentes</CardTitle>
         </CardHeader>
         <CardContent>
-          {recentActivities.length > 0 ? (
+          {limitedActivities.length > 0 ? (
             <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {activity.type === 'payment' ? (
-                        <DollarSign className={`h-5 w-5 ${activity.positive ? 'text-green-600' : 'text-red-600'}`} />
-                      ) : (
-                        <FileText className="h-5 w-5 text-orange-600" />
-                      )}
+              {limitedActivities.map((activity, index) => {
+                const getActivityIcon = () => {
+                  switch (activity.type) {
+                    case 'payment':
+                      return <DollarSign className="h-5 w-5 text-green-600" />;
+                    case 'expense':
+                      return <TrendingDown className="h-5 w-5 text-red-600" />;
+                    case 'commission':
+                      return <TrendingUp className="h-5 w-5 text-blue-600" />;
+                    case 'producer_payment':
+                      return <CreditCard className="h-5 w-5 text-purple-600" />;
+                    default:
+                      return <FileText className="h-5 w-5 text-gray-600" />;
+                  }
+                };
+
+                const getActivityBadge = () => {
+                  switch (activity.type) {
+                    case 'payment':
+                      return { label: activity.method || 'Recebimento', variant: 'default' as const };
+                    case 'expense':
+                      return { label: 'Despesa', variant: 'destructive' as const };
+                    case 'commission':
+                      return { label: 'Comissão', variant: 'secondary' as const };
+                    case 'producer_payment':
+                      return { label: 'Produtor', variant: 'outline' as const };
+                    default:
+                      return { label: 'Transação', variant: 'outline' as const };
+                  }
+                };
+
+                const badge = getActivityBadge();
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        activity.positive ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        {getActivityIcon()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{activity.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {activity.time ? new Date(activity.time).toLocaleString('pt-BR') : 'Data não disponível'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{activity.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {activity.time ? new Date(activity.time).toLocaleString('pt-BR') : 'Data não disponível'}
+                    <div className="text-right">
+                      <p className={`font-semibold ${activity.positive ? 'text-green-600' : 'text-red-600'}`}>
+                        {activity.positive ? '+' : '-'} R$ {activity.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
+                      <Badge variant={badge.variant} className="text-xs mt-1">
+                        {badge.label}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${activity.positive ? 'text-green-600' : 'text-red-600'}`}>
-                      {activity.positive ? '+' : '-'} R$ {activity.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <Badge variant="outline" className="text-xs">
-                      {activity.type === 'payment' ? 'Recebimento' : 'Despesa'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
