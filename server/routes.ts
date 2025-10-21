@@ -5439,6 +5439,7 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Failed to update receivable:", error);
       res.status(500).json({ error: "Failed to update receivable" });
+    }
   });
 
   // Expense Notes routes
