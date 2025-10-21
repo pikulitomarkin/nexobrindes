@@ -388,7 +388,7 @@ export default function AdminBudgets() {
     const matchesSearch = searchTerm === "" || 
       budget.budgetNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       budget.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      budget.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+      (budget.contactName || budget.clientName || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 

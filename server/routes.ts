@@ -4,7 +4,7 @@ import multer from 'multer';
 import express from 'express';
 import path from 'path';
 import { storage } from "./storage";
-import { db, eq, orders, clients, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
+import { db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1698,7 +1698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expenses,
         commissions,
         refunds,
-        manualPayables: manualPayablesAmount,
+        manual: manualPayablesAmount,
         total: payables
       });
 
@@ -2647,7 +2647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
-      
+
       console.log("Creating order with order number:", orderNumber);
 
       const orderData = {
@@ -3891,7 +3891,7 @@ Para mais detalhes, entre em contato conosco!`;
           clientEmail: clientEmail,
           shippingAddress: order.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
-            : clientAddress,
+            : (clientAddress || 'Endereço não informado'),
           deliveryType: order.deliveryType || 'delivery'
         },
         items: budgetItems,
@@ -4210,8 +4210,8 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const clients = await storage.getClients();
       console.log(`Found ${clients.length} clients`);
-      
-      // Enrich with user data if needed
+
+      // Enrich with additional information
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
           const user = client.userId ? await storage.getUser(client.userId) : null;
@@ -4235,10 +4235,10 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const clientData = req.body;
       console.log(`Creating client with data:`, clientData);
-      
+
       const newClient = await storage.createClient(clientData);
       console.log(`Client created successfully:`, newClient);
-      
+
       res.json(newClient);
     } catch (error) {
       console.error("Error creating client:", error);
@@ -4269,7 +4269,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.delete("/api/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       const deleted = await storage.deleteClient(id);
       if (!deleted) {
         return res.status(404).json({ error: "Cliente não encontrado" });
@@ -4301,7 +4301,7 @@ Para mais detalhes, entre em contato conosco!`;
       const enrichedOrders = await Promise.all(
         producerOrders.map(async (order) => {
           let clientName = order.contactName || 'Cliente não identificado';
-          
+
           // Try to get client name if not available
           if (!clientName && order.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
@@ -4316,7 +4316,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
 
           const vendor = await storage.getUser(order.vendorId);
-          
+
           // Get corresponding production order
           const productionOrder = productionOrders.find(po => po.orderId === order.id);
 
@@ -4349,9 +4349,9 @@ Para mais detalhes, entre em contato conosco!`;
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
           const order = await storage.getOrder(po.orderId);
-          
+
           if (!order) {
-            return null;
+            return null; // Skip if order doesn't exist
           }
 
           let clientName = order.contactName || 'Cliente não identificado';
@@ -4368,12 +4368,20 @@ Para mais detalhes, entre em contato conosco!`;
               clientPhone = clientRecord.phone || order.contactPhone;
               clientEmail = clientRecord.email || order.contactEmail;
             } else {
-              const clientUser = await storage.getUser(order.clientId);
-              if (clientUser) {
-                clientName = clientUser.name;
-                clientPhone = clientUser.phone || order.contactPhone;
-                clientEmail = clientUser.email || order.contactEmail;
-                clientAddress = clientUser.address;
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+                clientAddress = clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
+                }
               }
             }
           }
@@ -4386,6 +4394,7 @@ Para mais detalhes, entre em contato conosco!`;
             clientAddress,
             clientPhone,
             clientEmail,
+            producerName: producer?.name || null,
             order: {
               ...order,
               clientName,
@@ -5671,13 +5680,13 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();
-      
+
       // Enrich with additional information
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
           // Get vendor information
           const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
-          
+
           // Get orders count and total spent
           const orders = await storage.getOrdersByClient(client.id);
           const ordersCount = orders.length;
@@ -5706,10 +5715,10 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { vendorId } = req.params;
       console.log(`Fetching clients for vendor: ${vendorId}`);
-      
+
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-      
+
       // Enrich with user data if available
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
@@ -5735,7 +5744,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       console.log(`Returning ${enrichedClients.length} enriched clients`);
       res.json(enrichedClients);
     } catch (error) {
@@ -5749,10 +5758,10 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const clientData = req.body;
       console.log(`Creating client with data:`, clientData);
-      
+
       const newClient = await storage.createClient(clientData);
       console.log(`Client created successfully:`, newClient);
-      
+
       res.json(newClient);
     } catch (error) {
       console.error("Error creating client:", error);
@@ -5771,7 +5780,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const vendor = await storage.getUser(order.vendorId);
+                  const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           return {
@@ -5794,7 +5803,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       // Get orders that are ready for logistics (shipped, ready)
       const orders = await storage.getOrders();
-      const logisticsOrders = orders.filter(order => 
+      const logisticsOrders = orders.filter(order =>
         ['ready', 'shipped', 'delivered'].includes(order.status)
       );
 
@@ -5864,7 +5873,7 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       // Get orders that are ready for expedition (completed, ready for shipping)
       const orders = await storage.getOrders();
-      const expeditionOrders = orders.filter(order => 
+      const expeditionOrders = orders.filter(order =>
         ['ready', 'shipped'].includes(order.status)
       );
 

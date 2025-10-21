@@ -252,6 +252,9 @@ export interface IStorage {
   getQuoteRequestsByVendor(vendorId: string): Promise<any[]>;
   getQuoteRequestsByClient(clientId: string): Promise<any[]>;
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
+
+  // Logistics - Get paid orders that are ready to be sent to production
+  getPaidOrdersReadyForProduction(): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -1526,7 +1529,7 @@ export class MemStorage implements IStorage {
       console.log(`Storage: Client ${client.name} (${client.id}) - vendorId: ${client.vendorId}, matches ${vendorId}: ${isMatch}`);
       return isMatch;
     });
-    
+
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
     return filteredClients;
@@ -3605,6 +3608,43 @@ export class MemStorage implements IStorage {
 
     this.mockData.financialNotes.push(newNote);
     return newNote;
+  }
+
+  // Logistics - Get paid orders that are ready to be sent to production
+  async getPaidOrdersReadyForProduction(): Promise<Order[]> {
+    const allOrders = Array.from(this.orders.values());
+    const allProductionOrders = Array.from(this.productionOrders.values());
+    console.log(`Total orders in system: ${allOrders.length}`);
+
+    // Filter for paid orders that haven't been sent to production yet
+    const paidOrders = allOrders.filter(order => {
+      // Check if order already has production orders created
+      const hasProductionOrders = allProductionOrders.some(po => po.orderId === order.id);
+      if (hasProductionOrders) {
+        console.log(`Order ${order.orderNumber} already has production orders - skipping`);
+        return false;
+      }
+
+      // Check if order has sufficient payment
+      const totalValue = parseFloat(order.totalValue);
+      const paidValue = parseFloat(order.paidValue || "0");
+      const downPayment = parseFloat(order.downPayment || "0");
+      const shippingCost = parseFloat(order.shippingCost || "0");
+
+      // Calculate required minimum payment (entrada + frete)
+      const requiredPayment = downPayment + shippingCost;
+
+      const isPaid = paidValue >= requiredPayment && requiredPayment > 0;
+
+      console.log(`Order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Required=${requiredPayment}, isPaid=${isPaid}, status=${order.status}`);
+
+      // Order must be paid and not in production, shipped, delivered, completed, or cancelled
+      return isPaid && !['production', 'shipped', 'delivered', 'completed', 'cancelled'].includes(order.status);
+    });
+
+    console.log(`Found ${paidOrders.length} paid orders ready for production`);
+
+    return paidOrders;
   }
 }
 

@@ -682,7 +682,8 @@ export default function VendorOrders() {
     const matchesSearch = searchTerm === "" ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.contactName?.toLowerCase().includes(searchTerm.toLowerCase()); // Added contactName search
 
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
 
@@ -757,7 +758,7 @@ export default function VendorOrders() {
               <Plus className="h-4 w-4 mr-2" />
               Novo Pedido
             </Button>
-          </DialogTrigger>
+          </DialogDialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{isEditMode ? "Editar Pedido" : "Criar Novo Pedido"}</DialogTitle>
@@ -1852,7 +1853,7 @@ export default function VendorOrders() {
                       {order.title}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.clientName || order.contactName || "Nome não informado"}
+                      {order.contactName || order.clientName || 'Nome não informado'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

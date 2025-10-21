@@ -476,7 +476,7 @@ export default function AdminOrders() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.clientName || "Nome não informado"}
+                        {order.contactName || order.clientName || "Nome não informado"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {order.vendorName || "Vendedor não informado"}

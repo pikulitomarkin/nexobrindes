@@ -1786,8 +1786,8 @@ export default function VendorBudgets() {
                       {budget.title}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {budget.clientName}
-                    </td>
+                        {budget.contactName || budget.clientName || 'Nome não informado'}
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
