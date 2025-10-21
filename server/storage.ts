@@ -437,6 +437,7 @@ export class MemStorage implements IStorage {
   private createTestUsers() {
     // Override existing users with test users
     this.users.clear();
+    this.clients.clear();
 
     // Admin user
     const adminUser = {
@@ -470,21 +471,36 @@ export class MemStorage implements IStorage {
     };
     this.users.set(vendorUser.id, vendorUser);
 
-    // Client user
-    const clientUser = {
+    // Client users
+    const clientUser1 = {
       id: "client-1",
       username: "cliente1",
       password: "123456",
       name: "João Silva",
       email: "joao.silva@email.com",
-      phone: null,
+      phone: "(11) 98765-4321",
       vendorId: null,
       role: "client",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.users.set(clientUser.id, clientUser);
+    this.users.set(clientUser1.id, clientUser1);
+
+    const clientUser2 = {
+      id: "client-2", 
+      username: "cliente2",
+      password: "123456",
+      name: "Maria Santos",
+      email: "maria.santos@email.com", 
+      phone: "(11) 99876-5432",
+      vendorId: null,
+      role: "client",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.users.set(clientUser2.id, clientUser2);
 
     // Producer user
     const producerUser = {
@@ -533,6 +549,41 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(logisticsUser.id, logisticsUser);
+
+    // Create client records linked to vendor-1
+    const sampleClient1: Client = {
+      id: "client-record-1",
+      userId: "client-1",
+      name: "João Silva", 
+      email: "joao.silva@email.com",
+      phone: "(11) 98765-4321",
+      whatsapp: "(11) 98765-4321",
+      cpfCnpj: "123.456.789-00",
+      address: "Rua das Flores, 123, São Paulo, SP",
+      vendorId: "vendor-1", // Linked to vendor-1
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.clients.set(sampleClient1.id, sampleClient1);
+
+    const sampleClient2: Client = {
+      id: "client-record-2",
+      userId: "client-2", 
+      name: "Maria Santos",
+      email: "maria.santos@email.com",
+      phone: "(11) 99876-5432",
+      whatsapp: "(11) 99876-5432", 
+      cpfCnpj: "987.654.321-00",
+      address: "Av. Paulista, 456, São Paulo, SP",
+      vendorId: "vendor-1", // Linked to vendor-1
+      isActive: true,
+      createdAt: new Date(), 
+      updatedAt: new Date()
+    };
+    this.clients.set(sampleClient2.id, sampleClient2);
+
+    console.log(`Created ${this.clients.size} test clients for vendor vendor-1`);
   }
 
   private initializeData() {
