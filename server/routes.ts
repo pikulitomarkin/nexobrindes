@@ -364,11 +364,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Final clientId for order:", finalClientId);
 
-      // Create order with contact name as primary identifier
+      // Create order with contact name as primary identifier and proper items handling
       const newOrder = await storage.createOrder({
         orderNumber,
         clientId: finalClientId, // Can be null if no client selected
         vendorId: orderData.vendorId,
+        budgetId: orderData.budgetId || null,
         product: orderData.product || orderData.title,
         description: orderData.description || "",
         totalValue: orderData.totalValue || "0.00",
@@ -2328,21 +2329,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newBudget = await storage.createBudget(req.body);
 
-      // Process budget items
+      // Process budget items with ALL customization data
       for (const item of req.body.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const customizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+
+        // Calculate total price including all customizations
+        let totalPrice = unitPrice * quantity;
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
+        }
+        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
+          totalPrice += (generalCustomizationValue * quantity);
+        }
 
         await storage.createBudgetItem(newBudget.id, {
           productId: item.productId,
+          producerId: item.producerId || 'internal',
           quantity: quantity,
           unitPrice: unitPrice.toFixed(2),
-          totalPrice: (unitPrice * quantity).toFixed(2),
+          totalPrice: totalPrice.toFixed(2),
+          // Item Customization
           hasItemCustomization: item.hasItemCustomization || false,
-          itemCustomizationValue: customizationValue.toFixed(2),
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: itemCustomizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
-          customizationPhoto: item.customizationPhoto || ""
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+          customizationPhoto: item.customizationPhoto || "",
+          // General Customization
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: generalCustomizationValue.toFixed(2),
+          // Product dimensions
+          productWidth: item.productWidth ? parseFloat(item.productWidth) : null,
+          productHeight: item.productHeight ? parseFloat(item.productHeight) : null,
+          productDepth: item.productDepth ? parseFloat(item.productDepth) : null
         });
       }
 
@@ -2392,25 +2415,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of budgetData.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const customizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
 
-        // Calculate correct total with item customization
-        const baseTotal = unitPrice * quantity;
-        let itemTotal = baseTotal;
-
-        if (item.hasItemCustomization && customizationValue > 0) {
-          itemTotal = baseTotal + (customizationValue * quantity);
+        // Calculate total price including all customizations
+        let totalPrice = unitPrice * quantity;
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
+        }
+        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
+          totalPrice += (generalCustomizationValue * quantity);
         }
 
         await storage.createBudgetItem(updatedBudget.id, {
           productId: item.productId,
+          producerId: item.producerId || 'internal',
           quantity: quantity,
           unitPrice: unitPrice.toFixed(2),
-          totalPrice: itemTotal.toFixed(2),
+          totalPrice: totalPrice.toFixed(2),
+          // Item Customization
           hasItemCustomization: item.hasItemCustomization || false,
-          itemCustomizationValue: customizationValue.toFixed(2),
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: itemCustomizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
-          customizationPhoto: item.customizationPhoto || ""
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+          customizationPhoto: item.customizationPhoto || "",
+          // General Customization
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: generalCustomizationValue.toFixed(2),
+          // Product dimensions
+          productWidth: item.productWidth ? parseFloat(item.productWidth) : null,
+          productHeight: item.productHeight ? parseFloat(item.productHeight) : null,
+          productDepth: item.productDepth ? parseFloat(item.productDepth) : null
         });
       }
 
@@ -3975,23 +4012,47 @@ Para mais detalhes, entre em contato conosco!`;
           const client = budget.clientId ? await storage.getUser(budget.clientId) : null;
           const vendor = await storage.getUser(budget.vendorId);
 
-          // Get budget items with product details
+          // Get budget items with ALL customization data
           const items = await storage.getBudgetItems(budget.id);
           const enrichedItems = await Promise.all(
             items.map(async (item) => {
               const product = await storage.getProduct(item.productId);
+              
+              console.log(`Budget item ${item.id} customization data:`, {
+                hasItemCustomization: item.hasItemCustomization,
+                selectedCustomizationId: item.selectedCustomizationId,
+                itemCustomizationValue: item.itemCustomizationValue,
+                hasGeneralCustomization: item.hasGeneralCustomization,
+                generalCustomizationName: item.generalCustomizationName,
+                generalCustomizationValue: item.generalCustomizationValue
+              });
+              
               return {
                 ...item,
-                productName: product?.name || 'Produto não encontrado'
+                productName: product?.name || 'Produto não encontrado',
+                product: product ? {
+                  name: product.name,
+                  category: product.category,
+                  imageLink: product.imageLink
+                } : null
               };
             })
           );
+
+          // Get budget payment info
+          const paymentInfo = await storage.getBudgetPaymentInfo(budget.id);
 
           return {
             ...budget,
             clientName: client?.name || null,
             vendorName: vendor?.name || 'Unknown',
-            items: enrichedItems
+            items: enrichedItems,
+            paymentMethodId: paymentInfo?.paymentMethodId || null,
+            shippingMethodId: paymentInfo?.shippingMethodId || null,
+            installments: paymentInfo?.installments || 1,
+            downPayment: paymentInfo?.downPayment || "0.00",
+            remainingAmount: paymentInfo?.remainingAmount || "0.00",
+            shippingCost: paymentInfo?.shippingCost || "0.00"
           };
         })
       );

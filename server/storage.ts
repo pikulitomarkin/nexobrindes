@@ -265,8 +265,8 @@ export class MemStorage implements IStorage {
   private partners: Map<string, Partner>;
   private products: Map<string, any>;
   private budgets: Map<string, any>;
-  private budgetItems: any[]; // Changed from mockBudgetItems to be a class member
-  private budgetPhotos: any[]; // Changed from mockBudgetPhotos to be a class member
+  private budgetItems: Map<string, any>; // Changed to Map
+  private budgetPhotos: Map<string, any>; // Changed to Map
   private commissionSettings: CommissionSettings;
   private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
   private quoteRequests: any[] = []; // Added for quote requests
@@ -395,8 +395,8 @@ export class MemStorage implements IStorage {
     this.partners = new Map();
     this.products = new Map();
     this.budgets = new Map();
-    this.budgetItems = []; // Initialize as empty array
-    this.budgetPhotos = []; // Initialize as empty array
+    this.budgetItems = new Map(); // Initialize as Map
+    this.budgetPhotos = new Map(); // Initialize as Map
     this.producerPayments = new Map(); // Initialize producerPayments Map
 
     // Initialize financial module Maps
@@ -2275,8 +2275,8 @@ export class MemStorage implements IStorage {
 
   async deleteBudget(id: string): Promise<boolean> {
     // Also delete related items and photos
-    this.budgetItems = this.budgetItems.filter(item => item.budgetId !== id);
-    this.budgetPhotos = this.budgetPhotos.filter(photo => photo.budgetId !== id);
+    this.budgetItems = new Map([...this.budgetItems.entries()].filter(([key, value]) => value.budgetId !== id));
+    this.budgetPhotos = new Map([...this.budgetPhotos.entries()].filter(([key, value]) => value.budgetId !== id));
     return this.budgets.delete(id);
   }
 
@@ -2307,7 +2307,7 @@ export class MemStorage implements IStorage {
       contactPhone: budget.contactPhone || "",
       contactEmail: budget.contactEmail || "",
       deliveryType: budget.deliveryType || "delivery",
-      items: this.budgetItems.filter(item => item.budgetId === budgetId) || [],
+      items: Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId) || [],
       paymentMethodId: "",
       shippingMethodId: "",
       installments: 1,
@@ -2371,54 +2371,79 @@ export class MemStorage implements IStorage {
 
   // Budget Items methods
   async getBudgetItems(budgetId: string): Promise<any[]> {
-    return this.budgetItems.filter(item => item.budgetId === budgetId);
+    return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
-    const id = `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newItem = {
-      id,
-      budgetId,
+  async createBudgetItem(budgetId: string, itemData: any) {
+    const budgetItem = {
+      id: `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      budgetId: budgetId,
       productId: itemData.productId,
-      quantity: itemData.quantity || 1,
-      unitPrice: itemData.unitPrice || '0.00',
-      totalPrice: itemData.totalPrice || '0.00',
+      producerId: itemData.producerId || 'internal',
+      quantity: parseFloat(itemData.quantity || 1),
+      unitPrice: parseFloat(itemData.unitPrice || 0),
+      totalPrice: parseFloat(itemData.totalPrice || 0),
+      notes: itemData.notes || null,
+      // Item Customization
       hasItemCustomization: itemData.hasItemCustomization || false,
-      itemCustomizationValue: itemData.itemCustomizationValue || '0.00',
-      itemCustomizationDescription: itemData.itemCustomizationDescription || '',
-      customizationPhoto: itemData.customizationPhoto || '',
-      productWidth: itemData.productWidth || null,
-      productHeight: itemData.productHeight || null,
-      productDepth: itemData.productDepth || null,
-      // New fields for general customization
+      selectedCustomizationId: itemData.selectedCustomizationId || null,
+      itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || 0),
+      itemCustomizationDescription: itemData.itemCustomizationDescription || "",
+      additionalCustomizationNotes: itemData.additionalCustomizationNotes || "",
+      customizationPhoto: itemData.customizationPhoto || "",
+      // General Customization
       hasGeneralCustomization: itemData.hasGeneralCustomization || false,
       generalCustomizationName: itemData.generalCustomizationName || "",
-      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || "0"),
+      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || 0),
+      // Item Discount
+      hasItemDiscount: itemData.hasItemDiscount || false,
+      itemDiscountType: itemData.itemDiscountType || "percentage",
+      itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || 0),
+      itemDiscountValue: parseFloat(itemData.itemDiscountValue || 0),
+      // Product Dimensions
+      productWidth: itemData.productWidth ? parseFloat(itemData.productWidth) : null,
+      productHeight: itemData.productHeight ? parseFloat(itemData.productHeight) : null,
+      productDepth: itemData.productDepth ? parseFloat(itemData.productDepth) : null
     };
-    this.budgetItems.push(newItem);
 
-    // Recalculate budget total
-    await this.recalculateBudgetTotal(budgetId);
-
-    return newItem;
+    this.budgetItems.set(budgetItem.id, budgetItem);
+    return budgetItem;
   }
 
   async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
-    const itemIndex = this.budgetItems.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) {
+    const item = this.budgetItems.get(itemId);
+    if (!item) {
       throw new Error('Budget item not found');
     }
 
     const updatedItem = {
-      ...this.budgetItems[itemIndex],
+      ...item,
       ...itemData,
-      customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : this.budgetItems[itemIndex].customizationPhoto,
-      // Ensure general customization fields are correctly updated or set
-      hasGeneralCustomization: itemData.hasGeneralCustomization !== undefined ? itemData.hasGeneralCustomization : this.budgetItems[itemIndex].hasGeneralCustomization,
-      generalCustomizationName: itemData.generalCustomizationName !== undefined ? itemData.generalCustomizationName : this.budgetItems[itemIndex].generalCustomizationName,
-      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue) : this.budgetItems[itemIndex].generalCustomizationValue,
+      quantity: parseFloat(itemData.quantity || item.quantity),
+      unitPrice: parseFloat(itemData.unitPrice || item.unitPrice),
+      totalPrice: parseFloat(itemData.totalPrice || item.totalPrice),
+      itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || item.itemCustomizationValue),
+      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || item.generalCustomizationValue),
+      itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || item.itemDiscountPercentage),
+      itemDiscountValue: parseFloat(itemData.itemDiscountValue || item.itemDiscountValue),
+      productWidth: itemData.productWidth ? parseFloat(itemData.productWidth) : item.productWidth,
+      productHeight: itemData.productHeight ? parseFloat(itemData.productHeight) : item.productHeight,
+      productDepth: itemData.productDepth ? parseFloat(itemData.productDepth) : item.productDepth,
+      // Ensure other fields are preserved if not being updated
+      producerId: itemData.producerId || item.producerId,
+      notes: itemData.notes !== undefined ? itemData.notes : item.notes,
+      hasItemCustomization: itemData.hasItemCustomization !== undefined ? itemData.hasItemCustomization : item.hasItemCustomization,
+      selectedCustomizationId: itemData.selectedCustomizationId !== undefined ? itemData.selectedCustomizationId : item.selectedCustomizationId,
+      itemCustomizationDescription: itemData.itemCustomizationDescription !== undefined ? itemData.itemCustomizationDescription : item.itemCustomizationDescription,
+      additionalCustomizationNotes: itemData.additionalCustomizationNotes !== undefined ? itemData.additionalCustomizationNotes : item.additionalCustomizationNotes,
+      customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : item.customizationPhoto,
+      hasGeneralCustomization: itemData.hasGeneralCustomization !== undefined ? itemData.hasGeneralCustomization : item.hasGeneralCustomization,
+      generalCustomizationName: itemData.generalCustomizationName !== undefined ? itemData.generalCustomizationName : item.generalCustomizationName,
+      hasItemDiscount: itemData.hasItemDiscount !== undefined ? itemData.hasItemDiscount : item.hasItemDiscount,
+      itemDiscountType: itemData.itemDiscountType !== undefined ? itemData.itemDiscountType : item.itemDiscountType,
     };
-    this.budgetItems[itemIndex] = updatedItem;
+
+    this.budgetItems.set(itemId, updatedItem);
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(updatedItem.budgetId);
@@ -2427,13 +2452,13 @@ export class MemStorage implements IStorage {
   }
 
   async deleteBudgetItem(itemId: string): Promise<boolean> {
-    const itemIndex = this.budgetItems.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) {
+    const item = this.budgetItems.get(itemId);
+    if (!item) {
       return false;
     }
 
-    const budgetId = this.budgetItems[itemIndex].budgetId;
-    this.budgetItems.splice(itemIndex, 1);
+    const budgetId = item.budgetId;
+    this.budgetItems.delete(itemId);
 
     // Recalculate budget total
     await this.recalculateBudgetTotal(budgetId);
@@ -2442,14 +2467,14 @@ export class MemStorage implements IStorage {
   }
 
   async deleteBudgetItems(budgetId: string): Promise<boolean> {
-    const initialLength = this.budgetItems.length;
-    this.budgetItems = this.budgetItems.filter(item => item.budgetId !== budgetId);
-    return this.budgetItems.length < initialLength;
+    const initialSize = this.budgetItems.size;
+    this.budgetItems = new Map([...this.budgetItems.entries()].filter(([key, value]) => value.budgetId !== budgetId));
+    return this.budgetItems.size < initialSize;
   }
 
   // Budget Photos methods
   async getBudgetPhotos(budgetId: string): Promise<any[]> {
-    return this.budgetPhotos.filter(photo => photo.budgetId === budgetId);
+    return Array.from(this.budgetPhotos.values()).filter(photo => photo.budgetId === budgetId);
   }
 
   async createBudgetPhoto(budgetId: string, photoData: { imageUrl: string; description?: string }): Promise<any> {
@@ -2460,17 +2485,12 @@ export class MemStorage implements IStorage {
       description: photoData.description || "",
       uploadedAt: new Date().toISOString()
     };
-    this.budgetPhotos.push(newPhoto);
+    this.budgetPhotos.set(newPhoto.id, newPhoto);
     return newPhoto;
   }
 
   async deleteBudgetPhoto(photoId: string): Promise<boolean> {
-    const index = this.budgetPhotos.findIndex(photo => photo.id === photoId);
-    if (index !== -1) {
-      this.budgetPhotos.splice(index, 1);
-      return true;
-    }
-    return false;
+    return this.budgetPhotos.delete(photoId);
   }
 
   // Payment Methods

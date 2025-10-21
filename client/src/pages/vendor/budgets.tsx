@@ -247,7 +247,7 @@ export default function VendorBudgets() {
         item.totalPrice = calculateItemTotal({ ...item, [field]: Boolean(value) });
       } else {
         item[field] = value;
-        
+
         // If it's a discount-related field, recalculate totalPrice
         if (field.includes('Discount') || field.includes('discount')) {
           item.totalPrice = calculateItemTotal({ ...item, [field]: value });
@@ -286,13 +286,13 @@ export default function VendorBudgets() {
 
   const calculateItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    
+
     // Item customization (valor por unidade personalizada)
     const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-    
+
     // General customization (valor por unidade aplicado à quantidade total)
     const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (parseFloat(item.generalCustomizationValue) || 0) : 0;
-    
+
     let subtotal = basePrice + itemCustomizationValue + generalCustomizationValue;
 
     // Aplicar desconto do item (sobre o preço base apenas)
@@ -571,15 +571,15 @@ export default function VendorBudgets() {
 
         return {
           productId: item.productId,
-          productName: item.productName || item.product?.name || 'Produto não encontrado',
+          productName: item.productName || item.product?.name,
           producerId: producerId,
           quantity: parseInt(item.quantity) || 1,
           unitPrice: parseFloat(item.unitPrice) || 0,
           totalPrice: parseFloat(item.totalPrice) || 0,
-          // Item Customization - preserve existing values with fallback check
-          hasItemCustomization: Boolean(item.hasItemCustomization || item.selectedCustomizationId || item.itemCustomizationValue > 0),
+          // Item Customization - use exact saved values without fallback logic
+          hasItemCustomization: Boolean(item.hasItemCustomization),
           selectedCustomizationId: item.selectedCustomizationId || "",
-          itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+          itemCustomizationValue: parseFloat(item.itemCustomizationValue) || 0,
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
@@ -588,14 +588,14 @@ export default function VendorBudgets() {
           productHeight: item.productHeight ? item.productHeight.toString() : "",
           productDepth: item.productDepth ? item.productDepth.toString() : "",
           // Item discount
-          hasItemDiscount: Boolean(item.hasItemDiscount || item.itemDiscountPercentage > 0 || item.itemDiscountValue > 0),
+          hasItemDiscount: Boolean(item.hasItemDiscount),
           itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
-          itemDiscountValue: parseFloat(item.itemDiscountValue || 0),
-          // General Customization - preserve existing values with fallback check
-          hasGeneralCustomization: Boolean(item.hasGeneralCustomization || item.generalCustomizationName || item.generalCustomizationValue > 0),
+          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage) || 0,
+          itemDiscountValue: parseFloat(item.itemDiscountValue) || 0,
+          // General Customization - use exact saved values without fallback logic
+          hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
           generalCustomizationName: item.generalCustomizationName || "",
-          generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
+          generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
         };
       }),
       paymentMethodId: budget.paymentMethodId || "",
@@ -838,16 +838,16 @@ export default function VendorBudgets() {
 
               <Separator />
 
-              {/* Product Selection */}
+              {/* Product Selection */}      
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
 
-                {/* Selected Products */}
+                {/* Selected Products */}        
                 {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
                     {vendorBudgetForm.items.map((item, index) => (
                       <div key={index} className={`p-4 border rounded-lg ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
-                        {/* Producer Name Header */}
+                        {/* Producer Name Header */}                        
                         <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
                           <div className="flex items-center gap-2">
                             <Factory className="h-4 w-4 text-gray-600" />
@@ -885,7 +885,7 @@ export default function VendorBudgets() {
                             <Label htmlFor={`unit-price-${index}`}>Preço Unitário</Label>
                             <Input
                               id={`unit-price-${index}`}
-                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
                               disabled
                             />
                           </div>
@@ -893,13 +893,13 @@ export default function VendorBudgets() {
                             <Label htmlFor={`subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
                             <Input
                               id={`subtotal-${index}`}
-                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
                               disabled
                             />
                           </div>
                         </div>
 
-                        {/* Product Size Fields */}
+                        {/* Product Size Fields */}                        
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`width-${index}`}>Largura (cm)</Label>
@@ -989,11 +989,11 @@ export default function VendorBudgets() {
                               <div>
                                 <Label>Total da Personalização</Label>
                                 <Input
-                                  value={`R$ ${(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                  value={`R$ ${(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
                                   disabled
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                                 </p>
                               </div>
                             </div>
@@ -1007,7 +1007,7 @@ export default function VendorBudgets() {
                               />
                             </div>
 
-                            {/* Image Upload for Product Customization */}
+                            {/* Image Upload for Product Customization */}                            
                             <div>
                               <Label>Imagem da Personalização deste Produto</Label>
                               <div className="mt-2 space-y-2">
@@ -1095,11 +1095,11 @@ export default function VendorBudgets() {
                             <div>
                               <Label>Total da Personalização Geral</Label>
                               <Input
-                                value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
                                 disabled
                               />
                               <p className="text-xs text-gray-500 mt-1">
-                                {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                               </p>
                             </div>
                           </div>
@@ -1188,11 +1188,11 @@ export default function VendorBudgets() {
                           </span>
                         </div>
                       </div>
-                    ))}
+                    ))
                   </div>
                 )}
 
-                {/* Add Products */}
+                {/* Add Products */}                
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -1202,7 +1202,7 @@ export default function VendorBudgets() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* Producer Selection */}
+                      {/* Producer Selection */}                      
                       <div>
                         <Label>Selecionar Produtor</Label>
                         <Select 
@@ -1223,7 +1223,7 @@ export default function VendorBudgets() {
                         </Select>
                       </div>
 
-                      {/* Product Search */}
+                      {/* Product Search */}                      
                       {selectedProducerId && (
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -1236,7 +1236,7 @@ export default function VendorBudgets() {
                         </div>
                       )}
 
-                      {/* Products List */}
+                      {/* Products List */}                      
                       {selectedProducerId && (
                         <div className="border rounded-lg p-4 bg-gray-50">
                           <div className="mb-3">
@@ -1308,7 +1308,7 @@ export default function VendorBudgets() {
                 </Card>
               </div>
 
-              {/* Payment and Shipping Configuration */}
+              {/* Payment and Shipping Configuration */}              
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Pagamento e Frete</h3>
@@ -1316,7 +1316,7 @@ export default function VendorBudgets() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="payment-method">Forma de Pagamento</Label>
-                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value })}>
+                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value }) }>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a forma de pagamento" />
                       </SelectTrigger>
@@ -1329,7 +1329,7 @@ export default function VendorBudgets() {
                   </div>
                   <div>
                     <Label htmlFor="shipping-method">Método de Frete</Label>
-                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value })}>
+                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value }) }>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o método de frete" />
                       </SelectTrigger>
@@ -1342,7 +1342,7 @@ export default function VendorBudgets() {
                   </div>
                 </div>
 
-                {/* Payment Configuration */}
+                {/* Payment Configuration */}                
                 {selectedPaymentMethod && (
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Pagamento</h4>
@@ -1351,7 +1351,7 @@ export default function VendorBudgets() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor="installments">Número de Parcelas</Label>
-                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) })}>
+                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) }) }>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -1387,21 +1387,21 @@ export default function VendorBudgets() {
                         <div className="text-xs text-gray-600 mt-2 space-y-1">
                           <div className="flex justify-between">
                             <span>Subtotal dos Produtos:</span>
-                            <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                           </div>
                           {vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 && (
                             <div className="flex justify-between">
                               <span>Frete:</span>
-                              <span>R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              <span>R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                             </div>
                           )}
                           <div className="flex justify-between font-medium text-green-700 pt-1 border-t">
                             <span>Entrada para Iniciar:</span>
-                            <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                           </div>
                           {vendorBudgetForm.downPayment > 0 && vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 && (
                             <p className="text-blue-600 font-medium text-sm">
-                              * Valor inclui frete de R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              * Valor inclui frete de R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                             </p>
                           )}
                         </div>
@@ -1410,7 +1410,7 @@ export default function VendorBudgets() {
                         <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
                         <Input
                           id="remaining-amount"
-                          value={`R$ ${(vendorBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          value={`R$ ${(vendorBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
                           disabled
                         />
                         <p className="text-xs text-gray-500 mt-1">
@@ -1421,7 +1421,7 @@ export default function VendorBudgets() {
                   </div>
                 )}
 
-                {/* Shipping Configuration */}
+                {/* Shipping Configuration */}                
                 {vendorBudgetForm.deliveryType === "pickup" ? (
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h4 className="font-medium text-blue-800">Retirada no Local</h4>
@@ -1462,7 +1462,7 @@ export default function VendorBudgets() {
                 )}
               </div>
 
-              {/* Discount Section */}
+              {/* Discount Section */}              
               <Separator />
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -1482,7 +1482,7 @@ export default function VendorBudgets() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <Label htmlFor="discount-type">Tipo de Desconto</Label>
-                        <Select value={vendorBudgetForm.discountType} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, discountType: value })}>
+                        <Select value={vendorBudgetForm.discountType} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, discountType: value }) }>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -1547,7 +1547,7 @@ export default function VendorBudgets() {
                 )}
               </div>
 
-              {/* Budget Total */}
+              {/* Budget Total */}              
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -1583,30 +1583,30 @@ export default function VendorBudgets() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span>Subtotal com Desconto:</span>
-                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor da Entrada:</span>
-                    <span>R$ {vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor do Frete:</span>
                     <span>
                       {vendorBudgetForm.deliveryType === "pickup" ? 
                         "R$ 0,00" : 
-                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
                       }
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
                     <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
-                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                     </span>
                   </div>
                 </div>
@@ -1640,7 +1640,7 @@ export default function VendorBudgets() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards */}      
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
@@ -1707,7 +1707,7 @@ export default function VendorBudgets() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters */}      
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -1741,7 +1741,7 @@ export default function VendorBudgets() {
         </CardContent>
       </Card>
 
-      {/* Budgets Table */}
+      {/* Budgets Table */}      
       <Card>
         <CardHeader>
           <CardTitle>Lista de Orçamentos ({filteredBudgets?.length || 0})</CardTitle>
@@ -1864,7 +1864,7 @@ export default function VendorBudgets() {
         </CardContent>
       </Card>
 
-      {/* View Budget Dialog */}
+      {/* View Budget Dialog */}      
       <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1876,7 +1876,7 @@ export default function VendorBudgets() {
 
           {budgetToView && (
             <div className="space-y-6">
-              {/* Budget Header */}
+              {/* Budget Header */}              
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div>
                   <Label className="font-semibold">Número do Orçamento</Label>
@@ -1934,7 +1934,7 @@ export default function VendorBudgets() {
                 </div>
               </div>
 
-              {/* Budget Items */}
+              {/* Budget Items */}              
               {budgetToView.items && budgetToView.items.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
@@ -1943,7 +1943,7 @@ export default function VendorBudgets() {
                       <div key={index} className={`border rounded-lg p-4 ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            {/* Producer Name Header */}
+                            {/* Producer Name Header */}                            
                             <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
                               <div className="flex items-center gap-2">
                                 <Factory className="h-4 w-4 text-gray-600" />
@@ -2000,12 +2000,13 @@ export default function VendorBudgets() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                    ))
+                  }
                   </div>
                 </div>
               )}
 
-              {/* Budget Details */}
+              {/* Budget Details */}              
               <div>
                 <Label className="font-semibold">Título</Label>
                 <p className="mt-1">{budgetToView.title}</p>
@@ -2018,7 +2019,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Payment and Shipping Information */}
+              {/* Payment and Shipping Information */}              
               {(budgetToView.paymentMethodId || budgetToView.shippingMethodId) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Informações de Pagamento e Frete</h3>
@@ -2032,8 +2033,8 @@ export default function VendorBudgets() {
                         )}
                         {budgetToView.downPayment > 0 && (
                           <div className="mt-2 space-y-1">
-                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                           </div>
                         )}
                       </div>
@@ -2051,7 +2052,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Budget Items */}
+              {/* Budget Items */}              
               <div>
                 <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
                 <div className="space-y-3">
@@ -2068,7 +2069,7 @@ export default function VendorBudgets() {
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Preço Unitário</Label>
-                          <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Subtotal</Label>
@@ -2078,7 +2079,7 @@ export default function VendorBudgets() {
                         </div>
                       </div>
 
-                      {/* Product Size Information */}
+                      {/* Product Size Information */}                      
                       {(item.productWidth || item.productHeight || item.productDepth) && (
                         <div className="mt-3 p-3 bg-gray-50 rounded">
                           <Label className="text-sm font-medium">Dimensões (cm)</Label>
@@ -2114,7 +2115,7 @@ export default function VendorBudgets() {
                             </div>
                             <div>
                               <Label className="text-sm font-medium">Valor Unit. Personalização</Label>
-                              <p>R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              <p>R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                             </div>
                             <div>
                               <Label className="text-sm font-medium">Total Personalização</Label>
@@ -2149,7 +2150,7 @@ export default function VendorBudgets() {
                             </div>
                             <div>
                               <Label className="text-sm font-medium">Valor Unit. Personalização Geral</Label>
-                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                             </div>
                           </div>
                           <div className="mt-2 pt-2 border-t border-green-200">
@@ -2165,11 +2166,12 @@ export default function VendorBudgets() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  ))
+                }
                 </div>
               </div>
 
-              {/* Discount Details */}
+              {/* Discount Details */}              
               {budgetToView.hasDiscount && (
                 <div className="p-4 bg-orange-50 rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Desconto Aplicado</h3>
@@ -2183,7 +2185,7 @@ export default function VendorBudgets() {
                       <p className="text-orange-600 font-semibold">
                         {budgetToView.discountType === 'percentage'
                           ? `${budgetToView.discountPercentage}%`
-                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
                         }
                       </p>
                     </div>
@@ -2191,7 +2193,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Customization Details */}
+              {/* Customization Details */}              
               {budgetToView.hasCustomization && (
                 <div className="p-4 bg-yellow-50 rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Personalização Geral</h3>
@@ -2202,7 +2204,7 @@ export default function VendorBudgets() {
                     </div>
                     <div>
                       <Label className="font-medium">Valor</Label>
-                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                     </div>
                     <div className="col-span-2">
                       <Label className="font-medium">Descrição</Label>
@@ -2212,7 +2214,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Product Customization Images */}
+              {/* Product Customization Images */}              
               {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
@@ -2240,7 +2242,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Actions */}              
               <div className="flex gap-2 pt-4 border-t">
                 <Button
                   variant="outline"
@@ -2295,7 +2297,7 @@ export default function VendorBudgets() {
         </DialogContent>
       </Dialog>
 
-      {/* Convert to Order Confirmation Dialog */}
+      {/* Convert to Order Confirmation Dialog */}      
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -2319,7 +2321,7 @@ export default function VendorBudgets() {
               </Select>
             </div>
 
-            {/* Show producers involved in this budget */}
+            {/* Show producers involved in this budget */}            
             {budgetToConvert && (() => {
               const budget = budgets?.find((b: any) => b.id === budgetToConvert);
               if (!budget?.items) return null;

@@ -206,14 +206,22 @@ export const budgetItems = pgTable("budget_items", {
 
   // Campos para personalização do item
   hasItemCustomization: boolean("has_item_customization").default(false),
+  selectedCustomizationId: varchar("selected_customization_id").references(() => customizationOptions.id),
   itemCustomizationValue: decimal("item_customization_value", { precision: 10, scale: 2 }).default('0.00'),
   itemCustomizationDescription: text("item_customization_description"),
+  additionalCustomizationNotes: text("additional_customization_notes"),
   customizationPhoto: text("customization_photo"),
 
   // Campos para personalização geral
   hasGeneralCustomization: boolean("has_general_customization").default(false),
   generalCustomizationName: text("general_customization_name"), // Nome da personalização
   generalCustomizationValue: decimal("general_customization_value", { precision: 10, scale: 2 }).default('0.00'), // Valor por unidade
+
+  // Campos para desconto do item
+  hasItemDiscount: boolean("has_item_discount").default(false),
+  itemDiscountType: text("item_discount_type").default('percentage'), // 'percentage' or 'value'
+  itemDiscountPercentage: decimal("item_discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
+  itemDiscountValue: decimal("item_discount_value", { precision: 10, scale: 2 }).default('0.00'),
 
   // Campos para tamanho do produto (em cm)
   productWidth: decimal("product_width", { precision: 8, scale: 2 }), // Largura em cm
