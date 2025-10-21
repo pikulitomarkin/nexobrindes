@@ -5606,6 +5606,128 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get all clients
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+      
+      // Enrich with additional information
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          // Get vendor information
+          const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+          
+          // Get orders count and total spent
+          const orders = await storage.getOrdersByClient(client.id);
+          const ordersCount = orders.length;
+          const totalSpent = orders.reduce((sum, order) => {
+            return sum + parseFloat(order.totalValue || '0');
+          }, 0);
+
+          return {
+            ...client,
+            vendorName: vendor?.name || null,
+            ordersCount,
+            totalSpent
+          };
+        })
+      );
+
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Get clients by vendor
+  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching clients for vendor: ${vendorId}`);
+      
+      const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+      
+      // Enrich with user data if available
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          // Get user information if userId is available
+          let userData = null;
+          if (client.userId) {
+            userData = await storage.getUser(client.userId);
+          }
+
+          // Get orders count and total spent
+          const orders = await storage.getOrdersByClient(client.id);
+          const ordersCount = orders.length;
+          const totalSpent = orders.reduce((sum, order) => {
+            return sum + parseFloat(order.totalValue || '0');
+          }, 0);
+
+          return {
+            ...client,
+            username: userData?.username || client.userCode || 'N/A',
+            userCode: userData?.username || client.userCode || client.username || 'N/A',
+            ordersCount,
+            totalSpent
+          };
+        })
+      );
+      
+      console.log(`Returning ${enrichedClients.length} enriched clients`);
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching vendor clients:", error);
+      res.status(500).json({ error: "Failed to fetch vendor clients" });
+    }
+  });
+
+  // Create client
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log(`Creating client with data:`, clientData);
+      
+      const newClient = await storage.createClient(clientData);
+      console.log(`Client created successfully:`, newClient);
+      
+      res.json(newClient);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
+  // Get client orders
+  app.get("/api/clients/:clientId/orders", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      console.log(`Fetching orders for client: ${clientId}`);
+
+      const orders = await storage.getOrdersByClient(clientId);
+      console.log(`Found ${orders.length} orders for client ${clientId}`);
+
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          return {
+            ...order,
+            vendorName: vendor?.name || 'Unknown',
+            producerName: producer?.name || null
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching client orders:", error);
+      res.status(500).json({ error: "Failed to fetch client orders" });
+    }
+  });
+
   // Get all payment methods
   app.get("/api/payment-methods", async (req, res) => {
     try {
