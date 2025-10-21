@@ -1,408 +1,412 @@
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, CreditCard, FileText, Plus, Download, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { 
+  DollarSign, Search, Filter, Download, Calendar,
+  TrendingUp, CreditCard, Banknote
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
-export default function PaymentsHistory() {
-  const { data: payments, isLoading } = useQuery({
+export default function FinancePayments() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25; // Aumentado para mostrar mais itens por página
+
+  // Query para buscar pagamentos
+  const { data: payments = [], isLoading } = useQuery({
     queryKey: ["/api/finance/payments"],
     queryFn: async () => {
-      const response = await fetch("/api/finance/payments", {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch('/api/finance/payments');
       if (!response.ok) throw new Error('Failed to fetch payments');
       return response.json();
     },
   });
 
-  const { data: orders } = useQuery({
-    queryKey: ["/api/orders"],
-    queryFn: async () => {
-      const response = await fetch("/api/orders", {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+  // Função para exportar para Excel
+  const exportToExcel = () => {
+    try {
+      const exportData = filteredPayments.map(payment => ({
+        'Data': new Date(payment.paidAt || payment.createdAt).toLocaleDateString('pt-BR'),
+        'Pedido': payment.orderNumber,
+        'Cliente': payment.clientName,
+        'Valor': `R$ ${parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        'Método': getPaymentMethodLabel(payment.method),
+        'Status': getStatusLabel(payment.status),
+        'ID Transação': payment.transactionId || '',
+        'Valor do Pedido': `R$ ${parseFloat(payment.orderValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Pagamentos");
+      
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 12 }, // Data
+        { wch: 15 }, // Pedido
+        { wch: 25 }, // Cliente
+        { wch: 15 }, // Valor
+        { wch: 15 }, // Método
+        { wch: 12 }, // Status
+        { wch: 20 }, // ID Transação
+        { wch: 15 }  // Valor do Pedido
+      ];
+      ws['!cols'] = colWidths;
+
+      const fileName = `historico-pagamentos-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast({
+        title: "Exportação concluída",
+        description: `Relatório exportado como ${fileName}`,
       });
-      if (!response.ok) throw new Error('Failed to fetch orders');
-      return response.json();
-    },
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      toast({
+        title: "Erro na exportação",
+        description: "Não foi possível exportar o relatório",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para obter label do método de pagamento
+  const getPaymentMethodLabel = (method: string) => {
+    const methodLabels: { [key: string]: string } = {
+      'pix': 'PIX',
+      'credit_card': 'Cartão de Crédito',
+      'bank_transfer': 'Transferência',
+      'boleto': 'Boleto',
+      'manual': 'Manual',
+      'cash': 'Dinheiro'
+    };
+    return methodLabels[method] || method.toUpperCase();
+  };
+
+  // Função para obter label do status
+  const getStatusLabel = (status: string) => {
+    const statusLabels: { [key: string]: string } = {
+      'confirmed': 'Confirmado',
+      'pending': 'Pendente',
+      'failed': 'Falhado',
+      'cancelled': 'Cancelado'
+    };
+    return statusLabels[status] || status;
+  };
+
+  // Filtrar pagamentos
+  const filteredPayments = payments.filter(payment => {
+    const matchesSearch = !searchTerm || 
+      (payment.clientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (payment.orderNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (payment.transactionId?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
+    const matchesMethod = methodFilter === 'all' || payment.method === methodFilter;
+    
+    return matchesSearch && matchesStatus && matchesMethod;
   });
 
-  const { data: commissions } = useQuery({
-    queryKey: ["/api/commissions"],
-    queryFn: async () => {
-      const response = await fetch("/api/commissions", {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch commissions');
-      return response.json();
-    },
-  });
+  // Paginação
+  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedPayments = filteredPayments.slice(startIndex, startIndex + itemsPerPage);
 
-  const { data: expenses } = useQuery({
-    queryKey: ["/api/finance/expenses"],
-    queryFn: async () => {
-      const response = await fetch("/api/finance/expenses", {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch expenses');
-      return response.json();
-    },
-  });
+  // Calcular totais para o resumo
+  const totalRecebido = payments
+    .filter(p => p.status === 'confirmed')
+    .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
-  const { data: producerPayments } = useQuery({
-    queryKey: ["/api/finance/producer-payments"],
-    queryFn: async () => {
-      const response = await fetch("/api/finance/producer-payments", {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch producer payments');
-      return response.json();
-    },
-  });
+  const totalPendente = payments
+    .filter(p => p.status === 'pending')
+    .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+
+  const paymentsThisMonth = payments.filter(payment => {
+    const paymentDate = new Date(payment.paidAt || payment.createdAt);
+    const now = new Date();
+    return paymentDate.getMonth() === now.getMonth() && 
+           paymentDate.getFullYear() === now.getFullYear() &&
+           payment.status === 'confirmed';
+  }).reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
   if (isLoading) {
     return (
-      <div className="p-8">
+      <div className="container mx-auto p-4">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-xl"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
             ))}
           </div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
   }
 
-  // Calcular métricas reais
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  // Receita Total do mês atual (baseado em pagamentos confirmados)
-  const monthlyRevenue = payments?.filter((payment: any) => {
-    if (!payment.paidAt || payment.status !== 'confirmed') return false;
-    const paymentDate = new Date(payment.paidAt);
-    return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
-  }).reduce((total: number, payment: any) => total + parseFloat(payment.amount || '0'), 0) || 0;
-
-  // Custos de Produção (baseado em pagamentos de produtores)
-  const productionCosts = (producerPayments || [])?.filter((payment: any) => 
-    payment.status === 'paid'
-  ).reduce((total: number, payment: any) => total + parseFloat(payment.amount || '0'), 0) || 0;
-
-  // Comissões Pendentes
-  const pendingCommissions = commissions?.filter((commission: any) => 
-    commission.status === 'pending' || commission.status === 'confirmed'
-  ).reduce((total: number, commission: any) => total + parseFloat(commission.amount || '0'), 0) || 0;
-
-  // Despesas do Mês
-  const monthlyExpenses = expenses?.filter((expense: any) => {
-    if (!expense.createdAt && !expense.date) return false;
-    const expenseDate = new Date(expense.createdAt || expense.date);
-    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
-  }).reduce((total: number, expense: any) => total + parseFloat(expense.amount || '0'), 0) || 0;
-
-  // Lucro Líquido
-  const netProfit = monthlyRevenue - productionCosts - pendingCommissions - monthlyExpenses;
-
-  // Atividades recentes (últimos pagamentos e transações)
-  const recentActivities: any[] = [];
-
-  // Adicionar pagamentos recentes confirmados
-  if (payments && payments.length > 0) {
-    payments
-      .filter((payment: any) => payment.status === 'confirmed')
-      .sort((a: any, b: any) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())
-      .slice(0, 5)
-      .forEach((payment: any) => {
-        recentActivities.push({
-          type: 'payment',
-          description: `Recebimento - ${payment.clientName || 'Cliente'} (${payment.orderNumber || 'Pedido'})`,
-          amount: parseFloat(payment.amount || '0'),
-          time: payment.paidAt || payment.createdAt,
-          positive: true,
-          method: payment.method?.toUpperCase() || 'MANUAL'
-        });
-      });
-  }
-
-  // Adicionar despesas recentes aprovadas
-  if (expenses && expenses.length > 0) {
-    expenses
-      .filter((expense: any) => expense.status === 'approved' || expense.status === 'recorded')
-      .sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
-      .slice(0, 3)
-      .forEach((expense: any) => {
-        recentActivities.push({
-          type: 'expense',
-          description: `Despesa - ${expense.name || expense.description || 'Nova despesa'}`,
-          amount: parseFloat(expense.amount || '0'),
-          time: expense.createdAt || expense.date,
-          positive: false,
-          category: expense.category
-        });
-      });
-  }
-
-  // Adicionar pagamentos de comissões recentes
-  if (commissions && commissions.length > 0) {
-    commissions
-      .filter((commission: any) => commission.status === 'paid' && commission.paidAt)
-      .sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
-      .slice(0, 2)
-      .forEach((commission: any) => {
-        recentActivities.push({
-          type: 'commission',
-          description: `Comissão Paga - ${commission.vendorName || 'Vendedor'}`,
-          amount: parseFloat(commission.amount || '0'),
-          time: commission.paidAt,
-          positive: false
-        });
-      });
-  }
-
-  // Adicionar pagamentos de produtores recentes
-  if (producerPayments && producerPayments.length > 0) {
-    producerPayments
-      .filter((payment: any) => payment.status === 'paid' && payment.paidAt)
-      .sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
-      .slice(0, 2)
-      .forEach((payment: any) => {
-        recentActivities.push({
-          type: 'producer_payment',
-          description: `Pagamento Produtor - ${payment.producerName || 'Produtor'}`,
-          amount: parseFloat(payment.amount || '0'),
-          time: payment.paidAt,
-          positive: false
-        });
-      });
-  }
-
-  // Ordenar todas as atividades por data (mais recente primeiro)
-  recentActivities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-  // Limitar a 10 atividades mais recentes
-  const limitedActivities = recentActivities.slice(0, 10);
-
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Histórico de Pagamentos</h1>
-          <p className="text-gray-600 mt-2">Visualização de todos os pagamentos do sistema</p>
+          <h1 className="text-2xl font-bold text-gray-900">Histórico de Pagamentos</h1>
+          <p className="text-gray-600 text-sm">Visualização de todos os pagamentos do sistema</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={exportToExcel} className="bg-green-600 hover:bg-green-700">
           <Download className="h-4 w-4 mr-2" />
           Exportar Relatório
         </Button>
       </div>
 
       {/* Resumo do Mês */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold">Resumo do Mês</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">Receita Total</p>
-              <p className="text-2xl font-bold text-green-600">
-                R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Receita Total</p>
+                <p className="text-lg font-semibold text-green-600">
+                  R$ {totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">Custos de Produção</p>
-              <p className="text-2xl font-bold text-red-600">
-                R$ {productionCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Calendar className="h-8 w-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Receita do Mês</p>
+                <p className="text-lg font-semibold text-blue-600">
+                  R$ {paymentsThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">Comissões Pendentes</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <CreditCard className="h-8 w-8 text-orange-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Pendentes</p>
+                <p className="text-lg font-semibold text-orange-600">
+                  R$ {totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">Despesas do Mês</p>
-              <p className="text-2xl font-bold text-orange-600">
-                R$ {monthlyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Banknote className="h-8 w-8 text-purple-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Total de Pagamentos</p>
+                <p className="text-lg font-semibold text-purple-600">
+                  {filteredPayments.length}
+                </p>
+              </div>
             </div>
-          </div>
-          
-          <div className="mt-6 pt-6 border-t">
-            <div className="flex items-center justify-between">
-              <p className="text-lg font-semibold text-gray-700">Lucro Líquido</p>
-              <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtros */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por cliente, pedido ou transação..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="failed">Falhado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={methodFilter} onValueChange={setMethodFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Métodos</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                  <SelectItem value="bank_transfer">Transferência</SelectItem>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Atividades Recentes */}
+      {/* Tabela de Pagamentos */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-bold">Atividades Recentes</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Pagamentos Recentes</span>
+            <span className="text-sm font-normal text-gray-500">
+              {filteredPayments.length} pagamento{filteredPayments.length !== 1 ? 's' : ''}
+            </span>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {limitedActivities.length > 0 ? (
-            <div className="space-y-4">
-              {limitedActivities.map((activity, index) => {
-                const getActivityIcon = () => {
-                  switch (activity.type) {
-                    case 'payment':
-                      return <DollarSign className="h-5 w-5 text-green-600" />;
-                    case 'expense':
-                      return <TrendingDown className="h-5 w-5 text-red-600" />;
-                    case 'commission':
-                      return <TrendingUp className="h-5 w-5 text-blue-600" />;
-                    case 'producer_payment':
-                      return <CreditCard className="h-5 w-5 text-purple-600" />;
-                    default:
-                      return <FileText className="h-5 w-5 text-gray-600" />;
-                  }
-                };
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-[100px]">Data</TableHead>
+                  <TableHead className="w-[120px]">Pedido</TableHead>
+                  <TableHead className="w-[200px]">Cliente</TableHead>
+                  <TableHead className="w-[100px]">Valor</TableHead>
+                  <TableHead className="w-[120px]">Método</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[150px]">ID Transação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">Nenhum pagamento encontrado</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedPayments.map((payment) => (
+                    <TableRow key={payment.id} className="hover:bg-gray-50">
+                      <TableCell className="text-xs">
+                        {new Date(payment.paidAt || payment.createdAt).toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {payment.orderNumber}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {payment.clientName || 'Cliente não identificado'}
+                      </TableCell>
+                      <TableCell className="font-semibold text-sm">
+                        R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { 
+                          minimumFractionDigits: 2 
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {getPaymentMethodLabel(payment.method)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={payment.status === 'confirmed' ? 'default' : 
+                                  payment.status === 'pending' ? 'secondary' : 'destructive'}
+                          className="text-xs"
+                        >
+                          {getStatusLabel(payment.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-gray-600">
+                        {payment.transactionId || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-                const getActivityBadge = () => {
-                  switch (activity.type) {
-                    case 'payment':
-                      return { label: activity.method || 'Recebimento', variant: 'default' as const };
-                    case 'expense':
-                      return { label: 'Despesa', variant: 'destructive' as const };
-                    case 'commission':
-                      return { label: 'Comissão', variant: 'secondary' as const };
-                    case 'producer_payment':
-                      return { label: 'Produtor', variant: 'outline' as const };
-                    default:
-                      return { label: 'Transação', variant: 'outline' as const };
-                  }
-                };
-
-                const badge = getActivityBadge();
-                
-                return (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        activity.positive ? 'bg-green-100' : 'bg-red-100'
-                      }`}>
-                        {getActivityIcon()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{activity.description}</p>
-                        <p className="text-sm text-gray-500">
-                          {activity.time ? new Date(activity.time).toLocaleString('pt-BR') : 'Data não disponível'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-semibold ${activity.positive ? 'text-green-600' : 'text-red-600'}`}>
-                        {activity.positive ? '+' : '-'} R$ {activity.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <Badge variant={badge.variant} className="text-xs mt-1">
-                        {badge.label}
-                      </Badge>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">Nenhuma atividade recente encontrada</p>
-              <p className="text-sm text-gray-400">
-                Os pagamentos e transações aparecerão aqui conforme forem processados
-              </p>
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t">
+              <div className="text-sm text-gray-700">
+                Mostrando {startIndex + 1} a {Math.min(startIndex + itemsPerPage, filteredPayments.length)} de {filteredPayments.length} pagamentos
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                    if (page <= totalPages) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })}
+                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                    <>
+                      <span className="px-2 text-gray-400">...</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Lista Completa de Pagamentos */}
-      {payments && payments.length > 0 && (
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold">Todos os Pagamentos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pedido
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cliente
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Método
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {payments.map((payment: any) => (
-                    <tr key={payment.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : 
-                         new Date(payment.createdAt).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {payment.orderNumber || `#${payment.orderId?.slice(-6)}`}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {payment.clientName || 'Cliente não identificado'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <Badge variant="outline">
-                          {payment.method?.toUpperCase() || 'N/A'}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                        R$ {parseFloat(payment.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge className={`${
-                          payment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                          payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {payment.status === 'confirmed' ? 'Confirmado' :
-                           payment.status === 'pending' ? 'Pendente' : 'Cancelado'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
