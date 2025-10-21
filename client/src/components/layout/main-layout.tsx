@@ -14,7 +14,10 @@ import {
   Settings, // Added Settings icon import
   LogOut,
   ClipboardList, // Import ClipboardList if it was intended to be used elsewhere
-  MessageCircle
+  MessageCircle,
+  BarChart3, // Added BarChart3 icon
+  Calculator, // Added Calculator icon
+  User // Added User icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -84,10 +87,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         ];
       case "client":
         return [
-          { href: "/client/dashboard", icon: Home, label: "Dashboard" },
+          { href: "/client/dashboard", icon: BarChart3, label: "Dashboard" },
           { href: "/client/products", icon: Package, label: "Catálogo" },
           { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
-          { href: "/client/profile", icon: Users, label: "Meu Perfil" },
+          { href: "/client/budgets", icon: Calculator, label: "Meus Orçamentos" },
+          { href: "/client/profile", icon: User, label: "Meu Perfil" },
         ];
       case "producer":
         return [
