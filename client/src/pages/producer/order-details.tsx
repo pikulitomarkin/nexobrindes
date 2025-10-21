@@ -319,33 +319,25 @@ export default function ProducerOrderDetails() {
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium">{item.product?.name || 'Produto'}</h4>
+                        <span className="font-semibold text-green-600">
+                          R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                      <div className="grid grid-cols-3 gap-3 text-sm text-gray-600">
                         <div>
                           <span className="font-medium">Quantidade:</span> {item.quantity}
                         </div>
                         <div>
-                          <span className="font-medium">Categoria:</span> {item.product?.category || 'N/A'}
+                          <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </div>
                       </div>
-                      {item.product?.description && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded">
-                          <p className="text-sm"><strong>Descrição:</strong> {item.product.description}</p>
-                        </div>
-                      )}
                       {item.hasItemCustomization && (
                         <div className="mt-2 p-2 bg-yellow-50 rounded">
                           <p className="text-sm"><strong>Personalização:</strong> {item.itemCustomizationDescription}</p>
-                          {item.customizationPhoto && (
-                            <div className="mt-2">
-                              <img 
-                                src={item.customizationPhoto} 
-                                alt="Personalização" 
-                                className="w-20 h-20 object-cover rounded cursor-pointer"
-                                onClick={() => window.open(item.customizationPhoto, '_blank')}
-                              />
-                            </div>
-                          )}
+                          <p className="text-sm"><strong>Valor adicional:</strong> R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                       )}
                     </div>

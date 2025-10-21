@@ -98,7 +98,7 @@ export interface IStorage {
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
-  updateCommissionStatus(id: string, status: string, paidAt?: Date): Promise<Commission | undefined>;
+  updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
   deductPartnerCommission(partnerId: string, amount: string): Promise<void>;
   updateCommissionsByOrderStatus(orderId: string, orderStatus: string): Promise<void>;
 
@@ -478,41 +478,21 @@ export class MemStorage implements IStorage {
     };
     this.users.set(clientUser.id, clientUser);
 
-    // Producer user 1 - Marcenaria
-    const producerUser1 = {
+    // Producer user
+    const producerUser = {
       id: "producer-1",
       username: "produtor1",
       password: "123456",
       name: "Marcenaria Santos",
       email: "contato@marcenariasantos.com",
-      phone: "(11) 98765-4321",
-      address: "Rua das Madeiras, 123, São Paulo, SP",
-      specialty: "Móveis sob medida em madeira maciça",
+      phone: null,
       vendorId: null,
       role: "producer",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.users.set(producerUser1.id, producerUser1);
-
-    // Producer user 2 - Metalúrgica
-    const producerUser2 = {
-      id: "producer-2",
-      username: "produtor2",
-      password: "123456",
-      name: "Metalúrgica Silva",
-      email: "contato@metalurgicasilva.com",
-      phone: "(11) 99876-5432",
-      address: "Av. Industrial, 456, São Paulo, SP",
-      specialty: "Estruturas metálicas e móveis em aço",
-      vendorId: null,
-      role: "producer",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(producerUser2.id, producerUser2);
+    this.users.set(producerUser.id, producerUser);
 
     // Partner user with same credentials as admin
     const partnerUser = {
@@ -790,39 +770,18 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(payment.id, payment);
 
-    // Create vendor commission
+    // Create commission
     const commission: Commission = {
       id: "commission-1",
       vendorId: "vendor-1",
-      partnerId: null,
       orderId: "order-1",
-      type: "vendor",
       percentage: "10.00",
       amount: "245.00",
       status: "pending",
       paidAt: null,
-      orderValue: "2450.00",
-      orderNumber: "#12345",
       createdAt: new Date("2024-11-15")
     };
     this.commissions.set(commission.id, commission);
-
-    // Create partner commission
-    const partnerCommission: Commission = {
-      id: "commission-partner-1",
-      vendorId: null,
-      partnerId: "partner-1",
-      orderId: "order-1",
-      type: "partner",
-      percentage: "15.00",
-      amount: "367.50",
-      status: "confirmed", // Partner commission confirmed when order is confirmed
-      paidAt: null,
-      orderValue: "2450.00",
-      orderNumber: "#12345",
-      createdAt: new Date("2024-11-15")
-    };
-    this.commissions.set(partnerCommission.id, partnerCommission);
 
     // Create additional sample payments for recent orders to show correct values
     const allOrders = Array.from(this.orders.values());
@@ -922,9 +881,8 @@ export class MemStorage implements IStorage {
     ];
     mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
 
-    // Initialize mock products - 2 produtos para cada produtor
+    // Initialize mock products
     mockProducts = [
-      // Produtos da Marcenaria Santos (producer-1)
       {
         id: 'product-1',
         name: 'Mesa de Jantar Clássica',
@@ -933,55 +891,29 @@ export class MemStorage implements IStorage {
         basePrice: '2500.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1',
+        producerId: 'producer-1', // Added producerId
         createdAt: new Date().toISOString()
       },
       {
         id: 'product-2',
-        name: 'Guarda-Roupa 6 Portas',
-        description: 'Guarda-roupa em madeira MDF com espelhos',
+        name: 'Cadeira Estofada',
+        description: 'Cadeira com estofado em couro sintético',
         category: 'Móveis',
-        basePrice: '1890.00',
+        basePrice: '450.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1',
+        producerId: 'producer-1', // Added producerId
         createdAt: new Date().toISOString()
       },
-
-      // Produtos da Metalúrgica Silva (producer-2)
       {
         id: 'product-3',
-        name: 'Mesa de Centro Metálica',
-        description: 'Mesa de centro com estrutura em aço e tampo de vidro',
+        name: 'Estante Modular',
+        description: 'Estante com módulos personalizáveis',
         category: 'Móveis',
-        basePrice: '890.00',
-        unit: 'un',
+        basePrice: '1200.00',
+        unit: 'm',
         isActive: true,
-        producerId: 'producer-2',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'product-4',
-        name: 'Estante Industrial',
-        description: 'Estante em estrutura metálica estilo industrial',
-        category: 'Móveis',
-        basePrice: '1450.00',
-        unit: 'un',
-        isActive: true,
-        producerId: 'producer-2',
-        createdAt: new Date().toISOString()
-      },
-
-      // Produto interno (para exemplo)
-      {
-        id: 'product-5',
-        name: 'Almofada Decorativa',
-        description: 'Almofada decorativa em tecido premium',
-        category: 'Decoração',
-        basePrice: '85.00',
-        unit: 'un',
-        isActive: true,
-        producerId: 'internal',
+        producerId: 'internal', // Example of internal product
         createdAt: new Date().toISOString()
       }
     ];
@@ -1916,21 +1848,19 @@ export class MemStorage implements IStorage {
   }
 
   // Update commission status
-  async updateCommissionStatus(commissionId: string, status: string, paidAt?: Date): Promise<Commission | undefined> {
-    const commission = this.commissions.get(commissionId);
-    if (commission) {
-      commission.status = status;
-      if (status === 'paid') {
-        commission.paidAt = paidAt || new Date();
-      } else if (status === 'cancelled') {
-        commission.paidAt = null;
-      }
-      this.commissions.set(commissionId, commission);
-      console.log(`Updated commission ${commissionId} to status ${status}${status === 'paid' ? ' with paidAt: ' + commission.paidAt : ''}`);
-      return commission;
+  async updateCommissionStatus(id: string, status: string): Promise<Commission | undefined> {
+    const commission = this.commissions.get(id);
+    if (!commission) return undefined;
+
+    commission.status = status;
+    if (status === 'paid') {
+      commission.paidAt = new Date();
+    } else if (status === 'deducted') {
+      commission.deductedAt = new Date();
     }
-    console.log(`Commission ${commissionId} not found for status update`);
-    return null;
+
+    this.commissions.set(id, commission);
+    return commission;
   }
 
   // Update commissions based on order status
@@ -2712,7 +2642,7 @@ export class MemStorage implements IStorage {
         if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
           updatedReceivable.status = 'partial';
         } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
-          updatedReceivable.status = 'pending';
+          updatedReceivable.status = 'pending'; // Minimum not met
         } else {
           updatedReceivable.status = 'partial';
         }
@@ -2789,7 +2719,7 @@ export class MemStorage implements IStorage {
       if (minimumPayment > 0 && paidValue >= minimumPayment) {
         return 'partial';
       } else if (minimumPayment > 0 && paidValue < minimumPayment) {
-        return 'pending';
+        return 'pending'; // Minimum not met
       } else {
         return 'partial';
       }
@@ -3291,27 +3221,22 @@ export class MemStorage implements IStorage {
   }
 
   async updateProducerPayment(id: string, data: Partial<InsertProducerPayment & { paidBy?: string; paidAt?: Date; paymentMethod?: string }>): Promise<ProducerPayment | undefined> {
-    const payment = this.producerPayments.get(id);
-    if (!payment) return undefined;
+    const existing = this.producerPayments.get(id);
+    if (!existing) return undefined;
 
-    const updatedPayment = {
-      ...payment,
+    const updated: ProducerPayment = {
+      ...existing,
       ...data,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-
-    this.producerPayments.set(id, updatedPayment);
-
-    // If payment is marked as paid, update the production order
-    if (data.status === 'paid' && payment.productionOrderId) {
-      const productionOrder = this.productionOrders.get(payment.productionOrderId);
-      if (productionOrder) {
-        productionOrder.producerPaymentStatus = 'paid';
-        this.productionOrders.set(payment.productionOrderId, productionOrder);
-      }
-    }
-
-    return updatedPayment;
+    this.producerPayments.set(id, updated);
+    console.log(`Updated producer payment ${id}:`, {
+      status: updated.status,
+      amount: updated.amount,
+      paidAt: updated.paidAt,
+      paymentMethod: updated.paymentMethod
+    });
+    return updated;
   }
 
   async getProducerPayment(id: string): Promise<ProducerPayment | undefined> {
@@ -3356,55 +3281,66 @@ export class MemStorage implements IStorage {
       console.log(`Calculating commissions for order ${order.orderNumber}`);
 
       const orderValue = parseFloat(order.totalValue);
-      const settings = await this.getCommissionSettings();
 
-      // Create vendor commission
+      // Get commission settings
+      const settings = await this.getCommissionSettings();
+      const defaultVendorRate = parseFloat(settings?.vendorCommissionRate || '10.00');
+      const defaultPartnerRate = parseFloat(settings?.partnerCommissionRate || '15.00');
+
+      // Get vendor commission rate from vendor profile, fallback to default
+      let vendorRate = defaultVendorRate;
       if (order.vendorId) {
-        const vendorCommission: Commission = {
-          id: randomUUID(),
-          vendorId: order.vendorId,
-          partnerId: null,
-          orderId: order.id,
-          type: 'vendor',
-          percentage: settings?.vendorCommissionRate || '10.00',
-          amount: (orderValue * parseFloat(settings?.vendorCommissionRate || '10.00') / 100).toFixed(2),
-          status: 'pending', // Vendor commission starts as pending, becomes confirmed when order is ready
-          paidAt: null,
-          deductedAt: null,
-          orderValue: order.totalValue,
-          orderNumber: order.orderNumber,
-          createdAt: new Date()
-        };
-        this.commissions.set(vendorCommission.id, vendorCommission);
-        console.log(`Created vendor commission: ${vendorCommission.id} - ${vendorCommission.amount} for vendor ${order.vendorId}`);
+        const vendor = await this.getVendor(order.vendorId);
+        if (vendor) {
+          vendorRate = parseFloat(vendor.commissionRate || defaultVendorRate.toString());
+        }
       }
 
-      // Create partner commission for all partners
-      const partners = await this.getPartners();
-      console.log(`Found ${partners.length} partners to create commissions for`);
+      // Create vendor commission (to be paid when order is completed)
+      const vendorCommission: Commission = {
+        id: `comm-vendor-${order.id}`,
+        vendorId: order.vendorId,
+        partnerId: null,
+        orderId: order.id,
+        type: 'vendor',
+        percentage: vendorRate.toFixed(2),
+        amount: ((orderValue * vendorRate) / 100).toFixed(2),
+        status: 'pending', // Will be confirmed when order is completed
+        orderValue: order.totalValue,
+        orderNumber: order.orderNumber,
+        createdAt: new Date()
+      };
+
+      this.commissions.set(vendorCommission.id, vendorCommission);
+
+      // Create partner commission for all active partners (to be confirmed immediately on payment)
+      const allUsers = Array.from(this.users.values());
+      const partners = allUsers.filter(user => user.role === 'partner' && user.isActive);
 
       for (const partner of partners) {
+        const partnerInfo = await this.getPartner(partner.id);
+        let partnerRate = defaultPartnerRate;
+        if (partnerInfo) {
+          partnerRate = parseFloat(partnerInfo.commissionRate || defaultPartnerRate.toString());
+        }
+
         const partnerCommission: Commission = {
-          id: randomUUID(),
+          id: `comm-partner-${partner.id}-${order.id}`,
           vendorId: null,
           partnerId: partner.id,
           orderId: order.id,
           type: 'partner',
-          percentage: settings?.partnerCommissionRate || '15.00',
-          amount: (orderValue * parseFloat(settings?.partnerCommissionRate || '15.00') / 100).toFixed(2),
-          status: 'confirmed', // Partner commission is confirmed immediately when order is confirmed
-          paidAt: null,
-          deductedAt: null,
+          percentage: partnerRate.toFixed(2),
+          amount: ((orderValue * partnerRate) / 100).toFixed(2),
+          status: 'pending', // Will be confirmed when payment is received
           orderValue: order.totalValue,
           orderNumber: order.orderNumber,
           createdAt: new Date()
         };
+
         this.commissions.set(partnerCommission.id, partnerCommission);
-        console.log(`Created partner commission: ${partnerCommission.id} - ${partnerCommission.amount} for partner ${partner.id}`);
       }
 
-      const totalCommissions = this.commissions.size;
-      console.log(`Total commissions in system after creation: ${totalCommissions}`);
       console.log(`Created commissions for order ${order.orderNumber}: 1 vendor + ${partners.length} partners`);
     } catch (error) {
       console.error(`Error calculating commissions for order ${order.orderNumber}:`, error);

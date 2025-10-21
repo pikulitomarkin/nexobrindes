@@ -14,8 +14,7 @@ import {
   Settings, // Added Settings icon import
   LogOut,
   ClipboardList, // Import ClipboardList if it was intended to be used elsewhere
-  MessageCircle,
-  User // Import User icon
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -88,8 +87,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/client/dashboard", icon: Home, label: "Dashboard" },
           { href: "/client/products", icon: Package, label: "Catálogo" },
           { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
-          { href: "/client/budgets", icon: FileText, label: "Meus Orçamentos" },
-          { href: "/client/profile", icon: User, label: "Meu Perfil" },
+          { href: "/client/profile", icon: Users, label: "Meu Perfil" },
         ];
       case "producer":
         return [
