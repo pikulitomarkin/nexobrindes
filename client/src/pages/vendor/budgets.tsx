@@ -1811,87 +1811,63 @@ export default function VendorBudgets() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredBudgets?.map((budget: any) => (
-                  <tr key={budget.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {budget.budgetNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {budget.title}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {budget.contactName || budget.clientName || 'Nome não informado'}
-                      </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(budget.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-0.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewBudget(budget)}
-                          data-testid={`button-view-${budget.id}`}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
-                        {budget.status !== 'production' && (
+                  <div key={budget.id} className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 relative ${budget.hasVendorNotification ? 'border-blue-300 bg-blue-50' : ''}`} onClick={() => handleViewBudget(budget)}>
+                    {budget.hasVendorNotification && (
+                      <div className="absolute -top-2 -right-2">
+                        <Bell className="h-5 w-5 text-blue-600 animate-pulse" />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="font-semibold flex items-center gap-2">
+                          {budget.title}
+                          {budget.hasVendorNotification && (
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                              Nova Resposta!
+                            </Badge>
+                          )}
+                        </h3>
+                        <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {getStatusBadge(budget.status)}
+                        {budget.status === 'approved' && (
                           <Button
-                            variant="ghost"
                             size="sm"
-                            className="text-orange-600 hover:text-orange-900"
-                            onClick={() => handleEditBudget(budget)}
-                            data-testid={`button-edit-${budget.id}`}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Editar
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => generatePDFMutation.mutate(budget.id)}
-                          disabled={generatePDFMutation.isPending}
-                          data-testid={`button-pdf-${budget.id}`}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          PDF
-                        </Button>
-                        {(budget.status === 'draft' || budget.status === 'sent') && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-600 hover:text-blue-900"
-                            onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
-                            disabled={sendToWhatsAppMutation.isPending}
-                            data-testid={`button-send-${budget.id}`}
-                          >
-                            <Send className="h-4 w-4 mr-1" />
-                            {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar'}
-                          </Button>
-                        )}
-                        {budget.status !== 'converted' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-600 hover:text-green-900"
-                            onClick={() => handleConvertClick(budget.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleConvertClick(budget.id);
+                            }}
                             disabled={convertToOrderMutation.isPending}
-                            data-testid={`button-convert-${budget.id}`}
                           >
                             <ShoppingCart className="h-4 w-4 mr-1" />
-                            {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter'}
+                            Converter em Pedido
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+
+                    {budget.clientObservations && (
+                      <div className={`mb-3 p-2 rounded text-sm ${
+                        budget.status === 'approved' 
+                          ? 'bg-green-50 text-green-800 border border-green-200' 
+                          : 'bg-red-50 text-red-800 border border-red-200'
+                      }`}>
+                        <strong>Observações do Cliente:</strong> {budget.clientObservations}
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-green-600">
+                        R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="text-sm text-gray-500">
+                        {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </tbody>
             </table>
@@ -1970,7 +1946,6 @@ export default function VendorBudgets() {
               </div>
 
               {/* Budget Items */}              
-              {/* Itens do Orçamento */}
               {budgetToView.items && budgetToView.items.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Itens do Orçamento ({budgetToView.items.length})</h3>

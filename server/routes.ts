@@ -52,7 +52,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
 
 // Helper function to parse OFX buffer
 async function parseOFXBuffer(buffer: Buffer) {
-  const ofxContent = buffer.toString('utf-8');
+  const ofxContent = buffer.toString('utf-utf-8');
   const transactions = [];
 
   // Simple regex-based OFX parsing
@@ -2896,105 +2896,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Budget approval endpoint (for clients)
+  app.post("/api/budgets/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { observations } = req.body;
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: "approved",
+        approvedAt: new Date(),
+        clientObservations: observations || null,
+        hasVendorNotification: true // Nova notificação para o vendedor
+      });
+
+      if (!updatedBudget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      console.log(`Budget ${id} approved by client with observations: ${observations}`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error approving budget:", error);
+      res.status(500).json({ error: "Erro ao aprovar orçamento" });
+    }
+  });
+
+  // Budget rejection endpoint (for clients)
+  app.post("/api/budgets/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { observations } = req.body;
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: "rejected",
+        rejectedAt: new Date(),
+        clientObservations: observations || null,
+        hasVendorNotification: true // Nova notificação para o vendedor
+      });
+
+      if (!updatedBudget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      console.log(`Budget ${id} rejected by client with observations: ${observations}`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error rejecting budget:", error);
+      res.status(500).json({ error: "Erro ao rejeitar orçamento" });
+    }
+  });
+
+  // Convert approved budget to order
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const { id } = req.params;
-      const { clientId } = req.body;
-
-      console.log(`Converting budget ${id} to order for client ${clientId}`);
 
       const budget = await storage.getBudget(id);
       if (!budget) {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      if (budget.status === 'converted') {
-        return res.status(400).json({ error: "Este orçamento já foi convertido em pedido" });
+      if (budget.status !== 'approved') {
+        return res.status(400).json({ error: "Apenas orçamentos aprovados podem ser convertidos em pedidos" });
       }
-
-      // Generate order number
-      const orderNumber = `PED-${Date.now()}`;
-
-      console.log("Creating order with order number:", orderNumber);
 
       const orderData = {
-        orderNumber,
-        clientId: clientId,
+        budgetId: id,
+        clientId: budget.clientId,
         vendorId: budget.vendorId,
+        contactName: budget.contactName,
+        contactPhone: budget.contactPhone,
+        contactEmail: budget.contactEmail,
         product: budget.title,
-        description: budget.description || "",
-        totalValue: typeof budget.totalValue === 'number' ? budget.totalValue.toFixed(2) : budget.totalValue.toString(),
-        status: "confirmed",
-        deadline: budget.deliveryDeadline,
+        description: budget.description,
+        totalValue: budget.totalValue,
         deliveryDeadline: budget.deliveryDeadline,
-        contactName: budget.contactName || "Cliente do Orçamento",
-        contactPhone: budget.contactPhone || "",
-        contactEmail: budget.contactEmail || "",
-        deliveryType: budget.deliveryType || "delivery",
-        items: budget.items || [],
-        paymentMethodId: budget.paymentMethodId || "",
-        shippingMethodId: budget.shippingMethodId || "",
-        installments: budget.installments || 1,
-        downPayment: parseFloat(budget.downPayment || '0'),
-        remainingAmount: parseFloat(budget.remainingAmount || '0'),
-        shippingCost: parseFloat(budget.shippingCost || '0'),
-        hasDiscount: budget.hasDiscount || false,
-        discountType: budget.discountType || "percentage",
-        discountPercentage: parseFloat(budget.discountPercentage || '0'),
-        discountValue: parseFloat(budget.discountValue || '0')
+        deliveryType: budget.deliveryType,
+        items: budget.items,
+        paymentMethodId: budget.paymentMethodId,
+        shippingMethodId: budget.shippingMethodId,
+        installments: budget.installments,
+        downPayment: budget.downPayment,
+        remainingAmount: budget.remainingAmount,
+        shippingCost: budget.shippingCost,
+        hasDiscount: budget.hasDiscount,
+        discountType: budget.discountType,
+        discountPercentage: budget.discountPercentage,
+        discountValue: budget.discountValue,
+        status: 'confirmed'
       };
 
-      console.log("Converting budget to order with data:", {
-        budgetId: id,
-        orderNumber: orderNumber,
-        contactName: orderData.contactName,
-        clientId: orderData.clientId,
-        itemsCount: orderData.items.length,
-        totalValue: orderData.totalValue
-      });
-
-      const newOrder = await storage.createOrder(orderData);
+      const order = await storage.createOrder(orderData);
 
       // Update budget status to converted
-      await storage.updateBudget(id, { status: "converted" });
-
-      // Create production orders for all producers involved in the budget items
-      const producersInvolved = new Set<string>();
-
-      if (budget.items && Array.isArray(budget.items)) {
-        budget.items.forEach((item: any) => {
-          if (item.producerId && item.producerId !== 'internal') {
-            producersInvolved.add(item.producerId);
-          }
-        });
-      }
-
-      // Create production orders for each producer
-      for (const producerId of producersInvolved) {
-        await storage.createProductionOrder({
-          orderId: newOrder.id,
-          producerId: producerId,
-          status: "pending",
-          deadline: newOrder.deadline
-        });
-
-        console.log(`Created production order for order ${newOrder.id} with producer ${producerId}`);
-      }
-
-      console.log("Budget converted successfully:", newOrder.orderNumber);
-
-      res.json({
-        success: true,
-        order: newOrder,
-        message: "Orçamento convertido em pedido com sucesso"
+      await storage.updateBudget(id, {
+        status: 'converted',
+        convertedAt: new Date(),
+        orderId: order.id
       });
+
+      console.log(`Budget ${id} converted to order ${order.id}`);
+      res.json({ success: true, order });
     } catch (error) {
       console.error("Error converting budget to order:", error);
-      res.status(500).json({
-        error: "Erro ao converter orçamento em pedido",
-        details: error.message
-      });
+      res.status(500).json({ error: "Erro ao converter orçamento em pedido" });
     }
+  });
+
+  app.post("/api/budgets/:id/convert-to-budget", async (req, res) => {
   });
 
   app.post("/api/budgets/:id/send-whatsapp", async (req, res) => {
@@ -3771,10 +3780,8 @@ Para mais detalhes, entre em contato conosco!`;
             }
           }
 
-          // If still no name, use a descriptive message
-          if (!clientName) {
-            clientName = "Nome não informado";
-          }
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Get payment information
           const payments = await storage.getPaymentsByOrder(order.id);
@@ -4044,7 +4051,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-                  const vendor = await storage.getUser(order.vendorId);
+          const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           return {
@@ -4132,7 +4139,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Expedition routes  
+  // Expedition routes
   app.get("/api/expedition/orders", async (req, res) => {
     try {
       // Get orders that are ready for expedition (completed, ready for shipping)

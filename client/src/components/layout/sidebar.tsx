@@ -27,6 +27,7 @@ import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import cn from "clsx"; // Assuming clsx is available for conditional class merging
 
 
 // Mocking Link, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent for demonstration
@@ -85,7 +86,7 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     setLoading(false);
   }, []);
 
-  // Buscar notificações para vendedor
+  // Buscar notifications para vendedor
   const { data: pendingActions } = useQuery({
     queryKey: ["/api/vendor/pending-actions", user?.id],
     queryFn: async () => {

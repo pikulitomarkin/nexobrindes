@@ -17,35 +17,53 @@ export default function ClientBudgets() {
   const { toast } = useToast();
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false); // State to control budget details modal
 
+  const [clientObservations, setClientObservations] = useState("");
+  const [budgetAction, setBudgetAction] = useState<'approve' | 'reject' | null>(null);
+
   const approveBudgetMutation = useMutation({
-    mutationFn: async (budgetId: string) => {
-      const response = await fetch(`/api/budgets/${budgetId}/approve`, {
+    mutationFn: async ({ budgetId, action, observations }: { budgetId: string; action: 'approve' | 'reject'; observations?: string }) => {
+      const response = await fetch(`/api/budgets/${budgetId}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ observations: observations || "" }),
       });
-      if (!response.ok) throw new Error("Erro ao aprovar orçamento");
+      if (!response.ok) throw new Error(`Erro ao ${action === 'approve' ? 'aprovar' : 'rejeitar'} orçamento`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/client", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/client", clientId] }); // Invalidate requests too
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/client", clientId] });
       toast({
         title: "Sucesso!",
-        description: "Orçamento aprovado! Aguarde os dados de pagamento.",
+        description: variables.action === 'approve' 
+          ? "Orçamento aprovado! Os dados de pagamento serão disponibilizados em breve."
+          : "Orçamento rejeitado. O vendedor foi notificado.",
       });
-      setViewBudgetDialogOpen(false); // Close the modal after successful approval
+      setViewBudgetDialogOpen(false);
+      setClientObservations("");
+      setBudgetAction(null);
     },
     onError: (error) => {
       toast({
-        title: "Erro ao aprovar orçamento",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const handleApproveBudget = (budgetId: string) => {
-    approveBudgetMutation.mutate(budgetId);
+  const handleBudgetAction = (action: 'approve' | 'reject') => {
+    if (!selectedBudget) return;
+    setBudgetAction(action);
+  };
+
+  const confirmBudgetAction = () => {
+    if (!selectedBudget || !budgetAction) return;
+    approveBudgetMutation.mutate({
+      budgetId: selectedBudget.id,
+      action: budgetAction,
+      observations: clientObservations
+    });
   };
 
   // Buscar orçamentos do cliente
@@ -519,19 +537,100 @@ export default function ClientBudgets() {
                   </span>
                 </div>
 
-                {/* Botão de Aceitar Orçamento */}
-                {selectedBudget.status === 'sent' && (
+                {/* Interface de Aprovação/Rejeição */}
+                {selectedBudget.status === 'sent' && !budgetAction && (
+                  <div className="mt-4 pt-3 border-t space-y-3">
+                    <p className="text-sm text-gray-600 font-medium">O que você decide sobre este orçamento?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        onClick={() => handleBudgetAction('approve')}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        ✅ Aprovar
+                      </Button>
+                      <Button
+                        onClick={() => handleBudgetAction('reject')}
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        ❌ Rejeitar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Formulário de Observações */}
+                {selectedBudget.status === 'sent' && budgetAction && (
+                  <div className="mt-4 pt-3 border-t space-y-4">
+                    <div className={`p-3 rounded-lg ${budgetAction === 'approve' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border`}>
+                      <h4 className={`font-medium mb-2 ${budgetAction === 'approve' ? 'text-green-800' : 'text-red-800'}`}>
+                        {budgetAction === 'approve' ? '✅ Aprovando Orçamento' : '❌ Rejeitando Orçamento'}
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        {budgetAction === 'approve' 
+                          ? 'Adicione observações ou solicitações especiais (opcional):'
+                          : 'Explique o motivo da rejeição para o vendedor:'
+                        }
+                      </p>
+                      <textarea
+                        value={clientObservations}
+                        onChange={(e) => setClientObservations(e.target.value)}
+                        placeholder={budgetAction === 'approve' 
+                          ? 'Ex: Gostaria de confirmar a cor do produto antes da produção...'
+                          : 'Ex: O prazo de entrega não atende nossas necessidades...'
+                        }
+                        className="w-full p-3 border border-gray-300 rounded-lg resize-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={confirmBudgetAction}
+                        disabled={approveBudgetMutation.isPending}
+                        className={budgetAction === 'approve' 
+                          ? 'bg-green-600 hover:bg-green-700 flex-1' 
+                          : 'bg-red-600 hover:bg-red-700 flex-1'
+                        }
+                      >
+                        {approveBudgetMutation.isPending 
+                          ? 'Processando...' 
+                          : budgetAction === 'approve' 
+                            ? 'Confirmar Aprovação' 
+                            : 'Confirmar Rejeição'
+                        }
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setBudgetAction(null);
+                          setClientObservations("");
+                        }}
+                        variant="outline"
+                        disabled={approveBudgetMutation.isPending}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+
+                    {budgetAction === 'approve' && (
+                      <p className="text-xs text-green-600 text-center">
+                        ✨ Após a aprovação, os dados de pagamento serão disponibilizados
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status de orçamento rejeitado */}
+                {selectedBudget.status === 'rejected' && (
                   <div className="mt-4 pt-3 border-t">
-                    <Button
-                      onClick={() => handleApproveBudget(selectedBudget.id)}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                      disabled={approveBudgetMutation.isPending}
-                    >
-                      {approveBudgetMutation.isPending ? 'Processando...' : '✅ Aceitar Orçamento'}
-                    </Button>
-                    <p className="text-xs text-gray-500 text-center mt-2">
-                      Ao aceitar, você receberá os dados para pagamento
-                    </p>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-red-800 font-medium">❌ Orçamento Rejeitado</p>
+                      {selectedBudget.clientObservations && (
+                        <p className="text-sm text-red-700 mt-2">
+                          <strong>Suas observações:</strong> {selectedBudget.clientObservations}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
