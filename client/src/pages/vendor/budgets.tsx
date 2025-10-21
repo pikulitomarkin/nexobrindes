@@ -1853,7 +1853,7 @@ export default function VendorBudgets() {
                       {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-1">
+                      <div className="flex flex-wrap gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1863,7 +1863,7 @@ export default function VendorBudgets() {
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
-                        {budget.status === 'pending' && (
+                        {(budget.status === 'draft' || budget.status === 'sent') && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1873,6 +1873,19 @@ export default function VendorBudgets() {
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Editar
+                          </Button>
+                        )}
+                        {(budget.status === 'draft' || budget.status === 'sent') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-900"
+                            onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
+                            disabled={sendToWhatsAppMutation.isPending}
+                            data-testid={`button-send-${budget.id}`}
+                          >
+                            <Send className="h-4 w-4 mr-1" />
+                            Enviar
                           </Button>
                         )}
                         {budget.status === 'approved' && (
