@@ -137,7 +137,8 @@ export interface IStorage {
   createProduct(productData: any): Promise<any>;
   updateProduct(id: string, productData: any): Promise<any>;
   deleteProduct(id: string): Promise<boolean>;
-  importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }>;
+  importProducts(productsData: any[]): Promise<{ imported: number; errors: string[] }>;
+  importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }>;
   searchProducts(query: string): Promise<any[]>;
   getProductsByProducer(producerId: string): Promise<any[]>;
   getProductsGroupedByProducer(): Promise<{ [key: string]: any[] }>;
@@ -188,8 +189,8 @@ export interface IStorage {
   getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]>;
   getAccountsReceivableByClient(clientId: string): Promise<AccountsReceivable[]>;
   getAccountsReceivableByVendor(vendorId: string): Promise<AccountsReceivable[]>;
-  createAccountsReceivable(data: InsertAccountsReceivable): Promise<AccountsReceivable>;
-  updateAccountsReceivable(id: string, data: Partial<InsertAccountsReceivable>): Promise<AccountsReceivable | undefined>;
+  createAccountsReceivable(data: any): Promise<any>;
+  updateAccountsReceivable(id: string, data: any): Promise<any>;
 
   // Financial module - Payment Allocations
   getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]>;
@@ -2145,9 +2146,9 @@ export class MemStorage implements IStorage {
     return this.products.delete(id);
   }
 
-  async importProducts(productsData: any[]): Promise<{ imported: number; errors: any[] }> {
+  async importProducts(productsData: any[]): Promise<{ imported: number; errors: string[] }> {
+    const errors: string[] = [];
     let imported = 0;
-    const errors: any[] = [];
 
     for (const item of productsData) {
       try {
@@ -2159,12 +2160,9 @@ export class MemStorage implements IStorage {
           basePrice: (item.PrecoVenda || item.basePrice || 0).toString(),
           unit: 'un',
           isActive: true,
-
-          // Preserve producerId and type from import
           producerId: item.producerId || 'internal',
-          type: item.type || 'internal',
+          type: 'external',
 
-          // Campos específicos do JSON XBZ
           externalId: item.IdProduto?.toString(),
           externalCode: item.CodigoXbz,
           compositeCode: item.CodigoComposto,
@@ -2194,6 +2192,83 @@ export class MemStorage implements IStorage {
 
     return { imported, errors };
   }
+
+  async importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }> {
+    const errors: string[] = [];
+    let imported = 0;
+
+    // Verify producer exists
+    const producer = await this.getUser(producerId);
+    if (!producer || producer.role !== 'producer') {
+      throw new Error('Produtor não encontrado');
+    }
+
+    for (const productData of productsData) {
+      try {
+        // Map common JSON fields to our product structure
+        const name = productData.Nome || productData.name || productData.Produto;
+        const description = productData.Descricao || productData.description || productData.Descrição;
+        const category = productData.WebTipo || productData.category || productData.Categoria || productData.Tipo;
+        const basePrice = parseFloat(productData.PrecoVenda || productData.basePrice || productData.Preco || productData.price || '0');
+
+        if (!name) {
+          errors.push(`Produto sem nome: ${JSON.stringify(productData).substring(0, 100)}`);
+          continue;
+        }
+
+        if (isNaN(basePrice) || basePrice <= 0) {
+          errors.push(`Produto "${name}" com preço inválido: ${productData.PrecoVenda || productData.basePrice || 'não informado'}`);
+          continue;
+        }
+
+        const productId = `product-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+
+        const product = {
+          id: productId,
+          name: name.trim(),
+          description: description?.trim() || '',
+          category: category?.trim() || 'Geral',
+          basePrice: basePrice.toFixed(2),
+          unit: productData.unit || productData.Unidade || 'un',
+          isActive: true,
+          producerId: producerId, // Assign to the specified producer
+          type: 'external', // External product from producer
+          // Additional fields from JSON if available
+          externalId: productData.IdProduto || productData.id,
+          externalCode: productData.CodigoXbz || productData.codigo,
+          compositeCode: productData.CodigoAmigavel,
+          friendlyCode: productData.CodigoAmigavel,
+          siteLink: productData.SiteLink || productData.link,
+          imageLink: productData.ImageLink || productData.imagem || productData.foto,
+          mainColor: productData.CorWebPrincipal || productData.cor,
+          secondaryColor: productData.CorWebSecundaria,
+          weight: productData.Peso ? parseFloat(productData.Peso) : null,
+          height: productData.Altura ? parseFloat(productData.Altura) : null,
+          width: productData.Largura ? parseFloat(productData.Largura) : null,
+          depth: productData.Profundidade ? parseFloat(productData.Profundidade) : null,
+          availableQuantity: productData.QuantidadeDisponivel ? parseInt(productData.QuantidadeDisponivel) : null,
+          stockStatus: productData.StatusConfiabilidade,
+          ncm: productData.Ncm,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        this.products.set(productId, product);
+        imported++;
+
+        if (imported % 100 === 0) {
+          console.log(`Imported ${imported} products for producer ${producer.name}...`);
+        }
+      } catch (error) {
+        console.error('Error importing product:', error);
+        errors.push(`Erro ao importar produto: ${productData.Nome || 'sem nome'} - ${error.message}`);
+      }
+    }
+
+    console.log(`Finished importing ${imported} products for producer ${producer.name}`);
+    return { imported, errors };
+  }
+
 
   async searchProducts(query: string): Promise<any[]> {
     if (!query) return Array.from(this.products.values());

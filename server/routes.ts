@@ -2237,11 +2237,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logistics import JSON route
-  app.post("/api/logistics/import", upload.single('file'), async (req, res) => {
+  // Logistics products import route
+  app.post("/api/logistics/products/import", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const { producerId } = req.body;
+      if (!producerId) {
+        return res.status(400).json({ error: "Produtor é obrigatório para a importação" });
       }
 
       // Check file size
@@ -2251,13 +2256,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      let logisticsData;
+      let productsData;
       const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
 
       if (fileExtension === 'json') {
         try {
           const fileContent = req.file.buffer.toString('utf8');
-          logisticsData = JSON.parse(fileContent);
+          productsData = JSON.parse(fileContent);
         } catch (parseError) {
           return res.status(400).json({
             error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
@@ -2268,31 +2273,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
       }
 
-      if (!Array.isArray(logisticsData)) {
+      if (!Array.isArray(productsData)) {
         return res.status(400).json({
-          error: "O arquivo JSON deve conter um array de dados logísticos"
+          error: "O arquivo JSON deve conter um array de produtos"
         });
       }
 
-      if (logisticsData.length === 0) {
+      if (productsData.length === 0) {
         return res.status(400).json({
           error: "O arquivo JSON está vazio."
         });
       }
 
-      console.log(`Importing ${logisticsData.length} logistics data...`);
+      if (productsData.length > 10000) {
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
+        });
+      }
 
-      // Process logistics data import here - for now just return success
+      console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
+
+      // Import products with producer assignment
+      const result = await storage.importProductsForProducer(productsData, producerId);
+
+      console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
+
       res.json({
-        message: `${logisticsData.length} dados logísticos processados com sucesso`,
-        imported: logisticsData.length,
-        total: logisticsData.length,
-        errors: []
+        message: `${result.imported} produtos importados com sucesso para o produtor`,
+        imported: result.imported,
+        total: productsData.length,
+        errors: result.errors
       });
     } catch (error) {
-      console.error('Logistics import error:', error);
+      console.error('Logistics products import error:', error);
       res.status(500).json({
-        error: "Erro interno do servidor ao processar importação logística",
+        error: "Erro interno do servidor ao processar importação de produtos",
         details: (error as Error).message
       });
     }
@@ -4418,6 +4433,9 @@ Para mais detalhes, entre em contato conosco!`;
               }
             }
           }
+
+          // Get producer info for this production order
+          const producer = await storage.getUser(po.producerId);
 
           return {
             ...po,
