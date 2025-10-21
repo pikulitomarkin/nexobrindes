@@ -1197,6 +1197,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get clients for a specific vendor
+  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching clients for vendor: ${vendorId}`);
+      
+      const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+      
+      // Enrich with user data if available
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          if (client.userId) {
+            const user = await storage.getUser(client.userId);
+            return {
+              ...client,
+              user: user ? {
+                id: user.id,
+                username: user.username,
+                email: user.email
+              } : null
+            };
+          }
+          return client;
+        })
+      );
+      
+      console.log(`Returning ${enrichedClients.length} enriched clients`);
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching vendor clients:", error);
+      res.status(500).json({ error: "Failed to fetch vendor clients" });
+    }
+  });
+
   app.get("/api/vendor/:userId/info", async (req, res) => {
     try {
       const { userId } = req.params;
