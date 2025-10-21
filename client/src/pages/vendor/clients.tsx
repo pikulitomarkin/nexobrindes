@@ -56,11 +56,17 @@ export default function VendorClients() {
   }, [isCreateDialogOpen]);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ["/api/vendor/clients", vendorId],
+    queryKey: ["/api/vendors/clients", vendorId],
     queryFn: async () => {
+      console.log(`Fetching clients for vendor: ${vendorId}`);
       const response = await fetch(`/api/vendors/${vendorId}/clients`);
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
+      if (!response.ok) {
+        console.error(`Failed to fetch clients: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to fetch clients');
+      }
+      const data = await response.json();
+      console.log(`Received ${data.length} clients:`, data);
+      return data;
     },
   });
 

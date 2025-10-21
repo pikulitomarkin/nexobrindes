@@ -1683,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + refundAmount;
         }, 0);
 
-      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
@@ -1695,10 +1695,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
-      
+
       console.log('Payables breakdown:', {
         producers,
-        expenses, 
+        expenses,
         commissions,
         refunds,
         manualPayables: manualPayablesAmount,
@@ -5017,7 +5017,7 @@ Para mais detalhes, entre em contato conosco!`;
 
             let clientName = order?.contactName || 'Cliente não identificado';
 
-            // Try to get client name if not available in order
+            // If client name is not available in order, try to get it from client record
             if (!clientName && order?.clientId) {
               const clientRecord = await storage.getClient(order.clientId);
               if (clientRecord) {

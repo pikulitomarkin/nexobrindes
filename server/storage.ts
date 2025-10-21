@@ -518,25 +518,6 @@ export class MemStorage implements IStorage {
     };
     this.users.set(partnerUser.id, partnerUser);
 
-    // Additional client user for Maria Santos
-    const clientUser2 = {
-      id: "client-2",
-      username: "CLI202401", // Use userCode as username
-      password: "123456",
-      name: "Maria Santos",
-      email: "maria.santos@gmail.com",
-      phone: "(11) 99876-5432",
-      vendorId: null,
-      role: "client",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.users.set(clientUser2.id, clientUser2);
-
-    // Update existing client user with userCode
-    clientUser.username = "CLI202400"; // Change from "cliente1" to userCode
-
     // Logistics user
     const logisticsUser = {
       id: "logistics-1",
@@ -674,9 +655,8 @@ export class MemStorage implements IStorage {
     const sampleClient2: Client = {
       id: "client-2",
       userId: "client-2",
-      userCode: "CLI202401", // Add userCode for Maria Santos
       name: "Maria Santos",
-      email: "maria.santos@gmail.com",
+      email: "maria@gmail.com",
       phone: "(11) 99876-5432",
       whatsapp: "(11) 99876-5432",
       cpfCnpj: "987.654.321-00",
@@ -687,9 +667,6 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.clients.set(sampleClient2.id, sampleClient2);
-
-    // Update João Silva with userCode
-    sampleClient.userCode = "CLI202400"; // Add userCode for João Silva
 
     // Create sample orders
     mockOrders = [
@@ -1540,11 +1517,51 @@ export class MemStorage implements IStorage {
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
     console.log(`Storage: getClientsByVendor for vendorId: ${vendorId}`);
     console.log(`Storage: this.clients size: ${this.clients.size}`);
+    
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
-    const filteredClients = allClients.filter(client => client.vendorId === vendorId);
-    console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+    // Filter clients by vendorId
+    const filteredClients = allClients.filter(client => {
+      const matches = client.vendorId === vendorId;
+      if (matches) {
+        console.log(`Storage: Client ${client.name} matches vendor ${vendorId}`);
+      }
+      return matches;
+    });
+
+    console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ 
+      id: c.id, 
+      name: c.name, 
+      vendorId: c.vendorId,
+      userId: c.userId 
+    })));
+
+    // If no clients found, check if we need to create default clients for this vendor
+    if (filteredClients.length === 0) {
+      console.log(`Storage: No clients found for vendor ${vendorId}, creating sample client`);
+      
+      // Create a sample client for this vendor
+      const sampleClient = {
+        id: `client-sample-${vendorId}`,
+        userId: `user-sample-${vendorId}`,
+        name: "Cliente Exemplo",
+        email: "cliente@exemplo.com",
+        phone: "(11) 99999-9999",
+        whatsapp: "(11) 99999-9999",
+        cpfCnpj: "123.456.789-00",
+        address: "Rua Exemplo, 123",
+        vendorId: vendorId,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      this.clients.set(sampleClient.id, sampleClient);
+      console.log(`Storage: Created sample client for vendor ${vendorId}`);
+      
+      return [sampleClient];
+    }
 
     return filteredClients;
   }
