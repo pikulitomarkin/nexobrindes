@@ -5729,7 +5729,7 @@ Para mais detalhes, entre em contato conosco!`;
           return {
             ...client,
             username: userData?.username || client.userCode || 'N/A',
-            userCode: userData?.username || client.userCode || client.username || 'N/A',
+            userCode: client.userCode || userData?.username || client.username || 'N/A',
             ordersCount,
             totalSpent
           };

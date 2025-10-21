@@ -1224,9 +1224,9 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient): Promise<Client> {
+  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
     const id = randomUUID();
-    const client: Client = {
+    const client: Client & { userCode?: string } = {
       ...clientData,
       id,
       vendorId: clientData.vendorId || null,
@@ -1236,6 +1236,7 @@ export class MemStorage implements IStorage {
       whatsapp: clientData.whatsapp || null,
       cpfCnpj: clientData.cpfCnpj || null,
       address: clientData.address || null,
+      userCode: (clientData as any).userCode || null,
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -1520,7 +1521,12 @@ export class MemStorage implements IStorage {
     const allClients = Array.from(this.clients.values());
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
-    const filteredClients = allClients.filter(client => client.vendorId === vendorId);
+    const filteredClients = allClients.filter(client => {
+      const isMatch = client.vendorId === vendorId;
+      console.log(`Storage: Client ${client.name} (${client.id}) - vendorId: ${client.vendorId}, matches ${vendorId}: ${isMatch}`);
+      return isMatch;
+    });
+    
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
     return filteredClients;
