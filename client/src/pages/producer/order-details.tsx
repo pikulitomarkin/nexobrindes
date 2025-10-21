@@ -308,19 +308,19 @@ export default function ProducerOrderDetails() {
           </Card>
 
           {/* Items */}
-          {productionOrder.order?.items && productionOrder.order.items.length > 0 && (
+          {productionOrder.items && productionOrder.items.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Itens do Pedido</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {productionOrder.order.items.map((item: any, index: number) => (
+                  {productionOrder.items.map((item: any, index: number) => (
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">{item.productName || 'Produto'}</h4>
+                        <h4 className="font-medium">{item.product?.name || 'Produto'}</h4>
                         <span className="font-semibold text-green-600">
-                          R$ {parseFloat(item.totalPrice || item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-3 text-sm text-gray-600">
@@ -331,7 +331,7 @@ export default function ProducerOrderDetails() {
                           <span className="font-medium">Preço Unit.:</span> R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </div>
                         <div>
-                          <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice || item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <span className="font-medium">Total:</span> R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </div>
                       </div>
                       {item.hasItemCustomization && (
@@ -340,69 +340,12 @@ export default function ProducerOrderDetails() {
                           <p className="text-sm"><strong>Valor adicional:</strong> R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                       )}
-                      {item.hasGeneralCustomization && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded">
-                          <p className="text-sm"><strong>Personalização Geral:</strong> {item.generalCustomizationName}</p>
-                          <p className="text-sm"><strong>Valor adicional:</strong> R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                        </div>
-                      )}
-                      {item.producerId && item.producerId !== 'internal' && (
-                        <div className="mt-2 p-2 bg-green-50 rounded">
-                          <p className="text-sm"><strong>Produtor Responsável:</strong> {item.producerId}</p>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
           )}
-
-          {/* Order Financial Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalhes Financeiros do Pedido</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600 font-medium">Valor Total</p>
-                  <p className="text-xl font-bold text-blue-800">
-                    R$ {parseFloat(productionOrder.order?.totalValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600 font-medium">Valor Pago</p>
-                  <p className="text-xl font-bold text-green-800">
-                    R$ {parseFloat(productionOrder.order?.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-600 font-medium">Entrada</p>
-                  <p className="text-xl font-bold text-yellow-800">
-                    R$ {parseFloat(productionOrder.order?.downPayment || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-600 font-medium">Restante</p>
-                  <p className="text-xl font-bold text-purple-800">
-                    R$ {(parseFloat(productionOrder.order?.totalValue || '0') - parseFloat(productionOrder.order?.paidValue || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-
-              {productionOrder.order?.hasDiscount && (
-                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm font-medium text-orange-800">
-                    Desconto Aplicado: {productionOrder.order.discountType === 'percentage' 
-                      ? `${productionOrder.order.discountPercentage}%` 
-                      : `R$ ${parseFloat(productionOrder.order.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    }
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Photos */}
           {productionOrder.photos && productionOrder.photos.length > 0 && (
@@ -434,7 +377,7 @@ export default function ProducerOrderDetails() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Informações de Expedição
+                Informações de Envio
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -446,23 +389,14 @@ export default function ProducerOrderDetails() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-gray-600">Endereço de Expedição</Label>
-                <p className="font-medium text-gray-900 bg-gray-50 p-3 rounded-lg">
+                <Label className="text-sm font-medium text-gray-600">Endereço de Envio</Label>
+                <p className="font-medium text-gray-900">
                   {productionOrder.order?.deliveryType === 'pickup'
-                    ? 'Cliente irá retirar no local - Sede Principal'
-                    : (productionOrder.clientAddress || 'Endereço não informado')
+                    ? 'Sede Principal - Retirada no Local'
+                    : (productionOrder.order?.shippingAddress || productionOrder.order?.clientAddress || 'Endereço não informado')
                   }
                 </p>
               </div>
-
-              {productionOrder.order?.shippingCost && parseFloat(productionOrder.order.shippingCost) > 0 && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Custo do Frete</Label>
-                  <p className="font-medium text-green-600">
-                    R$ {parseFloat(productionOrder.order.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              )}
 
               {productionOrder.trackingCode && (
                 <div>
@@ -472,55 +406,6 @@ export default function ProducerOrderDetails() {
                   </p>
                 </div>
               )}
-
-              {/* Shipping Method Information */}
-              {productionOrder.order?.shippingMethodId && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Método de Envio</Label>
-                  <p className="font-medium">ID: {productionOrder.order.shippingMethodId}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Producer Value Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Valor do Serviço</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-200">
-                  <p className="text-sm text-green-600 font-medium">Seu Valor</p>
-                  <p className="text-2xl font-bold text-green-800">
-                    R$ {parseFloat(productionOrder.producerValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                
-                {productionOrder.producerNotes && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <Label className="text-sm font-medium text-blue-600">Observações sobre o Valor</Label>
-                    <p className="text-sm text-blue-800 mt-1">{productionOrder.producerNotes}</p>
-                  </div>
-                )}
-                
-                <div className="text-center">
-                  <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                    productionOrder.producerPaymentStatus === 'paid' 
-                      ? 'bg-green-100 text-green-800'
-                      : productionOrder.producerPaymentStatus === 'approved' 
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {productionOrder.producerPaymentStatus === 'paid' 
-                      ? 'Pago'
-                      : productionOrder.producerPaymentStatus === 'approved' 
-                      ? 'Aprovado para Pagamento'
-                      : 'Pendente de Aprovação'
-                    }
-                  </span>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
