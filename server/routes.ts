@@ -110,6 +110,7 @@ async function parseOFXBuffer(buffer: Buffer) {
 function generateId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).substring(2, 15)}`;
 }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
@@ -2586,6 +2587,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
+      
+      console.log("Creating order with order number:", orderNumber);
 
       const orderData = {
         orderNumber,
