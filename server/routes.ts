@@ -1469,6 +1469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: notes || null
       });
 
+      console.log(`Created manual payable: ${payable.id} - ${payable.description} - R$ ${payable.amount}`);
       res.json(payable);
     } catch (error) {
       console.error("Error creating manual payable:", error);

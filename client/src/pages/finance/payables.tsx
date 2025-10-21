@@ -153,10 +153,22 @@ export default function FinancePayables() {
     },
   });
 
+  // State for new payable form
+  const [newPayableData, setNewPayableData] = useState({
+    type: "",
+    description: "",
+    beneficiary: "",
+    amount: "",
+    dueDate: "",
+    category: "",
+    status: "pending",
+    notes: ""
+  });
+
   // Mutation for creating a new payable
   const createPayableMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/finance/payables', {
+      const response = await fetch('/api/finance/payables/manual', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,11 +186,20 @@ export default function FinancePayables() {
     },
     onSuccess: () => {
       setIsCreatePayableDialogOpen(false);
+      setNewPayableData({
+        type: "",
+        description: "",
+        beneficiary: "",
+        amount: "",
+        dueDate: "",
+        category: "",
+        status: "pending",
+        notes: ""
+      });
       toast({
         title: "Sucesso!",
         description: "Conta a pagar criada com sucesso",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables"] }); // Assuming this query exists
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
     },
     onError: (error: any) => {
@@ -189,6 +210,19 @@ export default function FinancePayables() {
       });
     },
   });
+
+  const handleCreatePayable = () => {
+    if (newPayableData.description && newPayableData.beneficiary && newPayableData.amount && newPayableData.dueDate) {
+      createPayableMutation.mutate({
+        beneficiary: newPayableData.beneficiary,
+        description: newPayableData.description,
+        amount: parseFloat(newPayableData.amount).toFixed(2),
+        dueDate: newPayableData.dueDate,
+        category: newPayableData.category || 'Outros',
+        notes: newPayableData.notes
+      });
+    }
+  };
 
 
   // Combine all payables
@@ -870,21 +904,20 @@ export default function FinancePayables() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="create-payable-type">Tipo <span className="text-red-500">*</span></Label>
+                <Label htmlFor="create-payable-category">Categoria</Label>
                 <Select 
-                  onValueChange={(value) => {
-                    // Update state for newPayableData
-                  }}
-                  defaultValue="" // Should be controlled by state
+                  value={newPayableData.category}
+                  onValueChange={(value) => setNewPayableData(prev => ({ ...prev, category: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
+                    <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="producer">Produtor</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                    <SelectItem value="commission">Comissão</SelectItem>
-                    <SelectItem value="other">Outro</SelectItem>
+                    <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                    <SelectItem value="Serviços">Serviços</SelectItem>
+                    <SelectItem value="Produção">Produção</SelectItem>
+                    <SelectItem value="Despesas Operacionais">Despesas Operacionais</SelectItem>
+                    <SelectItem value="Outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -893,8 +926,8 @@ export default function FinancePayables() {
                 <Input
                   id="create-payable-description"
                   placeholder="Ex: Compra de insumos"
-                  // value={newPayableData.description}
-                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
+                  value={newPayableData.description}
+                  onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
             </div>
@@ -905,8 +938,8 @@ export default function FinancePayables() {
                 <Input
                   id="create-payable-beneficiary"
                   placeholder="Nome do fornecedor ou produtor"
-                  // value={newPayableData.beneficiary}
-                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
+                  value={newPayableData.beneficiary}
+                  onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
                 />
               </div>
               <div>
@@ -916,38 +949,21 @@ export default function FinancePayables() {
                   type="number"
                   step="0.01"
                   placeholder="0,00"
-                  // value={newPayableData.amount}
-                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
+                  value={newPayableData.amount}
+                  onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="create-payable-dueDate">Data de Vencimento <span className="text-red-500">*</span></Label>
                 <Input
                   id="create-payable-dueDate"
                   type="date"
-                  // value={newPayableData.dueDate}
-                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
+                  value={newPayableData.dueDate}
+                  onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
                 />
-              </div>
-              <div>
-                <Label htmlFor="create-payable-status">Status <span className="text-red-500">*</span></Label>
-                <Select 
-                  onValueChange={(value) => {
-                    // Update state for newPayableData
-                  }}
-                  defaultValue="pending" // Default to pending
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="approved">Aprovado</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -956,8 +972,8 @@ export default function FinancePayables() {
               <Textarea
                 id="create-payable-notes"
                 placeholder="Informações adicionais sobre a conta a pagar..."
-                // value={newPayableData.notes}
-                // onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
+                value={newPayableData.notes}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
               />
             </div>
@@ -968,11 +984,8 @@ export default function FinancePayables() {
               </Button>
               <Button
                 className="gradient-bg text-white px-6"
-                onClick={() => {
-                  // Call handleCreatePayable with the actual newPayableData state
-                  // handleCreatePayable(newPayableData); 
-                }}
-                // disabled={!newPayableData.type || !newPayableData.description || !newPayableData.beneficiary || !newPayableData.amount || !newPayableData.dueDate || !newPayableData.status || createPayableMutation.isPending}
+                onClick={handleCreatePayable}
+                disabled={!newPayableData.description || !newPayableData.beneficiary || !newPayableData.amount || !newPayableData.dueDate || createPayableMutation.isPending}
               >
                 {createPayableMutation.isPending ? "Salvando..." : "Criar Conta a Pagar"}
               </Button>
