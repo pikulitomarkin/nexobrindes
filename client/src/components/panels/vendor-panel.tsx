@@ -12,11 +12,21 @@ export default function VendorPanel() {
   const vendorId = user.id; // Use actual vendor ID from logged user
 
   const { data: vendorInfo, isLoading: vendorLoading } = useQuery({
-    queryKey: ["/api/vendor", vendorId],
+    queryKey: ["/api/vendor", vendorId, "info"],
+    queryFn: async () => {
+      const response = await fetch(`/api/vendor/${vendorId}/info`);
+      if (!response.ok) throw new Error('Failed to fetch vendor info');
+      return response.json();
+    },
   });
 
   const { data: orders, isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/orders/vendor", vendorId],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/vendor/${vendorId}`);
+      if (!response.ok) throw new Error('Failed to fetch vendor orders');
+      return response.json();
+    },
   });
 
   const copyToClipboard = async (text: string) => {
@@ -87,9 +97,9 @@ export default function VendorPanel() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Vendas do Mês</h3>
             <p className="text-3xl font-bold gradient-text">
-              R$ {((vendorInfo as any)?.monthlySales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(vendorInfo?.monthlySales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-sm text-green-600 mt-1">+15% vs mês anterior</p>
+            <p className="text-sm text-green-600 mt-1">Vendas deste mês</p>
           </CardContent>
         </Card>
 
@@ -97,10 +107,10 @@ export default function VendorPanel() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Comissões</h3>
             <p className="text-3xl font-bold gradient-text">
-              R$ {((vendorInfo as any)?.totalCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(vendorInfo?.totalCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-sm text-blue-600 mt-1">
-              {(vendorInfo as any)?.confirmedOrders || 0} pedidos confirmados
+              {vendorInfo?.confirmedOrders || 0} pedidos confirmados
             </p>
           </CardContent>
         </Card>
@@ -110,12 +120,12 @@ export default function VendorPanel() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Link de Vendas</h3>
             <div className="flex items-center space-x-2">
               <Input
-                value={(vendorInfo as any)?.vendor?.salesLink || "https://vendas.erp.com/v1"}
+                value={vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`}
                 readOnly
                 className="flex-1 text-sm"
               />
               <Button
-                onClick={() => copyToClipboard((vendorInfo as any)?.vendor?.salesLink || "https://vendas.erp.com/v1")}
+                onClick={() => copyToClipboard(vendorInfo?.vendor?.salesLink || `https://vendas.erp.com/v/${vendorId}`)}
                 className="gradient-bg text-white"
                 size="sm"
               >
@@ -151,7 +161,7 @@ export default function VendorPanel() {
             <Link href="/vendor/orders">
               <Button variant="outline" className="w-full justify-start">
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Pedidos ({vendorInfo?.confirmedOrders || 0})
+                Pedidos ({(orders as any[])?.length || 0})
               </Button>
             </Link>
             <Link href="/vendor/commissions">
