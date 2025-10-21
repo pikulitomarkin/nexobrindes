@@ -115,6 +115,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
+  // File upload endpoint
+  app.post('/api/upload', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 15);
+      const extension = req.file.originalname.split('.').pop();
+      const filename = `image-${timestamp}-${randomStr}.${extension}`;
+      const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
+
+      // Write file to disk
+      const fs = require('fs');
+      fs.writeFileSync(filepath, req.file.buffer);
+
+      const url = `/uploads/${filename}`;
+      
+      console.log(`File uploaded successfully: ${filename}`);
+      res.json({ url });
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ error: 'Erro no upload do arquivo' });
+    }
+  });
+
+  // Budget approval/rejection by client
+  app.patch("/api/budgets/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, observations } = req.body; // status: 'approved' or 'rejected'
+
+      const budget = await storage.getBudget(id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Update budget status
+      const updatedBudget = await storage.updateBudget(id, { 
+        status,
+        clientObservations: observations || null,
+        reviewedAt: new Date().toISOString()
+      });
+
+      console.log(`Budget ${id} ${status} by client`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error updating budget status:", error);
+      res.status(500).json({ error: "Erro ao atualizar status do orçamento" });
+    }
+  });
+
+  // Get budget details for client review
+  app.get("/api/budgets/:id/review", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const budget = await storage.getBudget(id);
+      
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Get budget items
+      const items = await storage.getBudgetItems(id);
+      
+      // Get budget photos
+      const photos = await storage.getBudgetPhotos(id);
+
+      res.json({
+        ...budget,
+        items,
+        photos: photos.map(p => p.photoUrl || p.imageUrl)
+      });
+    } catch (error) {
+      console.error("Error fetching budget for review:", error);
+      res.status(500).json({ error: "Erro ao buscar orçamento" });
+    }
+  });
+
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password, preferredRole } = req.body;

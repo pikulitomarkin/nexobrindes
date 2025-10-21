@@ -1847,54 +1847,150 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values()).filter(payment => payment.orderId === orderId);
   }
 
-  async updateOrderPaidValue(orderId: string, receivedAmount?: string): Promise<void> {
-    const payments = await this.getPaymentsByOrder(orderId);
-    const totalPaid = payments
-      .filter(payment => payment.status === 'confirmed')
-      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-
-    const order = await this.getOrder(orderId);
+  // Update order paid value based on confirmed payments
+  private async updateOrderPaidValue(orderId: string): Promise<void> {
+    const order = this.orders.get(orderId);
     if (!order) return;
 
-    const newPaidValue = receivedAmount !== undefined ? receivedAmount : totalPaid.toFixed(2);
+    const orderPayments = Array.from(this.payments.values())
+      .filter(payment => payment.orderId === orderId && payment.status === 'confirmed');
 
-    if (newPaidValue !== order.paidValue) {
-      await this.updateOrder(orderId, { paidValue: newPaidValue });
+    const totalPaid = orderPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
 
-      // Update corresponding AccountsReceivable entry
-      const receivableId = `ar-${orderId}`;
-      const receivable = this.accountsReceivable.get(receivableId);
+    const updatedOrder = {
+      ...order,
+      paidValue: totalPaid.toFixed(2),
+      updatedAt: new Date()
+    };
 
-      if (receivable) {
-        const totalValue = parseFloat(receivable.amount);
-        const minimumPayment = parseFloat(receivable.minimumPayment || 0);
-        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+    this.orders.set(orderId, updatedOrder);
 
-        if (parseFloat(newPaidValue) >= totalValue) {
-          status = 'paid';
-        } else if (parseFloat(newPaidValue) > 0) {
-          // Check if minimum payment requirement is met
-          if (minimumPayment > 0 && parseFloat(newPaidValue) >= minimumPayment) {
-            status = 'partial';
-          } else if (minimumPayment > 0 && parseFloat(newPaidValue) < minimumPayment) {
-            status = 'pending'; // Minimum not met
-          } else {
-            status = 'partial'; // No minimum requirement
-          }
-        } else {
-          status = minimumPayment > 0 ? 'pending' : 'open';
+    // Also update accounts receivable
+    const receivableId = `ar-${orderId}`;
+    const receivable = this.accountsReceivable.get(receivableId);
+    if (receivable) {
+      const totalValue = parseFloat(order.totalValue);
+      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+
+      if (totalPaid >= totalValue) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        status = 'partial';
+      }
+
+      const updatedReceivable = {
+        ...receivable,
+        receivedAmount: totalPaid.toFixed(2),
+        status,
+        updatedAt: new Date()
+      };
+
+      this.accountsReceivable.set(receivableId, updatedReceivable);
+    }
+  }
+
+  // Calculate and create commissions for an order
+  private async calculateCommissions(order: Order): Promise<void> {
+    console.log(`Calculating commissions for order ${order.orderNumber}`);
+
+    // Get vendor commission rate
+    const vendor = await this.getVendor(order.vendorId);
+    const vendorCommissionRate = vendor?.commissionRate ? parseFloat(vendor.commissionRate) : 10.0;
+
+    // Create vendor commission
+    const vendorCommissionAmount = (parseFloat(order.totalValue) * vendorCommissionRate) / 100;
+
+    const vendorCommission: Commission = {
+      id: randomUUID(),
+      vendorId: order.vendorId,
+      partnerId: null,
+      orderId: order.id,
+      type: 'vendor',
+      percentage: vendorCommissionRate.toFixed(2),
+      amount: vendorCommissionAmount.toFixed(2),
+      status: 'pending', // Will be updated when order status changes
+      paidAt: null,
+      deductedAt: null,
+      orderValue: order.totalValue,
+      orderNumber: order.orderNumber,
+      createdAt: new Date()
+    };
+
+    this.commissions.set(vendorCommission.id, vendorCommission);
+    console.log(`Created vendor commission: ${vendorCommission.amount} for order ${order.orderNumber}`);
+
+    // Create partner commission if there are active partners
+    const partners = await this.getPartners();
+    if (partners.length > 0) {
+      // Use the first active partner for simplicity
+      const activePartner = partners.find(p => p.isActive);
+      if (activePartner) {
+        const partnerCommissionRate = 15.0; // Default partner rate
+        const partnerCommissionAmount = (parseFloat(order.totalValue) * partnerCommissionRate) / 100;
+
+        const partnerCommission: Commission = {
+          id: randomUUID(),
+          vendorId: null,
+          partnerId: activePartner.id,
+          orderId: order.id,
+          type: 'partner',
+          percentage: partnerCommissionRate.toFixed(2),
+          amount: partnerCommissionAmount.toFixed(2),
+          status: 'pending',
+          paidAt: null,
+          deductedAt: null,
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber,
+          createdAt: new Date()
+        };
+
+        this.commissions.set(partnerCommission.id, partnerCommission);
+        console.log(`Created partner commission: ${partnerCommission.amount} for order ${order.orderNumber}`);
+      }
+    }
+  }
+
+  // Process commission payments based on order status
+  private async processCommissionPayments(order: Order, newStatus: string): Promise<void> {
+    console.log(`Processing commission payments for order ${order.orderNumber}, new status: ${newStatus}`);
+
+    const orderCommissions = Array.from(this.commissions.values())
+      .filter(c => c.orderId === order.id);
+
+    for (const commission of orderCommissions) {
+      let shouldUpdateStatus = false;
+      let newCommissionStatus = commission.status;
+
+      // Vendor commissions: confirmed when order is completed/ready
+      if (commission.type === 'vendor' && ['completed', 'ready', 'shipped', 'delivered'].includes(newStatus)) {
+        if (commission.status === 'pending') {
+          newCommissionStatus = 'confirmed';
+          shouldUpdateStatus = true;
         }
+      }
 
-        // Check if overdue
-        const dueDate = order.deadline ? new Date(order.deadline) : null;
-        if (dueDate && new Date() > dueDate && status !== 'paid') {
-          status = 'overdue';
+      // Partner commissions: confirmed when order starts production
+      if (commission.type === 'partner' && ['production', 'confirmed'].includes(newStatus)) {
+        if (commission.status === 'pending') {
+          newCommissionStatus = 'confirmed';
+          shouldUpdateStatus = true;
         }
+      }
 
-        await this.updateAccountsReceivable(receivableId, {
-          receivedAmount: parseFloat(newPaidValue).toFixed(2),
-          status: status
-        });
+      // Cancel commissions if order is cancelled
+      if (newStatus === 'cancelled') {
+        newCommissionStatus = 'cancelled';
+        shouldUpdateStatus = true;
+      }
+
+      if (shouldUpdateStatus) {
+        const updatedCommission = {
+          ...commission,
+          status: newCommissionStatus,
+          updatedAt: new Date()
+        };
+        this.commissions.set(commission.id, updatedCommission);
+        console.log(`Updated commission ${commission.id} status to: ${newCommissionStatus}`);
       }
     }
   }
@@ -2491,15 +2587,14 @@ export class MemStorage implements IStorage {
 
   async updateBudget(id: string, budgetData: any): Promise<any> {
     const budget = this.budgets.get(id);
-    if (!budget) {
-      throw new Error('Budget not found');
-    }
+    if (!budget) return null;
 
     const updatedBudget = {
       ...budget,
       ...budgetData,
       updatedAt: new Date().toISOString()
     };
+
     this.budgets.set(id, updatedBudget);
     return updatedBudget;
   }

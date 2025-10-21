@@ -2,68 +2,58 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText, Check, X } from "lucide-react";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 export default function ClientBudgets() {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const clientId = currentUser.id; // Use clientId for queryKey
   const [selectedBudget, setSelectedBudget] = useState<any>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false); // State to control budget details modal
-
-  const [clientObservations, setClientObservations] = useState("");
-  const [budgetAction, setBudgetAction] = useState<'approve' | 'reject' | null>(null);
+  const [clientObservations, setClientObservations] = useState('');
+  const { toast } = useToast();
 
   const approveBudgetMutation = useMutation({
-    mutationFn: async ({ budgetId, action, observations }: { budgetId: string; action: 'approve' | 'reject'; observations?: string }) => {
-      const response = await fetch(`/api/budgets/${budgetId}/${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ observations: observations || "" }),
+    mutationFn: async ({ budgetId, status, observations }: { budgetId: string, status: string, observations: string }) => {
+      const response = await fetch(`/api/budgets/${budgetId}/approve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, observations }),
       });
-      if (!response.ok) throw new Error(`Erro ao ${action === 'approve' ? 'aprovar' : 'rejeitar'} orçamento`);
+      if (!response.ok) throw new Error('Erro ao atualizar orçamento');
       return response.json();
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/client", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/client", clientId] });
+      setViewBudgetDialogOpen(false);
+      setClientObservations('');
+      setBudgetToView(null);
       toast({
         title: "Sucesso!",
-        description: variables.action === 'approve' 
-          ? "Orçamento aprovado! Os dados de pagamento serão disponibilizados em breve."
-          : "Orçamento rejeitado. O vendedor foi notificado.",
+        description: variables.status === 'approved' ? 
+          "Orçamento aprovado com sucesso!" : 
+          "Orçamento rejeitado.",
+        variant: variables.status === 'approved' ? "default" : "destructive"
       });
-      setViewBudgetDialogOpen(false);
-      setClientObservations("");
-      setBudgetAction(null);
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Erro",
-        description: error.message,
-        variant: "destructive",
+        description: "Não foi possível atualizar o orçamento",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  const handleBudgetAction = (action: 'approve' | 'reject') => {
-    if (!selectedBudget) return;
-    setBudgetAction(action);
-  };
-
-  const confirmBudgetAction = () => {
-    if (!selectedBudget || !budgetAction) return;
-    approveBudgetMutation.mutate({
-      budgetId: selectedBudget.id,
-      action: budgetAction,
-      observations: clientObservations
-    });
+  // Handlers
+  const handleViewDetails = (budget: any) => {
+    setSelectedBudget(budget);
+    setViewBudgetDialogOpen(true); // Use the state for the dialog
   };
 
   // Buscar orçamentos do cliente
@@ -151,11 +141,6 @@ export default function ClientBudgets() {
         {budgetStatusLabels[status as keyof typeof budgetStatusLabels] || status}
       </Badge>
     );
-  };
-
-  const handleViewDetails = (budget: any) => {
-    setSelectedBudget(budget);
-    setViewBudgetDialogOpen(true); // Use the state for the dialog
   };
 
   if (budgetsLoading || requestsLoading) {
@@ -399,241 +384,154 @@ export default function ClientBudgets() {
       <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Orçamento</DialogTitle>
+            <DialogTitle>Detalhes do Orçamento - {selectedBudget?.title}</DialogTitle>
+            <DialogDescription>
+              Revise os detalhes do orçamento e aprove ou rejeite
+            </DialogDescription>
           </DialogHeader>
           {selectedBudget && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Budget Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div>
-                  <Label className="font-medium">Título</Label>
-                  <p>{selectedBudget.title}</p>
+                  <Label>Título</Label>
+                  <p className="font-medium">{selectedBudget.title}</p>
                 </div>
                 <div>
-                  <Label className="font-medium">Status</Label>
-                  <div className="mt-1">{getStatusBadge(selectedBudget.status, 'budget')}</div>
+                  <Label>Status</Label>
+                  <span className={`status-badge ${
+                    selectedBudget.status === 'sent' ? 'status-confirmed' : 
+                    selectedBudget.status === 'approved' ? 'status-production' : 
+                    selectedBudget.status === 'rejected' ? 'status-cancelled' : 
+                    'status-pending'
+                  }`}>
+                    {selectedBudget.status === 'sent' ? 'Enviado' : 
+                     selectedBudget.status === 'approved' ? 'Aprovado' : 
+                     selectedBudget.status === 'rejected' ? 'Rejeitado' : 
+                     selectedBudget.status}
+                  </span>
+                </div>
+                <div>
+                  <Label>Válido Até</Label>
+                  <p>{selectedBudget.validUntil ? new Date(selectedBudget.validUntil).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label>Prazo de Entrega</Label>
+                  <p>{selectedBudget.deliveryDeadline ? new Date(selectedBudget.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* Budget Items */}
+              {selectedBudget.items && selectedBudget.items.length > 0 && (
                 <div>
-                  <Label className="font-medium">Válido até</Label>
-                  <p>{selectedBudget.validUntil ? new Date(selectedBudget.validUntil).toLocaleDateString('pt-BR') : 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="font-medium">Prazo de Entrega</Label>
-                  <p>{selectedBudget.deliveryDeadline ? new Date(selectedBudget.deliveryDeadline).toLocaleDateString('pt-BR') : 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="font-medium">Tipo de Entrega</Label>
-                  <p>{selectedBudget.deliveryType === 'delivery' ? 'Entrega com Frete' : 'Retirada no Local'}</p>
-                </div>
-              </div>
-
-              <div>
-                <Label className="font-medium">Descrição</Label>
-                <p>{selectedBudget.description || 'N/A'}</p>
-              </div>
-
-              <div>
-                <Label className="font-medium">Produtos</Label>
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {selectedBudget.items?.map((item: any, index: number) => (
-                    <div key={index} className="border rounded p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">{item.productName}</h4>
-                        <span className="font-bold">
-                          R$ {((item.unitPrice * item.quantity) +
-                               (item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0) +
-                               (item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">Quantidade: {item.quantity} | Preço unitário: R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-
-                      {item.producerName && (
-                        <p className="text-xs text-blue-600">Produtor: {item.producerName}</p>
-                      )}
-
-                      {/* Detalhes de Personalização */}
-                      {(item.hasItemCustomization || item.hasGeneralCustomization) && (
-                        <div className="mt-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                          <h5 className="font-medium text-blue-800 mb-2">📋 Detalhes de Personalização:</h5>
-
-                          {item.hasItemCustomization && (
-                            <div className="mb-2">
-                              <p className="text-sm text-blue-700">
-                                <strong>Personalização Individual:</strong> R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                  <h3 className="text-lg font-semibold mb-3">Produtos</h3>
+                  <div className="space-y-3">
+                    {selectedBudget.items.map((item: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">{item.productName}</h4>
+                            <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
+                            <p className="text-sm text-gray-600">
+                              Preço unitário: R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            {item.hasItemCustomization && (
+                              <p className="text-sm text-blue-600">
+                                Personalização: {item.itemCustomizationDescription} 
+                                (+R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
                               </p>
-                              {item.itemCustomizationDescription && (
-                                <p className="text-xs text-blue-600 mt-1">{item.itemCustomizationDescription}</p>
-                              )}
-                            </div>
-                          )}
-
-                          {item.hasGeneralCustomization && (
-                            <div className="mb-2">
-                              <p className="text-sm text-blue-700">
-                                <strong>Personalização Geral:</strong> R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
-                              </p>
-                              {item.generalCustomizationDescription && (
-                                <p className="text-xs text-blue-600 mt-1">{item.generalCustomizationDescription}</p>
-                              )}
-                            </div>
-                          )}
-
-                          {item.customizationPhoto && (
-                            <div className="mt-2">
-                              <p className="text-xs text-blue-600 mb-1">Imagem de referência:</p>
-                              <img
-                                src={item.customizationPhoto}
-                                alt="Personalização"
-                                className="max-w-32 h-20 object-cover rounded border cursor-pointer"
-                                onClick={() => window.open(item.customizationPhoto, '_blank')}
-                              />
-                            </div>
-                          )}
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">
+                              R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dados de Pagamento - só aparece se orçamento foi aceito */}
-              {selectedBudget.status === 'approved' && (
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <h3 className="font-bold text-green-800 mb-3">💳 Dados para Pagamento</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="font-medium">PIX</Label>
-                      <p className="text-sm bg-white p-2 rounded border">
-                        {selectedBudget.paymentData?.pix || 'Aguardando dados...'}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Conta Bancária</Label>
-                      <p className="text-sm bg-white p-2 rounded border">
-                        {selectedBudget.paymentData?.bankAccount || 'Aguardando dados...'}
-                      </p>
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                  {selectedBudget.paymentData?.paymentLink && (
-                    <div className="mt-3">
-                      <Button
-                        onClick={() => window.open(selectedBudget.paymentData.paymentLink, '_blank')}
-                        className="w-full bg-green-600 hover:bg-green-700"
-                      >
-                        🔗 Pagar via Link
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
 
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-lg font-bold">Total do Orçamento:</span>
-                  <span className="text-xl font-bold text-green-600">
-                    R$ {selectedBudget.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+              {/* Budget Photos */}
+              {selectedBudget.photos && selectedBudget.photos.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Fotos</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedBudget.photos.map((photo: string, index: number) => (
+                      <img 
+                        key={index}
+                        src={photo} 
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total */}
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="gradient-text">
+                    R$ {parseFloat(selectedBudget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-
-                {/* Interface de Aprovação/Rejeição */}
-                {selectedBudget.status === 'sent' && !budgetAction && (
-                  <div className="mt-4 pt-3 border-t space-y-3">
-                    <p className="text-sm text-gray-600 font-medium">O que você decide sobre este orçamento?</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        onClick={() => handleBudgetAction('approve')}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        ✅ Aprovar
-                      </Button>
-                      <Button
-                        onClick={() => handleBudgetAction('reject')}
-                        variant="outline"
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                      >
-                        ❌ Rejeitar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Formulário de Observações */}
-                {selectedBudget.status === 'sent' && budgetAction && (
-                  <div className="mt-4 pt-3 border-t space-y-4">
-                    <div className={`p-3 rounded-lg ${budgetAction === 'approve' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border`}>
-                      <h4 className={`font-medium mb-2 ${budgetAction === 'approve' ? 'text-green-800' : 'text-red-800'}`}>
-                        {budgetAction === 'approve' ? '✅ Aprovando Orçamento' : '❌ Rejeitando Orçamento'}
-                      </h4>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {budgetAction === 'approve' 
-                          ? 'Adicione observações ou solicitações especiais (opcional):'
-                          : 'Explique o motivo da rejeição para o vendedor:'
-                        }
-                      </p>
-                      <textarea
-                        value={clientObservations}
-                        onChange={(e) => setClientObservations(e.target.value)}
-                        placeholder={budgetAction === 'approve' 
-                          ? 'Ex: Gostaria de confirmar a cor do produto antes da produção...'
-                          : 'Ex: O prazo de entrega não atende nossas necessidades...'
-                        }
-                        className="w-full p-3 border border-gray-300 rounded-lg resize-none"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={confirmBudgetAction}
-                        disabled={approveBudgetMutation.isPending}
-                        className={budgetAction === 'approve' 
-                          ? 'bg-green-600 hover:bg-green-700 flex-1' 
-                          : 'bg-red-600 hover:bg-red-700 flex-1'
-                        }
-                      >
-                        {approveBudgetMutation.isPending 
-                          ? 'Processando...' 
-                          : budgetAction === 'approve' 
-                            ? 'Confirmar Aprovação' 
-                            : 'Confirmar Rejeição'
-                        }
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setBudgetAction(null);
-                          setClientObservations("");
-                        }}
-                        variant="outline"
-                        disabled={approveBudgetMutation.isPending}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-
-                    {budgetAction === 'approve' && (
-                      <p className="text-xs text-green-600 text-center">
-                        ✨ Após a aprovação, os dados de pagamento serão disponibilizados
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Status de orçamento rejeitado */}
-                {selectedBudget.status === 'rejected' && (
-                  <div className="mt-4 pt-3 border-t">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-red-800 font-medium">❌ Orçamento Rejeitado</p>
-                      {selectedBudget.clientObservations && (
-                        <p className="text-sm text-red-700 mt-2">
-                          <strong>Suas observações:</strong> {selectedBudget.clientObservations}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {/* Approval Actions - Only show if budget status is 'sent' */}
+              {selectedBudget.status === 'sent' && (
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="text-lg font-semibold">Aprovação do Orçamento</h3>
+                  <div>
+                    <Label htmlFor="client-observations">Observações (opcional)</Label>
+                    <Textarea
+                      id="client-observations"
+                      placeholder="Deixe suas observações sobre o orçamento..."
+                      value={clientObservations}
+                      onChange={(e) => setClientObservations(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => approveBudgetMutation.mutate({ 
+                        budgetId: selectedBudget.id, 
+                        status: 'approved',
+                        observations: clientObservations 
+                      })}
+                      disabled={approveBudgetMutation.isPending}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Aprovar Orçamento
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => approveBudgetMutation.mutate({ 
+                        budgetId: selectedBudget.id, 
+                        status: 'rejected',
+                        observations: clientObservations 
+                      })}
+                      disabled={approveBudgetMutation.isPending}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Rejeitar Orçamento
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Show client observations if budget was reviewed */}
+              {selectedBudget.clientObservations && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <Label className="font-medium">Observações do Cliente:</Label>
+                  <p className="mt-1">{selectedBudget.clientObservations}</p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
