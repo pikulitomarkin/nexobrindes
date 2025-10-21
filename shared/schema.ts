@@ -36,7 +36,7 @@ export const clients = pgTable("clients", {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull().unique(),
-  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  clientId: varchar("client_id").references(() => clients.id),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
   budgetId: varchar("budget_id").references(() => budgets.id),
   product: text("product").notNull(),
@@ -46,6 +46,29 @@ export const orders = pgTable("orders", {
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).default('0'), // Valor a ser restituído em caso de cancelamento
   status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'delivered', 'cancelled'
   deadline: timestamp("deadline"),
+  // Contact information fields
+  contactName: text("contact_name").notNull(), // Nome de contato obrigatório
+  contactPhone: text("contact_phone"), // Telefone de contato opcional
+  contactEmail: text("contact_email"), // Email de contato opcional
+  // Delivery information
+  deliveryType: text("delivery_type").default('delivery'), // 'delivery' or 'pickup'
+  deliveryDeadline: timestamp("delivery_deadline"),
+  // Payment information
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  shippingMethodId: varchar("shipping_method_id").references(() => shippingMethods.id),
+  installments: integer("installments").default(1),
+  downPayment: decimal("down_payment", { precision: 10, scale: 2 }).default('0.00'),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
+  // Discount information
+  hasDiscount: boolean("has_discount").default(false),
+  discountType: text("discount_type").default('percentage'), // 'percentage' or 'value'
+  discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default('0.00'),
+  // Tracking
+  trackingCode: text("tracking_code"),
+  // Additional notes
+  refundNotes: text("refund_notes"), // Observações sobre reembolso
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
