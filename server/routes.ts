@@ -1197,6 +1197,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all clients
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+      res.json(clients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Create a new client
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log(`Creating client with data:`, clientData);
+      
+      const newClient = await storage.createClient(clientData);
+      console.log(`Client created successfully:`, newClient);
+      
+      res.json(newClient);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
   // Get clients for a specific vendor
   app.get("/api/vendors/:vendorId/clients", async (req, res) => {
     try {
