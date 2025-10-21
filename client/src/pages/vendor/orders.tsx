@@ -758,7 +758,7 @@ export default function VendorOrders() {
               <Plus className="h-4 w-4 mr-2" />
               Novo Pedido
             </Button>
-          </DialogDialogTrigger>
+          </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{isEditMode ? "Editar Pedido" : "Criar Novo Pedido"}</DialogTitle>
