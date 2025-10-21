@@ -341,6 +341,26 @@ export class MemStorage implements IStorage {
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
+    },
+    {
+      id: "pm-4",
+      name: "Depósito Bancário",
+      type: "bank_transfer",
+      maxInstallments: 1,
+      installmentInterest: "0.00",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "pm-5",
+      name: "Dinheiro",
+      type: "cash",
+      maxInstallments: 1,
+      installmentInterest: "0.00",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
   ];
 
@@ -359,6 +379,17 @@ export class MemStorage implements IStorage {
     },
     {
       id: "sm-2",
+      name: "Correios SEDEX",
+      type: "calculated",
+      basePrice: "0.00",
+      freeShippingThreshold: "200.00",
+      estimatedDays: 3,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "sm-3",
       name: "Transportadora",
       type: "fixed",
       basePrice: "25.00",
@@ -369,12 +400,34 @@ export class MemStorage implements IStorage {
       updatedAt: new Date().toISOString()
     },
     {
-      id: "sm-3",
+      id: "sm-4",
+      name: "Entrega Local",
+      type: "fixed",
+      basePrice: "15.00",
+      freeShippingThreshold: "100.00",
+      estimatedDays: 1,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "sm-5",
       name: "Frete Grátis",
       type: "free",
       basePrice: "0.00",
       freeShippingThreshold: "0.00",
       estimatedDays: 7,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: "sm-6",
+      name: "Retirada no Local",
+      type: "pickup",
+      basePrice: "0.00",
+      freeShippingThreshold: "0.00",
+      estimatedDays: 0,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
