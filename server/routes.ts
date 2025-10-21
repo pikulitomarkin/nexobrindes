@@ -1389,6 +1389,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Receivables payment endpoint
+  app.post("/api/receivables/:id/payment", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, method, transactionId, notes } = req.body;
+
+      console.log("Processing receivables payment:", { id, amount, method, transactionId });
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      // Check if this is a manual receivable or order-based
+      const receivables = await storage.getAccountsReceivable();
+      const receivable = receivables.find(r => r.id === id);
+      
+      if (!receivable) {
+        return res.status(404).json({ error: "Conta a receber não encontrada" });
+      }
+
+      let paymentRecord;
+
+      if (receivable.orderId) {
+        // This is an order-based receivable - create payment for the order
+        paymentRecord = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          status: "confirmed",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        });
+      } else {
+        // This is a manual receivable - update the receivable directly
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + parseFloat(amount);
+        
+        await storage.updateAccountsReceivable(id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'
+        });
+
+        paymentRecord = {
+          id: `payment-${Date.now()}`,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        };
+      }
+
+      console.log("Payment processed successfully:", paymentRecord);
+      res.json({ success: true, payment: paymentRecord });
+    } catch (error) {
+      console.error("Error processing receivables payment:", error);
+      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+    }
+  });
+
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {

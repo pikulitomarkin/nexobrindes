@@ -87,8 +87,15 @@ export default function FinanceReceivables() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao registrar pagamento');
+        let errorMessage = 'Erro ao registrar pagamento';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If response is not JSON (like HTML error page), use status text
+          errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       return response.json();
