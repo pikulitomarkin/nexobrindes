@@ -1188,7 +1188,7 @@ export default function VendorBudgets() {
                           </span>
                         </div>
                       </div>
-                    ))
+                    ))}
                   </div>
                 )}
 
