@@ -1520,7 +1520,30 @@ export class MemStorage implements IStorage {
     const filteredClients = allClients.filter(client => client.vendorId === vendorId);
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
-    return filteredClients;
+    // Enrich clients with user info and stats
+    const enrichedClients = await Promise.all(
+      filteredClients.map(async (client) => {
+        // Get user info
+        const user = client.userId ? await this.getUser(client.userId) : null;
+        
+        // Count orders for this client
+        const clientOrders = await this.getOrdersByClient(client.userId || client.id);
+        const ordersCount = clientOrders.length;
+        const totalSpent = clientOrders
+          .filter(order => order.status !== 'cancelled')
+          .reduce((total, order) => total + parseFloat(order.totalValue || '0'), 0);
+
+        return {
+          ...client,
+          userCode: user?.username || client.username || 'N/A',
+          username: user?.username || client.username || 'N/A',
+          ordersCount,
+          totalSpent
+        };
+      })
+    );
+
+    return enrichedClients;
   }
 
   // Production Order methods
