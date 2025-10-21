@@ -2962,6 +2962,26 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Payment Methods Routes (for frontend)
+  app.get("/api/payment-methods", async (req, res) => {
+    try {
+      const paymentMethods = await storage.getPaymentMethods();
+      res.json(paymentMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Shipping Methods Routes (for frontend)
+  app.get("/api/shipping-methods", async (req, res) => {
+    try {
+      const shippingMethods = await storage.getShippingMethods();
+      res.json(shippingMethods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
   // Settings Routes - Payment Methods
   app.get("/api/settings/payment-methods", async (req, res) => {
     try {
