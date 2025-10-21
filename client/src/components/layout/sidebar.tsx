@@ -1,8 +1,8 @@
-import { 
-  BarChart3, 
-  Bus, 
-  User, 
-  Factory, 
+import {
+  BarChart3,
+  Bus,
+  User,
+  Factory,
   TrendingUp,
   TrendingDown,
   Package,
@@ -24,11 +24,10 @@ import {
 } from "lucide-react";
 
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
-// Assuming Link and SidebarMenu related components are imported from a UI library
-// For demonstration, let's assume they are available or mock them if necessary.
-// Example: import { Link } from 'your-link-component-library';
-// Example: import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent } from 'your-sidebar-library';
 
 // Mocking Link, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent for demonstration
 const Link = ({ href, children }: any) => <a href={href}>{children}</a>;
@@ -44,19 +43,62 @@ interface SidebarProps {
   onPanelChange: (panel: string) => void;
 }
 
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  path: string;
+  isActive?: boolean;
+  onClick: () => void;
+  badge?: number;
+}
+
 // SidebarItem component
-const SidebarItem = ({ icon: Icon, label, href, isActive }: any) => (
-  <a
-    href={href}
-    className={`sidebar-item w-full flex items-center px-6 py-3 text-left text-white ${isActive ? "active" : ""}`}
-  >
-    <Icon className="mr-3 h-5 w-5" />
-    <span>{label}</span>
-  </a>
-);
+function SidebarItem({ icon, label, path, isActive, onClick, badge }: SidebarItemProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors relative ${
+        isActive ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      {icon}
+      <span className="flex-1 text-left">{label}</span>
+      {badge && badge > 0 && (
+        <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
-  const [location] = useLocation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Mock user data for now
+  useEffect(() => {
+    // In a real app, you would fetch user data here
+    setUser({ id: 1, role: 'admin' }); // Example: 'admin', 'vendor', 'client', etc.
+    setLoading(false);
+  }, []);
+
+  // Buscar notificações para vendedor
+  const { data: pendingActions } = useQuery({
+    queryKey: ["/api/vendor/pending-actions", user?.id],
+    queryFn: async () => {
+      if (!user?.id || user.role !== 'vendor') return 0;
+      const response = await fetch(`/api/vendor/${user.id}/pending-actions`);
+      if (!response.ok) return 0;
+      const data = await response.json();
+      return data.count || 0;
+    },
+    enabled: !!user?.id && user?.role === 'vendor',
+    refetchInterval: 10000, // Atualiza a cada 10 segundos
+  });
+
   const menuItems = [
     { id: "admin", label: "Admin Geral", icon: LayoutDashboard },
     { id: "vendor", label: "Vendedor", icon: ShoppingCart },
@@ -66,10 +108,11 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     { id: "finance", label: "Módulo Financeiro", icon: DollarSign },
   ];
 
-  // Assuming userRole is available, for example, from context or props
-  const userRole = "admin"; // Placeholder for actual user role
-  const user = { role: userRole }; // Mocking user object for role check
-  const pathname = location; // Mocking pathname for active link highlighting
+  const pathname = location[0]; // useLocation returns a tuple: [path, setPath]
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="w-64 gradient-bg text-white shadow-xl">
@@ -105,138 +148,161 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       {/* Admin Panel Specific Links */}
       {user?.role === 'admin' && (
             <>
-              <SidebarItem 
-                icon={LayoutDashboard} 
-                label="Dashboard" 
-                href="/admin-dashboard" 
+              <SidebarItem
+                icon={<LayoutDashboard className="h-5 w-5" />}
+                label="Dashboard"
+                path="/admin-dashboard"
                 isActive={pathname === '/admin-dashboard'}
+                onClick={() => navigate('/admin-dashboard')}
               />
-              <SidebarItem 
-                icon={Users} 
-                label="Usuários" 
-                href="/admin/users" 
+              <SidebarItem
+                icon={<Users className="h-5 w-5" />}
+                label="Usuários"
+                path="/admin/users"
                 isActive={pathname === '/admin/users'}
+                onClick={() => navigate('/admin/users')}
               />
-              <SidebarItem 
-                icon={Store} 
-                label="Vendedores" 
-                href="/admin/vendors" 
+              <SidebarItem
+                icon={<Store className="h-5 w-5" />}
+                label="Vendedores"
+                path="/admin/vendors"
                 isActive={pathname === '/admin/vendors'}
+                onClick={() => navigate('/admin/vendors')}
               />
-              <SidebarItem 
-                icon={UserCheck} 
-                label="Clientes" 
-                href="/admin/clients" 
+              <SidebarItem
+                icon={<UserCheck className="h-5 w-5" />}
+                label="Clientes"
+                path="/admin/clients"
                 isActive={pathname === '/admin/clients'}
+                onClick={() => navigate('/admin/clients')}
               />
-              <SidebarItem 
-                icon={Hammer} 
-                label="Produtores" 
-                href="/admin/producers" 
+              <SidebarItem
+                icon={<Hammer className="h-5 w-5" />}
+                label="Produtores"
+                path="/admin/producers"
                 isActive={pathname === '/admin/producers'}
+                onClick={() => navigate('/admin/producers')}
               />
-              <SidebarItem 
-                icon={UserCheck} 
-                label="Sócios" 
-                href="/admin/partners" 
+              <SidebarItem
+                icon={<UserCheck className="h-5 w-5" />}
+                label="Sócios"
+                path="/admin/partners"
                 isActive={pathname === '/admin/partners'}
+                onClick={() => navigate('/admin/partners')}
               />
-              <SidebarItem 
-                icon={Package} 
-                label="Produtos" 
-                href="/admin/products" 
+              <SidebarItem
+                icon={<Package className="h-5 w-5" />}
+                label="Produtos"
+                path="/admin/products"
                 isActive={pathname === '/admin/products'}
+                onClick={() => navigate('/admin/products')}
               />
-              <SidebarItem 
-                icon={Palette} 
-                label="Personalizações" 
-                href="/admin/customizations" 
+              <SidebarItem
+                icon={<Palette className="h-5 w-5" />}
+                label="Personalizações"
+                path="/admin/customizations"
                 isActive={pathname === '/admin/customizations'}
+                onClick={() => navigate('/admin/customizations')}
               />
-              <SidebarItem 
-                icon={Calculator} 
-                label="Orçamentos" 
-                href="/admin/budgets" 
+              <SidebarItem
+                icon={<Calculator className="h-5 w-5" />}
+                label="Orçamentos"
+                path="/admin/budgets"
                 isActive={pathname === '/admin/budgets'}
+                onClick={() => navigate('/admin/budgets')}
               />
-              <SidebarItem 
-                icon={ShoppingCart} 
-                label="Pedidos" 
-                href="/admin/orders" 
+              <SidebarItem
+                icon={<ShoppingCart className="h-5 w-5" />}
+                label="Pedidos"
+                path="/admin/orders"
                 isActive={pathname === '/admin/orders'}
+                onClick={() => navigate('/admin/orders')}
               />
-              <SidebarItem 
-                icon={Percent} 
-                label="Comissões" 
-                href="/admin/commission-management" 
+              <SidebarItem
+                icon={<Percent className="h-5 w-5" />}
+                label="Comissões"
+                path="/admin/commission-management"
                 isActive={pathname === '/admin/commission-management'}
+                onClick={() => navigate('/admin/commission-management')}
               />
-              <SidebarItem 
-                icon={CreditCard} 
-                label="Financeiro" 
-                href="/finance" 
+              <SidebarItem
+                icon={<CreditCard className="h-5 w-5" />}
+                label="Financeiro"
+                path="/finance"
                 isActive={pathname === '/finance'}
+                onClick={() => navigate('/finance')}
               />
-              <SidebarItem 
-                icon={Settings} 
-                label="Configurações de Comissão" 
-                href="/admin/commission-settings"
-                isActive={location === "/admin/commission-settings"}
+              <SidebarItem
+                icon={<Settings className="h-5 w-5" />}
+                label="Configurações de Comissão"
+                path="/admin/commission-settings"
+                isActive={pathname === "/admin/commission-settings"}
+                onClick={() => navigate("/admin/commission-settings")}
               />
-              <SidebarItem 
-                icon={DollarSign} 
-                label="Pagamentos Produtores" 
-                href="/admin/producer-payments"
-                isActive={location === "/admin/producer-payments"}
+              <SidebarItem
+                icon={<DollarSign className="h-5 w-5" />}
+                label="Pagamentos Produtores"
+                path="/admin/producer-payments"
+                isActive={pathname === "/admin/producer-payments"}
+                onClick={() => navigate("/admin/producer-payments")}
               />
             </>
           )}
 
       {/* Vendor Panel Specific Links */}
-      {activePanel === "vendor" && (
-        <nav className="mt-8">
-          <div className="px-6 mb-4">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Vendas
-            </p>
-          </div>
-          <SidebarItem 
-            icon={ShoppingCart} 
-            label="Pedidos" 
-            href="/vendor/orders"
-            isActive={location === "/vendor/orders"}
+      {user?.role === 'vendor' && (
+        <>
+          <SidebarItem
+            icon={<Home className="h-4 w-4" />}
+            label="Dashboard"
+            path="/vendor-dashboard"
+            isActive={pathname === "/vendor-dashboard"}
+            onClick={() => navigate("/vendor-dashboard")}
           />
-          <SidebarItem 
-            icon={Users} 
-            label="Clientes" 
-            href="/vendor/clients"
-            isActive={location === "/vendor/clients"}
+          <SidebarItem
+            icon={<Users className="h-4 w-4" />}
+            label="Clientes"
+            path="/vendor/clients"
+            isActive={pathname === "/vendor/clients"}
+            onClick={() => navigate("/vendor/clients")}
           />
-          <SidebarItem 
-            icon={Package} 
-            label="Produtos" 
-            href="/vendor/products"
-            isActive={location === "/vendor/products"}
+          <SidebarItem
+            icon={<Package className="h-4 w-4" />}
+            label="Produtos"
+            path="/vendor/products"
+            isActive={pathname === "/vendor/products"}
+            onClick={() => navigate("/vendor/products")}
           />
-          <SidebarItem 
-            icon={FileText} 
-            label="Orçamentos" 
-            href="/vendor/budgets"
-            isActive={location === "/vendor/budgets"}
+          <SidebarItem
+            icon={<FileText className="h-4 w-4" />}
+            label="Orçamentos"
+            path="/vendor/budgets"
+            isActive={pathname === "/vendor/budgets"}
+            onClick={() => navigate("/vendor/budgets")}
+            badge={pendingActions && pendingActions > 0 ? pendingActions : undefined}
           />
-
-          <div className="px-6 mb-4 mt-6">
-            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
-              Financeiro
-            </p>
-          </div>
-          <SidebarItem 
-            icon={DollarSign} 
-            label="Comissões" 
-            href="/vendor/commissions"
-            isActive={location === "/vendor/commissions"}
+          <SidebarItem
+            icon={<ShoppingCart className="h-4 w-4" />}
+            label="Pedidos"
+            path="/vendor/orders"
+            isActive={pathname === "/vendor/orders"}
+            onClick={() => navigate("/vendor/orders")}
           />
-        </nav>
+          <SidebarItem
+            icon={<Calculator className="h-4 w-4" />}
+            label="Comissões"
+            path="/vendor/commissions"
+            isActive={pathname === "/vendor/commissions"}
+            onClick={() => navigate("/vendor/commissions")}
+          />
+          <SidebarItem
+            icon={<FileText className="h-4 w-4" />}
+            label="Solicitações de Cotação"
+            path="/vendor/quote-requests"
+            isActive={pathname === "/vendor/quote-requests"}
+            onClick={() => navigate("/vendor/quote-requests")}
+          />
+        </>
       )}
 
       {activePanel === "client" && (
@@ -246,11 +312,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Dashboard
             </p>
           </div>
-          <SidebarItem 
-            icon={BarChart3} 
-            label="Dashboard" 
-            href="/client/dashboard"
-            isActive={location === "/client/dashboard"}
+          <SidebarItem
+            icon={<BarChart3 className="h-5 w-5" />}
+            label="Dashboard"
+            path="/client/dashboard"
+            isActive={pathname === "/client/dashboard"}
+            onClick={() => navigate("/client/dashboard")}
           />
 
           <div className="px-6 mb-4 mt-6">
@@ -258,11 +325,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Pedidos
             </p>
           </div>
-          <SidebarItem 
-            icon={ShoppingCart} 
-            label="Meus Pedidos" 
-            href="/client/orders"
-            isActive={location === "/client/orders"}
+          <SidebarItem
+            icon={<ShoppingCart className="h-5 w-5" />}
+            label="Meus Pedidos"
+            path="/client/orders"
+            isActive={pathname === "/client/orders"}
+            onClick={() => navigate("/client/orders")}
           />
 
           <div className="px-6 mb-4 mt-6">
@@ -270,11 +338,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Minha Conta
             </p>
           </div>
-          <SidebarItem 
-            icon={User} 
-            label="Meu Perfil" 
-            href="/client/profile"
-            isActive={location === "/client/profile"}
+          <SidebarItem
+            icon={<User className="h-5 w-5" />}
+            label="Meu Perfil"
+            path="/client/profile"
+            isActive={pathname === "/client/profile"}
+            onClick={() => navigate("/client/profile")}
           />
         </nav>
       )}
@@ -286,17 +355,19 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Produção
             </p>
           </div>
-          <SidebarItem 
-            icon={Factory} 
-            label="Painel de Produção" 
-            href="/producer/production-dashboard"
-            isActive={location === "/producer/production-dashboard"}
+          <SidebarItem
+            icon={<Factory className="h-5 w-5" />}
+            label="Painel de Produção"
+            path="/producer/production-dashboard"
+            isActive={pathname === "/producer/production-dashboard"}
+            onClick={() => navigate("/producer/production-dashboard")}
           />
-          <SidebarItem 
-            icon={CreditCard} 
-            label="Contas a Receber" 
-            href="/producer/receivables"
-            isActive={location === "/producer/receivables"}
+          <SidebarItem
+            icon={<CreditCard className="h-5 w-5" />}
+            label="Contas a Receber"
+            path="/producer/receivables"
+            isActive={pathname === "/producer/receivables"}
+            onClick={() => navigate("/producer/receivables")}
           />
         </nav>
       )}
@@ -308,29 +379,33 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Logística
             </p>
           </div>
-          <SidebarItem 
-            icon={LayoutDashboard} 
-            label="Dashboard" 
-            href="/logistics/dashboard"
-            isActive={location === "/logistics/dashboard"}
+          <SidebarItem
+            icon={<LayoutDashboard className="h-5 w-5" />}
+            label="Dashboard"
+            path="/logistics/dashboard"
+            isActive={pathname === "/logistics/dashboard"}
+            onClick={() => navigate("/logistics/dashboard")}
           />
-          <SidebarItem 
-            icon={Package} 
-            label="Pedidos Pagos" 
-            href="/logistics/paid-orders"
-            isActive={location === "/logistics/paid-orders"}
+          <SidebarItem
+            icon={<Package className="h-5 w-5" />}
+            label="Pedidos Pagos"
+            path="/logistics/paid-orders"
+            isActive={pathname === "/logistics/paid-orders"}
+            onClick={() => navigate("/logistics/paid-orders")}
           />
-          <SidebarItem 
-            icon={Factory} 
-            label="Acompanhar Produção" 
-            href="/logistics/production-tracking"
-            isActive={location === "/logistics/production-tracking"}
+          <SidebarItem
+            icon={<Factory className="h-5 w-5" />}
+            label="Acompanhar Produção"
+            path="/logistics/production-tracking"
+            isActive={pathname === "/logistics/production-tracking"}
+            onClick={() => navigate("/logistics/production-tracking")}
           />
-          <SidebarItem 
-            icon={Bus} 
-            label="Despachos" 
-            href="/logistics/shipments"
-            isActive={location === "/logistics/shipments"}
+          <SidebarItem
+            icon={<Bus className="h-5 w-5" />}
+            label="Despachos"
+            path="/logistics/shipments"
+            isActive={pathname === "/logistics/shipments"}
+            onClick={() => navigate("/logistics/shipments")}
           />
 
           <div className="px-6 mt-6 mb-4">
@@ -338,30 +413,21 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Gestão
             </p>
           </div>
-          <SidebarItem 
-            icon={Package} 
-            label="Produtos" 
-            href="/logistics/products"
-            isActive={location === "/logistics/products"}
+          <SidebarItem
+            icon={<Package className="h-5 w-5" />}
+            label="Produtos"
+            path="/logistics/products"
+            isActive={pathname === "/logistics/products"}
+            onClick={() => navigate("/logistics/products")}
           />
-          <SidebarItem 
-            icon={Factory} 
-            label="Produtores" 
-            href="/logistics/producers"
-            isActive={location === "/logistics/producers"}
+          <SidebarItem
+            icon={<Factory className="h-5 w-5" />}
+            label="Produtores"
+            path="/logistics/producers"
+            isActive={pathname === "/logistics/producers"}
+            onClick={() => navigate("/logistics/producers")}
           />
-          <SidebarItem 
-            icon={Package} 
-            label="Produtos" 
-            href="/logistics/products"
-            isActive={location === "/logistics/products"}
-          />
-          <SidebarItem 
-            icon={Factory} 
-            label="Produtores" 
-            href="/logistics/producers"
-            isActive={location === "/logistics/producers"}
-          />
+          {/* Duplicate entries removed */}
         </nav>
       )}
 
@@ -372,41 +438,47 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
               Controle Financeiro
             </p>
           </div>
-          <SidebarItem 
-            icon={DollarSign} 
-            label="Contas a Receber" 
-            href="/finance/receivables"
-            isActive={location === "/finance/receivables"}
+          <SidebarItem
+            icon={<DollarSign className="h-5 w-5" />}
+            label="Contas a Receber"
+            path="/finance/receivables"
+            isActive={pathname === "/finance/receivables"}
+            onClick={() => navigate("/finance/receivables")}
           />
-          <SidebarItem 
-            icon={TrendingDown} 
-            label="Contas a Pagar" 
-            href="/finance/payables"
-            isActive={location === "/finance/payables"}
+          <SidebarItem
+            icon={<TrendingDown className="h-5 w-5" />}
+            label="Contas a Pagar"
+            path="/finance/payables"
+            isActive={pathname === "/finance/payables"}
+            onClick={() => navigate("/finance/payables")}
           />
-          <SidebarItem 
-            icon={Receipt} 
-            label="Notas de Despesas" 
-            href="/finance/expenses"
-            isActive={location === "/finance/expenses"}
+          <SidebarItem
+            icon={<Receipt className="h-5 w-5" />}
+            label="Notas de Despesas"
+            path="/finance/expenses"
+            isActive={pathname === "/finance/expenses"}
+            onClick={() => navigate("/finance/expenses")}
           />
-          <SidebarItem 
-            icon={TrendingUp} 
-            label="Pagamentos de Comissão" 
-            href="/finance/commission-payouts"
-            isActive={location === "/finance/commission-payouts"}
+          <SidebarItem
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Pagamentos de Comissão"
+            path="/finance/commission-payouts"
+            isActive={pathname === "/finance/commission-payouts"}
+            onClick={() => navigate("/finance/commission-payouts")}
           />
-          <SidebarItem 
-            icon={Calculator} 
-            label="Conciliação Bancária" 
-            href="/finance/reconciliation"
-            isActive={location === "/finance/reconciliation"}
+          <SidebarItem
+            icon={<Calculator className="h-5 w-5" />}
+            label="Conciliação Bancária"
+            path="/finance/reconciliation"
+            isActive={pathname === "/finance/reconciliation"}
+            onClick={() => navigate("/finance/reconciliation")}
           />
-          <SidebarItem 
-            icon={CreditCard} 
-            label="Histórico de Pagamentos" 
-            href="/finance/payments"
-            isActive={location === "/finance/payments"}
+          <SidebarItem
+            icon={<CreditCard className="h-5 w-5" />}
+            label="Histórico de Pagamentos"
+            path="/finance/payments"
+            isActive={pathname === "/finance/payments"}
+            onClick={() => navigate("/finance/payments")}
           />
         </nav>
       )}

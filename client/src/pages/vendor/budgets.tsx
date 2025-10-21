@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -1710,23 +1710,10 @@ export default function VendorBudgets() {
       </div>
 
       {/* Filters */}      
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por número, título ou cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1739,9 +1726,55 @@ export default function VendorBudgets() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex-1">
+              <Input
+                placeholder="Buscar por título, descrição ou cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => setIsBudgetDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Orçamento
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
+          {budgets?.filter((budget: any) => budget.status === 'approved').length > 0 && (
+            <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                🔔 Solicitações Pendentes - Orçamentos Aprovados pelo Cliente
+              </h3>
+              <div className="space-y-2">
+                {budgets.filter((budget: any) => budget.status === 'approved').map((budget: any) => (
+                  <div key={budget.id} className="bg-white p-3 rounded border flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{budget.title}</p>
+                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                      <p className="text-sm text-green-600">Total: R$ {budget.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewBudget(budget)}
+                      >
+                        Ver Detalhes
+                      </Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => handleConvertClick(budget.id)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        🏷️ Converter em Pedido
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
       {/* Budgets Table */}      
       <Card>

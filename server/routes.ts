@@ -866,7 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
             trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-            estimatedDelivery: productionOrder?.deliveryDelivery || null,
+            estimatedDelivery: productionOrder?.deliveryDeadline || null,
             payments: payments.filter(p => p.status === 'confirmed'), // Include payment details
             budgetInfo: originalBudgetInfo // Include original budget payment info
           };
@@ -1299,7 +1299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const newBudget = await storage.createBudget(budgetData);
-      
+
       // Processar itens do orçamento
       for (const item of budgetData.items) {
         await storage.createBudgetItem(newBudget.id, item);
@@ -1309,8 +1309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateQuoteRequestStatus(id, "quoted");
 
       console.log(`Successfully converted quote request ${id} to budget ${newBudget.id}`);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         budget: newBudget,
         message: "Solicitação convertida em orçamento oficial com sucesso!"
       });
@@ -2630,18 +2630,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
 
+          // Get payment data
+          const paymentData = await storage.getBudgetPaymentInfo(budget.id);
+
           // Ensure all budget fields are properly set
           return {
             ...budget,
             status: budget.status || 'draft', // Ensure status is always present
             vendorName: vendor?.name || 'Vendedor',
-            items: enrichedItems,
             photos: photos,
-            // Make sure these timestamps are properly formatted
-            createdAt: budget.createdAt,
-            updatedAt: budget.updatedAt,
-            validUntil: budget.validUntil,
-            deliveryDeadline: budget.deliveryDeadline
+            items: enrichedItems,
+            paymentData
           };
         })
       );
@@ -2670,11 +2669,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrichedRequests = await Promise.all(
         quoteRequests.map(async (request) => {
           const vendor = request.vendorId ? await storage.getUser(request.vendorId) : null;
-          
+
           // Para solicitações consolidadas, criar um resumo dos produtos
           let productSummary = 'Produtos solicitados';
           let totalProducts = 1;
-          
+
           if (request.products && Array.isArray(request.products)) {
             totalProducts = request.products.length;
             if (totalProducts === 1) {
@@ -3679,2013 +3678,6 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Send order to production - automatically creates production orders for all producers
-  app.post("/api/orders/:id/send-to-production", async (req, res) => {
-    try {
-      const { id: orderId } = req.params;
-      const { producerId: specificProducerId } = req.body;
-
-      console.log(`Sending order ${orderId} to production${specificProducerId ? ` for producer ${specificProducerId}` : ' for all producers'}`);
-
-      // Get the order with full details
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Pedido não encontrado" });
-      }
-
-      // Get budget photos if order came from a budget
-      let budgetPhotos = [];
-      if (order.budgetId) {
-        const photos = await storage.getBudgetPhotos(order.budgetId);
-        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
-        console.log(`Found ${budgetPhotos.length} budget photos for order ${orderId}`);
-      }
-
-      // Get client details
-      let clientDetails = null;
-      if (order.clientId) {
-        const clientRecord = await storage.getClient(order.clientId);
-        if (clientRecord) {
-          clientDetails = {
-            name: clientRecord.name,
-            email: clientRecord.email,
-            phone: clientRecord.phone,
-            address: clientRecord.address
-          };
-        } else {
-          const clientUser = await storage.getUser(order.clientId);
-          if (clientUser) {
-            clientDetails = {
-              name: clientUser.name,
-              email: clientUser.email,
-              phone: clientUser.phone,
-              address: clientUser.address
-            };
-          }
-        }
-      }
-
-      // Use contact details as fallback
-      if (!clientDetails) {
-        clientDetails = {
-          name: order.contactName,
-          email: order.contactEmail,
-          phone: order.contactPhone,
-          address: null
-        };
-      }
-
-      // Determine producers involved
-      const producersInvolved = new Set<string>();
-
-      if (specificProducerId) {
-        // Send to specific producer only
-        producersInvolved.add(specificProducerId);
-      } else {
-        // Send to all producers involved in the order
-        if (order.items && Array.isArray(order.items)) {
-          order.items.forEach((item: any) => {
-            if (item.producerId && item.producerId !== 'internal') {
-              producersInvolved.add(item.producerId);
-            }
-          });
-        }
-      }
-
-      if (producersInvolved.size === 0) {
-        return res.status(400).json({
-          error: "Este pedido não possui itens que necessitam de produção externa"
-        });
-      }
-
-      // Create production orders for each producer
-      const productionOrdersCreated = [];
-      const producerNames = [];
-
-      for (const producerId of producersInvolved) {
-        // Check if production order already exists
-        const existingPOs = await storage.getProductionOrdersByOrder(orderId);
-        const alreadyExists = existingPOs.some(po => po.producerId === producerId);
-
-        if (!alreadyExists) {
-          // Get items for this specific producer
-          const producerItems = order.items ? order.items.filter((item: any) => item.producerId === producerId) : [];
-
-          // Calculate total value for this producer's items
-          const producerItemsValue = producerItems.reduce((total, item) => {
-            return total + (parseFloat(item.totalPrice) || 0);
-          }, 0);
-
-          // Create detailed production order
-          const productionOrder = await storage.createProductionOrder({
-            orderId: orderId,
-            producerId: producerId,
-            status: "pending",
-            deadline: order.deadline,
-            deliveryDeadline: order.deliveryDeadline,
-            notes: `Itens para produção: ${producerItems.map(item => `${item.productName} (Qty: ${item.quantity})`).join(', ')}`,
-            // Store additional order details for the producer (without client payment values)
-            orderDetails: JSON.stringify({
-              orderNumber: order.orderNumber,
-              product: order.product,
-              description: order.description,
-              clientDetails: clientDetails,
-              deliveryType: order.deliveryType,
-              deadline: order.deadline,
-              deliveryDeadline: order.deliveryDeadline,
-              items: producerItems, // Only items for this producer
-              photos: budgetPhotos, // Include budget photos
-              specialInstructions: order.description || '',
-              contactPhone: order.contactPhone,
-              contactEmail: order.contactEmail,
-              // Remove financial information from producer view
-              // producerItemsValue: producerItemsValue.toFixed(2), // Only producer sees their own pricing
-              // totalValue: order.totalValue, // Client total is hidden
-            })
-          });
-
-          productionOrdersCreated.push(productionOrder);
-
-          // Get producer name
-          const producer = await storage.getUser(producerId);
-          if (producer) {
-            producerNames.push(producer.name);
-          }
-
-          console.log(`Created detailed production order ${productionOrder.id} for producer ${producerId} with ${producerItems.length} items`);
-        } else {
-          console.log(`Production order already exists for producer ${producerId} on order ${orderId}`);
-        }
-      }
-
-      // Update order status to production if not already
-      if (order.status !== 'production') {
-        await storage.updateOrder(orderId, { status: 'production' });
-      }
-
-      res.json({
-        success: true,
-        message: "Pedido enviado para produção com sucesso",
-        productionOrdersCreated: productionOrdersCreated.length,
-        producerNames: producerNames,
-        orderId: orderId,
-        separatedByProducers: true,
-        producersCount: producersInvolved.size
-      });
-
-    } catch (error) {
-      console.error("Error sending order to production:", error);
-      res.status(500).json({ error: "Erro ao enviar pedido para produção: " + error.message });
-    }
-  });
-
-  // Update production order status
-  app.patch("/api/production-orders/:id/status", async (req, res) => {
-    const { id } = req.params;
-    const { status, notes, deliveryDate, trackingCode } = req.body;
-
-    try {
-      // Use storage instead of db.update
-      const result = await storage.updateProductionOrderStatus(id, status, notes || 'Status atualizado', deliveryDate, trackingCode);
-
-      if (!result) {
-        return res.status(404).json({ error: "Production order not found" });
-      }
-
-      // Get production order details
-      const productionOrder = await storage.getProductionOrder(id);
-
-      if (productionOrder) {
-        let orderStatus = 'production'; // Default
-
-        switch (status) {
-          case 'pending':
-            orderStatus = 'pending';
-            break;
-          case 'accepted':
-            orderStatus = 'confirmed';
-            break;
-          case 'production':
-            orderStatus = 'production';
-            break;
-          case 'ready':
-            orderStatus = 'ready';
-            // Create producer payment only when marked as ready
-            if (productionOrder.producerValue && parseFloat(productionOrder.producerValue) > 0) {
-              const existingPayment = await storage.getProducerPaymentByProductionOrderId(id);
-              if (!existingPayment) {
-                await storage.createProducerPayment({
-                  productionOrderId: id,
-                  producerId: productionOrder.producerId,
-                  amount: productionOrder.producerValue,
-                  status: 'pending',
-                  notes: productionOrder.producerNotes || null
-                });
-                console.log(`Created producer payment for production order ${id} when marked as ready - R$ ${productionOrder.producerValue}`);
-              }
-            }
-            break;
-          case 'shipped':
-            orderStatus = 'shipped';
-            break;
-          case 'delivered':
-            orderStatus = 'delivered';
-            break;
-          case 'completed':
-            orderStatus = 'completed';
-            break;
-          case 'rejected':
-            orderStatus = 'cancelled';
-            break;
-        }
-
-        // Atualizar o pedido principal com o novo status
-        await storage.updateOrder(productionOrder.orderId, {
-          status: orderStatus,
-          trackingCode: trackingCode || null
-        });
-
-        // Atualizar comissões baseado no novo status
-        await storage.updateCommissionsByOrderStatus(productionOrder.orderId, orderStatus);
-      }
-
-      res.json({ success: true, productionOrder: result });
-    } catch (error) {
-      console.error("Error updating production order status:", error);
-      res.status(500).json({ error: "Failed to update production order status" });
-    }
-  });
-
-  // Mark production order notes as read
-  app.patch("/api/production-orders/:id/acknowledge", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const po = await storage.getProductionOrder(id);
-      if (po) {
-        await storage.updateProductionOrderNotes(id, po.notes || '', false);
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: "Production order not found" });
-      }
-    } catch (error) {
-      console.error("Error acknowledging production order notes:", error);
-      res.status(500).json({ error: "Failed to acknowledge production order notes" });
-    }
-  });
-
-  // Update production order notes only
-  app.patch("/api/production-orders/:id/notes", async (req, res) => {
-    const { id } = req.params;
-    const { notes, deliveryDeadline } = req.body;
-
-    try {
-      const updateData: any = {};
-
-      if (notes) {
-        updateData.notes = notes;
-        updateData.hasUnreadNotes = true;
-        updateData.lastNoteAt = new Date();
-      }
-
-      if (deliveryDeadline) {
-        updateData.deliveryDeadline = new Date(deliveryDeadline);
-      }
-
-      await db.update(productionOrders)
-        .set(updateData)
-        .where(eq(productionOrders.id, id));
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error updating production order notes:", error);
-      res.status(500).json({ error: "Failed to update production order notes" });
-    }
-  });
-
-  // Mark notes as read
-  app.patch("/api/orders/:id/mark-notes-read", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      // Find production order by order ID
-      const productionOrderResult = await db.select()
-        .from(productionOrders)
-        .where(eq(productionOrders.orderId, id))
-        .limit(1);
-
-      if (productionOrderResult.length > 0) {
-        await db.update(productionOrders)
-          .set({ hasUnreadNotes: false })
-          .where(eq(productionOrders.orderId, id));
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error marking notes as read:", error);
-      res.status(500).json({ error: "Failed to mark notes as read" });
-    }
-  });
-
-  // Producer profile management
-  app.get("/api/producers/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const user = await storage.getUser(id);
-      if (!user || user.role !== 'producer') {
-        return res.status(404).json({ error: "Producer not found" });
-      }
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch producer" });
-    }
-  });
-
-  app.put("/api/producers/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { name, phone, specialty, address } = req.body;
-
-      const updatedUser = await storage.updateUser(id, {
-        name,
-        phone,
-        specialty,
-        address
-      });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Producer not found" });
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update producer" });
-    }
-  });
-
-  app.put("/api/producers/:id/change-password", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { currentPassword, newPassword } = req.body;
-
-      const user = await storage.getUser(id);
-      if (!user) {
-        return res.status(404).json({ error: "Producer not found" });
-      }
-
-      // Verify current password
-      if (user.password !== currentPassword) {
-        return res.status(400).json({ error: "Current password is incorrect" });
-      }
-
-      // Update password
-      await storage.updateUser(id, {
-        password: newPassword
-      });
-
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to change password" });
-    }
-  });
-
-  app.post("/api/forgot-password", async (req, res) => {
-    try {
-      const { email } = req.body;
-
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      // In a real application, you would send an actual email
-      // For now, we'll just return success
-      console.log(`Password reset requested for: ${email}`);
-
-      res.json({
-        success: true,
-        message: "Password reset instructions sent to your email"
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to process password reset" });
-    }
-  });
-
-  // Get production order details for producer
-  app.get("/api/production-orders/:id", async (req, res) => {
-    try {
-      const productionOrder = await storage.getProductionOrder(req.params.id);
-      if (!productionOrder) {
-        return res.status(404).json({ error: "Production order not found" });
-      }
-
-      // Get related order
-      const order = await storage.getOrder(productionOrder.orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Related order not found" });
-      }
-
-      // Get client info - try multiple approaches
-      let clientName = 'Cliente não encontrado';
-      let clientAddress = 'Endereço não informado';
-      let clientPhone = null;
-      let clientEmail = null;
-
-      console.log(`Getting client details for order ${order.id}, clientId: ${order.clientId}`);
-
-      // Method 1: Try to get client record directly by ID
-      const clientRecord = await storage.getClient(order.clientId);
-      if (clientRecord) {
-        console.log(`Found client record for details:`, clientRecord);
-        clientName = clientRecord.name;
-        clientAddress = clientRecord.address || 'Endereço não informado';
-        clientPhone = clientRecord.phone;
-        clientEmail = clientRecord.email;
-      } else {
-        // Method 2: Try to find client record by userId
-        const clientByUserId = await storage.getClientByUserId(order.clientId);
-        if (clientByUserId) {
-          console.log(`Found client by userId for details:`, clientByUserId);
-          clientName = clientByUserId.name;
-          clientAddress = clientByUserId.address || 'Endereço não informado';
-          clientPhone = clientByUserId.phone;
-          clientEmail = clientByUserId.email;
-        } else {
-          // Method 3: Fallback to user table
-          const clientUser = await storage.getUser(order.clientId);
-          if (clientUser) {
-            console.log(`Found user record for details:`, clientUser);
-            clientName = clientUser.name;
-            clientPhone = clientUser.phone;
-            clientEmail = clientUser.email;
-            clientAddress = clientUser.address || 'Endereço não informado';
-          } else {
-            console.log(`No client found for details with ID: ${order.clientId}`);
-          }
-        }
-      }
-
-      // Get budget items if order has budgetId
-      let budgetItems = [];
-      let budgetPhotos = [];
-      if (order.budgetId) {
-        budgetItems = await storage.getBudgetItems(order.budgetId);
-        budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
-
-        // Enrich items with product data
-        budgetItems = await Promise.all(
-          budgetItems.map(async (item) => {
-            const product = await storage.getProduct(item.productId);
-            return {
-              ...item,
-              product: {
-                name: product?.name || 'Produto não encontrado',
-                description: product?.description || '',
-                category: product?.category || '',
-                imageLink: product?.imageLink || ''
-              }
-            };
-          })
-        );
-      }
-
-      const enrichedPO = {
-        ...productionOrder,
-        order: {
-          ...order,
-          clientName: clientName,
-          clientAddress: clientAddress,
-          clientPhone: clientPhone,
-          clientEmail: clientEmail,
-          shippingAddress: order.deliveryType === 'pickup'
-            ? 'Sede Principal - Retirada no Local'
-            : (clientAddress || 'Endereço não informado'),
-          deliveryType: order.deliveryType || 'delivery'
-        },
-        items: budgetItems,
-        photos: budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl)
-      };
-
-      res.json(enrichedPO);
-    } catch (error) {
-      console.error('Error fetching production order:', error);
-      res.status(500).json({ error: "Failed to fetch production order" });
-    }
-  });
-
-  // Get order timeline for client view
-  app.get("/api/orders/:id/timeline", async (req, res) => {
-    try {
-      const order = await storage.getOrder(req.params.id);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-
-      // Get enriched order data
-      const client = await storage.getUser(order.clientId);
-      const vendor = await storage.getUser(order.vendorId);
-      const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
-      // Get production order if exists
-      let productionOrder = null;
-      if (order.producerId) {
-        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-        productionOrder = productionOrders[0] || null;
-      }
-
-      // Get payments for this order to calculate correct paid value
-      const payments = await storage.getPaymentsByOrder(order.id);
-      const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
-      const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-
-      // Get budget information if order was converted from budget
-      let budgetDownPayment = 0;
-      let originalBudgetInfo = null;
-
-      if (order.budgetId) {
-        try {
-          const budget = await storage.getBudget(order.budgetId);
-          const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
-
-          if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
-            budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment);
-            originalBudgetInfo = {
-              downPayment: budgetDownPayment,
-              remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
-              installments: budgetPaymentInfo.installments || 1
-            };
-          }
-        } catch (error) {
-          console.log("Error fetching budget info for timeline:", order.id, error);
-        }
-      }
-
-      // Use budget down payment if available, otherwise use calculated payments
-      const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
-      const totalValue = parseFloat(order.totalValue);
-      const remainingBalance = Math.max(0, totalValue - actualPaidValue);
-
-      // Create enriched order with all information including updated payment values
-      const enrichedOrder = {
-        ...order,
-        paidValue: actualPaidValue.toFixed(2), // Use budget down payment or payments
-        remainingValue: remainingBalance.toFixed(2), // Add remaining balance
-        clientName: client?.name || 'Unknown',
-        vendorName: vendor?.name || 'Unknown',
-        producerName: producer?.name || null,
-        trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-        productionOrder,
-        payments: confirmedPayments, // Include only confirmed payments
-        budgetInfo: originalBudgetInfo // Include original budget payment info
-      };
-
-      const timeline = [
-        {
-          id: 'created',
-          status: 'created',
-          title: 'Pedido Criado',
-          description: 'Pedido foi criado e está aguardando confirmação',
-          date: order.createdAt,
-          completed: true,
-          icon: 'file-plus'
-        },
-        {
-          id: 'confirmed',
-          status: 'confirmed',
-          title: 'Pedido Confirmado',
-          description: 'Pedido foi confirmado e enviado para produção',
-          date: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
-          completed: ['confirmed', 'production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
-          icon: 'check-circle'
-        },
-        {
-          id: 'production',
-          status: 'production',
-          title: 'Em Produção',
-          description: productionOrder?.notes || 'Pedido em processo de produção',
-          date: productionOrder?.acceptedAt || (['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null),
-          completed: ['production', 'ready', 'shipped', 'delivered', 'completed'].includes(order.status),
-          icon: 'settings',
-          estimatedDelivery: productionOrder?.deliveryDeadline || null
-        },
-        {
-          id: 'ready',
-          status: 'ready',
-          title: 'Pronto para Envio',
-          description: 'Produto finalizado e pronto para envio',
-          date: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
-          completed: ['ready', 'shipped', 'delivered', 'completed'].includes(order.status),
-          icon: 'package'
-        },
-        {
-          id: 'shipped',
-          status: 'shipped',
-          title: 'Enviado',
-          description: enrichedOrder.trackingCode ? `Código de rastreamento: ${enrichedOrder.trackingCode}` : 'Produto foi enviado para o cliente',
-          date: ['shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
-          completed: ['shipped', 'delivered', 'completed'].includes(order.status),
-          icon: 'truck',
-          trackingCode: enrichedOrder.trackingCode
-        },
-        {
-          id: 'completed',
-          status: 'completed',
-          title: 'Entregue',
-          description: 'Pedido foi entregue com sucesso',
-          date: ['delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
-          completed: ['delivered', 'completed'].includes(order.status),
-          icon: 'check-circle-2'
-        }
-      ];
-
-      res.json({
-        order: enrichedOrder,
-        timeline
-      });
-    } catch (error) {
-      console.error('Error fetching order timeline:', error);
-      res.status(500).json({ error: "Failed to fetch order timeline" });
-    }
-  });
-
-  // Image upload for budget customizations using local file system
-  app.post("/api/upload", upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
-
-      const { mimetype, size, buffer, originalname } = req.file;
-      if (!mimetype.startsWith("image/")) {
-        return res.status(400).json({ error: "Apenas imagens são permitidas" });
-      }
-      if (size > 5 * 1024 * 1024) { // 5MB
-        return res.status(400).json({ error: "Imagem muito grande. Limite de 5MB." });
-      }
-
-      // Generate unique filename
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(2, 15);
-      const extension = originalname.split('.').pop() || 'jpg';
-      const filename = `image-${timestamp}-${randomStr}.${extension}`;
-
-      // Save to public directory (accessible by Vite)
-      const fs = await import('fs');
-      const path = await import('path');
-
-      // Create public/uploads directory if it doesn't exist
-      const uploadsDir = path.default.join(process.cwd(), 'public', 'uploads');
-      if (!fs.default.existsSync(uploadsDir)) {
-        fs.default.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // Save file
-      const filePath = path.default.join(uploadsDir, filename);
-      fs.default.writeFileSync(filePath, buffer);
-
-      // Return public URL that Vite can serve
-      const url = `/uploads/${filename}`;
-      return res.json({ url });
-    } catch (err) {
-      console.error("Upload error:", err);
-      return res.status(500).json({ error: "Erro ao processar upload" });
-    }
-  });
-
-  // Commission management routes
-  app.get("/api/commissions", async (req, res) => {
-    try {
-      const commissions = await storage.getAllCommissions();
-
-      // Enrich with user and order data
-      const enrichedCommissions = await Promise.all(
-        commissions.map(async (commission) => {
-          const order = await storage.getOrder(commission.orderId);
-          const vendor = commission.vendorId ? await storage.getUser(commission.vendorId) : null;
-          const partner = commission.partnerId ? await storage.getUser(commission.partnerId) : null;
-          const client = order ? await storage.getUser(order.clientId) : null;
-
-          return {
-            ...commission,
-            orderNumber: order?.orderNumber || commission.orderNumber || 'N/A',
-            orderValue: order ? order.totalValue : commission.orderValue || '0.00',
-            vendorName: vendor?.name || null,
-            partnerName: partner?.name || null,
-            clientName: client?.name || 'Unknown'
-          };
-        })
-      );
-
-      res.json(enrichedCommissions);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch commissions" });
-    }
-  });
-
-  app.put("/api/commissions/:id/status", async (req, res) => {
-    try {
-      const { status } = req.body;
-      const updatedCommission = await storage.updateCommissionStatus(req.params.id, status);
-
-      if (!updatedCommission) {
-        return res.status(404).json({ error: "Commission not found" });
-      }
-
-      res.json(updatedCommission);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update commission status" });
-    }
-  });
-
-  // Partners management
-  app.get("/api/partners", async (req, res) => {
-    try {
-      const users = await storage.getUsers();
-      const partners = users.filter(user => user.role === 'partner');
-
-      const partnersWithInfo = await Promise.all(
-        partners.map(async (partner) => {
-          const partnerInfo = await storage.getPartner(partner.id);
-          const commissions = await storage.getCommissionsByVendor(partner.id);
-          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount), 0);
-
-          return {
-            id: partner.id,
-            name: partner.name,
-            email: partner.email,
-            username: partner.username,
-            commissionRate: partnerInfo?.commissionRate || '15.00',
-            isActive: partnerInfo?.isActive || true,
-            totalCommissions
-          };
-        })
-      );
-
-      res.json(partnersWithInfo);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch partners" });
-    }
-  });
-
-  app.post("/api/partners", async (req, res) => {
-    try {
-      const { name, email, username, commissionRate } = req.body;
-
-      const user = await storage.createPartner({
-        username,
-        name,
-        email,
-        commissionRate: commissionRate || '15.00'
-      });
-
-      res.json({ success: true, user });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create partner" });
-    }
-  });
-
-  app.put("/api/partners/:partnerId/commission", async (req, res) => {
-    try {
-      const { partnerId } = req.params;
-      const { commissionRate } = req.body;
-
-      await storage.updatePartnerCommission(partnerId, commissionRate);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update partner commission" });
-    }
-  });
-
-  // Commission settings
-  app.get("/api/commission-settings", async (req, res) => {
-    try {
-      const settings = await storage.getCommissionSettings();
-      res.json(settings);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch commission settings" });
-    }
-  });
-
-  app.put("/api/commission-settings", async (req, res) => {
-    try {
-      const settings = await storage.updateCommissionSettings(req.body);
-      res.json(settings);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update commission settings" });
-    }
-  });
-
-  // Client routes
-  app.get("/api/clients", async (req, res) => {
-    try {
-      const clients = await storage.getClients();
-      console.log(`Found ${clients.length} clients`);
-
-      // Enrich with additional information
-      const enrichedClients = await Promise.all(
-        clients.map(async (client) => {
-          const user = client.userId ? await storage.getUser(client.userId) : null;
-          return {
-            ...client,
-            userEmail: user?.email,
-            userPhone: user?.phone,
-            isActive: user?.isActive ?? true
-          };
-        })
-      );
-
-      res.json(enrichedClients);
-    } catch (error) {
-      console.error("Failed to fetch clients:", error);
-      res.status(500).json({ error: "Failed to fetch clients" });
-    }
-  });
-
-  app.post("/api/clients", async (req, res) => {
-    try {
-      const clientData = req.body;
-      console.log(`Creating client with data:`, clientData);
-
-      const newClient = await storage.createClient(clientData);
-      console.log(`Client created successfully:`, newClient);
-
-      res.json(newClient);
-    } catch (error) {
-      console.error("Error creating client:", error);
-      res.status(500).json({ error: "Failed to create client: " + error.message });
-    }
-  });
-
-  app.put("/api/clients/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updateData = req.body;
-
-      console.log(`Updating client ${id} with data:`, updateData);
-
-      const updatedClient = await storage.updateClient(id, updateData);
-      if (!updatedClient) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
-      }
-
-      console.log(`Client ${id} updated successfully`);
-      res.json(updatedClient);
-    } catch (error) {
-      console.error("Error updating client:", error);
-      res.status(500).json({ error: "Erro ao atualizar cliente: " + error.message });
-    }
-  });
-
-  app.delete("/api/clients/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const deleted = await storage.deleteClient(id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
-      }
-
-      console.log(`Client ${id} deleted successfully`);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting client:", error);
-      res.status(500).json({ error: "Erro ao deletar cliente: " + error.message });
-    }
-  });
-
-  // Get orders by producer
-  app.get("/api/orders/producer/:producerId", async (req, res) => {
-    try {
-      const { producerId } = req.params;
-      console.log(`Fetching orders for producer: ${producerId}`);
-
-      // Get production orders for this producer
-      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      const orderIds = productionOrders.map(po => po.orderId);
-
-      // Get the actual orders
-      const orders = await storage.getOrders();
-      const producerOrders = orders.filter(order => orderIds.includes(order.id));
-
-      // Enrich with client and vendor data
-      const enrichedOrders = await Promise.all(
-        producerOrders.map(async (order) => {
-          let clientName = order.contactName || 'Cliente não identificado';
-
-          // Try to get client name if not available
-          if (!clientName && order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              clientName = clientRecord.name;
-            } else {
-              const clientUser = await storage.getUser(order.clientId);
-              if (clientUser) {
-                clientName = clientUser.name;
-              }
-            }
-          }
-
-          const vendor = await storage.getUser(order.vendorId);
-
-          // Get corresponding production order
-          const productionOrder = productionOrders.find(po => po.orderId === order.id);
-
-          return {
-            ...order,
-            clientName,
-            vendorName: vendor?.name || 'Unknown',
-            productionOrder
-          };
-        })
-      );
-
-      console.log(`Found ${enrichedOrders.length} orders for producer ${producerId}`);
-      res.json(enrichedOrders);
-    } catch (error) {
-      console.error("Error fetching producer orders:", error);
-      res.status(500).json({ error: "Failed to fetch producer orders" });
-    }
-  });
-
-  // Get production orders by producer
-  app.get("/api/production-orders/producer/:producerId", async (req, res) => {
-    try {
-      const { producerId } = req.params;
-      console.log(`Fetching production orders for producer: ${producerId}`);
-
-      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-
-      // Enrich with order and client data
-      const enrichedOrders = await Promise.all(
-        productionOrders.map(async (po) => {
-          const order = await storage.getOrder(po.orderId);
-
-          if (!order) {
-            return null; // Skip if order doesn't exist
-          }
-
-          let clientName = order.contactName || 'Cliente não identificado';
-          let clientAddress = null;
-          let clientPhone = order.contactPhone;
-          let clientEmail = order.contactEmail;
-
-          // Try to get client details if not available
-          if (!clientName && order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              clientName = clientRecord.name;
-              clientAddress = clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
-            } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
-                  clientAddress = clientUser.address;
-                }
-              }
-            }
-          }
-
-          // Get producer info for this production order
-          const producer = await storage.getUser(po.producerId);
-
-          return {
-            ...po,
-            orderNumber: order.orderNumber || `PO-${po.id}`,
-            product: order.product || 'Produto não informado',
-            clientName,
-            clientAddress,
-            clientPhone,
-            clientEmail,
-            producerName: producer?.name || null,
-            order: {
-              ...order,
-              clientName,
-              clientAddress,
-              clientPhone,
-              clientEmail,
-              shippingAddress: order.deliveryType === 'pickup'
-                ? 'Sede Principal - Retirada no Local'
-                : (clientAddress || 'Endereço não informado'),
-              deliveryType: order.deliveryType || 'delivery'
-            }
-          };
-        })
-      );
-
-      // Filter out null entries
-      const validOrders = enrichedOrders.filter(order => order !== null);
-
-      console.log(`Found ${validOrders.length} production orders for producer ${producerId}`);
-      res.json(validOrders);
-    } catch (error) {
-      console.error("Error fetching production orders by producer:", error);
-      res.status(500).json({ error: "Failed to fetch production orders by producer" });
-    }
-  });
-
-  // User routes
-  app.get("/api/users", async (req, res) => {
-    try {
-      const users = await storage.getUsers();
-      res.json(users);
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-      res.status(500).json({ error: "Failed to fetch users" });
-    }
-  });
-
-  app.post("/api/users", async (req, res) => {
-    try {
-      const { name, email, username, password, role } = req.body;
-      const newUser = await storage.createUser({
-        name,
-        email,
-        username,
-        password,
-        role,
-        isActive: true // Default to active
-      });
-      res.json(newUser);
-    } catch (error) {
-      console.error("Failed to create user:", error);
-      res.status(500).json({ error: "Failed to create user" });
-    }
-  });
-
-  app.get("/api/users/:id", async (req, res) => {
-    try {
-      const user = await storage.getUser(req.params.id);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      // Exclude password from response
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      console.error("Failed to fetch user:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
-    }
-  });
-
-  app.put("/api/users/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { name, email, username, role, isActive, specialty, address, phone } = req.body;
-
-      const updatedUser = await storage.updateUser(id, {
-        name,
-        email,
-        username,
-        role,
-        isActive,
-        specialty,
-        address,
-        phone
-      });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Failed to update user:", error);
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
-
-  app.delete("/api/users/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deleteUser(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Failed to delete user:", error);
-      res.status(500).json({ error: "Failed to delete user" });
-    }
-  });
-
-  // ===== REPORTS MODULE ROUTES =====
-
-  // Get comprehensive reports data
-  app.get("/api/reports/dashboard", async (req, res) => {
-    try {
-      const { period = '30', status, vendorId, producerId } = req.query;
-
-      // Calculate date filter
-      const filterDate = period === 'all' ? null : new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
-
-      const orders = await storage.getOrders();
-      const commissions = await storage.getAllCommissions();
-      const producerPayments = await storage.getProducerPayments();
-      const receivables = await storage.getAccountsReceivable();
-      const expenses = await storage.getExpenseNotes();
-
-      // Apply filters
-      let filteredOrders = orders;
-
-      // Date filter
-      if (filterDate) {
-        filteredOrders = filteredOrders.filter(o => o.createdAt && new Date(o.createdAt) >= filterDate);
-      }
-
-      // Status filter
-      if (status && status !== 'all') {
-        filteredOrders = filteredOrders.filter(o => o.status === status);
-      }
-
-      // Vendor filter
-      if (vendorId && vendorId !== 'all') {
-        filteredOrders = filteredOrders.filter(o => o.vendorId === vendorId);
-      }
-
-      // Producer filter
-      if (producerId && producerId !== 'all') {
-        filteredOrders = filteredOrders.filter(o => o.producerId === producerId);
-      }
-
-      const filteredCommissions = filterDate
-        ? commissions.filter(c => new Date(c.createdAt) >= filterDate)
-        : commissions;
-
-      const filteredProducerPayments = filterDate
-        ? producerPayments.filter(p => p.createdAt && new Date(p.createdAt) >= filterDate)
-        : producerPayments;
-
-      // Calculate metrics
-      const totalReceivables = receivables
-        .filter(r => r.status !== 'paid')
-        .reduce((sum, r) => sum + (parseFloat(r.amount) - parseFloat(r.receivedAmount)), 0);
-
-      const totalPayables = producerPayments
-        .filter(p => ['pending', 'approved'].includes(p.status))
-        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-      const totalCommissionsPending = commissions
-        .filter(c => ['pending', 'confirmed'].includes(c.status))
-        .reduce((sum, c) => sum + parseFloat(c.amount), 0);
-
-      const ordersEvolution = filteredOrders.reduce((acc, order) => {
-        const month = new Date(order.createdAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' });
-        if (!acc[month]) {
-          acc[month] = { mes: month, pedidos: 0, valor: 0, receita: 0 };
-        }
-        acc[month].pedidos += 1;
-        acc[month].valor += parseFloat(order.totalValue);
-        acc[month].receita += parseFloat(order.paidValue || '0');
-        return acc;
-      }, {} as any);
-
-      // Status distribution
-      const statusDistribution = filteredOrders.reduce((acc, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
-        return acc;
-      }, {} as any);
-
-      // Vendor performance
-      const vendorPerformance = filteredOrders.reduce((acc, order) => {
-        const vendorId = order.vendorId;
-        if (!acc[vendorId]) {
-          acc[vendorId] = { vendorId, pedidos: 0, valor: 0 };
-        }
-        acc[vendorId].pedidos += 1;
-        acc[vendorId].valor += parseFloat(order.totalValue);
-        return acc;
-      }, {} as any);
-
-      // Client analysis
-      const clientAnalysis = filteredOrders.reduce((acc, order) => {
-        const clientName = order.contactName || 'Cliente Não Identificado';
-        if (!acc[clientName]) {
-          acc[clientName] = { cliente: clientName, pedidos: 0, valor: 0 };
-        }
-        acc[clientName].pedidos += 1;
-        acc[clientName].valor += parseFloat(order.totalValue);
-        return acc;
-      }, {} as any);
-
-      // Product analysis
-      const productAnalysis = filteredOrders.reduce((acc, order) => {
-        const product = order.product || 'Produto Não Identificado';
-        if (!acc[product]) {
-          acc[product] = { produto: product, pedidos: 0, valor: 0 };
-        }
-        acc[product].pedidos += 1;
-        acc[product].valor += parseFloat(order.totalValue);
-        return acc;
-      }, {} as any);
-
-      res.json({
-        summary: {
-          totalReceivables,
-          totalPayables,
-          totalCommissionsPending,
-          totalOrders: filteredOrders.length,
-          totalRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0),
-          totalPaidValue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.paidValue || '0'), 0),
-          averageTicket: filteredOrders.length > 0 ?
-            filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalValue), 0) / filteredOrders.length : 0,
-          conversionRate: orders.length > 0 ?
-            (filteredOrders.filter(o => o.status !== 'cancelled').length / orders.length) * 100 : 0
-        },
-        ordersEvolution: Object.values(ordersEvolution).sort((a: any, b: any) =>
-          new Date(a.mes + ' 2024').getTime() - new Date(b.mes + ' 2024').getTime()
-        ),
-        statusDistribution: Object.entries(statusDistribution).map(([status, count]) => ({
-          status, quantidade: count
-        })),
-        vendorPerformance: Object.values(vendorPerformance),
-        clientAnalysis: Object.values(clientAnalysis).sort((a: any, b: any) => b.valor - a.valor),
-        productAnalysis: Object.values(productAnalysis).sort((a: any, b: any) => b.valor - a.valor),
-        receivables: receivables.filter(r => r.status !== 'paid'),
-        payables: producerPayments.filter(p => ['pending', 'approved'].includes(p.status)),
-        commissionsPending: commissions.filter(c => ['pending', 'confirmed'].includes(c.status)),
-        commissionsPaid: commissions.filter(c => c.status === 'paid'),
-        producerPaymentsPending: producerPayments.filter(p => ['pending', 'approved'].includes(p.status)),
-        producerPaymentsPaid: producerPayments.filter(p => p.status === 'paid')
-      });
-    } catch (error) {
-      console.error("Error fetching reports data:", error);
-      res.status(500).json({ error: "Failed to fetch reports data" });
-    }
-  });
-
-  // Export reports data
-  app.get("/api/reports/export/:type", async (req, res) => {
-    try {
-      const { type } = req.params;
-      const { format = 'json', period = '30' } = req.query;
-
-      // Get data based on type
-      let data: any = [];
-
-      switch (type) {
-        case 'orders':
-          data = await storage.getOrders();
-          break;
-        case 'receivables':
-          data = await storage.getAccountsReceivable();
-          break;
-        case 'payables':
-          data = await storage.getProducerPayments();
-          break;
-        case 'commissions':
-          data = await storage.getAllCommissions();
-          break;
-        default:
-          return res.status(400).json({ error: "Invalid report type" });
-      }
-
-      // Apply date filter
-      if (period !== 'all') {
-        const filterDate = new Date(Date.now() - (parseInt(period as string) * 24 * 60 * 60 * 1000));
-        data = data.filter((item: any) =>
-          item.createdAt && new Date(item.createdAt) >= filterDate
-        );
-      }
-
-      if (format === 'json') {
-        res.json(data);
-      } else {
-        // For CSV or Excel export, you would implement the conversion here
-        res.json({ message: `Export in ${format} format not yet implemented`, data });
-      }
-    } catch (error) {
-      console.error("Error exporting report:", error);
-      res.status(500).json({ error: "Failed to export report" });
-    }
-  });
-
-  // ===== FINANCIAL MODULE ROUTES =====
-
-  // Accounts Receivable routes
-  app.get("/api/finance/receivables", async (req, res) => {
-    try {
-      const receivables = await storage.getAccountsReceivable();
-      console.log(`Found ${receivables.length} receivables total`);
-
-      // The receivables already come enriched from storage, just ensure all fields are present
-      const finalReceivables = receivables.map((receivable) => ({
-        id: receivable.id,
-        orderId: receivable.orderId,
-        orderNumber: receivable.orderNumber || (receivable.orderId ? `#${receivable.orderId}` : 'MANUAL'),
-        clientName: receivable.clientName || 'Cliente não identificado',
-        amount: receivable.amount || "0.00",
-        receivedAmount: receivable.receivedAmount || "0.00",
-        status: receivable.status || 'pending',
-        dueDate: receivable.dueDate,
-        createdAt: receivable.createdAt,
-        lastPaymentDate: receivable.lastPaymentDate,
-        isManual: receivable.isManual || false,
-        description: receivable.description,
-        notes: receivable.notes
-      }));
-
-      console.log(`Returning ${finalReceivables.length} receivables`);
-      res.json(finalReceivables);
-    } catch (error) {
-      console.error("Failed to fetch receivables:", error);
-      res.status(500).json({ error: "Failed to fetch receivables: " + error.message });
-    }
-  });
-
-  app.get("/api/finance/receivables/by-order/:orderId", async (req, res) => {
-    try {
-      const receivables = await storage.getAccountsReceivableByOrder(req.params.orderId);
-      res.json(receivables);
-    } catch (error) {
-      console.error("Failed to fetch receivables by order:", error);
-      res.status(500).json({ error: "Failed to fetch receivables by order" });
-    }
-  });
-
-  app.post("/api/finance/receivables", async (req, res) => {
-    try {
-      const receivable = await storage.createAccountsReceivable(req.body);
-      res.json(receivable);
-    } catch (error) {
-      console.error("Failed to create receivable:", error);
-      res.status(500).json({ error: "Failed to create receivable" });
-    }
-  });
-
-  app.patch("/api/finance/receivables/:id", async (req, res) => {
-    try {
-      const receivable = await storage.updateAccountsReceivable(req.params.id, req.body);
-      if (!receivable) {
-        return res.status(404).json({ error: "Receivable not found" });
-      }
-      res.json(receivable);
-    } catch (error) {
-      console.error("Failed to update receivable:", error);
-      res.status(500).json({ error: "Failed to update receivable" });
-    }
-  });
-
-  // Expense Notes routes
-  app.get("/api/finance/expenses", async (req, res) => {
-    try {
-      const expenses = await storage.getExpenseNotes();
-      res.json(expenses);
-    } catch (error) {
-      console.error("Failed to fetch expenses:", error);
-      res.status(500).json({ error: "Failed to fetch expenses" });
-    }
-  });
-
-  app.post("/api/finance/expenses", async (req, res) => {
-    try {
-      const { name, amount, category, date, description, status, createdBy } = req.body;
-
-      if (!name || !amount || !category || !date) {
-        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
-      }
-
-      const newExpense = await storage.createExpenseNote({
-        date: new Date(date),
-        category: category,
-        description: name + (description ? ` - ${description}` : ''),
-        amount: parseFloat(amount).toFixed(2),
-        vendorId: null, // Notas de despesa não têm vendedor associado
-        orderId: null,  // Não estão associadas a pedidos
-        attachmentUrl: null,
-        status: status || 'recorded',
-        approvedBy: null,
-        approvedAt: null,
-        createdBy: createdBy || 'admin-1'
-      });
-
-      res.json(newExpense);
-    } catch (error) {
-      console.error("Error creating expense:", error);
-      res.status(500).json({ error: "Failed to create expense" });
-    }
-  });
-
-  // Get orders with pending balance for reconciliation
-  app.get("/api/finance/pending-orders", async (req, res) => {
-    try {
-      const orders = await storage.getOrders();
-      const clients = await storage.getClients();
-      const users = await storage.getUsers();
-
-      const pendingOrders = await Promise.all(
-        orders
-          .filter(order => {
-            const totalValue = parseFloat(order.totalValue);
-            const paidValue = parseFloat(order.paidValue || '0');
-            return paidValue < totalValue && order.status !== 'cancelled'; // Has pending balance and not cancelled
-          })
-          .map(async (order) => {
-            // Try to get client by direct ID first
-            let clientName = 'Unknown';
-            const client = clients.find(c => c.id === order.clientId);
-            if (client) {
-              clientName = client.name;
-            } else {
-              // Fallback to user table
-              const clientUser = users.find(u => u.id === order.clientId);
-              if (clientUser) {
-                clientName = clientUser.name;
-              }
-            }
-
-            const vendor = users.find(v => v.id === order.vendorId);
-            const producer = order.producerId ? users.find(p => p.id === order.producerId) : null;
-
-            // Get payment history for this order
-            const payments = await storage.getPaymentsByOrder(order.id);
-            const confirmedPayments = payments.filter(p => p.status === 'confirmed');
-
-            // Get budget information if order was converted from budget
-            let budgetInfo = null;
-            if (order.budgetId) {
-              try {
-                const budget = await storage.getBudget(order.budgetId);
-                const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
-
-                if (budgetPaymentInfo) {
-                  budgetInfo = {
-                    downPayment: parseFloat(budgetPaymentInfo.downPayment || '0'),
-                    remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
-                    installments: budgetPaymentInfo.installments || 1,
-                    paymentMethodId: budgetPaymentInfo.paymentMethodId,
-                    shippingMethodId: budgetPaymentInfo.shippingMethodId
-                  };
-                }
-              } catch (error) {
-                console.log("Error fetching budget info for pending order:", order.id, error);
-              }
-            }
-
-            const totalValue = parseFloat(order.totalValue);
-            const paidValue = parseFloat(order.paidValue || '0');
-            const remainingBalance = totalValue - paidValue;
-
-            return {
-              ...order,
-              clientName,
-              vendorName: vendor?.name || 'Unknown',
-              producerName: producer?.name || null,
-              remainingBalance: remainingBalance.toFixed(2),
-              budgetInfo,
-              paymentHistory: confirmedPayments.map(p => ({
-                id: p.id,
-                amount: p.amount,
-                method: p.method,
-                paidAt: p.paidAt,
-                transactionId: p.transactionId
-              })),
-              paymentCount: confirmedPayments.length,
-              paymentPercentage: Math.round((paidValue / totalValue) * 100)
-            };
-          })
-      );
-
-      // Sort by creation date (newest first) and then by remaining balance (highest first)
-      const sortedOrders = pendingOrders.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        const balanceA = parseFloat(a.remainingBalance);
-        const balanceB = parseFloat(b.remainingBalance);
-
-        // First by date (newest first), then by balance (highest first)
-        if (dateB !== dateA) {
-          return dateB - dateA;
-        }
-        return balanceB - balanceA;
-      });
-
-      console.log(`Returning ${sortedOrders.length} pending orders for reconciliation`);
-      res.json(sortedOrders);
-    } catch (error) {
-      console.error("Failed to fetch pending orders:", error);
-      res.status(500).json({ error: "Failed to fetch pending orders" });
-    }
-  });
-
-  // Associate bank transaction with order payment
-  app.post("/api/finance/associate-payment", async (req, res) => {
-    try {
-      const { transactionId, orderId, amount } = req.body;
-
-      console.log("Associating payment:", { transactionId, orderId, amount });
-
-      if (!transactionId || !orderId || !amount) {
-        return res.status(400).json({ error: "Transaction ID, Order ID e valor são obrigatórios" });
-      }
-
-      // Get order to validate
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Pedido não encontrado" });
-      }
-
-      // Get transaction to validate
-      const bankTransactions = await storage.getBankTransactions();
-      const transaction = bankTransactions.find(t => t.id === transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transação bancária não encontrada" });
-      }
-
-      if (transaction.status === 'matched') {
-        return res.status(400).json({ error: "Esta transação já foi conciliada com outro pagamento" });
-      }
-
-      // Update transaction as matched
-      await storage.updateBankTransaction(transactionId, {
-        status: 'matched',
-        matchedOrderId: orderId,
-        matchedAt: new Date(),
-        notes: `Conciliado com pagamento de pedido ${orderId}`
-      });
-
-      // Create payment record with proper description
-      const payment = await storage.createPayment({
-        orderId,
-        amount: parseFloat(amount).toFixed(2),
-        method: 'bank_transfer', // Assume bank transfer for OFX transactions
-        status: 'confirmed',
-        transactionId: `BANK-${transactionId}`,
-        paidAt: transaction.date || new Date()
-      });
-
-      // Get updated order to return current state
-      const updatedOrder = await storage.getOrder(orderId);
-
-      console.log("Payment association successful:", {
-        paymentId: payment.id,
-        amount: payment.amount,
-        orderPaidValue: updatedOrder?.paidValue
-      });
-
-      res.json({
-        success: true,
-        payment,
-        order: updatedOrder,
-        message: "Pagamento confirmado e associado ao pedido com sucesso"
-      });
-    } catch (error) {
-      console.error("Failed to associate payment:", error);
-      res.status(500).json({
-        error: "Erro ao associar pagamento",
-        details: (error as Error).message
-      });
-    }
-  });
-
-  app.patch("/api/finance/expenses/:id", async (req, res) => {
-    try {
-      const expense = await storage.updateExpenseNote(req.params.id, req.body);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
-      }
-      res.json(expense);
-    } catch (error) {
-      console.error("Failed to update expense:", error);
-      res.status(500).json({ error: "Failed to update expense" });
-    }
-  });
-
-  // Commission Payouts routes
-  app.get("/api/finance/commission-payouts", async (req, res) => {
-    try {
-      const payouts = await storage.getCommissionPayouts();
-      res.json(payouts);
-    } catch (error) {
-      console.error("Failed to fetch commission payouts:", error);
-      res.status(500).json({ error: "Failed to fetch commission payouts" });
-    }
-  });
-
-  app.get("/api/finance/commission-payouts/user/:userId/:type", async (req, res) => {
-    try {
-      const { userId, type } = req.params;
-      const payouts = await storage.getCommissionPayoutsByUser(userId, type as 'vendor' | 'partner');
-      res.json(payouts);
-    } catch (error) {
-      console.error("Failed to fetch user commission payouts:", error);
-      res.status(500).json({ error: "Failed to fetch user commission payouts" });
-    }
-  });
-
-  app.post("/api/finance/commission-payouts", async (req, res) => {
-    try {
-      const payout = await storage.createCommissionPayout(req.body);
-      res.json(payout);
-    } catch (error) {
-      console.error("Failed to create commission payout:", error);
-      res.status(500).json({ error: "Failed to create commission payout" });
-    }
-  });
-
-  app.patch("/api/finance/commission-payouts/:id", async (req, res) => {
-    try {
-      const payout = await storage.updateCommissionPayout(req.params.id, req.body);
-      if (!payout) {
-        return res.status(404).json({ error: "Commission payout not found" });
-      }
-      res.json(payout);
-    } catch (error) {
-      console.error("Failed to update commission payout:", error);
-      res.status(500).json({ error: "Failed to update commission payout" });
-    }
-  });
-
-  // Bank Imports & Transactions routes
-  app.get("/api/finance/bank-imports", async (req, res) => {
-    try {
-      const imports = await storage.getBankImports();
-      res.json(imports);
-    } catch (error) {
-      console.error("Failed to fetch bank imports:", error);
-      res.status(500).json({ error: "Failed to fetch bank imports" });
-    }
-  });
-
-  app.post("/api/finance/bank-imports", async (req, res) => {
-    try {
-      const bankImport = await storage.createBankImport(req.body);
-      res.json(bankImport);
-    } catch (error) {
-      console.error("Failed to create bank import:", error);
-      res.status(500).json({ error: "Failed to create bank import" });
-    }
-  });
-
-  app.get("/api/finance/bank-imports/:id/transactions", async (req, res) => {
-    try {
-      const transactions = await storage.getBankTransactionsByImport(req.params.id);
-      res.json(transactions);
-    } catch (error) {
-      console.error("Failed to fetch bank transactions:", error);
-      res.status(500).json({ error: "Failed to fetch bank transactions" });
-    }
-  });
-
-  app.get("/api/finance/bank-transactions", async (req, res) => {
-    try {
-      const transactions = await storage.getBankTransactions();
-      // Garantir que todas as transações tenham status padrão se não tiver
-      const normalizedTransactions = transactions.map(txn => ({
-        ...txn,
-        status: txn.status || 'unmatched'
-      }));
-      res.json(normalizedTransactions);
-    } catch (error) {
-      console.error("Failed to fetch bank transactions:", error);
-      res.status(500).json({ error: "Failed to fetch bank transactions" });
-    }
-  });
-
-  app.post("/api/finance/bank-transactions", async (req, res) => {
-    try {
-      const transaction = await storage.createBankTransaction(req.body);
-      res.json(transaction);
-    } catch (error) {
-      console.error("Failed to create bank transaction:", error);
-      res.status(500).json({ error: "Failed to create bank transaction" });
-    }
-  });
-
-  app.patch("/api/finance/bank-transactions/:id/match", async (req, res) => {
-    try {
-      const { receivableId } = req.body;
-      const transaction = await storage.matchTransactionToReceivable(req.params.id, receivableId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-      res.json(transaction);
-    } catch (error) {
-      console.error("Failed to match transaction:", error);
-      res.status(500).json({ error: "Failed to match transaction" });
-    }
-  });
-
-
-
-  // Producer payment association route
-  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
-    try {
-      const { transactionId, producerPaymentId, amount } = req.body;
-
-      console.log("Associating producer payment:", { transactionId, producerPaymentId, amount });
-
-      // Get the bank transaction
-      const transaction = await storage.getBankTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transação não encontrada" });
-      }
-
-      // Verify this is a debit transaction (outgoing payment)
-      if (parseFloat(transaction.amount) >= 0) {
-        return res.status(400).json({ error: "Esta transação não é uma saída (débito)" });
-      }
-
-      // Get the producer payment
-      const producerPayment = await storage.getProducerPayment(producerPaymentId);
-      if (!producerPayment) {
-        return res.status(404).json({ error: "Pagamento de produtor não encontrado" });
-      }
-
-      // Update producer payment status to paid
-      await storage.updateProducerPayment(producerPaymentId, {
-        status: 'paid',
-        paidAt: new Date(),
-        paymentMethod: 'bank_transfer'
-      });
-
-      // Update bank transaction status
-      await storage.updateBankTransaction(transactionId, {
-        status: 'matched',
-        paidAt: new Date(),
-        notes: `Conciliado com pagamento de produtor ${producerPayment.producerId} - Conta a pagar`
-      });
-
-      res.json({
-        success: true,
-        message: "Pagamento de produtor conciliado com sucesso"
-      });
-
-    } catch (error) {
-      console.error("Error associating producer payment:", error);
-      res.status(500).json({ error: "Erro ao conciliar pagamento de produtor" });
-    }
-  });
-
-  // OFX Import route with file processing
-  app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
-      }
-
-      console.log("Processing OFX file:", req.file.originalname, "Size:", req.file.size);
-
-      // Validate file type
-      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
-        return res.status(400).json({ error: "Apenas arquivos .ofx são aceitos" });
-      }
-
-      // Validate file size (max 10MB)
-      if (req.file.size > 10 * 1024 * 1024) {
-        return res.status(400).json({ error: "Arquivo muito grande. Máximo 10MB." });
-      }
-
-      const { transactions } = await parseOFXBuffer(req.file.buffer);
-
-      if (!transactions || transactions.length === 0) {
-        return res.status(400).json({
-          error: "Nenhuma transação encontrada no arquivo OFX"
-        });
-      }
-
-      console.log(`Parsed ${transactions.length} transactions from OFX`);
-
-      // Create bank import record
-      const bankImport = await storage.createBankImport({
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        totalTransactions: transactions.length,
-        importedBy: 'admin-1', // In production, get from authenticated user
-        status: 'completed'
-      });
-
-      // Create bank transactions
-      let successCount = 0;
-      let duplicateCount = 0;
-      let errorCount = 0;
-      const dateWarnings = [];
-
-      for (const transaction of transactions) {
-        try {
-          // Check if transaction already exists by fitId
-          const existing = await storage.getBankTransactionByFitId(transaction.fitId);
-          if (existing) {
-            duplicateCount++;
-            continue;
-          }
-
-          // Track date warnings
-          if (!transaction.hasValidDate) {
-            dateWarnings.push(transaction.fitId);
-          }
-
-          // Validate transaction data
-          if (!transaction.amount || isNaN(parseFloat(transaction.amount))) {
-            console.log('Invalid transaction amount:', transaction.amount);
-            errorCount++;
-            continue;
-          }
-
-          let notes = parseFloat(transaction.amount) > 0
-            ? 'Entrada - Disponível para conciliação com contas a receber'
-            : 'Saída - Disponível para conciliação com contas a pagar e pagamentos de produtores';
-
-          // Add date warning to notes if applicable
-          if (!transaction.hasValidDate) {
-            notes += ' (Data gerada automaticamente - não encontrada no OFX)';
-          }
-
-          await storage.createBankTransaction({
-            importId: bankImport.id,
-            fitId: transaction.fitId,
-            amount: transaction.amount,
-            date: transaction.dtPosted,
-            description: transaction.memo || 'Transação sem descrição',
-            type: transaction.type,
-            status: 'unmatched',
-            bankRef: transaction.refNum,
-            notes: notes
-          });
-          successCount++;
-        } catch (error) {
-          console.error('Error creating transaction:', error);
-          errorCount++;
-        }
-      }
-
-      console.log(`Import completed: ${successCount} new transactions, ${duplicateCount} duplicates, ${errorCount} errors`);
-
-      let message = `Importadas ${successCount} transações com sucesso.`;
-      if (duplicateCount > 0) {
-        message += ` ${duplicateCount} duplicatas ignoradas.`;
-      }
-      if (errorCount > 0) {
-        message += ` ${errorCount} transações com erro.`;
-      }
-      if (dateWarnings.length > 0) {
-        message += ` ${dateWarnings.length} com data gerada automaticamente.`;
-      }
-
-
-      res.json({
-        success: true,
-        importId: bankImport.id,
-        message: message,
-        totalTransactions: transactions.length,
-        newTransactions: successCount,
-        duplicates: duplicateCount,
-        errors: errorCount,
-        dateWarnings: dateWarnings.length
-      });
-
-    } catch (error) {
-      console.error("Error importing OFX:", error);
-      res.status(500).json({
-        error: "Erro ao processar arquivo OFX",
-        details: error.message
-      });
-    }
-  });
-
-  // Producer Payments API
-  app.get("/api/finance/producer-payments", async (req, res) => {
-    try {
-      const productionOrders = await storage.getProductionOrders();
-
-      const producerPayments = await Promise.all(
-        productionOrders
-          .filter(po => po.producerValue && parseFloat(po.producerValue) > 0)
-          .map(async (po) => {
-            const order = await storage.getOrder(po.orderId);
-            const producer = await storage.getUser(po.producerId);
-
-            let clientName = order?.contactName || 'Cliente não identificado';
-
-            // Try to get client name if not available in order
-            if (!clientName && order?.clientId) {
-              const clientRecord = await storage.getClient(order.clientId);
-              if (clientRecord) {
-                clientName = clientRecord.name;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  clientName = clientUser.name;
-                }
-              }
-            }
-
-            return {
-              id: `implicit-${po.id}`, // Unique ID for implicit payments
-              productionOrderId: po.id,
-              producerId: po.producerId,
-              producerName: producer?.name || 'Unknown',
-              amount: po.producerValue,
-              status: po.producerPaymentStatus || 'pending',
-              createdAt: po.acceptedAt || new Date(),
-              notes: po.producerNotes || null,
-              productionOrder: po,
-              order: order,
-              clientName: clientName
-            };
-          })
-      );
-
-      res.json(producerPayments);
-    } catch (error) {
-      console.error("Failed to fetch producer payments:", error);
-      res.status(500).json({ error: "Failed to fetch producer payments" });
-    }
-  });
-
-  app.get("/api/finance/producer-payments/pending", async (req, res) => {
-    try {
-      const producerPayments = await storage.getProducerPayments();
-
-      // Enrich with production order and producer data
-      const enrichedPayments = await Promise.all(
-        producerPayments
-          .filter(payment => payment.status === 'approved' || payment.status === 'pending')
-          .map(async (payment) => {
-            const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-            const producer = await storage.getUser(payment.producerId);
-            let order = null;
-            let clientName = 'Unknown';
-
-            if (productionOrder) {
-              order = await storage.getOrder(productionOrder.orderId);
-              if (order) {
-                // Get client name
-                const clientRecord = await storage.getClient(order.clientId);
-                if (clientRecord) {
-                  clientName = clientRecord.name;
-                } else {
-                  const clientByUserId = await storage.getClientByUserId(order.clientId);
-                  if (clientByUserId) {
-                    clientName = clientByUserId.name;
-                  } else {
-                    const clientUser = await storage.getUser(order.clientId);
-                    if (clientUser) {
-                      clientName = clientUser.name;
-                    }
-                  }
-                }
-              }
-            }
-
-            return {
-              ...payment,
-              productionOrder,
-              order,
-              producerName: producer?.name || 'Unknown',
-              clientName: clientName,
-              orderNumber: order?.orderNumber || 'Unknown',
-              product: order?.product || 'Unknown'
-            };
-          })
-      );
-
-      res.json(enrichedPayments);
-    } catch (error) {
-      console.error("Error fetching pending producer payments:", error);
-      res.status(500).json({ error: "Failed to fetch pending producer payments" });
-    }
-  });
-
-  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // Buscar o pagamento de produtor
-      const producerPayment = await storage.getProducerPayment(id);
-      if (!producerPayment) {
-        return res.status(404).json({ error: "Producer payment not found" });
-      }
-
-      // Atualizar status para aprovado
-      const updated = await storage.updateProducerPayment(id, {
-        status: 'approved',
-        approvedAt: new Date(),
-        approvedBy: 'admin' // Em produção, usar req.user.id
-      });
-
-      if (!updated) {
-        return res.status(404).json({ error: "Failed to update producer payment" });
-      }
-
-      res.json({
-        success: true,
-        message: "Pagamento aprovado com sucesso",
-        payment: updated
-      });
-    } catch (error) {
-      console.error("Failed to approve producer payment:", error);
-      res.status(500).json({ error: "Failed to approve producer payment" });
-    }
-  });
-
   // Get logistics producer stats
   app.get("/api/logistics/producer-stats", async (req, res) => {
     try {
@@ -5951,6 +3943,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/clients", async (req, res) => {
     try {
       const clients = await storage.getClients();
+      console.log(`Found ${clients.length} clients`);
 
       // Enrich with additional information
       const enrichedClients = await Promise.all(
@@ -6228,6 +4221,185 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching shipping methods:", error);
       res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
+  // Approve budget
+  app.post("/api/budgets/:id/approve", async (req, res) => {
+    try {
+      const budgetId = req.params.id;
+      const budget = await storage.getBudget(budgetId);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+
+      budget.status = 'approved';
+      budget.updatedAt = new Date().toISOString();
+
+      await storage.updateBudget(budgetId, budget);
+
+      res.json({ success: true, budget });
+    } catch (error) {
+      console.error('Error approving budget:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get pending actions count for vendor
+  app.get("/api/vendor/:vendorId/pending-actions", async (req, res) => {
+    try {
+      const vendorId = req.params.vendorId;
+      const budgets = await storage.getBudgetsByVendor(vendorId);
+
+      // Count approved budgets waiting to be converted to orders
+      const approvedBudgets = budgets.filter((budget: any) => budget.status === 'approved');
+
+      res.json({ count: approvedBudgets.length });
+    } catch (error) {
+      console.error('Error fetching pending actions:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Finance payment data routes
+  app.get("/api/finance/payment-data", async (req, res) => {
+    try {
+      const paymentData = await storage.getPaymentData();
+      res.json(paymentData || {
+        pix: '',
+        bankAccount: '',
+        paymentLink: '',
+        instructions: ''
+      });
+    } catch (error) {
+      console.error('Error fetching payment data:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/finance/payment-data", async (req, res) => {
+    try {
+      const paymentData = req.body;
+      await storage.updatePaymentData(paymentData);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating payment data:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get budgets for client
+  app.get("/api/budgets/client/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      console.log(`Fetching budgets for client: ${clientId}`);
+
+      let budgets = [];
+
+      // Get all budgets to search through
+      const allBudgets = await storage.getBudgets();
+      console.log(`Total budgets in system: ${allBudgets.length}`);
+
+      // Find budgets that match this client ID in various ways
+      for (const budget of allBudgets) {
+        let shouldInclude = false;
+
+        // Direct match with clientId
+        if (budget.clientId === clientId) {
+          shouldInclude = true;
+        }
+
+        // Check if clientId refers to a user, and find client record
+        if (!shouldInclude) {
+          try {
+            const clientRecord = await storage.getClientByUserId(clientId);
+            if (clientRecord && budget.clientId === clientRecord.id) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
+        // Check if budget.clientId is a client record, and see if its userId matches
+        if (!shouldInclude) {
+          try {
+            const budgetClientRecord = await storage.getClient(budget.clientId);
+            if (budgetClientRecord && budgetClientRecord.userId === clientId) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
+        // Also check if contactName matches user info (fallback for orders created from budgets)
+        if (!shouldInclude && budget.contactName) {
+          try {
+            const user = await storage.getUser(clientId);
+            if (user && user.name === budget.contactName) {
+              shouldInclude = true;
+            }
+          } catch (e) {
+            // Continue searching
+          }
+        }
+
+        if (shouldInclude) {
+          budgets.push(budget);
+        }
+      }
+
+      // Remove duplicates
+      const uniqueBudgets = budgets.filter((budget, index, self) =>
+        index === self.findIndex(b => b.id === budget.id)
+      );
+
+      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
+
+      // Enrich with vendor names and items
+      const enrichedBudgets = await Promise.all(
+        uniqueBudgets.map(async (budget) => {
+          const vendor = await storage.getUser(budget.vendorId);
+          const items = await storage.getBudgetItems(budget.id);
+          const photos = await storage.getBudgetPhotos(budget.id);
+
+          // Enrich items with product details
+          const enrichedItems = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              return {
+                ...item,
+                productName: product?.name || 'Produto não encontrado'
+              };
+            })
+          );
+
+          // Get payment data
+          const paymentData = await storage.getBudgetPaymentInfo(budget.id);
+
+          // Ensure all budget fields are properly set
+          return {
+            ...budget,
+            status: budget.status || 'draft', // Ensure status is always present
+            vendorName: vendor?.name || 'Vendedor',
+            photos: photos,
+            items: enrichedItems,
+            paymentData
+          };
+        })
+      );
+
+      // Sort by creation date (newest first)
+      enrichedBudgets.sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+
+      res.json(enrichedBudgets);
+    } catch (error) {
+      console.error("Error fetching client budgets:", error);
+      res.status(500).json({ error: "Failed to fetch client budgets" });
     }
   });
 

@@ -278,6 +278,15 @@ export class MemStorage implements IStorage {
   private budgets: Map<string, any>;
   private budgetItems: Map<string, any>; // Changed to Map
   private budgetPhotos: Map<string, any>; // Changed to Map
+
+  // Payment data for finance
+  private paymentData: any = {
+    pix: '',
+    bankAccount: '',
+    paymentLink: '',
+    instructions: ''
+  };
+
   private commissionSettings: CommissionSettings;
   private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
   private quoteRequests: any[] = []; // Added for quote requests
@@ -2150,12 +2159,12 @@ export class MemStorage implements IStorage {
     console.log(`Storage: Initial query has ${query.length} products`);
 
     // Log some sample products for debugging
-    console.log(`Storage: Sample products:`, query.slice(0, 3).map(p => ({ 
-      id: p.id, 
-      name: p.name, 
-      category: p.category, 
+    console.log(`Storage: Sample products:`, query.slice(0, 3).map(p => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
       producerId: p.producerId,
-      isActive: p.isActive 
+      isActive: p.isActive
     })));
 
     // Only show active products first

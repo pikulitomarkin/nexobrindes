@@ -1,40 +1,75 @@
-
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText } from "lucide-react";
 import { useState } from "react";
+import { Label } from "@/components/ui/label"; // Assuming Label is from shadcn/ui and needs to be imported
+import { useToast } from "@/components/ui/use-toast"; // Assuming useToast is from shadcn/ui
 
 export default function ClientBudgets() {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const clientId = currentUser.id; // Use clientId for queryKey
   const [selectedBudget, setSelectedBudget] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false); // State to control budget details modal
+
+  const approveBudgetMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao aprovar orçamento");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/client", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/client", clientId] }); // Invalidate requests too
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento aprovado! Aguarde os dados de pagamento.",
+      });
+      setViewBudgetDialogOpen(false); // Close the modal after successful approval
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao aprovar orçamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleApproveBudget = (budgetId: string) => {
+    approveBudgetMutation.mutate(budgetId);
+  };
 
   // Buscar orçamentos do cliente
   const { data: budgets, isLoading: budgetsLoading, refetch: refetchBudgets } = useQuery({
-    queryKey: ["/api/budgets/client", currentUser.id],
+    queryKey: ["/api/budgets/client", clientId],
     queryFn: async () => {
-      const response = await fetch(`/api/budgets/client/${currentUser.id}`);
+      const response = await fetch(`/api/budgets/client/${clientId}`);
       if (!response.ok) throw new Error('Failed to fetch client budgets');
       return response.json();
     },
-    enabled: !!currentUser.id,
+    enabled: !!clientId,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
 
   // Buscar solicitações de orçamento
   const { data: quoteRequests, isLoading: requestsLoading, refetch: refetchQuoteRequests } = useQuery({
-    queryKey: ["/api/quote-requests/client", currentUser.id],
+    queryKey: ["/api/quote-requests/client", clientId],
     queryFn: async () => {
       try {
-        console.log(`Fetching quote requests for client: ${currentUser.id}`);
-        const response = await fetch(`/api/quote-requests/client/${currentUser.id}`);
+        console.log(`Fetching quote requests for client: ${clientId}`);
+        const response = await fetch(`/api/quote-requests/client/${clientId}`);
         if (!response.ok) {
           console.error('Failed to fetch quote requests:', response.status, response.statusText);
-          // Se der erro 404 ou similar, retornar array vazio em vez de erro
           if (response.status === 404) {
             return [];
           }
@@ -48,7 +83,7 @@ export default function ClientBudgets() {
         return []; // Retornar array vazio em caso de erro
       }
     },
-    enabled: !!currentUser.id,
+    enabled: !!clientId,
     refetchInterval: 10000,
     refetchOnWindowFocus: true,
     retry: 1, // Reduzir retry para evitar spam
@@ -102,7 +137,7 @@ export default function ClientBudgets() {
 
   const handleViewDetails = (budget: any) => {
     setSelectedBudget(budget);
-    setShowDetailsModal(true);
+    setViewBudgetDialogOpen(true); // Use the state for the dialog
   };
 
   if (budgetsLoading || requestsLoading) {
@@ -261,7 +296,7 @@ export default function ClientBudgets() {
                           R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
-                      
+
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Vendedor</p>
                         <p className="font-medium text-gray-900">
@@ -272,8 +307,8 @@ export default function ClientBudgets() {
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Prazo de Entrega</p>
                         <p className="font-medium text-gray-900">
-                          {budget.deliveryDeadline ? 
-                            new Date(budget.deliveryDeadline).toLocaleDateString('pt-BR') : 
+                          {budget.deliveryDeadline ?
+                            new Date(budget.deliveryDeadline).toLocaleDateString('pt-BR') :
                             'A definir'
                           }
                         </p>
@@ -291,17 +326,17 @@ export default function ClientBudgets() {
                       <div className="flex space-x-2">
                         {budget.status === 'sent' && (
                           <>
-                            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white">
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Aprovar Orçamento
+                            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white" onClick={() => handleViewDetails(budget)}>
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver Detalhes
                             </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50">
+                            <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => handleViewDetails(budget)}>
                               <X className="h-4 w-4 mr-1" />
                               Rejeitar
                             </Button>
                           </>
                         )}
-                        
+
                         {budget.status === 'approved' && (
                           <div className="flex items-center text-green-600">
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -316,7 +351,7 @@ export default function ClientBudgets() {
                           </div>
                         )}
                       </div>
-                      
+
                       <Button
                         size="sm"
                         variant="ghost"
@@ -343,133 +378,163 @@ export default function ClientBudgets() {
       </Card>
 
       {/* Modal de Detalhes do Orçamento */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+      <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Orçamento</DialogTitle>
-            <DialogDescription>
-              Informações completas do orçamento
-            </DialogDescription>
           </DialogHeader>
           {selectedBudget && (
             <div className="space-y-6">
-              {/* Cabeçalho do Orçamento */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">{selectedBudget.title}</h3>
-                  <p className="text-sm text-gray-600">
-                    Orçamento: {selectedBudget.budgetNumber}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Criado em: {new Date(selectedBudget.createdAt).toLocaleDateString('pt-BR')}
-                  </p>
+                  <Label className="font-medium">Título</Label>
+                  <p>{selectedBudget.title}</p>
                 </div>
-                <div className="text-right">
-                  {getStatusBadge(selectedBudget.status, 'budget')}
-                  <div className="mt-2">
-                    <p className="text-2xl font-bold text-green-600">
-                      R$ {parseFloat(selectedBudget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <div>
+                  <Label className="font-medium">Status</Label>
+                  <div className="mt-1">{getStatusBadge(selectedBudget.status, 'budget')}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="font-medium">Válido até</Label>
+                  <p>{selectedBudget.validUntil ? new Date(selectedBudget.validUntil).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="font-medium">Prazo de Entrega</Label>
+                  <p>{selectedBudget.deliveryDeadline ? new Date(selectedBudget.deliveryDeadline).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="font-medium">Tipo de Entrega</Label>
+                  <p>{selectedBudget.deliveryType === 'delivery' ? 'Entrega com Frete' : 'Retirada no Local'}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="font-medium">Descrição</Label>
+                <p>{selectedBudget.description || 'N/A'}</p>
+              </div>
+
+              <div>
+                <Label className="font-medium">Produtos</Label>
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {selectedBudget.items?.map((item: any, index: number) => (
+                    <div key={index} className="border rounded p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium">{item.productName}</h4>
+                        <span className="font-bold">
+                          R$ {((item.unitPrice * item.quantity) +
+                               (item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0) +
+                               (item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">Quantidade: {item.quantity} | Preço unitário: R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+
+                      {item.producerName && (
+                        <p className="text-xs text-blue-600">Produtor: {item.producerName}</p>
+                      )}
+
+                      {/* Detalhes de Personalização */}
+                      {(item.hasItemCustomization || item.hasGeneralCustomization) && (
+                        <div className="mt-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                          <h5 className="font-medium text-blue-800 mb-2">📋 Detalhes de Personalização:</h5>
+
+                          {item.hasItemCustomization && (
+                            <div className="mb-2">
+                              <p className="text-sm text-blue-700">
+                                <strong>Personalização Individual:</strong> R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
+                              {item.itemCustomizationDescription && (
+                                <p className="text-xs text-blue-600 mt-1">{item.itemCustomizationDescription}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {item.hasGeneralCustomization && (
+                            <div className="mb-2">
+                              <p className="text-sm text-blue-700">
+                                <strong>Personalização Geral:</strong> R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
+                              {item.generalCustomizationDescription && (
+                                <p className="text-xs text-blue-600 mt-1">{item.generalCustomizationDescription}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {item.customizationPhoto && (
+                            <div className="mt-2">
+                              <p className="text-xs text-blue-600 mb-1">Imagem de referência:</p>
+                              <img
+                                src={item.customizationPhoto}
+                                alt="Personalização"
+                                className="max-w-32 h-20 object-cover rounded border cursor-pointer"
+                                onClick={() => window.open(item.customizationPhoto, '_blank')}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dados de Pagamento - só aparece se orçamento foi aceito */}
+              {selectedBudget.status === 'approved' && (
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <h3 className="font-bold text-green-800 mb-3">💳 Dados para Pagamento</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-medium">PIX</Label>
+                      <p className="text-sm bg-white p-2 rounded border">
+                        {selectedBudget.paymentData?.pix || 'Aguardando dados...'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Conta Bancária</Label>
+                      <p className="text-sm bg-white p-2 rounded border">
+                        {selectedBudget.paymentData?.bankAccount || 'Aguardando dados...'}
+                      </p>
+                    </div>
+                  </div>
+                  {selectedBudget.paymentData?.paymentLink && (
+                    <div className="mt-3">
+                      <Button
+                        onClick={() => window.open(selectedBudget.paymentData.paymentLink, '_blank')}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        🔗 Pagar via Link
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-lg font-bold">Total do Orçamento:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    R$ {selectedBudget.totalValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+
+                {/* Botão de Aceitar Orçamento */}
+                {selectedBudget.status === 'sent' && (
+                  <div className="mt-4 pt-3 border-t">
+                    <Button
+                      onClick={() => handleApproveBudget(selectedBudget.id)}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      disabled={approveBudgetMutation.isPending}
+                    >
+                      {approveBudgetMutation.isPending ? 'Processando...' : '✅ Aceitar Orçamento'}
+                    </Button>
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                      Ao aceitar, você receberá os dados para pagamento
                     </p>
                   </div>
-                </div>
+                )}
               </div>
-
-              {/* Descrição */}
-              {selectedBudget.description && (
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Descrição</h4>
-                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    {selectedBudget.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Itens do Orçamento */}
-              {selectedBudget.items && selectedBudget.items.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Itens do Orçamento</h4>
-                  <div className="space-y-3">
-                    {selectedBudget.items.map((item: any, index: number) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Produto</p>
-                            <p className="font-semibold">{item.productName}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Quantidade</p>
-                            <p>{item.quantity}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Preço Unitário</p>
-                            <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Subtotal</p>
-                            <p className="font-semibold">
-                              R$ {parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                        </div>
-
-                        {item.hasItemCustomization && (
-                          <div className="bg-blue-50 p-3 rounded mt-3">
-                            <p className="text-sm font-medium text-blue-800 mb-1">Personalização Incluída</p>
-                            <p className="text-sm text-blue-700">
-                              {item.itemCustomizationDescription}
-                            </p>
-                            {parseFloat(item.itemCustomizationValue) > 0 && (
-                              <p className="text-sm font-medium text-blue-800 mt-1">
-                                Valor adicional: R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Informações de Entrega e Pagamento */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Informações de Entrega</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Tipo:</strong> {selectedBudget.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega'}</p>
-                    {selectedBudget.deliveryDeadline && (
-                      <p><strong>Prazo:</strong> {new Date(selectedBudget.deliveryDeadline).toLocaleDateString('pt-BR')}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Vendedor</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Nome:</strong> {selectedBudget.vendorName || 'Não informado'}</p>
-                    {selectedBudget.contactPhone && (
-                      <p className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {selectedBudget.contactPhone}
-                      </p>
-                    )}
-                    {selectedBudget.contactEmail && (
-                      <p className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {selectedBudget.contactEmail}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {selectedBudget.validUntil && (
-                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Validade:</strong> Este orçamento é válido até {new Date(selectedBudget.validUntil).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>

@@ -410,3 +410,219 @@ export default function FinancePayments() {
     </div>
   );
 }
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CreditCard, Building2, Link2, Smartphone } from 'lucide-react';
+
+export default function FinancePayments() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [paymentData, setPaymentData] = useState({
+    pix: '',
+    bankAccount: '',
+    paymentLink: '',
+    instructions: ''
+  });
+
+  // Buscar dados de pagamento atuais
+  const { data: currentPaymentData, isLoading } = useQuery({
+    queryKey: ["/api/finance/payment-data"],
+    queryFn: async () => {
+      const response = await fetch('/api/finance/payment-data');
+      if (!response.ok) throw new Error('Failed to fetch payment data');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data) {
+        setPaymentData(data);
+      }
+    }
+  });
+
+  // Buscar orçamentos aprovados que aguardam dados de pagamento
+  const { data: approvedBudgets } = useQuery({
+    queryKey: ["/api/budgets/approved"],
+    queryFn: async () => {
+      const response = await fetch('/api/budgets?status=approved');
+      if (!response.ok) throw new Error('Failed to fetch approved budgets');
+      return response.json();
+    },
+  });
+
+  const updatePaymentDataMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/finance/payment-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Erro ao atualizar dados de pagamento');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payment-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/approved"] });
+      toast({
+        title: "Sucesso!",
+        description: "Dados de pagamento atualizados com sucesso",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    updatePaymentDataMutation.mutate(paymentData);
+  };
+
+  if (isLoading) {
+    return <div className="p-6">Carregando...</div>;
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Dados Bancários e Pagamentos</h1>
+          <p className="text-gray-600">Configure os dados que aparecerão para os clientes nos orçamentos aprovados</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Configuração de Dados Bancários */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Configurar Dados Bancários
+            </CardTitle>
+            <CardDescription>
+              Estes dados serão exibidos para os clientes quando aprovarem orçamentos
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Tabs defaultValue="pix" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="pix">PIX</TabsTrigger>
+                <TabsTrigger value="bank">Conta Bancária</TabsTrigger>
+                <TabsTrigger value="link">Link de Pagamento</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="pix" className="space-y-3">
+                <Label htmlFor="pix" className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  Chave PIX
+                </Label>
+                <Textarea
+                  id="pix"
+                  value={paymentData.pix}
+                  onChange={(e) => setPaymentData({ ...paymentData, pix: e.target.value })}
+                  placeholder="Digite a chave PIX (CPF, e-mail, telefone ou chave aleatória)"
+                  className="min-h-[100px]"
+                />
+              </TabsContent>
+              
+              <TabsContent value="bank" className="space-y-3">
+                <Label htmlFor="bankAccount" className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Dados da Conta Bancária
+                </Label>
+                <Textarea
+                  id="bankAccount"
+                  value={paymentData.bankAccount}
+                  onChange={(e) => setPaymentData({ ...paymentData, bankAccount: e.target.value })}
+                  placeholder={`Exemplo:
+Banco: Banco do Brasil
+Agência: 1234-5
+Conta Corrente: 12345-6
+Titular: Nome da Empresa
+CNPJ: 00.000.000/0001-00`}
+                  className="min-h-[120px]"
+                />
+              </TabsContent>
+              
+              <TabsContent value="link" className="space-y-3">
+                <Label htmlFor="paymentLink" className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  Link de Pagamento
+                </Label>
+                <Input
+                  id="paymentLink"
+                  value={paymentData.paymentLink}
+                  onChange={(e) => setPaymentData({ ...paymentData, paymentLink: e.target.value })}
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-gray-500">
+                  Link para gateway de pagamento (PagSeguro, Mercado Pago, etc.)
+                </p>
+              </TabsContent>
+            </Tabs>
+
+            <div className="space-y-2">
+              <Label htmlFor="instructions">Instruções Adicionais</Label>
+              <Textarea
+                id="instructions"
+                value={paymentData.instructions}
+                onChange={(e) => setPaymentData({ ...paymentData, instructions: e.target.value })}
+                placeholder="Instruções adicionais para pagamento..."
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <Button onClick={handleSave} disabled={updatePaymentDataMutation.isPending} className="w-full">
+              {updatePaymentDataMutation.isPending ? 'Salvando...' : 'Salvar Dados Bancários'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Lista de Orçamentos Aprovados */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Orçamentos Aguardando Pagamento
+            </CardTitle>
+            <CardDescription>
+              Orçamentos aprovados pelos clientes que receberão os dados de pagamento
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {approvedBudgets && approvedBudgets.length > 0 ? (
+              <div className="space-y-3">
+                {approvedBudgets.map((budget: any) => (
+                  <div key={budget.id} className="border rounded p-3 bg-green-50">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{budget.title}</p>
+                        <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                        <p className="text-sm text-green-600 font-medium">
+                          R$ {budget.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Aprovado
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Os dados de pagamento configurados serão exibidos para este cliente
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-8">
+                Nenhum orçamento aprovado aguardando pagamento
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
