@@ -357,10 +357,10 @@ export default function AdminOrders() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.clientName}
+                        {order.clientName || "Nome não informado"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.vendorName}
+                        {order.vendorName || "Vendedor não informado"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {order.product}
@@ -733,8 +733,8 @@ export default function AdminOrders() {
                 Informações completas do pedido e status de produção
               </DialogDescription>
             </DialogHeader>
-            <OrderDetailsContent 
-              orderId={selectedOrderId} 
+            <OrderDetailsContent
+              orderId={selectedOrderId}
               onClose={() => setShowOrderDetails(false)}
             />
           </DialogContent>
@@ -757,6 +757,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
   });
 
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // Make sure queryClient is available here
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -797,7 +798,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800", 
+      confirmed: "bg-blue-100 text-blue-800",
       production: "bg-purple-100 text-purple-800",
       shipped: "bg-orange-100 text-orange-800",
       delivered: "bg-green-100 text-green-800",
@@ -807,7 +808,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
     const statusLabels = {
       pending: "Aguardando",
       confirmed: "Confirmado",
-      production: "Em Produção", 
+      production: "Em Produção",
       shipped: "Enviado",
       delivered: "Entregue",
       cancelled: "Cancelado",
@@ -833,11 +834,11 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Cliente</label>
-              <p>{order.clientName}</p>
+              <p>{order.clientName || "Nome não informado"}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Vendedor</label>
-              <p>{order.vendorName}</p>
+              <p>{order.vendorName || "Vendedor não informado"}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Produto</label>
@@ -909,7 +910,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">Produtor: {po.producerName}</span>
+                      <span className="font-medium">Produtor: {po.producerName || "Produtor não informado"}</span>
                       {po.hasUnreadNotes && (
                         <div className="flex items-center gap-1">
                           <AlertCircle className="h-4 w-4 text-red-500" />

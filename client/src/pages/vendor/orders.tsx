@@ -1852,7 +1852,7 @@ export default function VendorOrders() {
                       {order.title}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.clientName}
+                      {order.clientName || order.contactName || "Nome não informado"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -2033,7 +2033,7 @@ export default function VendorOrders() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Cliente</label>
-                      <p>{selectedOrder.clientName}</p>
+                      <p>{selectedOrder.clientName || selectedOrder.contactName || "Não informado"}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Produto</label>
