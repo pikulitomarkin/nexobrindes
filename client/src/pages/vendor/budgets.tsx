@@ -1888,13 +1888,13 @@ export default function VendorBudgets() {
                             Enviar
                           </Button>
                         )}
-                        {budget.status === 'approved' && (
+                        {(budget.status === 'sent' || budget.status === 'approved') && (
                           <Button
-                            variant="ghost"
-                            size="sm"
                             className="text-green-600 hover:text-green-900"
-                            onClick={() => handleConvertClick(budget.id)}
-                            disabled={convertToOrderMutation.isPending}
+                            onClick={() => {
+                              setViewBudgetDialogOpen(false);
+                              handleConvertClick(budget.id);
+                            }}
                             data-testid={`button-convert-${budget.id}`}
                           >
                             <ShoppingCart className="h-4 w-4 mr-1" />
