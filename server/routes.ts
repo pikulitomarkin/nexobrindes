@@ -1683,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + refundAmount;
         }, 0);
 
-      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
@@ -1695,7 +1695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
-      
+
       console.log('Payables breakdown:', {
         producers,
         expenses, 
@@ -3296,7 +3296,7 @@ Para mais detalhes, entre em contato conosco!`;
             }
 
             payment = {
-              id: `implicit-${po.id}`,
+              id: `implicit-${po.id}`, // Unique ID for implicit payments
               productionOrderId: po.id,
               producerId: producerId,
               amount: po.producerValue,
@@ -5356,6 +5356,194 @@ Para mais detalhes, entre em contato conosco!`;
         error: "Erro interno do servidor",
         details: error.message
       });
+    }
+  });
+
+  // Get paid orders for logistics (orders that received payment but not sent to production yet)
+  app.get("/api/logistics/paid-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const payments = await storage.getPayments();
+
+      // Filter orders that are paid but not yet sent to production
+      const paidOrders = orders.filter(order => {
+        // Check if order has confirmed payments
+        const orderPayments = payments.filter(p => p.orderId === order.id && p.status === 'confirmed');
+        const totalPaid = orderPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        // Consider paid if has confirmed payments or budget down payment
+        const hasPaidValue = parseFloat(order.paidValue || '0') > 0 || totalPaid > 0;
+
+        // Include orders that are paid but status is still 'confirmed' (not yet in production)
+        return hasPaidValue && (order.status === 'confirmed' || order.status === 'paid');
+      });
+
+      // Enrich with client names and payment info
+      const enrichedOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          let clientName = order.contactName;
+
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Cliente não identificado";
+          }
+
+          // Get last payment date
+          const orderPayments = payments.filter(p => p.orderId === order.id && p.status === 'confirmed');
+          const lastPaymentDate = orderPayments.length > 0 
+            ? orderPayments.sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0].paidAt
+            : null;
+
+          return {
+            ...order,
+            clientName,
+            lastPaymentDate
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedOrders.length} paid orders awaiting production`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching paid orders for logistics:", error);
+      res.status(500).json({ error: "Failed to fetch paid orders" });
+    }
+  });
+
+  // Get production orders for logistics tracking
+  app.get("/api/logistics/production-orders", async (req, res) => {
+    try {
+      const productionOrders = await storage.getProductionOrders();
+
+      const enrichedOrders = await Promise.all(
+        productionOrders.map(async (po) => {
+          const order = await storage.getOrder(po.orderId);
+          const producer = po.producerId ? await storage.getUser(po.producerId) : null;
+
+          let clientName = order?.contactName;
+
+          if (!clientName && order?.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Cliente não identificado";
+          }
+
+          return {
+            ...po,
+            orderNumber: order?.orderNumber || `PO-${po.id}`,
+            product: order?.product || 'Produto não informado',
+            clientName,
+            producerName: producer?.name || null,
+            order: order
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedOrders.length} production orders for logistics tracking`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching production orders for logistics:", error);
+      res.status(500).json({ error: "Failed to fetch production orders" });
+    }
+  });
+
+  // Dispatch order (mark as shipped)
+  app.post("/api/logistics/dispatch-order", async (req, res) => {
+    try {
+      const { productionOrderId, orderId, notes, trackingCode } = req.body;
+
+      // Update production order to shipped status
+      if (productionOrderId) {
+        await storage.updateProductionOrderStatus(
+          productionOrderId, 
+          'shipped', 
+          notes || 'Produto despachado para o cliente',
+          null,
+          trackingCode
+        );
+      }
+
+      // Update main order to shipped status
+      if (orderId) {
+        await storage.updateOrder(orderId, {
+          status: 'shipped',
+          trackingCode: trackingCode || null
+        });
+      }
+
+      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
+
+      res.json({
+        success: true,
+        message: "Pedido despachado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error dispatching order:", error);
+      res.status(500).json({ error: "Failed to dispatch order" });
+    }
+  });
+
+  // Get budgets by vendor
+  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const budgets = await storage.getBudgetsByVendor(vendorId);
+      res.json(budgets);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch vendor budgets" });
+    }
+  });
+
+  // Get all payment methods
+  app.get("/api/payment-methods", async (req, res) => {
+    try {
+      const methods = await storage.getAllPaymentMethods();
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Get all shipping methods
+  app.get("/api/shipping-methods", async (req, res) => {
+    try {
+      const methods = await storage.getAllShippingMethods();
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
     }
   });
 
