@@ -628,8 +628,8 @@ export default function ProductionDashboard() {
                           <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
                             {orderDetails.photos.map((photoUrl: string, index: number) => (
                               <div key={index} className="relative group">
-                                <img 
-                                  src={photoUrl} 
+                                <img
+                                  src={photoUrl}
                                   alt={`Foto ${index + 1}`}
                                   className="w-full h-20 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
                                   onClick={() => window.open(photoUrl, '_blank')}
@@ -710,8 +710,8 @@ export default function ProductionDashboard() {
                   <div className="col-span-2">
                     <span className="text-gray-600">Prazo:</span>
                     <p className="font-medium">
-                      {selectedOrder.deadline ? 
-                        new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 
+                      {selectedOrder.deadline ?
+                        new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') :
                         'Não definido'}
                     </p>
                   </div>
@@ -745,8 +745,8 @@ export default function ProductionDashboard() {
             <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSaveValue} 
+            <Button
+              onClick={handleSaveValue}
               disabled={!producerValue || parseFloat(producerValue) <= 0}
               className="bg-green-600 hover:bg-green-700"
             >
@@ -779,8 +779,8 @@ export default function ProductionDashboard() {
                 <div>
                   <Label className="text-sm text-gray-600">Prazo</Label>
                   <p className="font-medium">
-                    {selectedOrder?.deadline ? 
-                      new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') : 
+                    {selectedOrder?.deadline ?
+                      new Date(selectedOrder.deadline).toLocaleDateString('pt-BR') :
                       'Não definido'}
                   </p>
                 </div>

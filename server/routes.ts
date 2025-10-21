@@ -3319,7 +3319,7 @@ Para mais detalhes, entre em contato conosco!`;
             deadline: order.deadline,
             deliveryDeadline: order.deliveryDeadline,
             notes: `Itens para produção: ${producerItems.map(item => `${item.productName} (Qty: ${item.quantity})`).join(', ')}`,
-            // Store additional order details for the producer
+            // Store additional order details for the producer (without client payment values)
             orderDetails: JSON.stringify({
               orderNumber: order.orderNumber,
               product: order.product,
@@ -3330,12 +3330,15 @@ Para mais detalhes, entre em contato conosco!`;
               deliveryDeadline: order.deliveryDeadline,
               items: producerItems, // Only items for this producer
               photos: budgetPhotos, // Include budget photos
-              totalValue: order.totalValue,
-              producerItemsValue: producerItemsValue.toFixed(2),
               shippingAddress: order.deliveryType === 'pickup'
                 ? 'Sede Principal - Retirada no Local'
                 : (clientDetails?.address || 'Endereço não informado'),
-              specialInstructions: order.description || ''
+              specialInstructions: order.description || '',
+              contactPhone: order.contactPhone,
+              contactEmail: order.contactEmail,
+              // Remove financial information from producer view
+              // producerItemsValue: producerItemsValue.toFixed(2), // Only producer sees their own pricing
+              // totalValue: order.totalValue, // Client total is hidden
             })
           });
 

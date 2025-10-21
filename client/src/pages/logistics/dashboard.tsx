@@ -434,7 +434,7 @@ export default function LogisticsDashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Entrega</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Pagamento</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                   </tr>
@@ -453,8 +453,8 @@ export default function LogisticsDashboard() {
                         <div className="text-sm text-gray-900">{order.product}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-green-600">
-                          R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <div className="text-sm text-gray-900">
+                          {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -780,21 +780,23 @@ export default function LogisticsDashboard() {
                       <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Valor Total</label>
-                      <p className="text-2xl font-bold text-green-600">
-                        R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
+                      <label className="text-sm font-medium text-gray-500">Tipo de Entrega</label>
+                      <p className="font-medium">{selectedOrder.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Valor Pago</label>
-                      <p className="text-lg font-semibold text-blue-600">
-                        R$ {parseFloat(selectedOrder.paidValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
+                      <label className="text-sm font-medium text-gray-500">Contato do Cliente</label>
+                      <p className="font-medium">{selectedOrder.contactPhone || 'Não informado'}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Data de Criação</label>
                       <p>{new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}</p>
                     </div>
+                    {selectedOrder.deliveryType === 'delivery' && (
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
+                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.shippingAddress || 'Endereço não informado'}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
