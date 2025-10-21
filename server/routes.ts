@@ -1636,6 +1636,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productionOrders = await storage.getProductionOrders();
       const bankTransactions = await storage.getBankTransactions();
       const expenseNotes = await storage.getExpenseNotes();
+      const producerPayments = await storage.getProducerPayments();
+
+      console.log('Overview calculation - Data counts:', {
+        orders: orders.length,
+        payments: payments.length,
+        commissions: allCommissions.length,
+        productionOrders: productionOrders.length,
+        expenseNotes: expenseNotes.length,
+        producerPayments: producerPayments.length
+      });
 
       // Contas a Receber - soma dos valores pendentes dos pedidos
       const receivables = orders
@@ -1647,22 +1657,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + Math.max(0, remaining);
         }, 0);
 
-      // Contas a Pagar - separado por categorias
-      const producers = productionOrders
-        .filter(po =>
-          po.producerValue &&
-          parseFloat(po.producerValue) > 0 &&
-          (!po.producerPaymentStatus || po.producerPaymentStatus === 'pending' || po.producerPaymentStatus === 'approved')
-        )
-        .reduce((total, po) => total + parseFloat(po.producerValue || '0'), 0);
+      // Contas a Pagar - usando producer payments em vez de production orders
+      const producers = producerPayments
+        .filter(payment => ['pending', 'approved'].includes(payment.status))
+        .reduce((total, payment) => total + parseFloat(payment.amount || '0'), 0);
+
+      console.log(`Producer payments pending/approved: ${producerPayments.filter(p => ['pending', 'approved'].includes(p.status)).length}, total: ${producers}`);
 
       const expenses = expenseNotes
         .filter(expense => expense.status === 'approved' && !expense.reimbursedAt)
         .reduce((total, expense) => total + parseFloat(expense.amount), 0);
 
+      console.log(`Expenses approved not reimbursed: ${expenseNotes.filter(e => e.status === 'approved' && !e.reimbursedAt).length}, total: ${expenses}`);
+
       const commissions = allCommissions
-        .filter(c => c.status === 'confirmed' && !c.paidAt)
+        .filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt)
         .reduce((total, c) => total + parseFloat(c.amount), 0);
+
+      console.log(`Commissions pending/confirmed: ${allCommissions.filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt).length}, total: ${commissions}`);
 
       const refunds = orders
         .filter(order => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
@@ -1670,6 +1682,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const refundAmount = order.refundAmount ? parseFloat(order.refundAmount) : parseFloat(order.paidValue || '0');
           return total + refundAmount;
         }, 0);
+
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
@@ -1681,6 +1695,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
       const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
+      
+      console.log('Payables breakdown:', {
+        producers,
+        expenses, 
+        commissions,
+        refunds,
+        manualPayables: manualPayablesAmount,
+        total: payables
+      });
 
       // Saldo em Conta - transações bancárias não conciliadas (entrada - saída)
       const bankBalance = bankTransactions.reduce((total, txn) => {

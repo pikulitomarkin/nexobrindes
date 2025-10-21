@@ -202,25 +202,43 @@ export default function AdminReports() {
   const calculateMetrics = () => {
     // Contas a Receber
     const contasAReceber = receivables.filter((r: any) => r.status !== 'paid');
-    const totalContasAReceber = contasAReceber.reduce((sum: number, r: any) => 
-      sum + (parseFloat(r.amount) - parseFloat(r.receivedAmount)), 0
+    const totalContasAReceber = contasAReceber.reduce((sum: number, r: any) => {
+      const amount = parseFloat(r.amount || '0');
+      const received = parseFloat(r.receivedAmount || '0');
+      return sum + Math.max(0, amount - received);
+    }, 0);
+
+    // Contas a Pagar - incluir todas as fontes
+    const contasAPagarProdutor = producerPayments.filter((p: any) => ['pending', 'approved'].includes(p.status));
+    const totalProdutor = contasAPagarProdutor.reduce((sum: number, p: any) => 
+      sum + parseFloat(p.amount || '0'), 0
     );
 
-    // Contas a Pagar
-    const contasAPagar = producerPayments.filter((p: any) => ['pending', 'approved'].includes(p.status));
-    const totalContasAPagar = contasAPagar.reduce((sum: number, p: any) => 
-      sum + parseFloat(p.amount), 0
+    // Despesas aprovadas não reembolsadas
+    const despesasPendentes = expenses.filter((e: any) => e.status === 'approved' && !e.reimbursedAt);
+    const totalDespesas = despesasPendentes.reduce((sum: number, e: any) => 
+      sum + parseFloat(e.amount || '0'), 0
     );
 
-    // Comissões
-    const comissoesAPagar = commissions.filter((c: any) => ['pending', 'confirmed'].includes(c.status));
+    // Comissões pendentes
+    const comissoesAPagar = commissions.filter((c: any) => ['pending', 'confirmed'].includes(c.status) && !c.paidAt);
     const totalComissoesAPagar = comissoesAPagar.reduce((sum: number, c: any) => 
-      sum + parseFloat(c.amount), 0
+      sum + parseFloat(c.amount || '0'), 0
     );
+
+    // Estornos de pedidos cancelados
+    const pedidosCancelados = filteredOrders.filter((o: any) => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0);
+    const totalEstornos = pedidosCancelados.reduce((sum: number, o: any) => {
+      const refundAmount = o.refundAmount ? parseFloat(o.refundAmount) : parseFloat(o.paidValue || '0');
+      return sum + refundAmount;
+    }, 0);
+
+    // Total de contas a pagar
+    const totalContasAPagar = totalProdutor + totalDespesas + totalComissoesAPagar + totalEstornos;
 
     const comissoesPagas = commissions.filter((c: any) => c.status === 'paid');
     const totalComissoesPagas = comissoesPagas.reduce((sum: number, c: any) => 
-      sum + parseFloat(c.amount), 0
+      sum + parseFloat(c.amount || '0'), 0
     );
 
     // Métricas de vendas
@@ -258,9 +276,16 @@ export default function AdminReports() {
       taxaConversao,
       crescimentoPercentual,
       contasAReceber: contasAReceber.length,
-      contasAPagar: contasAPagar.length,
+      contasAPagar: contasAPagarProdutor.length + despesasPendentes.length + comissoesAPagar.length + pedidosCancelados.length,
       comissoesAPagar: comissoesAPagar.length,
-      comissoesPagas: comissoesPagas.length
+      comissoesPagas: comissoesPagas.length,
+      // Detalhamento das contas a pagar por categoria
+      contasAPagarDetalhes: {
+        produtores: totalProdutor,
+        despesas: totalDespesas,
+        comissoes: totalComissoesAPagar,
+        estornos: totalEstornos
+      }
     };
   };
 
@@ -992,8 +1017,12 @@ export default function AdminReports() {
               R$ {metrics.totalContasAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {metrics.contasAPagar} pagamentos pendentes
+              {metrics.contasAPagar} itens pendentes
             </p>
+            <div className="text-xs text-gray-500 mt-1">
+              Produtores: R$ {metrics.contasAPagarDetalhes?.produtores?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'} | 
+              Despesas: R$ {metrics.contasAPagarDetalhes?.despesas?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+            </div>
           </CardContent>
         </Card>
 
