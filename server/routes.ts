@@ -165,6 +165,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const category = (req.query.category as string) || '';
       const producer = (req.query.producer as string) || '';
 
+      console.log(`Logistics products request: page=${page}, limit=${limit}, search='${search}', category='${category}', producer='${producer}'`);
+
       const result = await storage.getProducts({
         page,
         limit,
@@ -173,31 +175,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         producer
       });
 
-      // Enrich products with producer names
-      const enrichedProducts = await Promise.all(
-        result.products.map(async (product) => {
-          let producerName = null;
-          if (product.producerId && product.producerId !== 'internal') {
-            const producer = await storage.getUser(product.producerId);
-            producerName = producer?.name || 'Produtor não encontrado';
-          } else {
-            producerName = 'Produto Interno';
-          }
+      console.log(`Logistics products result: ${result.products.length} products found, total=${result.total}`);
 
-          return {
-            ...product,
-            producerName
-          };
-        })
-      );
-
-      res.json({
-        ...result,
-        products: enrichedProducts
-      });
+      // Products are already enriched with producer names in storage
+      res.json(result);
     } catch (error) {
       console.error("Error fetching logistics products:", error);
-      res.status(500).json({ error: "Failed to fetch logistics products" });
+      res.status(500).json({ error: "Failed to fetch logistics products: " + error.message });
     }
   });
 

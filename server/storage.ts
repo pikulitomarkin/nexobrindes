@@ -972,6 +972,32 @@ export class MemStorage implements IStorage {
         type: 'internal',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'product-7',
+        name: 'Chaveiro Personalizado',
+        description: 'Chaveiro de acrílico para sublimação',
+        category: 'Brindes',
+        basePrice: '5.50',
+        unit: 'un',
+        isActive: true,
+        producerId: 'internal',
+        type: 'internal',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'product-8',
+        name: 'Quadro Decorativo',
+        description: 'Quadro de madeira com moldura artesanal',
+        category: 'Decoração',
+        basePrice: '89.90',
+        unit: 'un',
+        isActive: true,
+        producerId: 'producer-1',
+        type: 'external',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ];
     mockProducts.forEach(product => this.products.set(product.id, product));
@@ -2112,8 +2138,22 @@ export class MemStorage implements IStorage {
     console.log(`Storage: getProducts called with options:`, { page, limit, search, category, producer });
     console.log(`Storage: Total products in storage: ${this.products.size}`);
 
-    let query = Array.from(this.products.values()); // Use Array.from to get all products
+    // Get all products as array
+    let query = Array.from(this.products.values());
     console.log(`Storage: Initial query has ${query.length} products`);
+    
+    // Log some sample products for debugging
+    console.log(`Storage: Sample products:`, query.slice(0, 3).map(p => ({ 
+      id: p.id, 
+      name: p.name, 
+      category: p.category, 
+      producerId: p.producerId,
+      isActive: p.isActive 
+    })));
+
+    // Only show active products first
+    query = query.filter(product => product.isActive !== false);
+    console.log(`Storage: After active filter: ${query.length} products`);
 
     // Apply search filter
     if (search && search.trim().length > 0) {
@@ -2147,10 +2187,6 @@ export class MemStorage implements IStorage {
       console.log(`Storage: After producer filter: ${query.length} products`);
     }
 
-    // Only show active products
-    query = query.filter(product => product.isActive !== false);
-    console.log(`Storage: After active filter: ${query.length} products`);
-
     const total = query.length;
     const totalPages = Math.ceil(total / limit);
 
@@ -2160,9 +2196,24 @@ export class MemStorage implements IStorage {
     const products = query.slice(startIndex, endIndex);
 
     console.log(`Storage: Returning ${products.length} products (page ${page}/${totalPages})`);
-    console.log(`Storage: Sample products:`, products.slice(0, 2).map(p => ({ id: p.id, name: p.name, category: p.category, producerId: p.producerId })));
+    
+    // Enrich with producer names
+    const enrichedProducts = await Promise.all(
+      products.map(async (product) => {
+        let producerName = 'Produto Interno';
+        if (product.producerId && product.producerId !== 'internal') {
+          const producer = await this.getUser(product.producerId);
+          producerName = producer?.name || 'Produtor não encontrado';
+        }
 
-    return { products, total, page, totalPages };
+        return {
+          ...product,
+          producerName
+        };
+      })
+    );
+
+    return { products: enrichedProducts, total, page, totalPages };
   }
 
   async getProduct(id: string): Promise<any> {
@@ -2254,15 +2305,18 @@ export class MemStorage implements IStorage {
     const errors: string[] = [];
     let imported = 0;
 
+    console.log(`Starting import for producer: ${producerId}, ${productsData.length} products to import`);
+
     // Verify producer exists (allow 'internal' as well)
     if (producerId !== 'internal') {
       const producer = await this.getUser(producerId);
+      console.log(`Producer verification for ${producerId}:`, producer ? { id: producer.id, name: producer.name, role: producer.role } : 'not found');
       if (!producer || (producer.role !== 'producer' && producer.role !== 'admin')) {
-        throw new Error('Produtor não encontrado');
+        throw new Error('Produtor não encontrado ou não possui permissão');
       }
     }
 
-    for (const productData of productsData) {
+    for (const [index, productData] of productsData.entries()) {
       try {
         // Map common JSON fields to our product structure
         const name = productData.Nome || productData.name || productData.Produto;
@@ -2282,7 +2336,7 @@ export class MemStorage implements IStorage {
         }
 
         if (!name || name.trim().length === 0) {
-          errors.push(`Produto sem nome: ${JSON.stringify(productData).substring(0, 100)}`);
+          errors.push(`Produto ${index + 1} sem nome`);
           continue;
         }
 
@@ -2291,7 +2345,7 @@ export class MemStorage implements IStorage {
           continue;
         }
 
-        const productId = `product-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        const productId = `product-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 9)}`;
 
         const product = {
           id: productId,
@@ -2306,7 +2360,7 @@ export class MemStorage implements IStorage {
           // Additional fields from JSON if available
           externalId: productData.IdProduto || productData.id,
           externalCode: productData.CodigoXbz || productData.codigo,
-          compositeCode: productData.CodigoAmigavel || productData.compositeCode,
+          compositeCode: productData.CodigoComposto || productData.compositeCode,
           friendlyCode: productData.CodigoAmigavel || productData.friendlyCode,
           siteLink: productData.SiteLink || productData.link,
           imageLink: productData.ImageLink || productData.imagem || productData.foto,
@@ -2323,21 +2377,22 @@ export class MemStorage implements IStorage {
           updatedAt: new Date()
         };
 
+        console.log(`Importing product ${imported + 1}: ${product.name} for producer ${producerId}`);
         this.products.set(productId, product);
         imported++;
 
-        if (imported % 50 === 0) {
+        if (imported % 10 === 0) {
           const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
-          console.log(`Imported ${imported} products for ${producerName}...`);
+          console.log(`Progress: ${imported} products imported for ${producerName}...`);
         }
       } catch (error) {
         console.error('Error importing product:', error);
-        errors.push(`Erro ao importar produto: ${productData.Nome || productData.name || 'sem nome'} - ${(error as Error).message}`);
+        errors.push(`Erro ao importar produto ${index + 1}: ${productData.Nome || productData.name || 'sem nome'} - ${(error as Error).message}`);
       }
     }
 
     const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
-    console.log(`Finished importing ${imported} products for ${producerName}`);
+    console.log(`Finished importing ${imported} products for ${producerName}. Total products in storage: ${this.products.size}`);
     return { imported, errors };
   }
 
