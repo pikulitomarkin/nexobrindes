@@ -2054,38 +2054,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Clear test data endpoint
-  app.delete("/api/orders/test-data", async (req, res) => {
+  // Clear development/test data endpoint - SAFE for production
+  app.delete("/api/system/clear-test-data", async (req, res) => {
     try {
-      // Get all orders
-      const orders = await storage.getOrders();
+      let deletedCount = 0;
+      const deletedItems = {
+        orders: 0,
+        productionOrders: 0,
+        payments: 0,
+        commissions: 0,
+        budgets: 0,
+        manualPayables: 0,
+        manualReceivables: 0
+      };
 
-      // Delete test orders (you can adjust the criteria)
+      console.log("Starting safe test data cleanup...");
+
+      // 1. Clear test/mock orders (very specific criteria to avoid real data)
+      const orders = await storage.getOrders();
       const testOrders = orders.filter(order =>
         order.orderNumber?.includes('TEST') ||
+        order.orderNumber?.includes('#12345') || // Mock data
+        order.orderNumber?.includes('PED-TEST') ||
         order.product?.toLowerCase().includes('test') ||
-        order.description?.toLowerCase().includes('test')
+        order.product?.toLowerCase().includes('exemplo') ||
+        order.product?.toLowerCase().includes('mock') ||
+        order.description?.toLowerCase().includes('test') ||
+        order.contactName?.toLowerCase().includes('test') ||
+        order.contactName?.toLowerCase().includes('exemplo') ||
+        order.totalValue === "1234.56" // Mock values
       );
 
+      console.log(`Found ${testOrders.length} test orders to delete`);
+
       for (const order of testOrders) {
-        // Delete related production orders first
+        // Delete related production orders
         const productionOrders = await storage.getProductionOrdersByOrder(order.id);
         for (const po of productionOrders) {
           await storage.deleteProductionOrder(po.id);
+          deletedItems.productionOrders++;
+        }
+
+        // Delete related payments
+        const payments = await storage.getPaymentsByOrder(order.id);
+        for (const payment of payments) {
+          await storage.deletePayment(payment.id);
+          deletedItems.payments++;
+        }
+
+        // Delete related commissions
+        const commissions = await storage.getCommissionsByOrder(order.id);
+        for (const commission of commissions) {
+          await storage.deleteCommission(commission.id);
+          deletedItems.commissions++;
         }
 
         // Delete the order
         await storage.deleteOrder(order.id);
+        deletedItems.orders++;
       }
+
+      // 2. Clear test budgets
+      const budgets = await storage.getBudgets();
+      const testBudgets = budgets.filter(budget =>
+        budget.budgetNumber?.includes('TEST') ||
+        budget.budgetNumber?.includes('ORC-TEST') ||
+        budget.title?.toLowerCase().includes('test') ||
+        budget.title?.toLowerCase().includes('exemplo') ||
+        budget.contactName?.toLowerCase().includes('test') ||
+        budget.contactName?.toLowerCase().includes('exemplo')
+      );
+
+      console.log(`Found ${testBudgets.length} test budgets to delete`);
+
+      for (const budget of testBudgets) {
+        await storage.deleteBudget(budget.id);
+        deletedItems.budgets++;
+      }
+
+      // 3. Clear manual test payables (created for testing)
+      const manualPayables = await storage.getManualPayables();
+      const testPayables = manualPayables.filter(payable =>
+        payable.description?.toLowerCase().includes('test') ||
+        payable.description?.toLowerCase().includes('exemplo') ||
+        payable.beneficiary?.toLowerCase().includes('test') ||
+        payable.beneficiary?.toLowerCase().includes('exemplo') ||
+        payable.amount === "100.00" // Common test value
+      );
+
+      console.log(`Found ${testPayables.length} test payables to delete`);
+
+      for (const payable of testPayables) {
+        await storage.deleteManualPayable(payable.id);
+        deletedItems.manualPayables++;
+      }
+
+      // 4. Clear manual test receivables
+      const manualReceivables = await storage.getManualReceivables();
+      const testReceivables = manualReceivables.filter(receivable =>
+        receivable.description?.toLowerCase().includes('test') ||
+        receivable.description?.toLowerCase().includes('exemplo') ||
+        receivable.clientName?.toLowerCase().includes('test') ||
+        receivable.clientName?.toLowerCase().includes('exemplo')
+      );
+
+      console.log(`Found ${testReceivables.length} test receivables to delete`);
+
+      for (const receivable of testReceivables) {
+        await storage.deleteManualReceivable(receivable.id);
+        deletedItems.manualReceivables++;
+      }
+
+      deletedCount = deletedItems.orders + deletedItems.budgets + deletedItems.manualPayables + deletedItems.manualReceivables;
+
+      console.log("Test data cleanup completed:", deletedItems);
 
       res.json({
         success: true,
-        deletedCount: testOrders.length,
-        message: `${testOrders.length} pedidos de teste foram removidos`
+        deletedCount,
+        deletedItems,
+        message: `Limpeza de dados de teste concluída com segurança. ${deletedCount} itens removidos.`,
+        details: [
+          `${deletedItems.orders} pedidos de teste`,
+          `${deletedItems.productionOrders} ordens de produção relacionadas`,
+          `${deletedItems.payments} pagamentos de teste`,
+          `${deletedItems.commissions} comissões de teste`,
+          `${deletedItems.budgets} orçamentos de teste`,
+          `${deletedItems.manualPayables} contas a pagar manuais de teste`,
+          `${deletedItems.manualReceivables} contas a receber manuais de teste`
+        ]
       });
     } catch (error) {
-      console.error("Error clearing test orders:", error);
-      res.status(500).json({ error: "Failed to clear test orders" });
+      console.error("Error clearing test data:", error);
+      res.status(500).json({ 
+        error: "Erro ao limpar dados de teste",
+        message: error.message 
+      });
     }
   });
 
