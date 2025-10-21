@@ -711,6 +711,56 @@ export default function AdminBudgets() {
                           </div>
                         )}
 
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`admin-general-customization-${index}`}
+                            checked={item.hasGeneralCustomization}
+                            onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasGeneralCustomization', checked)}
+                          />
+                          <Label htmlFor={`admin-general-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização Geral
+                          </Label>
+                        </div>
+
+                        {item.hasGeneralCustomization && (
+                          <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`admin-general-customization-name-${index}`}>Nome da Personalização</Label>
+                                <Input
+                                  id={`admin-general-customization-name-${index}`}
+                                  value={item.generalCustomizationName || ''}
+                                  onChange={(e) => updateAdminBudgetItem(index, 'generalCustomizationName', e.target.value)}
+                                  placeholder="Ex: Bordado, Gravação, etc."
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`admin-general-customization-value-${index}`}>Valor Unitário (R$)</Label>
+                                <Input
+                                  id={`admin-general-customization-value-${index}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.generalCustomizationValue || 0}
+                                  onChange={(e) => updateAdminBudgetItem(index, 'generalCustomizationValue', parseFloat(e.target.value) || 0)}
+                                  placeholder="0,00"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Total da Personalização Geral</Label>
+                              <Input
+                                value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                disabled
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex justify-between items-center text-sm">
                           <span>Subtotal:</span>
                           <span className="font-medium">
