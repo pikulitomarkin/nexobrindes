@@ -249,6 +249,7 @@ export interface IStorage {
   // Quote Requests
   createQuoteRequest(data: any): Promise<any>;
   getQuoteRequestsByVendor(vendorId: string): Promise<any[]>;
+  getQuoteRequestsByClient(clientId: string): Promise<any[]>;
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
 }
 
@@ -2648,7 +2649,7 @@ export class MemStorage implements IStorage {
         if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
           updatedReceivable.status = 'partial';
         } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
-          updatedReceivable.status = 'pending'; // Minimum not met
+          updatedReceivable.status = 'pending';
         } else {
           updatedReceivable.status = 'partial';
         }
@@ -2772,7 +2773,7 @@ export class MemStorage implements IStorage {
       if (minimumPayment > 0 && paidValue >= minimumPayment) {
         return 'partial';
       } else if (minimumPayment > 0 && paidValue < minimumPayment) {
-        return 'pending'; // Minimum not met
+        return 'pending';
       } else {
         return 'partial';
       }
@@ -3310,22 +3311,26 @@ export class MemStorage implements IStorage {
   }
 
   async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
-    return this.quoteRequests
-      .filter(qr => qr.vendorId === vendorId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return this.quoteRequests.filter(request => request.vendorId === vendorId);
+  }
+
+  async getQuoteRequestsByClient(clientId: string): Promise<any[]> {
+    return this.quoteRequests.filter(request => request.clientId === clientId);
   }
 
   async updateQuoteRequestStatus(id: string, status: string): Promise<any> {
-    const index = this.quoteRequests.findIndex(qr => qr.id === id);
-    if (index === -1) return null;
+    const requestIndex = this.quoteRequests.findIndex(request => request.id === id);
+    if (requestIndex === -1) {
+      return null;
+    }
 
-    this.quoteRequests[index] = {
-      ...this.quoteRequests[index],
+    this.quoteRequests[requestIndex] = {
+      ...this.quoteRequests[requestIndex],
       status,
       updatedAt: new Date().toISOString()
     };
 
-    return this.quoteRequests[index];
+    return this.quoteRequests[requestIndex];
   }
 
   // Automatic commission calculation and processing methods

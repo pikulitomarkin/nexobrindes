@@ -1,4 +1,3 @@
-
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useState, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -42,10 +41,11 @@ import VendorCommissions from "@/pages/vendor/commissions";
 import VendorQuoteRequests from "@/pages/vendor/quote-requests";
 
 // Client imports
-import ClientOrders from "@/pages/client/orders";
-import ClientProducts from "@/pages/client/products";
-import ClientProfile from "@/pages/client/profile";
-import ClientOrderTimeline from "@/pages/client/order-timeline";
+import ClientOrders from "./pages/client/orders";
+import ClientBudgets from "./pages/client/budgets";
+import ClientProducts from "./pages/client/products";
+import ClientOrderTimeline from "./pages/client/order-timeline";
+import ClientProfile from "./pages/client/profile";
 
 // Producer imports
 import ProducerOrders from "@/pages/producer/orders";
@@ -176,10 +176,12 @@ function App() {
 
                   {/* Client Routes */}
                   <Route path="/client/dashboard" component={ClientDashboard} />
-                  <Route path="/client/orders" component={ClientOrders} />
                   <Route path="/client/products" component={ClientProducts} />
+                  <Route path="/client/budgets" component={ClientBudgets} />
+                  <Route path="/client/orders" component={ClientOrders} />
+                  <Route path="/client/order/:orderId/timeline" component={ClientOrderTimeline} />
                   <Route path="/client/profile" component={ClientProfile} />
-                  <Route path="/client/order-timeline/:orderId" component={ClientOrderTimeline} />
+
 
                   {/* Producer Routes */}
                   <Route path="/producer/dashboard" component={ProducerDashboard} />
