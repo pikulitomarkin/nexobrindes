@@ -52,17 +52,35 @@ export default function ProducerReceivables() {
     return matchesStatus && matchesSearch;
   });
 
+  // Calculate totals correctly using available payment data
   const totalPending = producerPayments
-    .filter((p: any) => ['pending', 'approved'].includes(p.status))
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+    .filter((p: any) => ['pending', 'approved', 'draft'].includes(p.status))
+    .reduce((sum: number, p: any) => {
+      const amount = parseFloat(p.amount || '0');
+      console.log(`Payment ${p.id}: status=${p.status}, amount=${amount}`);
+      return sum + amount;
+    }, 0);
 
   const totalReceived = producerPayments
     .filter((p: any) => p.status === 'paid')
-    .reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+    .reduce((sum: number, p: any) => {
+      const amount = parseFloat(p.amount || '0');
+      console.log(`Paid payment ${p.id}: amount=${amount}`);
+      return sum + amount;
+    }, 0);
 
-  const pendingCount = producerPayments.filter((p: any) => p.status === 'pending').length;
+  const pendingCount = producerPayments.filter((p: any) => ['pending', 'draft'].includes(p.status)).length;
   const approvedCount = producerPayments.filter((p: any) => p.status === 'approved').length;
   const totalSum = totalPending + totalReceived;
+
+  console.log('Producer Receivables Summary:', {
+    totalPayments: producerPayments?.length || 0,
+    totalPending,
+    totalReceived,
+    totalSum,
+    pendingCount,
+    approvedCount
+  });
 
   if (isLoading) {
     return (
