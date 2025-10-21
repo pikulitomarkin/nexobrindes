@@ -1213,10 +1213,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientData = req.body;
       console.log(`Creating client with data:`, clientData);
-      
+
       const newClient = await storage.createClient(clientData);
       console.log(`Client created successfully:`, newClient);
-      
+
       res.json(newClient);
     } catch (error) {
       console.error("Error creating client:", error);
@@ -1229,10 +1229,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching clients for vendor: ${vendorId}`);
-      
+
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-      
+
       // Enrich with user data if available
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
@@ -1250,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return client;
         })
       );
-      
+
       console.log(`Returning ${enrichedClients.length} enriched clients`);
       res.json(enrichedClients);
     } catch (error) {
@@ -2275,7 +2275,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgets = await storage.getBudgets();
       res.json(budgets);
     } catch (error) {
+      console.error("Error fetching budgets:", error);
       res.status(500).json({ error: "Failed to fetch budgets" });
+    }
+  });
+
+  // Get budgets by vendor
+  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const budgets = await storage.getBudgetsByVendor(vendorId);
+      res.json(budgets);
+    } catch (error) {
+      console.error("Error fetching vendor budgets:", error);
+      res.status(500).json({ error: "Failed to fetch vendor budgets" });
     }
   });
 

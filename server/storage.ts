@@ -2366,6 +2366,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgets.values());
   }
 
+  async getBudgetsByVendor(vendorId: string): Promise<any[]> {
+    return Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
+  }
+
   async getBudget(id: string): Promise<any> {
     return this.budgets.get(id);
   }
