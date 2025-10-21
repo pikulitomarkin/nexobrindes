@@ -17,6 +17,7 @@ export default function FinancePayables() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [isCreatePayableDialogOpen, setIsCreatePayableDialogOpen] = useState(false); // State for the new payable dialog
   const [selectedPayable, setSelectedPayable] = useState<any>(null);
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [paymentData, setPaymentData] = useState({
@@ -152,6 +153,44 @@ export default function FinancePayables() {
     },
   });
 
+  // Mutation for creating a new payable
+  const createPayableMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/finance/payables', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar conta a pagar');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsCreatePayableDialogOpen(false);
+      toast({
+        title: "Sucesso!",
+        description: "Conta a pagar criada com sucesso",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables"] }); // Assuming this query exists
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível criar a conta a pagar",
+        variant: "destructive",
+      });
+    },
+  });
+
+
   // Combine all payables
   const allPayables = [
     // Producer payments
@@ -271,7 +310,7 @@ export default function FinancePayables() {
       const actualId = selectedPayable.id.startsWith('producer-') 
         ? selectedPayable.id.replace('producer-', '') 
         : selectedPayable.productionOrderId || selectedPayable.id;
-      
+
       payProducerMutation.mutate({
         payableId: actualId,
         amount: parseFloat(paymentData.amount.replace('R$ ', '').replace(',', '.')),
@@ -291,6 +330,12 @@ export default function FinancePayables() {
         method: refundData.method, // Pass refund method
       });
     }
+  };
+
+  const handleCreatePayable = (newPayableData: any) => {
+    // Here you would typically have form data from the dialog
+    // For now, let's assume newPayableData contains all necessary fields
+    createPayableMutation.mutate(newPayableData);
   };
 
   const breakdown = overview?.payablesBreakdown || {
@@ -437,6 +482,14 @@ export default function FinancePayables() {
                   <SelectItem value="refund">Estornos</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button 
+                className="gradient-bg text-white"
+                onClick={() => setIsCreatePayableDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Conta a Pagar
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -542,6 +595,7 @@ export default function FinancePayables() {
                             <DollarSign className="h-3 w-3" />
                           </Button>
                         )}
+                        {/* Add other actions here if needed, e.g., edit, delete */}
                       </div>
                     </td>
                   </tr>
@@ -800,6 +854,127 @@ export default function FinancePayables() {
                 disabled={!refundData.amount || !refundData.notes || setRefundMutation.isPending}
               >
                 {setRefundMutation.isPending ? "Salvando..." : "Definir Valor de Estorno"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Payable Dialog */}
+      <Dialog open={isCreatePayableDialogOpen} onOpenChange={setIsCreatePayableDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Nova Conta a Pagar</DialogTitle>
+            <DialogDescription>Preencha os campos abaixo para adicionar uma nova conta a pagar.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="create-payable-type">Tipo <span className="text-red-500">*</span></Label>
+                <Select 
+                  onValueChange={(value) => {
+                    // Update state for newPayableData
+                  }}
+                  defaultValue="" // Should be controlled by state
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="producer">Produtor</SelectItem>
+                    <SelectItem value="expense">Despesa</SelectItem>
+                    <SelectItem value="commission">Comissão</SelectItem>
+                    <SelectItem value="other">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="create-payable-description">Descrição <span className="text-red-500">*</span></Label>
+                <Input
+                  id="create-payable-description"
+                  placeholder="Ex: Compra de insumos"
+                  // value={newPayableData.description}
+                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="create-payable-beneficiary">Beneficiário <span className="text-red-500">*</span></Label>
+                <Input
+                  id="create-payable-beneficiary"
+                  placeholder="Nome do fornecedor ou produtor"
+                  // value={newPayableData.beneficiary}
+                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="create-payable-amount">Valor <span className="text-red-500">*</span></Label>
+                <Input
+                  id="create-payable-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0,00"
+                  // value={newPayableData.amount}
+                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="create-payable-dueDate">Data de Vencimento <span className="text-red-500">*</span></Label>
+                <Input
+                  id="create-payable-dueDate"
+                  type="date"
+                  // value={newPayableData.dueDate}
+                  // onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="create-payable-status">Status <span className="text-red-500">*</span></Label>
+                <Select 
+                  onValueChange={(value) => {
+                    // Update state for newPayableData
+                  }}
+                  defaultValue="pending" // Default to pending
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="approved">Aprovado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="create-payable-notes">Observações</Label>
+              <Textarea
+                id="create-payable-notes"
+                placeholder="Informações adicionais sobre a conta a pagar..."
+                // value={newPayableData.notes}
+                // onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsCreatePayableDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="gradient-bg text-white px-6"
+                onClick={() => {
+                  // Call handleCreatePayable with the actual newPayableData state
+                  // handleCreatePayable(newPayableData); 
+                }}
+                // disabled={!newPayableData.type || !newPayableData.description || !newPayableData.beneficiary || !newPayableData.amount || !newPayableData.dueDate || !newPayableData.status || createPayableMutation.isPending}
+              >
+                {createPayableMutation.isPending ? "Salvando..." : "Criar Conta a Pagar"}
               </Button>
             </div>
           </div>

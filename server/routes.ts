@@ -1450,6 +1450,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create manual payables endpoint
+  app.post("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const { beneficiary, description, amount, dueDate, category, notes } = req.body;
+
+      if (!beneficiary || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create a manual payable entry
+      const payable = await storage.createManualPayable({
+        beneficiary,
+        description,
+        amount: parseFloat(amount).toFixed(2),
+        dueDate: new Date(dueDate),
+        category: category || 'Outros',
+        notes: notes || null
+      });
+
+      res.json(payable);
+    } catch (error) {
+      console.error("Error creating manual payable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a pagar: " + error.message });
+    }
+  });
+
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {

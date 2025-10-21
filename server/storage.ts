@@ -227,6 +227,10 @@ export interface IStorage {
   createManualReceivable(data: any): Promise<any>;
   getManualReceivables(): Promise<any[]>;
 
+  // Manual Payables
+  createManualPayable(data: any): Promise<any>;
+  getManualPayables(): Promise<any[]>;
+
   // Customization Options
   createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
   getCustomizationOptions(): Promise<CustomizationOption[]>;
@@ -299,7 +303,8 @@ export class MemStorage implements IStorage {
     customizationOptions: [] as CustomizationOption[],
     customizationCategories: [] as string[], // Added for storing customization categories
     financialNotes: [] as any[], // Added for financial notes
-    manualReceivables: [] as any[] // Added for manual receivables
+    manualReceivables: [] as any[], // Added for manual receivables
+    manualPayables: [] as any[] // Added for manual payables
   };
 
   // Payment Methods
@@ -2681,6 +2686,40 @@ export class MemStorage implements IStorage {
   // Added method to get manual receivables
   async getManualReceivables(): Promise<any[]> {
     return this.mockData.manualReceivables || [];
+  }
+
+  // Create manual payable
+  async createManualPayable(data: any): Promise<any> {
+    const id = `manual-payable-${randomUUID()}`;
+    const payable = {
+      id,
+      type: 'manual',
+      beneficiary: data.beneficiary,
+      description: data.description,
+      amount: data.amount,
+      dueDate: data.dueDate,
+      category: data.category || 'Outros',
+      status: 'pending',
+      notes: data.notes,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Ensure manualPayables array exists
+    if (!this.mockData.manualPayables) {
+      this.mockData.manualPayables = [];
+    }
+
+    this.mockData.manualPayables.push(payable);
+    console.log(`Created manual payable: ${payable.id} for ${payable.beneficiary} - ${payable.amount}`);
+    console.log(`Total manual payables: ${this.mockData.manualPayables.length}`);
+
+    return payable;
+  }
+
+  // Get manual payables
+  async getManualPayables(): Promise<any[]> {
+    return this.mockData.manualPayables || [];
   }
 
   getAll(table: string): any[] {
