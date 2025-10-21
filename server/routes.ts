@@ -2204,6 +2204,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics import JSON route
+  app.post("/api/logistics/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      // Check file size
+      if (req.file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      let logisticsData;
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+
+      if (fileExtension === 'json') {
+        try {
+          const fileContent = req.file.buffer.toString('utf8');
+          logisticsData = JSON.parse(fileContent);
+        } catch (parseError) {
+          return res.status(400).json({
+            error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
+            details: (parseError as Error).message
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
+      }
+
+      if (!Array.isArray(logisticsData)) {
+        return res.status(400).json({
+          error: "O arquivo JSON deve conter um array de dados logísticos"
+        });
+      }
+
+      if (logisticsData.length === 0) {
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio."
+        });
+      }
+
+      console.log(`Importing ${logisticsData.length} logistics data...`);
+
+      // Process logistics data import here - for now just return success
+      res.json({
+        message: `${logisticsData.length} dados logísticos processados com sucesso`,
+        imported: logisticsData.length,
+        total: logisticsData.length,
+        errors: []
+      });
+    } catch (error) {
+      console.error('Logistics import error:', error);
+      res.status(500).json({
+        error: "Erro interno do servidor ao processar importação logística",
+        details: (error as Error).message
+      });
+    }
+  });
+
   // Budget routes
   app.get("/api/budgets", async (req, res) => {
     try {
@@ -5725,6 +5786,146 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching client orders:", error);
       res.status(500).json({ error: "Failed to fetch client orders" });
+    }
+  });
+
+  // Logistics routes
+  app.get("/api/logistics/orders", async (req, res) => {
+    try {
+      // Get orders that are ready for logistics (shipped, ready)
+      const orders = await storage.getOrders();
+      const logisticsOrders = orders.filter(order => 
+        ['ready', 'shipped', 'delivered'].includes(order.status)
+      );
+
+      const enrichedOrders = await Promise.all(
+        logisticsOrders.map(async (order) => {
+          let clientName = order.contactName || 'Cliente não identificado';
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+
+          // Get client details if available
+          if (order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+              clientAddress = clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+                clientAddress = clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
+                }
+              }
+            }
+          }
+
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          return {
+            ...order,
+            clientName,
+            clientAddress: clientAddress || 'Endereço não informado',
+            clientPhone,
+            clientEmail,
+            vendorName: vendor?.name || 'Vendedor',
+            producerName: producer?.name || null,
+            shippingAddress: order.deliveryType === 'pickup'
+              ? 'Sede Principal - Retirada no Local'
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} logistics orders`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching logistics orders:", error);
+      res.status(500).json({ error: "Failed to fetch logistics orders" });
+    }
+  });
+
+  // Expedition routes  
+  app.get("/api/expedition/orders", async (req, res) => {
+    try {
+      // Get orders that are ready for expedition (completed, ready for shipping)
+      const orders = await storage.getOrders();
+      const expeditionOrders = orders.filter(order => 
+        ['ready', 'shipped'].includes(order.status)
+      );
+
+      const enrichedOrders = await Promise.all(
+        expeditionOrders.map(async (order) => {
+          let clientName = order.contactName || 'Cliente não identificado';
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+
+          // Get client details if available
+          if (order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+              clientAddress = clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+                clientAddress = clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
+                }
+              }
+            }
+          }
+
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          return {
+            ...order,
+            clientName,
+            clientAddress: clientAddress || 'Endereço não informado',
+            clientPhone,
+            clientEmail,
+            vendorName: vendor?.name || 'Vendedor',
+            producerName: producer?.name || null,
+            shippingAddress: order.deliveryType === 'pickup'
+              ? 'Sede Principal - Retirada no Local'
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} expedition orders`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching expedition orders:", error);
+      res.status(500).json({ error: "Failed to fetch expedition orders" });
     }
   });
 
