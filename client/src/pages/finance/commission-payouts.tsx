@@ -5,11 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, Plus, Calendar, CreditCard } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, CreditCard, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -17,25 +15,16 @@ export default function FinanceCommissionPayouts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [payoutData, setPayoutData] = useState({
-    type: "vendor",
-    userId: "",
-    periodStart: "",
-    periodEnd: "",
-    amount: "",
-    notes: "",
-  });
+  const [selectedCommission, setSelectedCommission] = useState<any>(null);
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: payouts, isLoading } = useQuery({
-    queryKey: ["/api/finance/commission-payouts"],
-  });
-
-  const { data: commissions } = useQuery({
+  // Buscar todas as comissões do sistema
+  const { data: commissions, isLoading } = useQuery({
     queryKey: ["/api/commissions"],
   });
 
+  // Buscar dados de vendedores e sócios
   const { data: vendors } = useQuery({
     queryKey: ["/api/vendors"],
   });
@@ -44,62 +33,23 @@ export default function FinanceCommissionPayouts() {
     queryKey: ["/api/partners"],
   });
 
-  const createPayoutMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch("/api/finance/commission-payouts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          createdBy: "current-user-id", // TODO: Get from auth context
-        }),
-      });
-      if (!response.ok) throw new Error("Erro ao criar pagamento de comissão");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/commission-payouts"] });
-      setIsCreateDialogOpen(false);
-      setPayoutData({
-        type: "vendor",
-        userId: "",
-        periodStart: "",
-        periodEnd: "",
-        amount: "",
-        notes: "",
-      });
-      toast({
-        title: "Sucesso!",
-        description: "Pagamento de comissão criado com sucesso",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Não foi possível criar o pagamento de comissão",
-        variant: "destructive",
-      });
-    },
-  });
-
+  // Mutation para marcar comissão como paga
   const markAsPaidMutation = useMutation({
-    mutationFn: async (payoutId: string) => {
-      const response = await fetch(`/api/finance/commission-payouts/${payoutId}`, {
-        method: "PATCH",
+    mutationFn: async (commissionId: string) => {
+      const response = await fetch(`/api/commissions/${commissionId}/status`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "paid",
-          paidAt: new Date(),
-        }),
+        body: JSON.stringify({ status: "paid" }),
       });
       if (!response.ok) throw new Error("Erro ao marcar como pago");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/commission-payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      setIsPayDialogOpen(false);
       toast({
         title: "Sucesso!",
-        description: "Pagamento marcado como realizado",
+        description: "Comissão marcada como paga",
       });
     },
     onError: () => {
@@ -113,14 +63,16 @@ export default function FinanceCommissionPayouts() {
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      pending: { label: "Pendente", variant: "secondary" as const },
-      paid: { label: "Pago", variant: "default" as const },
+      pending: { label: "Pendente", variant: "secondary" as const, color: "text-yellow-600" },
+      confirmed: { label: "Confirmada", variant: "default" as const, color: "text-blue-600" },
+      paid: { label: "Paga", variant: "default" as const, color: "text-green-600" },
+      cancelled: { label: "Cancelada", variant: "destructive" as const, color: "text-red-600" },
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    
+
     return (
-      <Badge variant={statusInfo.variant} className="capitalize">
+      <Badge variant={statusInfo.variant} className={`capitalize ${statusInfo.color}`}>
         {statusInfo.label}
       </Badge>
     );
@@ -130,36 +82,48 @@ export default function FinanceCommissionPayouts() {
     return type === 'vendor' ? <UserCheck className="h-4 w-4" /> : <Users className="h-4 w-4" />;
   };
 
-  const getUsersList = (type: string) => {
-    return type === 'vendor' ? vendors : partners;
+  const getUserName = (commission: any) => {
+    if (commission.vendorName) return commission.vendorName;
+    if (commission.partnerName) return commission.partnerName;
+    if (commission.type === 'vendor') {
+      const vendor = vendors?.find((v: any) => v.id === commission.vendorId);
+      return vendor?.name || 'Vendedor não encontrado';
+    }
+    if (commission.type === 'partner') {
+      const partner = partners?.find((p: any) => p.id === commission.partnerId);
+      return partner?.name || 'Sócio não encontrado';
+    }
+    return 'Usuário não identificado';
   };
 
-  const filteredPayouts = payouts?.filter((payout: any) => {
-    const matchesStatus = statusFilter === "all" || payout.status === statusFilter;
-    const matchesType = typeFilter === "all" || payout.type === typeFilter;
-    const matchesSearch = searchTerm === "" || 
-      payout.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payout.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredCommissions = commissions?.filter((commission: any) => {
+    const matchesStatus = statusFilter === "all" || commission.status === statusFilter;
+    const matchesType = typeFilter === "all" || commission.type === typeFilter;
+    const userName = getUserName(commission);
+    const matchesSearch = searchTerm === "" ||
+      userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      commission.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesType && matchesSearch;
   });
 
-  const handleCreatePayout = () => {
-    if (payoutData.type && payoutData.userId && payoutData.periodStart && payoutData.periodEnd && payoutData.amount) {
-      createPayoutMutation.mutate({
-        ...payoutData,
-        amount: parseFloat(payoutData.amount).toFixed(2),
-        periodStart: new Date(payoutData.periodStart),
-        periodEnd: new Date(payoutData.periodEnd),
-      });
+  const handleMarkAsPaid = (commission: any) => {
+    setSelectedCommission(commission);
+    setIsPayDialogOpen(true);
+  };
+
+  const confirmPayment = () => {
+    if (selectedCommission) {
+      markAsPaidMutation.mutate(selectedCommission.id);
     }
   };
 
-  // Calculate summary statistics
-  const totalPayouts = payouts?.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const paidPayouts = payouts?.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const pendingPayouts = payouts?.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0) || 0;
-  const vendorPayouts = payouts?.filter((p: any) => p.type === 'vendor').length || 0;
-  const partnerPayouts = payouts?.filter((p: any) => p.type === 'partner').length || 0;
+  // Calcular estatísticas
+  const vendorCommissions = commissions?.filter((c: any) => c.type === 'vendor') || [];
+  const partnerCommissions = commissions?.filter((c: any) => c.type === 'partner') || [];
+
+  const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
+  const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
+  const pendingCommissions = commissions?.filter((c: any) => ['pending', 'confirmed'].includes(c.status)).reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
 
   if (isLoading) {
     return (
@@ -181,124 +145,9 @@ export default function FinanceCommissionPayouts() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="text-page-title">Pagamento de Comissões</h1>
-          <p className="text-gray-600">Controle de pagamentos para vendedores e sócios</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Pagamento de Comissões</h1>
+          <p className="text-gray-600">Controle de todas as comissões do sistema</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gradient-bg text-white" data-testid="button-create-payout">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Pagamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Novo Pagamento de Comissão</DialogTitle>
-              <DialogDescription>
-                Crie um pagamento de comissão para vendedor ou sócio
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="payout-type">Tipo</Label>
-                <Select 
-                  value={payoutData.type} 
-                  onValueChange={(value) => setPayoutData(prev => ({ ...prev, type: value, userId: "" }))}
-                >
-                  <SelectTrigger data-testid="select-payout-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vendor">Vendedor</SelectItem>
-                    <SelectItem value="partner">Sócio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="payout-user">
-                  {payoutData.type === 'vendor' ? 'Vendedor' : 'Sócio'}
-                </Label>
-                <Select 
-                  value={payoutData.userId} 
-                  onValueChange={(value) => setPayoutData(prev => ({ ...prev, userId: value }))}
-                >
-                  <SelectTrigger data-testid="select-payout-user">
-                    <SelectValue placeholder={`Selecione o ${payoutData.type === 'vendor' ? 'vendedor' : 'sócio'}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getUsersList(payoutData.type)?.map((user: any) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="period-start">Período Início</Label>
-                  <Input
-                    id="period-start"
-                    type="date"
-                    value={payoutData.periodStart}
-                    onChange={(e) => setPayoutData(prev => ({ ...prev, periodStart: e.target.value }))}
-                    data-testid="input-period-start"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="period-end">Período Fim</Label>
-                  <Input
-                    id="period-end"
-                    type="date"
-                    value={payoutData.periodEnd}
-                    onChange={(e) => setPayoutData(prev => ({ ...prev, periodEnd: e.target.value }))}
-                    data-testid="input-period-end"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="payout-amount">Valor da Comissão</Label>
-                <Input
-                  id="payout-amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={payoutData.amount}
-                  onChange={(e) => setPayoutData(prev => ({ ...prev, amount: e.target.value }))}
-                  data-testid="input-payout-amount"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="payout-notes">Observações (Opcional)</Label>
-                <Textarea
-                  id="payout-notes"
-                  placeholder="Observações sobre o pagamento..."
-                  value={payoutData.notes}
-                  onChange={(e) => setPayoutData(prev => ({ ...prev, notes: e.target.value }))}
-                  data-testid="textarea-payout-notes"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="gradient-bg text-white"
-                  onClick={handleCreatePayout}
-                  disabled={!payoutData.type || !payoutData.userId || !payoutData.amount || createPayoutMutation.isPending}
-                  data-testid="button-save-payout"
-                >
-                  {createPayoutMutation.isPending ? "Criando..." : "Criar Pagamento"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Summary Cards */}
@@ -307,9 +156,9 @@ export default function FinanceCommissionPayouts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Pagamentos</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-total-payouts">
-                  R$ {totalPayouts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm font-medium text-gray-600">Total Comissões</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -323,9 +172,9 @@ export default function FinanceCommissionPayouts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Já Pagos</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-paid-payouts">
-                  R$ {paidPayouts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm font-medium text-gray-600">Já Pagas</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {paidCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -339,9 +188,9 @@ export default function FinanceCommissionPayouts() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-pending-payouts">
-                  R$ {pendingPayouts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm font-medium text-gray-600">A Pagar</p>
+                <p className="text-2xl font-bold gradient-text">
+                  R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -356,8 +205,8 @@ export default function FinanceCommissionPayouts() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Vendedores/Sócios</p>
-                <p className="text-2xl font-bold gradient-text" data-testid="text-payouts-count">
-                  {vendorPayouts} / {partnerPayouts}
+                <p className="text-2xl font-bold gradient-text">
+                  {vendorCommissions.length} / {partnerCommissions.length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -376,28 +225,29 @@ export default function FinanceCommissionPayouts() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Buscar por nome ou observações..."
+                  placeholder="Buscar por nome ou número do pedido..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
-                  data-testid="input-search"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos Status</SelectItem>
                   <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="confirmed">Confirmada</SelectItem>
+                  <SelectItem value="paid">Paga</SelectItem>
+                  <SelectItem value="cancelled">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -411,90 +261,188 @@ export default function FinanceCommissionPayouts() {
         </CardContent>
       </Card>
 
-      {/* Payouts Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pagamentos de Comissão ({filteredPayouts?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Período
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tipo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nome
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data Pagamento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayouts?.map((payout: any) => (
-                  <tr key={payout.id} data-testid={`row-payout-${payout.id}`}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(payout.periodStart).toLocaleDateString('pt-BR')} - {new Date(payout.periodEnd).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        {getTypeIcon(payout.type)}
-                        <span className="ml-2 capitalize">{payout.type === 'vendor' ? 'Vendedor' : 'Sócio'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {payout.userName || payout.userId}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                      R$ {parseFloat(payout.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(payout.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payout.paidAt ? new Date(payout.paidAt).toLocaleDateString('pt-BR') : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" data-testid={`button-view-${payout.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
-                        {payout.status === 'pending' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => markAsPaidMutation.mutate(payout.id)}
-                            disabled={markAsPaidMutation.isPending}
-                            data-testid={`button-mark-paid-${payout.id}`}
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Marcar como Pago
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Commissions by Type */}
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">Todas ({filteredCommissions?.length || 0})</TabsTrigger>
+          <TabsTrigger value="vendor">Vendedores ({vendorCommissions.length})</TabsTrigger>
+          <TabsTrigger value="partner">Sócios ({partnerCommissions.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all">
+          <CommissionsTable
+            commissions={filteredCommissions}
+            getUserName={getUserName}
+            getStatusBadge={getStatusBadge}
+            getTypeIcon={getTypeIcon}
+            onMarkAsPaid={handleMarkAsPaid}
+          />
+        </TabsContent>
+
+        <TabsContent value="vendor">
+          <CommissionsTable
+            commissions={filteredCommissions?.filter((c: any) => c.type === 'vendor')}
+            getUserName={getUserName}
+            getStatusBadge={getStatusBadge}
+            getTypeIcon={getTypeIcon}
+            onMarkAsPaid={handleMarkAsPaid}
+          />
+        </TabsContent>
+
+        <TabsContent value="partner">
+          <CommissionsTable
+            commissions={filteredCommissions?.filter((c: any) => c.type === 'partner')}
+            getUserName={getUserName}
+            getStatusBadge={getStatusBadge}
+            getTypeIcon={getTypeIcon}
+            onMarkAsPaid={handleMarkAsPaid}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Payment Confirmation Dialog */}
+      <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja marcar esta comissão como paga?
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCommission && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p><strong>Tipo:</strong> {selectedCommission.type === 'vendor' ? 'Vendedor' : 'Sócio'}</p>
+                <p><strong>Nome:</strong> {getUserName(selectedCommission)}</p>
+                <p><strong>Valor:</strong> R$ {parseFloat(selectedCommission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p><strong>Pedido:</strong> {selectedCommission.orderNumber || 'N/A'}</p>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="gradient-bg text-white"
+                  onClick={confirmPayment}
+                  disabled={markAsPaidMutation.isPending}
+                >
+                  {markAsPaidMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Componente de tabela reutilizável
+function CommissionsTable({
+  commissions,
+  getUserName,
+  getStatusBadge,
+  getTypeIcon,
+  onMarkAsPaid
+}: {
+  commissions: any[];
+  getUserName: (commission: any) => string;
+  getStatusBadge: (status: string) => JSX.Element;
+  getTypeIcon: (type: string) => JSX.Element;
+  onMarkAsPaid: (commission: any) => void;
+}) {
+  return (
+    <Card>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tipo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nome
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pedido
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Percentual
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Valor
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Data Criação
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {commissions?.map((commission: any) => (
+                <tr key={commission.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex items-center">
+                      {getTypeIcon(commission.type)}
+                      <span className="ml-2 capitalize">
+                        {commission.type === 'vendor' ? 'Vendedor' : 'Sócio'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                    {getUserName(commission)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {commission.orderNumber || commission.orderId?.slice(-6) || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {commission.percentage}%
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(commission.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver
+                      </Button>
+                      {['pending', 'confirmed'].includes(commission.status) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onMarkAsPaid(commission)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Pagar
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(!commissions || commissions.length === 0) && (
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma comissão encontrada
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

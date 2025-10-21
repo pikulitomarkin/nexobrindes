@@ -1163,22 +1163,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const commissions = await storage.getAllCommissions();
 
-      // Enrich with user names
+      // Enrich with user names and determine commission type
       const enrichedCommissions = await Promise.all(
         commissions.map(async (commission) => {
           let vendorName = null;
           let partnerName = null;
           let orderValue = commission.orderValue;
           let orderNumber = commission.orderNumber;
+          let type = 'vendor'; // Default to vendor
 
           if (commission.vendorId) {
             const vendor = await storage.getUser(commission.vendorId);
             vendorName = vendor?.name;
+            type = 'vendor';
           }
 
           if (commission.partnerId) {
             const partner = await storage.getUser(commission.partnerId);
             partnerName = partner?.name;
+            type = 'partner';
+          }
+
+          // Use existing type field if available, otherwise determine from IDs
+          if (commission.type) {
+            type = commission.type;
           }
 
           // Enrich with order data if missing
@@ -1192,6 +1200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...commission,
+            type,
             vendorName,
             partnerName,
             orderValue,
