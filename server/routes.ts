@@ -156,6 +156,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics Products Routes
+  app.get("/api/logistics/products", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const search = (req.query.search as string) || '';
+      const category = (req.query.category as string) || '';
+      const producer = (req.query.producer as string) || '';
+
+      const result = await storage.getProducts({
+        page,
+        limit,
+        search,
+        category,
+        producer
+      });
+
+      // Enrich products with producer names
+      const enrichedProducts = await Promise.all(
+        result.products.map(async (product) => {
+          let producerName = null;
+          if (product.producerId && product.producerId !== 'internal') {
+            const producer = await storage.getUser(product.producerId);
+            producerName = producer?.name || 'Produtor não encontrado';
+          } else {
+            producerName = 'Produto Interno';
+          }
+
+          return {
+            ...product,
+            producerName
+          };
+        })
+      );
+
+      res.json({
+        ...result,
+        products: enrichedProducts
+      });
+    } catch (error) {
+      console.error("Error fetching logistics products:", error);
+      res.status(500).json({ error: "Failed to fetch logistics products" });
+    }
+  });
+
+  app.post("/api/logistics/products", async (req, res) => {
+    try {
+      const productData = req.body;
+      console.log("Creating logistics product:", productData);
+
+      // Validate required fields
+      if (!productData.name) {
+        return res.status(400).json({ error: "Nome do produto é obrigatório" });
+      }
+
+      if (!productData.basePrice || parseFloat(productData.basePrice) <= 0) {
+        return res.status(400).json({ error: "Preço base deve ser maior que zero" });
+      }
+
+      // Set default values
+      const newProduct = {
+        ...productData,
+        producerId: productData.producerId || 'internal',
+        type: productData.producerId === 'internal' || !productData.producerId ? 'internal' : 'external',
+        isActive: productData.isActive !== undefined ? productData.isActive : true,
+        unit: productData.unit || 'un',
+        category: productData.category || 'Geral'
+      };
+
+      const product = await storage.createProduct(newProduct);
+      console.log("Logistics product created successfully:", product.id);
+
+      res.json(product);
+    } catch (error) {
+      console.error("Error creating logistics product:", error);
+      res.status(500).json({ error: "Erro ao criar produto: " + error.message });
+    }
+  });
+
+  app.put("/api/logistics/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      console.log(`Updating logistics product ${id}:`, updateData);
+
+      const updatedProduct = await storage.updateProduct(id, updateData);
+      if (!updatedProduct) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Error updating logistics product:", error);
+      res.status(500).json({ error: "Erro ao atualizar produto: " + error.message });
+    }
+  });
+
+  app.delete("/api/logistics/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Deleting logistics product ${id}`);
+
+      const deleted = await storage.deleteProduct(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting logistics product:", error);
+      res.status(500).json({ error: "Erro ao deletar produto: " + error.message });
+    }
+  });
+
   // Process producer payment
   app.post("/api/finance/producer-payments/:id/pay", async (req, res) => {
     try {

@@ -903,8 +903,10 @@ export class MemStorage implements IStorage {
         basePrice: '2500.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1', // Added producerId
-        createdAt: new Date().toISOString()
+        producerId: 'producer-1',
+        type: 'external',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       {
         id: 'product-2',
@@ -914,8 +916,10 @@ export class MemStorage implements IStorage {
         basePrice: '450.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1', // Added producerId
-        createdAt: new Date().toISOString()
+        producerId: 'producer-1',
+        type: 'external',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       {
         id: 'product-3',
@@ -925,8 +929,49 @@ export class MemStorage implements IStorage {
         basePrice: '1200.00',
         unit: 'm',
         isActive: true,
-        producerId: 'internal', // Example of internal product
-        createdAt: new Date().toISOString()
+        producerId: 'internal',
+        type: 'internal',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'product-4',
+        name: 'Caneca Personalizada',
+        description: 'Caneca de cerâmica branca 325ml para sublimação',
+        category: 'Brindes',
+        basePrice: '12.50',
+        unit: 'un',
+        isActive: true,
+        producerId: 'internal',
+        type: 'internal',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'product-5',
+        name: 'Camiseta Básica',
+        description: 'Camiseta 100% algodão, disponível em várias cores',
+        category: 'Vestuário',
+        basePrice: '25.90',
+        unit: 'un',
+        isActive: true,
+        producerId: 'producer-1',
+        type: 'external',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'product-6',
+        name: 'Mouse Pad Personalizado',
+        description: 'Mouse pad retangular 23x19cm para sublimação',
+        category: 'Informática',
+        basePrice: '8.75',
+        unit: 'un',
+        isActive: true,
+        producerId: 'internal',
+        type: 'internal',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ];
     mockProducts.forEach(product => this.products.set(product.id, product));
@@ -2064,13 +2109,15 @@ export class MemStorage implements IStorage {
       producer = ''
     } = options;
 
-    const offset = (page - 1) * limit;
+    console.log(`Storage: getProducts called with options:`, { page, limit, search, category, producer });
+    console.log(`Storage: Total products in storage: ${this.products.size}`);
 
     let query = Array.from(this.products.values()); // Use Array.from to get all products
+    console.log(`Storage: Initial query has ${query.length} products`);
 
     // Apply search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
+    if (search && search.trim().length > 0) {
+      const searchLower = search.toLowerCase().trim();
       query = query.filter(product =>
         (product.name?.toLowerCase() || '').includes(searchLower) ||
         (product.description?.toLowerCase() || '').includes(searchLower) ||
@@ -2079,23 +2126,30 @@ export class MemStorage implements IStorage {
         (product.compositeCode?.toLowerCase() || '').includes(searchLower) ||
         (product.friendlyCode?.toLowerCase() || '').includes(searchLower)
       );
+      console.log(`Storage: After search filter: ${query.length} products`);
     }
 
     // Apply category filter
-    if (category) {
+    if (category && category.trim().length > 0 && category !== 'all') {
       query = query.filter(product =>
         product.category === category
       );
+      console.log(`Storage: After category filter: ${query.length} products`);
     }
 
     // Apply producer filter
-    if (producer) {
+    if (producer && producer.trim().length > 0 && producer !== 'all') {
       if (producer === 'internal') {
         query = query.filter(product => product.producerId === 'internal');
       } else {
         query = query.filter(product => product.producerId === producer);
       }
+      console.log(`Storage: After producer filter: ${query.length} products`);
     }
+
+    // Only show active products
+    query = query.filter(product => product.isActive !== false);
+    console.log(`Storage: After active filter: ${query.length} products`);
 
     const total = query.length;
     const totalPages = Math.ceil(total / limit);
@@ -2104,6 +2158,9 @@ export class MemStorage implements IStorage {
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const products = query.slice(startIndex, endIndex);
+
+    console.log(`Storage: Returning ${products.length} products (page ${page}/${totalPages})`);
+    console.log(`Storage: Sample products:`, products.slice(0, 2).map(p => ({ id: p.id, name: p.name, category: p.category, producerId: p.producerId })));
 
     return { products, total, page, totalPages };
   }
@@ -2197,10 +2254,12 @@ export class MemStorage implements IStorage {
     const errors: string[] = [];
     let imported = 0;
 
-    // Verify producer exists
-    const producer = await this.getUser(producerId);
-    if (!producer || producer.role !== 'producer') {
-      throw new Error('Produtor não encontrado');
+    // Verify producer exists (allow 'internal' as well)
+    if (producerId !== 'internal') {
+      const producer = await this.getUser(producerId);
+      if (!producer || (producer.role !== 'producer' && producer.role !== 'admin')) {
+        throw new Error('Produtor não encontrado');
+      }
     }
 
     for (const productData of productsData) {
@@ -2209,15 +2268,26 @@ export class MemStorage implements IStorage {
         const name = productData.Nome || productData.name || productData.Produto;
         const description = productData.Descricao || productData.description || productData.Descrição;
         const category = productData.WebTipo || productData.category || productData.Categoria || productData.Tipo;
-        const basePrice = parseFloat(productData.PrecoVenda || productData.basePrice || productData.Preco || productData.price || '0');
+        let basePrice = 0;
 
-        if (!name) {
+        // Try to parse price from various possible fields
+        if (productData.PrecoVenda !== undefined && productData.PrecoVenda !== null) {
+          basePrice = parseFloat(productData.PrecoVenda.toString().replace(',', '.'));
+        } else if (productData.basePrice !== undefined && productData.basePrice !== null) {
+          basePrice = parseFloat(productData.basePrice.toString().replace(',', '.'));
+        } else if (productData.Preco !== undefined && productData.Preco !== null) {
+          basePrice = parseFloat(productData.Preco.toString().replace(',', '.'));
+        } else if (productData.price !== undefined && productData.price !== null) {
+          basePrice = parseFloat(productData.price.toString().replace(',', '.'));
+        }
+
+        if (!name || name.trim().length === 0) {
           errors.push(`Produto sem nome: ${JSON.stringify(productData).substring(0, 100)}`);
           continue;
         }
 
         if (isNaN(basePrice) || basePrice <= 0) {
-          errors.push(`Produto "${name}" com preço inválido: ${productData.PrecoVenda || productData.basePrice || 'não informado'}`);
+          errors.push(`Produto "${name}" com preço inválido: ${productData.PrecoVenda || productData.basePrice || productData.Preco || productData.price || 'não informado'}`);
           continue;
         }
 
@@ -2231,22 +2301,22 @@ export class MemStorage implements IStorage {
           basePrice: basePrice.toFixed(2),
           unit: productData.unit || productData.Unidade || 'un',
           isActive: true,
-          producerId: producerId, // Assign to the specified producer
-          type: 'external', // External product from producer
+          producerId: producerId, // Assign to the specified producer (can be 'internal')
+          type: producerId === 'internal' ? 'internal' : 'external',
           // Additional fields from JSON if available
           externalId: productData.IdProduto || productData.id,
           externalCode: productData.CodigoXbz || productData.codigo,
-          compositeCode: productData.CodigoAmigavel,
-          friendlyCode: productData.CodigoAmigavel,
+          compositeCode: productData.CodigoAmigavel || productData.compositeCode,
+          friendlyCode: productData.CodigoAmigavel || productData.friendlyCode,
           siteLink: productData.SiteLink || productData.link,
           imageLink: productData.ImageLink || productData.imagem || productData.foto,
           mainColor: productData.CorWebPrincipal || productData.cor,
           secondaryColor: productData.CorWebSecundaria,
-          weight: productData.Peso ? parseFloat(productData.Peso) : null,
-          height: productData.Altura ? parseFloat(productData.Altura) : null,
-          width: productData.Largura ? parseFloat(productData.Largura) : null,
-          depth: productData.Profundidade ? parseFloat(productData.Profundidade) : null,
-          availableQuantity: productData.QuantidadeDisponivel ? parseInt(productData.QuantidadeDisponivel) : null,
+          weight: productData.Peso ? parseFloat(productData.Peso.toString().replace(',', '.')) : null,
+          height: productData.Altura ? parseFloat(productData.Altura.toString().replace(',', '.')) : null,
+          width: productData.Largura ? parseFloat(productData.Largura.toString().replace(',', '.')) : null,
+          depth: productData.Profundidade ? parseFloat(productData.Profundidade.toString().replace(',', '.')) : null,
+          availableQuantity: productData.QuantidadeDisponivel ? parseInt(productData.QuantidadeDisponivel.toString()) : null,
           stockStatus: productData.StatusConfiabilidade,
           ncm: productData.Ncm,
           createdAt: new Date(),
@@ -2256,16 +2326,18 @@ export class MemStorage implements IStorage {
         this.products.set(productId, product);
         imported++;
 
-        if (imported % 100 === 0) {
-          console.log(`Imported ${imported} products for producer ${producer.name}...`);
+        if (imported % 50 === 0) {
+          const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
+          console.log(`Imported ${imported} products for ${producerName}...`);
         }
       } catch (error) {
         console.error('Error importing product:', error);
-        errors.push(`Erro ao importar produto: ${productData.Nome || 'sem nome'} - ${error.message}`);
+        errors.push(`Erro ao importar produto: ${productData.Nome || productData.name || 'sem nome'} - ${(error as Error).message}`);
       }
     }
 
-    console.log(`Finished importing ${imported} products for producer ${producer.name}`);
+    const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
+    console.log(`Finished importing ${imported} products for ${producerName}`);
     return { imported, errors };
   }
 
