@@ -518,6 +518,25 @@ export class MemStorage implements IStorage {
     };
     this.users.set(partnerUser.id, partnerUser);
 
+    // Additional client user for Maria Santos
+    const clientUser2 = {
+      id: "client-2",
+      username: "CLI202401", // Use userCode as username
+      password: "123456",
+      name: "Maria Santos",
+      email: "maria.santos@gmail.com",
+      phone: "(11) 99876-5432",
+      vendorId: null,
+      role: "client",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.users.set(clientUser2.id, clientUser2);
+
+    // Update existing client user with userCode
+    clientUser.username = "CLI202400"; // Change from "cliente1" to userCode
+
     // Logistics user
     const logisticsUser = {
       id: "logistics-1",
@@ -655,8 +674,9 @@ export class MemStorage implements IStorage {
     const sampleClient2: Client = {
       id: "client-2",
       userId: "client-2",
+      userCode: "CLI202401", // Add userCode for Maria Santos
       name: "Maria Santos",
-      email: "maria@gmail.com",
+      email: "maria.santos@gmail.com",
       phone: "(11) 99876-5432",
       whatsapp: "(11) 99876-5432",
       cpfCnpj: "987.654.321-00",
@@ -667,6 +687,9 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.clients.set(sampleClient2.id, sampleClient2);
+
+    // Update João Silva with userCode
+    sampleClient.userCode = "CLI202400"; // Add userCode for João Silva
 
     // Create sample orders
     mockOrders = [
