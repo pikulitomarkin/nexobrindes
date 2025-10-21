@@ -92,13 +92,18 @@ export default function FinancePayables() {
       }
     },
     onSuccess: (data, variables) => {
+      // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      
       toast({
         title: "Sucesso!",
-        description: variables.isProducer ? "Pagamento do produtor processado com sucesso" : "Pagamento processado com sucesso",
+        description: variables.payableType === 'producer' ? "Pagamento do produtor processado com sucesso" : "Pagamento processado com sucesso",
       });
     },
     onError: (error: any) => {
@@ -397,8 +402,14 @@ export default function FinancePayables() {
         title: "Sucesso!",
         description: "Pagamento registrado com sucesso",
       });
+      // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     },
     onError: (error: any) => {
       toast({

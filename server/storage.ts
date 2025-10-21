@@ -2647,78 +2647,48 @@ export class MemStorage implements IStorage {
     });
   }
 
-  // Added method to update accounts receivable
-  async updateAccountsReceivable(id: string, data: any): Promise<AccountsReceivable | undefined> {
-    console.log(`Updating receivable ${id} with data:`, data);
+  // Update account receivable
+  async updateAccountsReceivable(id: string, updates: any): Promise<any> {
+    console.log(`Updating receivable ${id} with updates:`, updates);
 
-    // Check if this is a manual receivable
-    if (id.startsWith('manual-')) {
-      const manualIndex = this.mockData.manualReceivables.findIndex((r: any) => r.id === id);
-      if (manualIndex >= 0) {
-        const updatedManualReceivable = {
-          ...this.mockData.manualReceivables[manualIndex],
-          ...data,
-          updatedAt: new Date()
-        };
-        this.mockData.manualReceivables[manualIndex] = updatedManualReceivable;
-        console.log(`Updated manual receivable ${id}:`, updatedManualReceivable);
-        return updatedManualReceivable;
-      }
-    } else if (this.accountsReceivable.has(id)) {
-      // This is an order-based receivable
-      const receivable = this.accountsReceivable.get(id);
-      if (!receivable) return undefined;
+    // Find in manual receivables
+    const receivables = await this.getManualReceivables();
+    const actualId = id.startsWith('manual-') ? id.replace('manual-', '') : id;
+    const receivableIndex = receivables.findIndex((r: any) => r.id === actualId);
 
-      const updatedReceivable: AccountsReceivable = {
+    if (receivableIndex !== -1) {
+      const receivable = receivables[receivableIndex];
+      const updatedReceivable = {
         ...receivable,
-        ...data,
+        ...updates,
         updatedAt: new Date()
       };
 
-      // Update status based on received amount and minimum payment
-      const totalAmount = parseFloat(updatedReceivable.amount);
-      const receivedAmount = parseFloat(updatedReceivable.receivedAmount);
-      const minimumPayment = parseFloat(updatedReceivable.minimumPayment || 0);
+      // Update in the array
+      this.mockData.manualReceivables[receivableIndex] = updatedReceivable;
 
-      if (receivedAmount >= totalAmount) {
-        updatedReceivable.status = 'paid';
-      } else if (receivedAmount > 0) {
-        // Check if minimum payment requirement is met
-        if (minimumPayment > 0 && receivedAmount >= minimumPayment) {
-          updatedReceivable.status = 'partial';
-        } else if (minimumPayment > 0 && receivedAmount < minimumPayment) {
-          updatedReceivable.status = 'pending';
-        } else {
-          updatedReceivable.status = 'partial';
-        }
-      } else {
-        updatedReceivable.status = minimumPayment > 0 ? 'pending' : 'open';
-      }
-
-      // Check if overdue
-      const dueDate = updatedReceivable.dueDate ? new Date(updatedReceivable.dueDate) : null;
-      if (dueDate && new Date() > dueDate && updatedReceivable.status !== 'paid') {
-        updatedReceivable.status = 'overdue';
-      }
-
-      this.accountsReceivable.set(id, updatedReceivable);
-      console.log(`Updated receivable ${id}:`, {
-        id: updatedReceivable.id,
-        amount: updatedReceivable.amount,
-        receivedAmount: updatedReceivable.receivedAmount,
-        minimumPayment: updatedReceivable.minimumPayment,
-        status: updatedReceivable.status,
-        dueDate: updatedReceivable.dueDate
-      });
-
-      // Also update the order's paidValue if receivedAmount is provided in data
-      if (data.receivedAmount !== undefined && receivable.orderId) {
-        await this.updateOrderPaidValue(receivable.orderId, data.receivedAmount);
-      }
-
+      console.log(`Updated manual receivable ${actualId}: status=${updatedReceivable.status}, receivedAmount=${updatedReceivable.receivedAmount}`);
       return updatedReceivable;
     }
 
+    // Check if it's an order-based receivable and update the order
+    const orders = await this.getOrders();
+    const order = orders.find((o: any) => o.id === id);
+    if (order) {
+      // Update the order's paid value
+      const currentPaidValue = parseFloat(order.paidValue || '0');
+      const additionalPayment = parseFloat(updates.receivedAmount || '0');
+      const newPaidValue = currentPaidValue + additionalPayment;
+
+      const updatedOrder = await this.updateOrder(order.id, { paidValue: newPaidValue.toFixed(2) });
+
+      if (updatedOrder) {
+        console.log(`Updated order receivable ${id}: new paidValue=${updatedOrder.paidValue}`);
+        return updatedOrder;
+      }
+    }
+
+    console.log(`Receivable ${id} not found for update`);
     return undefined; // Return undefined if not found or not updated
   }
 

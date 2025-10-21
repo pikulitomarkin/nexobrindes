@@ -114,6 +114,10 @@ export default function FinanceReceivables() {
         title: "Sucesso!",
         description: "Pagamento registrado com sucesso",
       });
+      // Force refetch after a short delay to ensure data is fresh
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/finance/receivables"] });
+      }, 100);
     },
     onError: (error: any) => {
       toast({
