@@ -2256,7 +2256,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quote-requests/client/:clientId", async (req, res) => {
     try {
       const { clientId } = req.params;
+      console.log(`Fetching quote requests for client: ${clientId}`);
+      
       const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
+      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}:`, quoteRequests.map(qr => ({ id: qr.id, productName: qr.productName, status: qr.status })));
       
       // Enrich with vendor names
       const enrichedRequests = await Promise.all(
@@ -2269,6 +2272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
+      console.log(`Returning ${enrichedRequests.length} enriched quote requests`);
       res.json(enrichedRequests);
     } catch (error) {
       console.error("Error fetching client quote requests:", error);

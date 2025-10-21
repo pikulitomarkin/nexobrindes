@@ -30,12 +30,18 @@ export default function ClientBudgets() {
     queryKey: ["/api/quote-requests/client", currentUser.id],
     queryFn: async () => {
       const response = await fetch(`/api/quote-requests/client/${currentUser.id}`);
-      if (!response.ok) throw new Error('Failed to fetch quote requests');
-      return response.json();
+      if (!response.ok) {
+        console.error('Failed to fetch quote requests:', response.status, response.statusText);
+        throw new Error('Failed to fetch quote requests');
+      }
+      const data = await response.json();
+      console.log('Quote requests fetched:', data);
+      return data;
     },
     enabled: !!currentUser.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 10000, // Refetch every 10 seconds (more frequent)
     refetchOnWindowFocus: true, // Refetch when user returns to the page
+    retry: 3, // Retry failed requests
   });
 
   const getStatusBadge = (status: string, type: 'budget' | 'request') => {
@@ -133,8 +139,16 @@ export default function ClientBudgets() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {quoteRequests && quoteRequests.length > 0 ? (
+          {requestsLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-500 mt-2">Carregando solicitações...</p>
+            </div>
+          ) : quoteRequests && quoteRequests.length > 0 ? (
             <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Encontradas {quoteRequests.length} solicitações de orçamento
+              </p>
               {quoteRequests.map((request: any) => (
                 <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start mb-3">
