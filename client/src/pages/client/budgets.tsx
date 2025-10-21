@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText, Check, X } from "lucide-react";
+import { Calendar, Eye, MessageSquare, Package, Phone, Mail, Clock, CheckCircle, X, FileText, Check } from "lucide-react";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
