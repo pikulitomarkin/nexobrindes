@@ -130,14 +130,17 @@ export default function ClientProducts() {
   };
 
   const updateCartItemQuantity = (productId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
+    // Limitar quantidade entre 1 e 999999
+    const validQuantity = Math.max(1, Math.min(999999, Math.floor(newQuantity)));
+    
+    if (validQuantity <= 0) {
       removeFromCart(productId);
       return;
     }
 
     setCart(cart.map(item => 
       item.productId === productId 
-        ? { ...item, quantity: newQuantity }
+        ? { ...item, quantity: validQuantity }
         : item
     ));
   };
@@ -172,6 +175,16 @@ export default function ClientProducts() {
       return;
     }
 
+    // Verificar se há vendedor atribuído
+    if (!clientProfile?.vendorId) {
+      toast({
+        title: "Vendedor não atribuído",
+        description: "Entre em contato com o administrador para ter um vendedor atribuído",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setQuoteForm({
       observations: "",
       whatsapp: clientProfile?.phone || "",
@@ -184,10 +197,39 @@ export default function ClientProducts() {
   const handleSubmitQuote = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (cart.length === 0 || !quoteForm.contactName.trim()) {
+    if (cart.length === 0) {
       toast({
         title: "Erro",
-        description: "Preencha pelo menos o nome de contato e adicione produtos",
+        description: "Adicione pelo menos um produto ao carrinho",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!quoteForm.contactName.trim()) {
+      toast({
+        title: "Erro",
+        description: "O nome de contato é obrigatório",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!clientProfile?.vendorId) {
+      toast({
+        title: "Erro",
+        description: "Você precisa ter um vendedor atribuído para solicitar orçamentos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar quantidades
+    const invalidQuantities = cart.filter(item => !item.quantity || item.quantity <= 0);
+    if (invalidQuantities.length > 0) {
+      toast({
+        title: "Erro",
+        description: "Todos os produtos devem ter quantidade maior que zero",
         variant: "destructive"
       });
       return;
@@ -197,23 +239,24 @@ export default function ClientProducts() {
     const consolidatedQuote = {
       clientId: currentUser.id,
       vendorId: clientProfile?.vendorId,
-      contactName: quoteForm.contactName,
-      whatsapp: quoteForm.whatsapp,
-      email: quoteForm.email,
-      observations: quoteForm.observations,
+      contactName: quoteForm.contactName.trim(),
+      whatsapp: quoteForm.whatsapp.trim(),
+      email: quoteForm.email.trim(),
+      observations: quoteForm.observations.trim(),
       status: "pending",
       products: cart.map(item => ({
         productId: item.productId,
         productName: item.productName,
-        quantity: item.quantity,
+        quantity: Math.max(1, item.quantity), // Garantir que quantidade seja pelo menos 1
         basePrice: item.basePrice,
         category: item.category,
         imageLink: item.imageLink,
-        observations: item.observations
+        observations: item.observations.trim()
       })),
       totalEstimatedValue: getTotalValue()
     };
 
+    console.log("Submitting consolidated quote:", consolidatedQuote);
     requestQuoteMutation.mutate(consolidatedQuote);
   };
 
@@ -323,7 +366,14 @@ export default function ClientProducts() {
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
-                              <span className="w-8 text-center text-sm">{item.quantity}</span>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="999999"
+                                value={item.quantity}
+                                onChange={(e) => updateCartItemQuantity(item.productId, parseInt(e.target.value) || 1)}
+                                className="w-16 text-center text-sm h-8"
+                              />
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -364,12 +414,17 @@ export default function ClientProducts() {
                         <Button 
                           onClick={handleQuoteRequest}
                           className="w-full gradient-bg text-white"
-                          disabled={!clientProfile?.vendorId || cart.length === 0}
+                          disabled={cart.length === 0}
                         >
                           <MessageSquare className="h-4 w-4 mr-2" />
-                          Solicitar Orçamento
+                          Solicitar Orçamento ({getTotalItems()} itens)
                         </Button>
-                        {!clientProfile?.vendorId && (
+                        {cart.length === 0 && (
+                          <p className="text-xs text-gray-600 text-center mt-2">
+                            Adicione produtos ao carrinho
+                          </p>
+                        )}
+                        {!clientProfile?.vendorId && cart.length > 0 && (
                           <p className="text-xs text-red-600 text-center mt-2">
                             Você precisa ter um vendedor atribuído
                           </p>
@@ -495,7 +550,6 @@ export default function ClientProducts() {
                           onClick={() => addToCart(product)}
                           size="sm"
                           className="gradient-bg text-white"
-                          disabled={!clientProfile?.vendorId}
                         >
                           <Plus className="h-4 w-4 mr-1" />
                           Adicionar
@@ -549,15 +603,14 @@ export default function ClientProducts() {
                   <Button
                     onClick={() => addToCart(product)}
                     className="w-full gradient-bg text-white"
-                    disabled={!clientProfile?.vendorId}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar ao Carrinho
                   </Button>
                   
                   {!clientProfile?.vendorId && (
-                    <p className="text-xs text-red-600 text-center">
-                      Você precisa ter um vendedor atribuído para solicitar orçamentos
+                    <p className="text-xs text-amber-600 text-center">
+                      Você pode adicionar produtos, mas precisará ter um vendedor atribuído para solicitar orçamentos
                     </p>
                   )}
                 </div>
