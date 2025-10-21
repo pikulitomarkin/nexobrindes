@@ -530,6 +530,10 @@ export default function VendorBudgets() {
     setViewBudgetDialogOpen(true);
   };
 
+  const handleGeneratePDF = (budget: any) => {
+    generatePDFMutation.mutate(budget.id);
+  };
+
   const handleEditBudget = (budget: any) => {
     console.log('Editing budget:', budget);
     console.log('Budget items:', budget.items);
@@ -1811,63 +1815,91 @@ export default function VendorBudgets() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredBudgets?.map((budget: any) => (
-                  <div key={budget.id} className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 relative ${budget.hasVendorNotification ? 'border-blue-300 bg-blue-50' : ''}`} onClick={() => handleViewBudget(budget)}>
-                    {budget.hasVendorNotification && (
-                      <div className="absolute -top-2 -right-2">
-                        <Bell className="h-5 w-5 text-blue-600 animate-pulse" />
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold flex items-center gap-2">
-                          {budget.title}
-                          {budget.hasVendorNotification && (
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">
-                              Nova Resposta!
-                            </Badge>
-                          )}
-                        </h3>
-                        <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        {getStatusBadge(budget.status)}
-                        {budget.status === 'approved' && (
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleConvertClick(budget.id);
-                            }}
-                            disabled={convertToOrderMutation.isPending}
-                          >
-                            <ShoppingCart className="h-4 w-4 mr-1" />
-                            Converter em Pedido
-                          </Button>
+                  <tr key={budget.id} className={budget.hasVendorNotification ? 'bg-blue-50' : ''}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {budget.budgetNumber}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <div className="flex items-center gap-2">
+                        {budget.title}
+                        {budget.hasVendorNotification && (
+                          <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            Nova Resposta!
+                          </Badge>
                         )}
                       </div>
-                    </div>
-
-                    {budget.clientObservations && (
-                      <div className={`mb-3 p-2 rounded text-sm ${
-                        budget.status === 'approved' 
-                          ? 'bg-green-50 text-green-800 border border-green-200' 
-                          : 'bg-red-50 text-red-800 border border-red-200'
-                      }`}>
-                        <strong>Observações do Cliente:</strong> {budget.clientObservations}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {budget.contactName || budget.clientName || 'Nome não informado'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-2">
+                        {getStatusBadge(budget.status)}
+                        {budget.clientObservations && (
+                          <div className={`text-xs p-1 rounded ${
+                            budget.status === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {budget.clientObservations}
+                          </div>
+                        )}
                       </div>
-                    )}
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-green-600">
-                        R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      <div className="text-sm text-gray-500">
-                        {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewBudget(budget)}
+                          data-testid={`button-view-${budget.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                        {budget.status === 'pending' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditBudget(budget)}
+                            data-testid={`button-edit-${budget.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
+                        {budget.status === 'approved' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-green-600 hover:text-green-900"
+                            onClick={() => handleConvertClick(budget.id)}
+                            disabled={convertToOrderMutation.isPending}
+                            data-testid={`button-convert-${budget.id}`}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-1" />
+                            Converter
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleGeneratePDF(budget)}
+                          data-testid={`button-pdf-${budget.id}`}
+                        >
+                          <FileText className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
