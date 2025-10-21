@@ -15,8 +15,7 @@ import ClientDashboard from "@/pages/dashboards/client-dashboard";
 import ProducerDashboard from "@/pages/dashboards/producer-dashboard";
 import PartnerDashboard from "@/pages/dashboards/partner-dashboard";
 
-// Home page
-import Home from "@/pages/home";
+
 
 // Admin imports
 import AdminOrders from "@/pages/admin/orders";
@@ -141,10 +140,8 @@ function App() {
           </div>
         }>
           <Switch>
-            {/* Home Route */}
-            <Route path="/" component={Home} />
-            
-            {/* Login Route */}
+            {/* Login Route - back as index */}
+            <Route path="/" component={Login} />
             <Route path="/login" component={Login} />
 
             {/* Protected Routes */}
