@@ -534,20 +534,24 @@ export default function LogisticsDashboard() {
                                   );
                                 }
 
-                                // Se status é confirmed/paid, mostrar botões para enviar
-                                return Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
-                                  <Button
-                                    key={producerId}
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                                    onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
-                                    disabled={sendToProductionMutation.isPending}
-                                    title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
-                                  >
-                                    <Send className="h-4 w-4 mr-1" />
-                                    {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
-                                  </Button>
-                                ));
+                                // Se status é confirmed/paid, mostrar botões para enviar (um embaixo do outro)
+                                return (
+                                  <div className="flex flex-col gap-1 w-full">
+                                    {Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
+                                      <Button
+                                        key={producerId}
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white text-xs whitespace-nowrap"
+                                        onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
+                                        disabled={sendToProductionMutation.isPending}
+                                        title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
+                                      >
+                                        <Send className="h-4 w-4 mr-1" />
+                                        {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                );
                               })()}
                             </div>
                           </td>

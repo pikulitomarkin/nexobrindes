@@ -794,7 +794,7 @@ export class MemStorage implements IStorage {
       {
         id: 'product-7',
         name: 'Agenda Executiva',
-        description: 'Agenda capa dura com logomarca personalizada',
+        description: 'Agenda com logomarca personalizada',
         category: 'Papelaria',
         basePrice: '45.00',
         unit: 'un',
@@ -1078,12 +1078,70 @@ export class MemStorage implements IStorage {
 
   // Order methods
   async getOrders(): Promise<Order[]> {
-    return Array.from(this.orders.values());
+    // Get all orders and enrich them with budget item details, including producer names
+    const ordersWithItems = await Promise.all(Array.from(this.orders.values()).map(async (order) => {
+      let budgetItems = [];
+      if (order.budgetId) {
+        // Get budget items with product details
+        const items = await storage.getBudgetItems(order.budgetId);
+        budgetItems = await Promise.all(
+          items.map(async (item) => {
+            const product = await storage.getProduct(item.productId);
+            let producerName = null;
+            if (item.producerId && item.producerId !== 'internal') {
+              const producer = await storage.getUser(item.producerId);
+              producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+            }
+            return {
+              ...item,
+              producerName: producerName,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
+        );
+      }
+      return { ...order, items: budgetItems };
+    }));
+    return ordersWithItems;
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
-    return this.orders.get(id);
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+
+    let budgetItems = [];
+    if (order.budgetId) {
+      // Get budget items with product details
+      const items = await storage.getBudgetItems(order.budgetId);
+      budgetItems = await Promise.all(
+        items.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          let producerName = null;
+          if (item.producerId && item.producerId !== 'internal') {
+            const producer = await storage.getUser(item.producerId);
+            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+          }
+          return {
+            ...item,
+            producerName: producerName,
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
+      );
+    }
+    return { ...order, items: budgetItems };
   }
+
 
   async createOrder(orderData: InsertOrder): Promise<Order> {
     const id = randomUUID();
@@ -1127,6 +1185,9 @@ export class MemStorage implements IStorage {
 
     // Automatically calculate and create commissions for this new order
     await this.calculateCommissions(order);
+
+    // Auto-deduct partner commissions if any are marked for deduction
+    await this.autoDeductPartnerCommissions(order);
 
     return order;
   }
@@ -1281,7 +1342,38 @@ export class MemStorage implements IStorage {
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(order => order.vendorId === vendorId);
+    // Get orders and enrich with budget items
+    const ordersWithItems = await Promise.all(Array.from(this.orders.values())
+      .filter(order => order.vendorId === vendorId)
+      .map(async (order) => {
+        let budgetItems = [];
+        if (order.budgetId) {
+          // Get budget items with product details
+          const items = await storage.getBudgetItems(order.budgetId);
+          budgetItems = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              let producerName = null;
+              if (item.producerId && item.producerId !== 'internal') {
+                const producer = await storage.getUser(item.producerId);
+                producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+              }
+              return {
+                ...item,
+                producerName: producerName,
+                product: {
+                  name: product?.name || 'Produto não encontrado',
+                  description: product?.description || '',
+                  category: product?.category || '',
+                  imageLink: product?.imageLink || ''
+                }
+              };
+            })
+          );
+        }
+        return { ...order, items: budgetItems };
+      }));
+    return ordersWithItems;
   }
 
   async getOrdersByClient(clientId: string): Promise<Order[]> {
@@ -1317,7 +1409,37 @@ export class MemStorage implements IStorage {
       }
     }
 
-    return matchingOrders;
+    // Enrich matching orders with budget items
+    const enrichedOrders = await Promise.all(matchingOrders.map(async (order) => {
+      let budgetItems = [];
+      if (order.budgetId) {
+        // Get budget items with product details
+        const items = await storage.getBudgetItems(order.budgetId);
+        budgetItems = await Promise.all(
+          items.map(async (item) => {
+            const product = await storage.getProduct(item.productId);
+            let producerName = null;
+            if (item.producerId && item.producerId !== 'internal') {
+              const producer = await storage.getUser(item.producerId);
+              producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+            }
+            return {
+              ...item,
+              producerName: producerName,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
+        );
+      }
+      return { ...order, items: budgetItems };
+    }));
+
+    return enrichedOrders;
   }
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
@@ -1514,7 +1636,7 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(id, payment);
 
-    // Se o pagamento está confirmado, atualizar o valor pago no pedido
+    // If the payment is confirmed, update the order's paid value
     if (payment.status === 'confirmed') {
       await this.updateOrderPaidValue(payment.orderId);
     }
@@ -2021,7 +2143,7 @@ export class MemStorage implements IStorage {
         let producerName = 'Produto Interno';
         if (product.producerId && product.producerId !== 'internal') {
           const producer = await this.getUser(product.producerId);
-          producerName = producer?.name || 'Produtor não encontrado';
+          producerName = producer?.name || 'Produtor Desconhecido';
         }
 
         return {
@@ -2260,12 +2382,28 @@ export class MemStorage implements IStorage {
     if (!budget) return null;
 
     // Get budget items with all fields including customizationPhoto
-    const items = Array.from(this.budgetItems.values())
+    const items = await Promise.all(
+      Array.from(this.budgetItems.values())
       .filter(item => item.budgetId === id)
-      .map(item => ({
-        ...item,
-        customizationPhoto: item.customizationPhoto || '' // Ensure customizationPhoto is included
-      }));
+      .map(async (item) => {
+        const product = await storage.getProduct(item.productId);
+        let producerName = null;
+        if (item.producerId && item.producerId !== 'internal') {
+          const producer = await storage.getUser(item.producerId);
+          producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+        }
+        return {
+          ...item,
+          producerName: producerName,
+          product: {
+            name: product?.name || 'Produto não encontrado',
+            description: product?.description || '',
+            category: product?.category || '',
+            imageLink: product?.imageLink || ''
+          }
+        };
+      })
+    );
 
     // Get budget photos
     const photos = Array.from(this.budgetPhotos.values()).filter(photo => photo.budgetId === id);
@@ -2298,11 +2436,65 @@ export class MemStorage implements IStorage {
   }
 
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
-    return Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
+    const budgets = Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
+    // Enrich with items and producer names
+    const enrichedBudgets = await Promise.all(budgets.map(async (budget) => {
+      const items = await Promise.all(
+        Array.from(this.budgetItems.values())
+        .filter(item => item.budgetId === budget.id)
+        .map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          let producerName = null;
+          if (item.producerId && item.producerId !== 'internal') {
+            const producer = await storage.getUser(item.producerId);
+            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+          }
+          return {
+            ...item,
+            producerName: producerName,
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
+      );
+      return { ...budget, items };
+    }));
+    return enrichedBudgets;
   }
 
   async getBudgetsByClient(clientId: string): Promise<any[]> {
-    return Array.from(this.budgets.values()).filter(budget => budget.clientId === clientId);
+    const budgets = Array.from(this.budgets.values()).filter(budget => budget.clientId === clientId);
+    // Enrich with items and producer names
+    const enrichedBudgets = await Promise.all(budgets.map(async (budget) => {
+      const items = await Promise.all(
+        Array.from(this.budgetItems.values())
+        .filter(item => item.budgetId === budget.id)
+        .map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          let producerName = null;
+          if (item.producerId && item.producerId !== 'internal') {
+            const producer = await storage.getUser(item.producerId);
+            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+          }
+          return {
+            ...item,
+            producerName: producerName,
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
+      );
+      return { ...budget, items };
+    }));
+    return enrichedBudgets;
   }
 
   async createBudget(budgetData: any): Promise<any> {
@@ -2385,7 +2577,28 @@ export class MemStorage implements IStorage {
     }
 
     // Get budget items
-    const budgetItems = Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
+    const budgetItems = await Promise.all(
+      Array.from(this.budgetItems.values())
+      .filter(item => item.budgetId === budgetId)
+      .map(async (item) => {
+        const product = await storage.getProduct(item.productId);
+        let producerName = null;
+        if (item.producerId && item.producerId !== 'internal') {
+          const producer = await storage.getUser(item.producerId);
+          producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
+        }
+        return {
+          ...item,
+          producerName: producerName,
+          product: {
+            name: product?.name || 'Produto não encontrado',
+            description: product?.description || '',
+            category: product?.category || '',
+            imageLink: product?.imageLink || ''
+          }
+        };
+      })
+    );
 
     // Create order data based on budget
     const orderData = {
@@ -2415,6 +2628,7 @@ export class MemStorage implements IStorage {
         productId: item.productId,
         productName: item.productName,
         producerId: item.producerId,
+        producerName: item.producerName, // Include producer name
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
