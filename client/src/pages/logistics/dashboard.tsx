@@ -441,96 +441,113 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPaidOrders?.map((order: any) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.clientName}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{order.product}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setShowOrderDetailsModal(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Ver
-                          </Button>
-                          <div className="flex gap-2">
-                            {/* Identificar produtores do pedido */}
-                            {(() => {
-                              const producers = new Set<string>();
-                              if (order.items && Array.isArray(order.items)) {
-                                order.items.forEach((item: any) => {
-                                  if (item.producerId && item.producerId !== 'internal') {
-                                    producers.add(item.producerId);
-                                  }
-                                });
-                              }
+                  {(() => {
+                    // Agrupar pedidos por cliente
+                    const groupedOrders = {};
+                    filteredPaidOrders?.forEach((order: any) => {
+                      const clientKey = order.clientName || 'Cliente não identificado';
+                      if (!groupedOrders[clientKey]) {
+                        groupedOrders[clientKey] = [];
+                      }
+                      groupedOrders[clientKey].push(order);
+                    });
 
-                              if (producers.size === 0) {
-                                return (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled
-                                  >
-                                    Sem produtores externos
-                                  </Button>
-                                );
-                              }
+                    return Object.entries(groupedOrders).map(([clientName, orders]: [string, any]) => (
+                      orders.map((order: any, index: number) => (
+                        <tr key={order.id} className={`hover:bg-gray-50 ${index === 0 ? 'border-t-2 border-blue-200' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                            <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`text-sm font-medium ${index === 0 ? 'text-blue-700 bg-blue-50 px-2 py-1 rounded' : 'text-gray-900'}`}>
+                              {order.clientName}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{order.product}</div>
+                            {order.items && order.items.length > 1 && (
+                              <div className="text-xs text-gray-500">
+                                {order.items.length} itens no pedido
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2 flex-wrap gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setShowOrderDetailsModal(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Ver
+                              </Button>
+                              
+                              {/* Mostrar botões para cada produtor */}
+                              {(() => {
+                                const producersMap = new Map();
+                                if (order.items && Array.isArray(order.items)) {
+                                  order.items.forEach((item: any) => {
+                                    if (item.producerId && item.producerId !== 'internal') {
+                                      if (!producersMap.has(item.producerId)) {
+                                        producersMap.set(item.producerId, {
+                                          items: [],
+                                          name: item.producerName || `Produtor ${item.producerId.slice(-6)}`
+                                        });
+                                      }
+                                      producersMap.get(item.producerId).items.push(item);
+                                    }
+                                  });
+                                }
 
-                              // Verificar se o pedido já foi enviado para produção
-                              if (order.status === 'production') {
-                                return (
+                                if (producersMap.size === 0) {
+                                  return (
+                                    <Button size="sm" variant="outline" disabled>
+                                      Apenas itens internos
+                                    </Button>
+                                  );
+                                }
+
+                                if (order.status === 'production') {
+                                  return (
+                                    <Button size="sm" variant="outline" disabled className="text-gray-500">
+                                      <Send className="h-4 w-4 mr-1" />
+                                      Já enviado
+                                    </Button>
+                                  );
+                                }
+
+                                return Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
                                   <Button
+                                    key={producerId}
                                     size="sm"
-                                    variant="outline"
-                                    disabled
-                                    className="text-gray-500"
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                                    onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
+                                    disabled={sendToProductionMutation.isPending}
+                                    title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
                                   >
                                     <Send className="h-4 w-4 mr-1" />
-                                    Já enviado para produção
+                                    {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
                                   </Button>
-                                );
-                              }
-
-                              return Array.from(producers).map((producerId) => (
-                                <Button
-                                  key={producerId}
-                                  size="sm"
-                                  className="bg-green-600 hover:bg-green-700 text-white"
-                                  onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
-                                  disabled={sendToProductionMutation.isPending}
-                                >
-                                  <Send className="h-4 w-4 mr-1" />
-                                  {sendToProductionMutation.isPending ? 'Enviando...' : `Enviar para ${producerId === 'producer-1' ? 'Marcenaria' : 'Produtor'}`}
-                                </Button>
-                              ));
-                            })()}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                                ));
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>

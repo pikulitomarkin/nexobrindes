@@ -1970,7 +1970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const remaining = totalValue - paidValue;
           return total + Math.max(0, remaining);
         }, 0);
-      
+
       // Add manual receivables
       const manualReceivables = await storage.getManualReceivables();
       const manualReceivablesAmount = manualReceivables
@@ -1980,7 +1980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const received = parseFloat(receivable.receivedAmount || '0');
           return total + Math.max(0, amount - received);
         }, 0);
-      
+
       const receivables = orderReceivables + manualReceivablesAmount;
 
       // Contas a Pagar - usando producer payments em vez de production orders
@@ -3816,23 +3816,15 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const orders = await storage.getOrders();
 
-      // Filter orders that are paid but not yet in production
+      // Filter orders that are paid and ready for production
       const paidOrders = orders.filter(order => {
-        const totalValue = parseFloat(order.totalValue);
-        const paidValue = parseFloat(order.paidValue || '0');
-        const downPayment = parseFloat(order.downPayment || '0');
-        const shippingCost = parseFloat(order.shippingCost || '0');
+        const isPaid = parseFloat(order.paidValue || '0') > 0;
+        const isConfirmed = order.status === 'confirmed';
+        const notInProduction = order.status !== 'production';
+        const hasExternalItems = order.items && Array.isArray(order.items) && 
+          order.items.some((item: any) => item.producerId && item.producerId !== 'internal');
 
-        // Check if minimum payment (down payment + shipping) is paid
-        const minimumRequired = downPayment + shippingCost;
-        const hasMinimumPayment = minimumRequired > 0 ? paidValue >= minimumRequired : paidValue > 0;
-
-        return (
-          order.status !== 'cancelled' &&
-          order.status !== 'pending' &&
-          hasMinimumPayment &&
-          order.status !== 'production' // Not yet sent to production
-        );
+        return isPaid && isConfirmed && notInProduction && hasExternalItems;
       });
 
       // Enrich with client information
@@ -4497,6 +4489,73 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching client budgets:", error);
       res.status(500).json({ error: "Failed to fetch client budgets" });
+    }
+  });
+
+  // Send order to production
+  app.post("/api/orders/:id/send-to-production", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { producerId } = req.body;
+
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Update order status to production
+      await storage.updateOrderStatus(id, 'production');
+
+      // Create production orders for each producer involved in this order
+      const producersInvolved = new Set<string>();
+      const producerNames: string[] = [];
+
+      if (order.items && Array.isArray(order.items)) {
+        for (const item of order.items) {
+          if (item.producerId && item.producerId !== 'internal') {
+            producersInvolved.add(item.producerId);
+          }
+        }
+      }
+
+      // If specific producerId is provided, only create for that producer
+      const targetProducers = producerId ? [producerId] : Array.from(producersInvolved);
+
+      let productionOrdersCreated = 0;
+
+      for (const pId of targetProducers) {
+        const producer = await storage.getUser(pId);
+        if (producer) {
+          producerNames.push(producer.name);
+
+          // Check if production order already exists
+          const existingPOs = await storage.getProductionOrdersByOrder(id);
+          const existingPO = existingPOs.find(po => po.producerId === pId);
+
+          if (!existingPO) {
+            await storage.createProductionOrder({
+              orderId: id,
+              producerId: pId,
+              status: 'pending',
+              deadline: order.deadline,
+              notes: `Produção de itens do pedido ${order.orderNumber}`,
+              deliveryDeadline: order.deliveryDeadline
+            });
+            productionOrdersCreated++;
+          }
+        }
+      }
+
+      console.log(`Order ${id} sent to production. Created ${productionOrdersCreated} production orders for producers: ${producerNames.join(', ')}`);
+
+      res.json({ 
+        success: true, 
+        productionOrdersCreated,
+        producerNames
+      });
+    } catch (error) {
+      console.error("Error sending order to production:", error);
+      res.status(500).json({ error: "Erro ao enviar para produção" });
     }
   });
 
