@@ -2571,14 +2571,21 @@ export class MemStorage implements IStorage {
         throw new Error("Orçamento não encontrado");
       }
 
+      const budgetItems = await this.getBudgetItems(budgetId);
+
       console.log(`Converting budget to order with data:`, {
         budgetId,
         orderNumber: `PED-${Date.now()}`,
         contactName: budget.contactName,
         clientId: budget.clientId,
-        itemsCount: budget.items?.length || 0,
+        itemsCount: budgetItems.length,
         totalValue: budget.totalValue
       });
+
+      // Calculate total from budget items or use budget total
+      const totalValue = budgetItems.length > 0
+        ? budgetItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0).toFixed(2)
+        : (parseFloat(budget.totalValue || 0).toFixed(2));
 
       // Create order from budget data
       const orderData = {
@@ -2588,7 +2595,7 @@ export class MemStorage implements IStorage {
         budgetId: budgetId,
         product: budget.title,
         description: budget.description || '',
-        totalValue: budget.totalValue?.toFixed(2) || '0.00',
+        totalValue: totalValue,
         status: 'pending' as const,
         contactName: budget.contactName,
         contactPhone: budget.contactPhone,
