@@ -3768,6 +3768,15 @@ export class MemStorage implements IStorage {
         );
       }
 
+      // Also check if there are external items in budget items
+      if (!hasExternalItems && order.budgetId) {
+        const budgetItems = Array.from(this.budgetItems.values()).filter(item => item.budgetId === order.budgetId);
+        hasExternalItems = budgetItems.some((item: any) =>
+          item.producerId && item.producerId !== 'internal'
+        );
+        console.log(`Order ${order.orderNumber} - checked budget items, hasExternalItems: ${hasExternalItems}`);
+      }
+
       if (!hasExternalItems) {
         console.log(`Order ${order.orderNumber} filtered out - no external production items`);
         return false; // No external production needed
