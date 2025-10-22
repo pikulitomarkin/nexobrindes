@@ -114,4 +114,36 @@ async createManualReceivable(data: any): Promise<any> {
 
 ---
 
+## 🚫 Erro: Importação OFX para produtores não encontra transações de débito
+
+### Descrição do Problema
+```
+Processing producer payment OFX file: Found 0 debit transactions out of 54 total
+POST /api/finance/producer-ofx-import 400 :: {"error":"Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX"}
+```
+
+### Causa
+A função `parseOFXBuffer` estava criando transações com tipos 'CREDIT' e 'PAYMENT', mas o filtro para importação de produtores procurava apenas por `type === 'debit'`. Isso causava incompatibilidade entre os tipos de transação.
+
+### Solução
+**Arquivo:** `server/routes.ts`
+**Alteração:** 
+1. Padronizar tipos de transação na função `parseOFXBuffer`:
+   - 'CREDIT' ou valores positivos → 'credit'  
+   - 'PAYMENT'/'DEBIT' ou valores negativos → 'debit'
+
+2. Atualizar filtro para aceitar tanto 'PAYMENT' quanto 'debit':
+```typescript
+// ANTES:
+const debitTransactions = transactions.filter(t => t.type === 'debit');
+
+// DEPOIS:
+const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.type === 'debit');
+```
+
+### Data de Resolução
+28/01/2025
+
+---
+
 *Mantenha este documento atualizado sempre que resolver um erro recorrente!*

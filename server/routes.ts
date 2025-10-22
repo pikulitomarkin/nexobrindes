@@ -93,6 +93,14 @@ async function parseOFXBuffer(buffer: Buffer) {
         }
       }
 
+      // Standardize transaction types
+      let standardType = 'other';
+      if (trnType === 'CREDIT' || parseFloat(trnAmt) > 0) {
+        standardType = 'credit';
+      } else if (trnType === 'PAYMENT' || trnType === 'DEBIT' || parseFloat(trnAmt) < 0) {
+        standardType = 'debit';
+      }
+
       transactions.push({
         fitId: fitId,
         date: transactionDate,
@@ -100,7 +108,7 @@ async function parseOFXBuffer(buffer: Buffer) {
         amount: trnAmt,
         description: memo,
         bankRef: refNum,
-        type: trnType
+        type: standardType
       });
     });
   }
@@ -2623,7 +2631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter only debit transactions (payments out)
-      const debitTransactions = transactions.filter(t => t.type === 'debit');
+      const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.type === 'debit');
       console.log(`Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
 
       if (debitTransactions.length === 0) {
