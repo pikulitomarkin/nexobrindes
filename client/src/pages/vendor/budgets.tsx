@@ -1888,17 +1888,19 @@ export default function VendorBudgets() {
                             Enviar
                           </Button>
                         )}
-                        <Button
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => {
-                            setViewBudgetDialogOpen(false);
-                            handleConvertClick(budget.id);
-                          }}
-                          data-testid={`button-convert-${budget.id}`}
-                        >
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                          Converter
-                        </Button>
+                        {budget.status !== 'converted' && (
+                          <Button
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              setViewBudgetDialogOpen(false);
+                              handleConvertClick(budget.id);
+                            }}
+                            data-testid={`button-convert-${budget.id}`}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Converter
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -2341,16 +2343,18 @@ export default function VendorBudgets() {
                   </Button>
                 )}
 
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    setViewBudgetDialogOpen(false);
-                    handleConvertClick(budgetToView.id);
-                  }}
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Converter
-                </Button>
+                {budgetToView.status !== 'converted' && (
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleConvertClick(budgetToView.id);
+                    }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Converter
+                  </Button>
+                )}
 
                 <Button
                   variant="outline"
