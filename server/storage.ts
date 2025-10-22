@@ -2781,13 +2781,18 @@ export class MemStorage implements IStorage {
       .map(order => {
         let clientName = order.contactName || 'Cliente não identificado';
         const minimumPayment = (parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0")).toFixed(2);
+        
+        // Calculate remaining amount to receive (total - already paid)
+        const totalValue = parseFloat(order.totalValue || "0");
+        const paidValue = parseFloat(order.paidValue || "0");
+        const remainingAmount = Math.max(0, totalValue - paidValue);
 
         return {
           id: `ar-${order.id}`,
           orderId: order.id,
           orderNumber: order.orderNumber || `#${order.id}`,
           clientName: clientName,
-          amount: order.totalValue || "0.00",
+          amount: remainingAmount.toFixed(2), // Show remaining amount instead of total
           receivedAmount: order.paidValue || "0.00",
           minimumPayment: minimumPayment, // Add minimumPayment
           status: this.calculateReceivableStatus(order),
@@ -2795,7 +2800,8 @@ export class MemStorage implements IStorage {
           createdAt: new Date(order.createdAt),
           lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
           isManual: false,
-          type: 'sale'
+          type: 'sale',
+          originalAmount: order.totalValue || "0.00" // Keep original amount for reference
         };
       });
 

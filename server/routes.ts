@@ -1925,8 +1925,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         producerPayments: producerPayments.length
       });
 
-      // Contas a Receber - soma dos valores pendentes dos pedidos
-      const receivables = orders
+      // Contas a Receber - soma dos valores pendentes dos pedidos + contas manuais
+      const orderReceivables = orders
         .filter(order => order.status !== 'cancelled')
         .reduce((total, order) => {
           const totalValue = parseFloat(order.totalValue);
@@ -1934,6 +1934,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const remaining = totalValue - paidValue;
           return total + Math.max(0, remaining);
         }, 0);
+      
+      // Add manual receivables
+      const manualReceivables = await storage.getManualReceivables();
+      const manualReceivablesAmount = manualReceivables
+        .filter(receivable => receivable.status !== 'paid')
+        .reduce((total, receivable) => {
+          const amount = parseFloat(receivable.amount || '0');
+          const received = parseFloat(receivable.receivedAmount || '0');
+          return total + Math.max(0, amount - received);
+        }, 0);
+      
+      const receivables = orderReceivables + manualReceivablesAmount;
 
       // Contas a Pagar - usando producer payments em vez de production orders
       const producers = producerPayments
