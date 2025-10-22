@@ -425,7 +425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Sending order ${id} to production. Producer filter: ${producerId || 'all'}`);
 
-      const order = await storage.getOrder(id);
+      let order = await storage.getOrder(id);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with order and client information
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
-          const order = await storage.getOrder(po.orderId);
+          let order = await storage.getOrder(po.orderId);
           if (!order) {
             console.log(`Order not found for production order: ${po.orderId}`);
             return null;
@@ -825,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the related order
-      const order = await storage.getOrder(productionOrder.orderId);
+      let order = await storage.getOrder(productionOrder.orderId);
       if (!order) {
         console.log(`Related order not found for production order: ${id}`);
         return res.status(404).json({ error: "Pedido relacionado não encontrado" });
@@ -1201,7 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const order = await storage.getOrder(id);
+      let order = await storage.getOrder(id);
 
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
@@ -1643,7 +1643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
-          const order = await storage.getOrder(po.orderId);
+          let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
           // Always use contactName as primary client identifier
@@ -2213,7 +2213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Enrich with order data if missing
           if (commission.orderId && (!orderValue || !orderNumber)) {
-            const order = await storage.getOrder(commission.orderId);
+            let order = await storage.getOrder(commission.orderId);
             if (order) {
               orderValue = orderValue || order.totalValue;
               orderNumber = orderNumber || order.orderNumber;
@@ -2254,7 +2254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrichedCommissions = await Promise.all(
         commissions.map(async (commission) => {
           if (commission.orderId) {
-            const order = await storage.getOrder(commission.orderId);
+            let order = await storage.getOrder(commission.orderId);
             if (order) {
               return {
                 ...commission,
@@ -3502,7 +3502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify order exists
-      const order = await storage.getOrder(orderId);
+      let order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
@@ -3532,7 +3532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { amount } = req.body;
       const orderId = req.params.id;
 
-      const order = await storage.getOrder(orderId);
+      let order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
@@ -3560,7 +3560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       console.log(`Client confirming delivery for order: ${id}`);
 
-      const order = await storage.getOrder(id);
+      let order = await storage.getOrder(id);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
@@ -4835,7 +4835,7 @@ Para mais detalhes, entre em contato conosco!`;
           let clientName = "Cliente não informado";
 
           if (productionOrder) {
-            const order = await storage.getOrder(productionOrder.orderId);
+            let order = await storage.getOrder(productionOrder.orderId);
             if (order) {
               orderInfo = order;
               clientName = order.contactName || "Nome não informado";
@@ -4987,7 +4987,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
-          const order = await storage.getOrder(po.orderId);
+          let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
           if (!order) {
@@ -5585,7 +5585,7 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       const { producerId } = req.body;
 
-      const order = await storage.getOrder(id);
+      let order = await storage.getOrder(id);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
