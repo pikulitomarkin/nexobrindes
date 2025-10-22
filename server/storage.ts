@@ -1467,10 +1467,6 @@ export class MemStorage implements IStorage {
     return filteredClients;
   }
 
-  async getClientByUserId(userId: string): Promise<Client | undefined> {
-    return Array.from(this.clients.values()).find(client => client.userId === userId);
-  }
-
   // Production Order methods
   async getProductionOrders(): Promise<ProductionOrder[]> {
     return Array.from(this.productionOrders.values());
@@ -1621,10 +1617,6 @@ export class MemStorage implements IStorage {
     }
 
     return updated;
-  }
-
-  async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {
-    return Array.from(this.productionOrders.values()).filter(po => po.orderId === orderId);
   }
 
   // Payment methods

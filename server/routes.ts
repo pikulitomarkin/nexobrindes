@@ -4635,10 +4635,7 @@ Para mais detalhes, entre em contato conosco!`;
           let order = null;
 
           if (productionOrder) {
-            const order = await storage.getOrder(productionOrder.orderId);
-            if (order) {
-              order = order;
-            }
+            order = await storage.getOrder(productionOrder.orderId);
           }
 
           return {
