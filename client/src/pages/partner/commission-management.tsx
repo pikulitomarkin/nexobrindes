@@ -165,22 +165,7 @@ export default function PartnerCommissionManagement() {
   };
 
   const handleEditPartnerCommission = (partner: any) => {
-    setEditingPartner(partner.id);
-    commissionForm.setValue('commissionRate', partner.commissionRate);
-  };
-
-  const onCommissionSubmit = (data: CommissionFormValues) => {
-    if (editingVendor) {
-      updateVendorCommissionMutation.mutate({
-        vendorId: editingVendor,
-        commissionRate: data.commissionRate
-      });
-    } else if (editingPartner) {
-      updatePartnerCommissionMutation.mutate({
-        partnerId: editingPartner,
-        commissionRate: data.commissionRate
-      });
-    }
+    // Função removida - sócios não podem editar suas próprias comissões
   };
 
   const onPartnerSubmit = (data: PartnerFormValues) => {
@@ -447,54 +432,8 @@ export default function PartnerCommissionManagement() {
                       </p>
                     </div>
                     <div className="flex items-center space-x-4">
-                      {editingPartner === partner.id ? (
-                        <Form {...commissionForm}>
-                          <form onSubmit={commissionForm.handleSubmit(onCommissionSubmit)} className="flex items-center space-x-2">
-                            <FormField
-                              control={commissionForm.control}
-                              name="commissionRate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <div className="flex items-center space-x-1">
-                                      <Input 
-                                        type="number" 
-                                        step="0.01" 
-                                        className="w-20" 
-                                        {...field} 
-                                      />
-                                      <span className="text-sm text-gray-500">%</span>
-                                    </div>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="submit" size="sm" className="gradient-bg text-white">
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingPartner(null)}
-                            >
-                              Cancelar
-                            </Button>
-                          </form>
-                        </Form>
-                      ) : (
-                        <>
-                          <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditPartnerCommission(partner)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                      <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
+                      <span className="text-sm text-gray-500">Apenas administrador pode alterar</span>
                     </div>
                   </div>
                 ))}
