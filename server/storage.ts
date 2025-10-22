@@ -2997,6 +2997,35 @@ export class MemStorage implements IStorage {
     return this.mockData.manualReceivables || [];
   }
 
+  // Create manual receivable
+  async createManualReceivable(data: any): Promise<any> {
+    const id = `manual-receivable-${randomUUID()}`;
+    const receivable = {
+      id,
+      type: 'manual',
+      clientName: data.clientName,
+      description: data.description,
+      amount: parseFloat(data.amount).toFixed(2),
+      receivedAmount: '0.00',
+      dueDate: new Date(data.dueDate),
+      status: 'pending',
+      notes: data.notes || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Ensure manualReceivables array exists
+    if (!this.mockData.manualReceivables) {
+      this.mockData.manualReceivables = [];
+    }
+
+    this.mockData.manualReceivables.push(receivable);
+    console.log(`Created manual receivable: ${receivable.id} for ${receivable.clientName} - R$ ${receivable.amount}`);
+    console.log(`Total manual receivables: ${this.mockData.manualReceivables.length}`);
+
+    return receivable;
+  }
+
   // Create manual payable
   async createManualPayable(data: any): Promise<any> {
     const id = `manual-payable-${randomUUID()}`;

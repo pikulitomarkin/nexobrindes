@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, TrendingDown, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function AdminDashboard() {
@@ -15,6 +15,10 @@ export default function AdminDashboard() {
 
   const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
+  });
+
+  const { data: financeOverview } = useQuery({
+    queryKey: ["/api/finance/overview"],
   });
 
   const handleLogout = () => {
@@ -139,7 +143,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card data-testid="card-orders-today">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -158,7 +162,7 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Receita Mensal</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    R$ {financeOverview?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                   </p>
                 </div>
                 <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -166,16 +170,109 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-pending-payments">
+          <Card data-testid="card-receivables">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pagamentos Pendentes</p>
-                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    R$ {stats?.pendingPayments?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Contas a Receber</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    R$ {financeOverview?.receivables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                   </p>
                 </div>
-                <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-payables">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Contas a Pagar</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    R$ {financeOverview?.payables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </p>
+                </div>
+                <TrendingDown className="h-6 w-6 text-red-600 dark:text-red-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Resumo Financeiro Detalhado */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-gray-900">Resumo Financeiro</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Receita Mensal</span>
+                  <span className="font-semibold text-green-600">
+                    R$ {financeOverview?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Despesas do Mês</span>
+                  <span className="font-semibold text-red-600">
+                    R$ {financeOverview?.monthlyExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Comissões Pendentes</span>
+                  <span className="font-semibold text-yellow-600">
+                    R$ {financeOverview?.pendingCommissions?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-900">Saldo Líquido</span>
+                    <span className="font-bold text-lg text-green-600">
+                      R$ {((financeOverview?.monthlyRevenue || 0) - (financeOverview?.payables || 0) - (financeOverview?.monthlyExpenses || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-gray-900">Breakdown Contas a Pagar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Produtores</span>
+                  <span className="font-semibold">
+                    R$ {financeOverview?.payablesBreakdown?.producers?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Comissões</span>
+                  <span className="font-semibold">
+                    R$ {financeOverview?.payablesBreakdown?.commissions?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Despesas</span>
+                  <span className="font-semibold">
+                    R$ {financeOverview?.payablesBreakdown?.expenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Reembolsos</span>
+                  <span className="font-semibold">
+                    R$ {financeOverview?.payablesBreakdown?.refunds?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Manuais</span>
+                  <span className="font-semibold">
+                    R$ {financeOverview?.payablesBreakdown?.manual?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
