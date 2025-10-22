@@ -776,9 +776,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
             
-            // Remove duplicatas baseado em productId
+            // Remove duplicatas baseado em productId e producerId
             const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
-              self.findIndex(i => i.productId === item.productId && i.productName === item.productName) === index
+              self.findIndex(i => i.productId === item.productId && i.producerId === item.producerId) === index
             );
             
             // Remove valores financeiros dos itens
@@ -788,11 +788,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalPrice: undefined,
               itemCustomizationValue: undefined,
               generalCustomizationValue: undefined,
-              itemDiscountValue: undefined
+              itemDiscountValue: undefined,
+              itemDiscountPercentage: undefined,
+              discountValue: undefined,
+              discountPercentage: undefined
             }));
             
-            // Remove valores financeiros do pedido
+            // Remove TODOS os valores financeiros do pedido
             parsedDetails.totalValue = undefined;
+            parsedDetails.downPayment = undefined;
+            parsedDetails.remainingAmount = undefined;
+            parsedDetails.shippingCost = undefined;
+            parsedDetails.discountValue = undefined;
+            parsedDetails.discountPercentage = undefined;
             
             console.log(`Filtered items for producer ${parsedDetails.producerId}: ${parsedDetails.items.length} unique items`);
           }

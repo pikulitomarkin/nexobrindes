@@ -482,10 +482,8 @@ export default function ProductionDashboard() {
                         <div className="flex items-center gap-3">
                           {order.producerValue && (
                             <div className="text-right">
-                              <p className="text-lg font-bold text-green-600">
-                                R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                              <p className="text-xs text-gray-500">Valor definido</p>
+                              <p className="text-sm font-medium text-green-600">Valor definido</p>
+                              <p className="text-xs text-gray-500">Aguardando produção</p>
                             </div>
                           )}
                           {!order.producerValue && (
@@ -577,8 +575,8 @@ export default function ProductionDashboard() {
                                       <p className="text-sm text-blue-600">Personalização: {item.itemCustomizationDescription}</p>
                                     )}
                                   </div>
-                                  <span className="text-sm font-medium text-green-600">
-                                    R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <span className="text-sm text-gray-500">
+                                    Item #{index + 1}
                                   </span>
                                 </div>
                               </div>
