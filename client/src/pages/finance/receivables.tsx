@@ -345,10 +345,10 @@ export default function FinanceReceivables() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="client-name">Nome do Cliente *</Label>
+                    <Label htmlFor="client-name">Conta a Receber *</Label>
                     <Input
                       id="client-name"
-                      placeholder="Nome do cliente"
+                      placeholder="Nome da conta a receber"
                       value={newReceivableData.clientName}
                       onChange={(e) => setNewReceivableData(prev => ({ ...prev, clientName: e.target.value }))}
                     />
