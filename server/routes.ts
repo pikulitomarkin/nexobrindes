@@ -1556,7 +1556,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      res.json(enrichedCommissions);
+      // Filter out invalid commissions (without names or order numbers)
+      const validCommissions = enrichedCommissions.filter(commission => 
+        commission.amount && 
+        (commission.vendorName || commission.partnerName) && 
+        commission.orderNumber
+      );
+
+      res.json(validCommissions);
     } catch (error) {
       console.error("Error fetching commissions:", error);
       res.status(500).json({ error: "Failed to fetch commissions" });

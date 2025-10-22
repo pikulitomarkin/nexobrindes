@@ -236,10 +236,16 @@ export default function CommissionManagement() {
 
 
 
-  // Calculate totals
-  const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
-  const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
-  const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
+  // Calculate totals - filter out invalid commissions
+  const validCommissions = commissions?.filter((c: any) => 
+    c.amount && 
+    (c.vendorName || c.partnerName) && 
+    c.orderNumber
+  ) || [];
+  
+  const totalCommissions = validCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const pendingCommissions = validCommissions.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const paidCommissions = validCommissions.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
 
   if (loadingCommissions || loadingVendors || loadingPartners) {
     return (
@@ -460,8 +466,55 @@ export default function CommissionManagement() {
                       )}
                     </div>
                     <div className="flex items-center space-x-4">
-                      <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
-                      <span className="text-sm text-gray-500">(de cada pedido)</span>
+                      {editingPartner === partner.id ? (
+                        <Form {...commissionForm}>
+                          <form onSubmit={commissionForm.handleSubmit(onCommissionSubmit)} className="flex items-center space-x-2">
+                            <FormField
+                              control={commissionForm.control}
+                              name="commissionRate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <div className="flex items-center space-x-1">
+                                      <Input 
+                                        type="number" 
+                                        step="0.01" 
+                                        className="w-20" 
+                                        {...field} 
+                                      />
+                                      <span className="text-sm text-gray-500">%</span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <Button type="submit" size="sm" className="gradient-bg text-white">
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingPartner(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </form>
+                        </Form>
+                      ) : (
+                        <>
+                          <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
+                          <span className="text-sm text-gray-500">(de cada pedido)</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPartnerCommission(partner)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -517,7 +570,7 @@ export default function CommissionManagement() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {commissions?.map((commission: any) => (
+                    {validCommissions?.map((commission: any) => (
                       <tr key={commission.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(commission.createdAt).toLocaleDateString('pt-BR')}
@@ -586,7 +639,7 @@ export default function CommissionManagement() {
                 </table>
               </div>
 
-              {(!commissions || commissions.length === 0) && (
+              {(!validCommissions || validCommissions.length === 0) && (
                 <div className="text-center py-8">
                   <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-500">Nenhuma comissão encontrada</p>
