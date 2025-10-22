@@ -411,6 +411,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingForProducer) {
           console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
+          // Still add to created orders list so response shows success
+          createdOrders.push(existingForProducer);
+          producerNames.push(producer.name);
           continue;
         }
 

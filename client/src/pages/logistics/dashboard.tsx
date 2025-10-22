@@ -532,13 +532,15 @@ export default function LogisticsDashboard() {
                                 return (
                                   <Button
                                     size="sm"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                                     onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
-                                    disabled={sendToProductionMutation.isPending}
-                                    title={`Criar ordens separadas para todos os ${producersMap.size} produtores`}
+                                    disabled={sendToProductionMutation.isPending || order.status === 'production'}
+                                    title={order.status === 'production' ? 'Já enviado para produção' : `Criar ordens separadas para todos os ${producersMap.size} produtores`}
                                   >
                                     <Send className="h-4 w-4 mr-1" />
-                                    {sendToProductionMutation.isPending ? 'Enviando...' : `📤 Enviar p/ ${producersText}`}
+                                    {sendToProductionMutation.isPending ? 'Enviando...' : 
+                                     order.status === 'production' ? '✓ Enviado' : 
+                                     `📤 Enviar p/ ${producersText}`}
                                   </Button>
                                 );
                               })()}
@@ -866,6 +868,14 @@ export default function LogisticsDashboard() {
                                         `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
                                         'Não informado'
                                       }
+                                    </p>
+                                  </div>
+
+                                  {/* Produtor do Item */}
+                                  <div className="col-span-2">
+                                    <span className="text-gray-500">Produtor:</span>
+                                    <p className="font-medium text-orange-700">
+                                      {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
                                     </p>
                                   </div>
 

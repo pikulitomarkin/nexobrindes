@@ -1089,13 +1089,13 @@ export class MemStorage implements IStorage {
       let budgetItems = [];
       if (order.budgetId) {
         // Get budget items with product details
-        const items = await storage.getBudgetItems(order.budgetId);
+        const items = await this.getBudgetItems(order.budgetId);
         budgetItems = await Promise.all(
           items.map(async (item) => {
-            const product = await storage.getProduct(item.productId);
+            const product = await this.getProduct(item.productId);
             let producerName = null;
             if (item.producerId && item.producerId !== 'internal') {
-              const producer = await storage.getUser(item.producerId);
+              const producer = await this.getUser(item.producerId);
               producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
             }
             return {
@@ -1123,13 +1123,13 @@ export class MemStorage implements IStorage {
     let budgetItems = [];
     if (order.budgetId) {
       // Get budget items with product details
-      const items = await storage.getBudgetItems(order.budgetId);
+      const items = await this.getBudgetItems(order.budgetId);
       budgetItems = await Promise.all(
         items.map(async (item) => {
-          const product = await storage.getProduct(item.productId);
+          const product = await this.getProduct(item.productId);
           let producerName = null;
           if (item.producerId && item.producerId !== 'internal') {
-            const producer = await storage.getUser(item.producerId);
+            const producer = await this.getUser(item.producerId);
             producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
           }
           return {
@@ -1355,13 +1355,13 @@ export class MemStorage implements IStorage {
         let budgetItems = [];
         if (order.budgetId) {
           // Get budget items with product details
-          const items = await storage.getBudgetItems(order.budgetId);
+          const items = await this.getBudgetItems(order.budgetId);
           budgetItems = await Promise.all(
             items.map(async (item) => {
-              const product = await storage.getProduct(item.productId);
+              const product = await this.getProduct(item.productId);
               let producerName = null;
               if (item.producerId && item.producerId !== 'internal') {
-                const producer = await storage.getUser(item.producerId);
+                const producer = await this.getUser(item.producerId);
                 producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
               }
               return {
@@ -1420,13 +1420,13 @@ export class MemStorage implements IStorage {
       let budgetItems = [];
       if (order.budgetId) {
         // Get budget items with product details
-        const items = await storage.getBudgetItems(order.budgetId);
+        const items = await this.getBudgetItems(order.budgetId);
         budgetItems = await Promise.all(
           items.map(async (item) => {
-            const product = await storage.getProduct(item.productId);
+            const product = await this.getProduct(item.productId);
             let producerName = null;
             if (item.producerId && item.producerId !== 'internal') {
-              const producer = await storage.getUser(item.producerId);
+              const producer = await this.getUser(item.producerId);
               producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
             }
             return {
@@ -2392,10 +2392,10 @@ export class MemStorage implements IStorage {
       Array.from(this.budgetItems.values())
       .filter(item => item.budgetId === id)
       .map(async (item) => {
-        const product = await storage.getProduct(item.productId);
+        const product = await this.getProduct(item.productId);
         let producerName = null;
         if (item.producerId && item.producerId !== 'internal') {
-          const producer = await storage.getUser(item.producerId);
+          const producer = await this.getUser(item.producerId);
           producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
         }
         return {
@@ -2449,10 +2449,10 @@ export class MemStorage implements IStorage {
         Array.from(this.budgetItems.values())
         .filter(item => item.budgetId === budget.id)
         .map(async (item) => {
-          const product = await storage.getProduct(item.productId);
+          const product = await this.getProduct(item.productId);
           let producerName = null;
           if (item.producerId && item.producerId !== 'internal') {
-            const producer = await storage.getUser(item.producerId);
+            const producer = await this.getUser(item.producerId);
             producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
           }
           return {
@@ -2480,10 +2480,10 @@ export class MemStorage implements IStorage {
         Array.from(this.budgetItems.values())
         .filter(item => item.budgetId === budget.id)
         .map(async (item) => {
-          const product = await storage.getProduct(item.productId);
+          const product = await this.getProduct(item.productId);
           let producerName = null;
           if (item.producerId && item.producerId !== 'internal') {
-            const producer = await storage.getUser(item.producerId);
+            const producer = await this.getUser(item.producerId);
             producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
           }
           return {
@@ -2587,10 +2587,10 @@ export class MemStorage implements IStorage {
       Array.from(this.budgetItems.values())
       .filter(item => item.budgetId === budgetId)
       .map(async (item) => {
-        const product = await storage.getProduct(item.productId);
+        const product = await this.getProduct(item.productId);
         let producerName = null;
         if (item.producerId && item.producerId !== 'internal') {
-          const producer = await storage.getUser(item.producerId);
+          const producer = await this.getUser(item.producerId);
           producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
         }
         return {
@@ -3541,7 +3541,7 @@ export class MemStorage implements IStorage {
   }
 
   // Producer Payments methods
-  async getProducerPayments(): Promise<ProducerPayment[]> {
+  async getProducerPayments(): Promise<ProducerPayment[]>{
     return Array.from(this.producerPayments.values());
   }
 
