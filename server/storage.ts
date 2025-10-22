@@ -1350,37 +1350,6 @@ export class MemStorage implements IStorage {
     console.log(`Storage: Getting production orders for producer: ${producerId}`);
     const productionOrders = Array.from(this.productionOrders.values()).filter(po => po.producerId === producerId);
 
-    // Também incluir pedidos onde o produtor tem itens específicos
-    const ordersWithProducerItems = Array.from(this.orders.values()).filter(order => {
-      if (order.items && Array.isArray(order.items)) {
-        return order.items.some((item: any) => item.producerId === producerId);
-      }
-      return false;
-    });
-
-    // Criar production orders para pedidos que têm itens deste produtor mas ainda não têm production order
-    for (const order of ordersWithProducerItems) {
-      const existingPO = productionOrders.find(po => po.orderId === order.id);
-      if (!existingPO && order.status === 'production') {
-        const newPO = {
-          id: `po-${Date.now()}-${producerId}-${order.id}`,
-          orderId: order.id,
-          producerId: producerId,
-          status: 'pending',
-          deadline: order.deadline,
-          acceptedAt: null,
-          completedAt: null,
-          notes: null,
-          deliveryDeadline: order.deliveryDeadline,
-          hasUnreadNotes: false,
-          lastNoteAt: null,
-          producerValue: null
-        };
-        this.productionOrders.set(newPO.id, newPO);
-        productionOrders.push(newPO);
-      }
-    }
-
     console.log(`Storage: Found ${productionOrders.length} production orders for producer ${producerId}:`, productionOrders.map(o => ({ id: o.id, orderId: o.orderId, status: o.status })));
     return productionOrders;
   }
@@ -3513,9 +3482,9 @@ export class MemStorage implements IStorage {
     const readyOrders = orders.filter(order => {
       console.log(`Order ${order.orderNumber}: status=${order.status}, paidValue=${order.paidValue}, totalValue=${order.totalValue}`);
 
-      // Order must be confirmed and have received payment
-      if (!['confirmed', 'paid'].includes(order.status)) {
-        console.log(`Order ${order.orderNumber} filtered out - status not confirmed/paid: ${order.status}`);
+      // Order must be confirmed and have received payment (but can also be in production status for tracking)
+      if (!['confirmed', 'paid', 'production'].includes(order.status)) {
+        console.log(`Order ${order.orderNumber} filtered out - status not confirmed/paid/production: ${order.status}`);
         return false;
       }
 
@@ -3552,17 +3521,11 @@ export class MemStorage implements IStorage {
         return false; // No external production needed
       }
 
-      // Make sure it hasn't been sent to production yet
-      const notInProduction = order.status !== 'production';
-      if (!notInProduction) {
-        console.log(`Order ${order.orderNumber} filtered out - already in production`);
-      }
-
-      console.log(`Order ${order.orderNumber} APPROVED for production - has payment and external items`);
-      return notInProduction;
+      console.log(`Order ${order.orderNumber} APPROVED for logistics tracking - has payment and external items`);
+      return true;
     });
 
-    console.log(`Found ${readyOrders.length} paid orders ready for production`);
+    console.log(`Found ${readyOrders.length} paid orders for logistics tracking`);
     return readyOrders;
   }
 }

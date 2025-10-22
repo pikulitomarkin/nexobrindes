@@ -288,6 +288,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send order to production
+  app.post("/api/orders/:id/send-to-production", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { producerId } = req.body;
+
+      console.log(`Sending order ${id} to production for producer ${producerId}`);
+
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Update order status to production
+      await storage.updateOrder(id, { status: 'production' });
+
+      // Get producer information
+      const producer = await storage.getUser(producerId);
+      if (!producer) {
+        return res.status(404).json({ error: "Produtor não encontrado" });
+      }
+
+      // Create detailed order information for the producer
+      const orderDetails = {
+        orderNumber: order.orderNumber,
+        product: order.product,
+        description: order.description,
+        totalValue: order.totalValue,
+        deadline: order.deadline,
+        deliveryDeadline: order.deliveryDeadline,
+        clientDetails: {
+          name: order.contactName,
+          phone: order.contactPhone,
+          email: order.contactEmail
+        },
+        shippingAddress: order.deliveryType === 'pickup' 
+          ? 'Sede Principal - Retirada no Local'
+          : (order.shippingAddress || 'Endereço não informado'),
+        items: order.items ? order.items.filter((item: any) => 
+          item.producerId === producerId
+        ) : [],
+        photos: [] // Will be populated if budget photos exist
+      };
+
+      // Get budget photos if order was converted from budget
+      if (order.budgetId) {
+        const photos = await storage.getBudgetPhotos(order.budgetId);
+        orderDetails.photos = photos.map(photo => photo.photoUrl || photo.imageUrl);
+      }
+
+      // Create production order
+      const productionOrder = await storage.createProductionOrder({
+        orderId: id,
+        producerId: producerId,
+        status: 'pending',
+        deadline: order.deadline,
+        deliveryDeadline: order.deliveryDeadline,
+        shippingAddress: orderDetails.shippingAddress,
+        orderDetails: JSON.stringify(orderDetails), // Store detailed order info
+        producerValue: '0.00',
+        producerValueLocked: false
+      });
+
+      console.log(`Created production order ${productionOrder.id} for producer ${producer.name}`);
+
+      res.json({
+        success: true,
+        productionOrder: productionOrder,
+        productionOrdersCreated: 1,
+        producerNames: [producer.name],
+        message: `Pedido enviado para produção - ${producer.name}`
+      });
+    } catch (error) {
+      console.error("Error sending order to production:", error);
+      res.status(500).json({ error: "Erro ao enviar pedido para produção: " + error.message });
+    }
+  });
+
   // Logistics Products Routes
   app.get("/api/logistics/products", async (req, res) => {
     try {
@@ -442,6 +520,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating producer value:", error);
       res.status(500).json({ error: "Erro ao atualizar valor do produtor" });
+    }
+  });
+
+  // Get production orders for a specific producer
+  app.get("/api/production-orders/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      console.log(`Fetching production orders for producer: ${producerId}`);
+
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      console.log(`Found ${productionOrders.length} production orders for producer ${producerId}`);
+
+      // Enrich with order and client information
+      const enrichedOrders = await Promise.all(
+        productionOrders.map(async (po) => {
+          const order = await storage.getOrder(po.orderId);
+          if (!order) {
+            console.log(`Order not found for production order: ${po.orderId}`);
+            return null;
+          }
+
+          // Get client information
+          let clientName = order.contactName;
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          return {
+            ...po,
+            orderNumber: order.orderNumber,
+            product: order.product,
+            totalValue: order.totalValue,
+            clientName: clientName,
+            order: {
+              ...order,
+              clientName: clientName
+            }
+          };
+        })
+      );
+
+      // Filter out null values (orders that weren't found)
+      const validOrders = enrichedOrders.filter(order => order !== null);
+
+      console.log(`Returning ${validOrders.length} enriched production orders for producer ${producerId}`);
+      res.json(validOrders);
+    } catch (error) {
+      console.error("Error fetching production orders for producer:", error);
+      res.status(500).json({ error: "Failed to fetch production orders for producer" });
     }
   });
 

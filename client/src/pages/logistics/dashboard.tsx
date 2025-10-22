@@ -519,15 +519,22 @@ export default function LogisticsDashboard() {
                                   );
                                 }
 
+                                // Mostrar status baseado no status do pedido
                                 if (order.status === 'production') {
                                   return (
-                                    <Button size="sm" variant="outline" disabled className="text-gray-500">
-                                      <Send className="h-4 w-4 mr-1" />
-                                      Já enviado
-                                    </Button>
+                                    <div className="flex flex-col gap-1">
+                                      <Button size="sm" variant="outline" disabled className="text-green-600 border-green-300 bg-green-50">
+                                        <Send className="h-4 w-4 mr-1" />
+                                        Enviado para Produção
+                                      </Button>
+                                      <span className="text-xs text-gray-500">
+                                        {producersMap.size} produtor(es) notificado(s)
+                                      </span>
+                                    </div>
                                   );
                                 }
 
+                                // Se status é confirmed/paid, mostrar botões para enviar
                                 return Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
                                   <Button
                                     key={producerId}
