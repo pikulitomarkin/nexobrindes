@@ -93,12 +93,26 @@ async function parseOFXBuffer(buffer: Buffer) {
         }
       }
 
-      // Standardize transaction types
+      // Improved transaction type classification for producer payments
       let standardType = 'other';
-      if (trnType === 'CREDIT' || parseFloat(trnAmt) > 0) {
-        standardType = 'credit';
-      } else if (trnType === 'PAYMENT' || trnType === 'DEBIT' || parseFloat(trnAmt) < 0) {
+      const amount = parseFloat(trnAmt);
+
+      // Check for debit indicators (payments/withdrawals)
+      const isDebit = amount < 0 || 
+                     trnType === 'PAYMENT' || 
+                     trnType === 'DEBIT' || 
+                     trnType === 'CHECK' ||
+                     trnType === 'XFER' ||
+                     trnType === 'WITHDRAWAL' ||
+                     memo.toLowerCase().includes('pag') ||
+                     memo.toLowerCase().includes('transf') ||
+                     memo.toLowerCase().includes('saque') ||
+                     memo.toLowerCase().includes('débito');
+
+      if (isDebit) {
         standardType = 'debit';
+      } else if (trnType === 'CREDIT' || amount > 0) {
+        standardType = 'credit';
       }
 
       transactions.push({
@@ -108,7 +122,8 @@ async function parseOFXBuffer(buffer: Buffer) {
         amount: trnAmt,
         description: memo,
         bankRef: refNum,
-        type: standardType
+        type: standardType,
+        originalType: trnType // Manter tipo original para debug
       });
     });
   }
@@ -2481,7 +2496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           const amount = Math.abs(parseFloat(transaction.amount));
-          
+
           // Create payment record
           const payment = await storage.createPayment({
             orderId: orderId,
@@ -2504,7 +2519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           paymentsCreated++;
           actualTotalAmount += amount;
-          
+
           console.log(`Created payment ${payment.id} for R$ ${amount} from transaction ${txn.transactionId}`);
         } catch (error) {
           console.error(`Error processing transaction ${txn.transactionId}:`, error);
