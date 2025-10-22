@@ -1777,10 +1777,6 @@ export default function VendorBudgets() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={() => setIsBudgetDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Orçamento
-            </Button>
           </div>
 
           {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
