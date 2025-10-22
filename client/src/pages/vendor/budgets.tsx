@@ -1890,15 +1890,15 @@ export default function VendorBudgets() {
                         )}
                         {(budget.status === 'sent' || budget.status === 'approved') && (
                           <Button
-                            className="text-green-600 hover:text-green-900"
+                            className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => {
                               setViewBudgetDialogOpen(false);
                               handleConvertClick(budget.id);
                             }}
                             data-testid={`button-convert-${budget.id}`}
                           >
-                            <ShoppingCart className="h-4 w-4 mr-1" />
-                            Converter
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Converter em Pedido
                           </Button>
                         )}
                         <Button
