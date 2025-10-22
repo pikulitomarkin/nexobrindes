@@ -2663,7 +2663,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any>) {
+  async createBudgetItem(budgetId: string, itemData: any) {
     const id = generateId('budget-item');
 
     const item = {

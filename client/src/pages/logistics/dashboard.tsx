@@ -67,7 +67,7 @@ export default function LogisticsDashboard() {
         throw new Error(errorData.error || "Erro ao enviar para produção");
       }
       return response.json();
-    },</old_str>
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
@@ -590,7 +590,7 @@ export default function LogisticsDashboard() {
                                     ))}
                                   </div>
                                 );
-                              })()}</old_str>
+                              })()}
                             </div>
                           </td>
                         </tr>
