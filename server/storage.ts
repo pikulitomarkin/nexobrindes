@@ -2256,7 +2256,45 @@ export class MemStorage implements IStorage {
   }
 
   async getBudget(id: string): Promise<any> {
-    return this.budgets.get(id);
+    const budget = this.budgets.get(id);
+    if (!budget) return null;
+
+    // Get budget items with all fields including customizationPhoto
+    const items = Array.from(this.budgetItems.values())
+      .filter(item => item.budgetId === id)
+      .map(item => ({
+        ...item,
+        customizationPhoto: item.customizationPhoto || '' // Ensure customizationPhoto is included
+      }));
+
+    // Get budget photos
+    const photos = Array.from(this.budgetPhotos.values()).filter(photo => photo.budgetId === id);
+
+    // Get client info if clientId exists
+    let clientName = budget.contactName;
+    if (budget.clientId) {
+      const client = this.clients.get(budget.clientId);
+      if (client) {
+        clientName = client.name;
+      }
+    }
+
+    // Get vendor info if vendorId exists
+    let vendorName = null;
+    if (budget.vendorId) {
+      const vendor = this.users.get(budget.vendorId);
+      if (vendor) {
+        vendorName = vendor.name;
+      }
+    }
+
+    return {
+      ...budget,
+      items,
+      photos,
+      clientName,
+      vendorName
+    };
   }
 
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
@@ -2268,27 +2306,55 @@ export class MemStorage implements IStorage {
   }
 
   async createBudget(budgetData: any): Promise<any> {
-    const id = `budget-${Date.now()}`;
-    const newBudget = {
+    const id = generateId('budget');
+    const now = new Date();
+
+    const budget = {
       id,
-      budgetNumber: `ORC-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      ...budgetData,
+      budgetNumber: `ORC-${Date.now()}`,
+      title: budgetData.title || 'Orçamento sem título',
+      description: budgetData.description || '',
+      clientId: budgetData.clientId || null,
+      contactName: budgetData.contactName || '',
+      contactPhone: budgetData.contactPhone || '',
+      contactEmail: budgetData.contactEmail || '',
+      vendorId: budgetData.vendorId || null,
+      validUntil: budgetData.validUntil || null,
+      deliveryDeadline: budgetData.deliveryDeadline || null,
+      deliveryType: budgetData.deliveryType || 'delivery',
       totalValue: budgetData.totalValue || '0.00',
       status: budgetData.status || 'draft',
-      deliveryType: budgetData.deliveryType || 'delivery',
-      hasCustomization: budgetData.hasCustomization || false,
-      customizationPercentage: budgetData.customizationPercentage || '0.00',
-      customizationValue: budgetData.customizationValue || '0.00',
-      customizationDescription: budgetData.customizationDescription || '',
+      paymentMethodId: budgetData.paymentMethodId || '',
+      shippingMethodId: budgetData.shippingMethodId || '',
+      installments: budgetData.installments || 1,
+      downPayment: parseFloat(budgetData.downPayment || 0),
+      remainingAmount: parseFloat(budgetData.remainingAmount || 0),
+      shippingCost: parseFloat(budgetData.shippingCost || 0),
       hasDiscount: budgetData.hasDiscount || false,
       discountType: budgetData.discountType || 'percentage',
-      discountPercentage: budgetData.discountPercentage || '0.00',
-      discountValue: budgetData.discountValue || '0.00',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      discountPercentage: parseFloat(budgetData.discountPercentage || 0),
+      discountValue: parseFloat(budgetData.discountValue || 0),
+      createdAt: now,
+      updatedAt: now
     };
-    this.budgets.set(id, newBudget);
-    return newBudget;
+
+    this.budgets.set(id, budget);
+
+    // Create budget items if provided
+    if (budgetData.items && Array.isArray(budgetData.items)) {
+      for (const itemData of budgetData.items) {
+        await this.createBudgetItem(id, itemData);
+      }
+    }
+
+    // Create budget photos if provided
+    if (budgetData.photos && Array.isArray(budgetData.photos)) {
+      for (const photoUrl of budgetData.photos) {
+        await this.createBudgetPhoto(id, { photoUrl });
+      }
+    }
+
+    return budget;
   }
 
   async updateBudget(id: string, budgetData: any): Promise<any> {
@@ -2313,96 +2379,78 @@ export class MemStorage implements IStorage {
   }
 
   async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
-    try {
-      const budget = this.budgets.get(budgetId);
-      if (!budget) {
-        throw new Error("Orçamento não encontrado");
-      }
-
-      const budgetItems = await this.getBudgetItems(budgetId);
-
-      console.log(`Converting budget to order with data:`, {
-        budgetId,
-        orderNumber: `PED-${Date.now()}`,
-        contactName: budget.contactName,
-        clientId: budget.clientId,
-        itemsCount: budgetItems.length,
-        totalValue: budget.totalValue
-      });
-
-      // Calculate total from budget items or use budget total
-      const totalValue = budgetItems.length > 0
-        ? budgetItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0).toFixed(2)
-        : (parseFloat(budget.totalValue || 0).toFixed(2));
-
-      // Create order from budget data
-      const orderData = {
-        orderNumber: `PED-${Date.now()}`,
-        clientId: budget.clientId,
-        vendorId: budget.vendorId,
-        budgetId: budgetId,
-        product: budget.title,
-        description: budget.description || '',
-        totalValue: totalValue,
-        status: 'pending' as const,
-        contactName: budget.contactName,
-        contactPhone: budget.contactPhone,
-        contactEmail: budget.contactEmail,
-        deliveryType: budget.deliveryType || 'delivery',
-        deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
-        items: budget.items || [],
-        paymentMethodId: budget.paymentMethodId || '',
-        shippingMethodId: budget.shippingMethodId || '',
-        installments: budget.installments || 1,
-        downPayment: budget.downPayment || 0,
-        remainingAmount: budget.remainingAmount || 0,
-        shippingCost: budget.shippingCost || 0,
-        hasDiscount: budget.hasDiscount || false,
-        discountType: budget.discountType || 'percentage',
-        discountPercentage: budget.discountPercentage || 0,
-        discountValue: budget.discountValue || 0
-      };
-
-      const order = await this.createOrder(orderData);
-
-      // Update budget status
-      budget.status = 'converted';
-      this.budgets.set(budgetId, budget);
-
-      // Create production orders if needed
-      if (budget.items && Array.isArray(budget.items)) {
-        const producersMap = new Map<string, any[]>();
-
-        budget.items.forEach((item: any) => {
-          const itemProducerId = item.producerId || producerId || 'internal';
-          if (!producersMap.has(itemProducerId)) {
-            producersMap.set(itemProducerId, []);
-          }
-          producersMap.get(itemProducerId)!.push(item);
-        });
-
-        for (const [pId, items] of producersMap.entries()) {
-          if (pId !== 'internal') {
-            const productionOrder = {
-              orderId: order.id,
-              producerId: pId,
-              status: 'pending' as const,
-              deadline: orderData.deadline,
-              notes: `Produção de ${items.length} itens do orçamento ${budget.budgetNumber}`,
-              deliveryDeadline: orderData.deadline,
-              orderDetails: JSON.stringify(items)
-            };
-
-            await this.createProductionOrder(productionOrder);
-          }
-        }
-      }
-
-      return order;
-    } catch (error) {
-      console.error('Error in convertBudgetToOrder:', error);
-      throw error;
+    const budget = this.budgets.get(budgetId);
+    if (!budget) {
+      throw new Error('Orçamento não encontrado');
     }
+
+    // Get budget items
+    const budgetItems = Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
+
+    // Create order data based on budget
+    const orderData = {
+      budgetId: budgetId,
+      clientId: budget.clientId,
+      vendorId: budget.vendorId,
+      product: budget.title,
+      description: budget.description,
+      totalValue: budget.totalValue,
+      status: 'confirmed',
+      contactName: budget.contactName,
+      contactPhone: budget.contactPhone,
+      contactEmail: budget.contactEmail,
+      deliveryType: budget.deliveryType,
+      deliveryDeadline: budget.deliveryDeadline,
+      paymentMethodId: budget.paymentMethodId,
+      shippingMethodId: budget.shippingMethodId,
+      installments: budget.installments,
+      downPayment: budget.downPayment,
+      remainingAmount: budget.remainingAmount,
+      shippingCost: budget.shippingCost,
+      hasDiscount: budget.hasDiscount,
+      discountType: budget.discountType,
+      discountPercentage: budget.discountPercentage,
+      discountValue: budget.discountValue,
+      items: budgetItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        producerId: item.producerId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        hasItemCustomization: item.hasItemCustomization,
+        selectedCustomizationId: item.selectedCustomizationId,
+        itemCustomizationValue: item.itemCustomizationValue,
+        itemCustomizationDescription: item.itemCustomizationDescription,
+        additionalCustomizationNotes: item.additionalCustomizationNotes,
+        customizationPhoto: item.customizationPhoto, // Include customization photo
+        hasGeneralCustomization: item.hasGeneralCustomization,
+        generalCustomizationName: item.generalCustomizationName,
+        generalCustomizationValue: item.generalCustomizationValue,
+        productWidth: item.productWidth,
+        productHeight: item.productHeight,
+        productDepth: item.productDepth,
+        hasItemDiscount: item.hasItemDiscount,
+        itemDiscountType: item.itemDiscountType,
+        itemDiscountPercentage: item.itemDiscountPercentage,
+        itemDiscountValue: item.itemDiscountValue
+      }))
+    };
+
+    // Create the order
+    const order = await this.createOrder(orderData);
+
+    // Update budget status to converted
+    const updatedBudget = {
+      ...budget,
+      status: 'converted',
+      convertedAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.budgets.set(budgetId, updatedBudget);
+
+    console.log(`Budget ${budgetId} converted to order ${order.id}`);
+    return order;
   }
 
 
@@ -2412,72 +2460,66 @@ export class MemStorage implements IStorage {
   }
 
   async createBudgetItem(budgetId: string, itemData: any) {
-    const budgetItem = {
-      id: `budget-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      budgetId: budgetId,
-      productId: itemData.productId,
-      producerId: itemData.producerId || 'internal',
-      quantity: parseFloat(itemData.quantity || 1),
-      unitPrice: parseFloat(itemData.unitPrice || 0),
-      totalPrice: parseFloat(itemData.totalPrice || 0),
-      notes: itemData.notes || null,
-      // Item Customization
+    const id = generateId('budget-item');
+
+    const item = {
+      id,
+      budgetId,
+      productId: itemData.productId || null,
+      productName: itemData.productName || '',
+      producerId: itemData.producerId || null,
+      quantity: parseInt(itemData.quantity) || 1,
+      unitPrice: parseFloat(itemData.unitPrice) || 0,
+      totalPrice: parseFloat(itemData.totalPrice) || 0,
+      // Item customization fields
       hasItemCustomization: itemData.hasItemCustomization || false,
       selectedCustomizationId: itemData.selectedCustomizationId || null,
       itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || 0),
-      itemCustomizationDescription: itemData.itemCustomizationDescription || "",
-      additionalCustomizationNotes: itemData.additionalCustomizationNotes || "",
-      customizationPhoto: itemData.customizationPhoto || "",
-      // General Customization
+      itemCustomizationDescription: itemData.itemCustomizationDescription || '',
+      additionalCustomizationNotes: itemData.additionalCustomizationNotes || '',
+      customizationPhoto: itemData.customizationPhoto || '', // Add customization photo field
+      // General customization fields
       hasGeneralCustomization: itemData.hasGeneralCustomization || false,
-      generalCustomizationName: itemData.generalCustomizationName || "",
+      generalCustomizationName: itemData.generalCustomizationName || '',
       generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || 0),
-      // Item Discount
+      // Product dimensions
+      productWidth: itemData.productWidth || null,
+      productHeight: itemData.productHeight || null,
+      productDepth: itemData.productDepth || null,
+      // Item discount
       hasItemDiscount: itemData.hasItemDiscount || false,
-      itemDiscountType: itemData.itemDiscountType || "percentage",
+      itemDiscountType: itemData.itemDiscountType || 'percentage',
       itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || 0),
       itemDiscountValue: parseFloat(itemData.itemDiscountValue || 0),
-      // Product Dimensions
-      productWidth: itemData.productWidth ? parseFloat(itemData.productWidth) : null,
-      productHeight: itemData.productHeight ? parseFloat(itemData.productHeight) : null,
-      productDepth: itemData.productDepth ? parseFloat(itemData.productDepth) : null
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
-    this.budgetItems.set(budgetItem.id, budgetItem);
-    return budgetItem;
+    this.budgetItems.set(id, item);
+    return item;
   }
 
   async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
     const item = this.budgetItems.get(itemId);
-    if (!item) {
-      throw new Error('Budget item not found');
-    }
+    if (!item) return null;
 
     const updatedItem = {
       ...item,
       ...itemData,
-      quantity: parseFloat(itemData.quantity || item.quantity),
-      unitPrice: parseFloat(itemData.unitPrice || item.unitPrice),
-      totalPrice: parseFloat(itemData.totalPrice || item.totalPrice),
-      itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || item.itemCustomizationValue),
-      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || item.generalCustomizationValue),
-      itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || item.itemDiscountPercentage),
-      itemDiscountValue: parseFloat(itemData.itemDiscountValue || item.itemDiscountValue),
-      productWidth: itemData.productWidth ? parseFloat(itemData.productWidth) : item.productWidth,
-      productHeight: itemData.productHeight ? parseFloat(itemData.productHeight) : item.productHeight,
-      productDepth: itemData.productDepth ? parseFloat(itemData.productDepth) : item.productDepth,
-      // Ensure other fields are preserved if not being updated
-      producerId: itemData.producerId || item.producerId,
-      notes: itemData.notes !== undefined ? itemData.notes : item.notes,
-      hasItemCustomization: itemData.hasItemCustomization !== undefined ? itemData.hasItemCustomization : item.hasItemCustomization,
-      selectedCustomizationId: itemData.selectedCustomizationId !== undefined ? itemData.selectedCustomizationId : item.selectedCustomizationId,
-      itemCustomizationDescription: itemData.itemCustomizationDescription !== undefined ? itemData.itemCustomizationDescription : item.itemCustomizationDescription,
-      additionalCustomizationNotes: itemData.additionalCustomizationNotes !== undefined ? itemData.additionalCustomizationNotes : item.additionalCustomizationNotes,
+      // Preserve customization photo if not explicitly updated
       customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : item.customizationPhoto,
-      hasGeneralCustomization: itemData.hasGeneralCustomization !== undefined ? itemData.hasGeneralCustomization : item.hasGeneralCustomization,
-      generalCustomizationName: itemData.generalCustomizationName !== undefined ? itemData.generalCustomizationName : item.generalCustomizationName,
-      hasItemDiscount: itemData.hasItemDiscount !== undefined ? itemData.hasItemDiscount : item.hasItemDiscount,
-      itemDiscountType: itemData.itemDiscountType !== undefined ? itemData.itemDiscountType : item.itemDiscountType,
+      // Recalculate fields if they are present in itemData
+      quantity: itemData.quantity !== undefined ? parseFloat(itemData.quantity) : item.quantity,
+      unitPrice: itemData.unitPrice !== undefined ? parseFloat(itemData.unitPrice) : item.unitPrice,
+      totalPrice: itemData.totalPrice !== undefined ? parseFloat(itemData.totalPrice) : item.totalPrice,
+      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue) : item.itemCustomizationValue,
+      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue) : item.generalCustomizationValue,
+      itemDiscountPercentage: itemData.itemDiscountPercentage !== undefined ? parseFloat(itemData.itemDiscountPercentage) : item.itemDiscountPercentage,
+      itemDiscountValue: itemData.itemDiscountValue !== undefined ? parseFloat(itemData.itemDiscountValue) : item.itemDiscountValue,
+      productWidth: itemData.productWidth !== undefined ? parseFloat(itemData.productWidth) : item.productWidth,
+      productHeight: itemData.productHeight !== undefined ? parseFloat(itemData.productHeight) : item.productHeight,
+      productDepth: itemData.productDepth !== undefined ? parseFloat(itemData.productDepth) : item.productDepth,
+      updatedAt: new Date()
     };
 
     this.budgetItems.set(itemId, updatedItem);
@@ -3507,7 +3549,7 @@ export class MemStorage implements IStorage {
       // Check if order has external producer items that need production
       let hasExternalItems = false;
       if (order.items && Array.isArray(order.items)) {
-        hasExternalItems = order.items.some((item: any) => 
+        hasExternalItems = order.items.some((item: any) =>
           item.producerId && item.producerId !== 'internal'
         );
       }

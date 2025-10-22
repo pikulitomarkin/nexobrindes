@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import multer from 'multer';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { storage } from "./storage";
 import { db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
@@ -130,7 +131,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
 
       // Write file to disk
-      const fs = require('fs');
       fs.writeFileSync(filepath, req.file.buffer);
 
       const url = `/uploads/${filename}`;
@@ -193,6 +193,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching budget for review:", error);
       res.status(500).json({ error: "Erro ao buscar orçamento" });
+    }
+  });
+
+  // Get budget PDF data with all images
+  app.get("/api/budgets/:id/pdf-data", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const budget = await storage.getBudget(id);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Get all budget data including item photos
+      const budgetData = {
+        budget: budget,
+        items: budget.items || [],
+        photos: budget.photos || [],
+        itemPhotos: budget.items?.map((item: any) => item.customizationPhoto).filter(Boolean) || []
+      };
+
+      res.json(budgetData);
+    } catch (error) {
+      console.error("Error fetching budget PDF data:", error);
+      res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF" });
     }
   });
 
