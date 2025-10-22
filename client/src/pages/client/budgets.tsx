@@ -158,7 +158,7 @@ export default function ClientBudgets() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 client-panel">
       <div className="mb-8">
         <div className="flex justify-between items-center mb-2">
           <h1 className="text-3xl font-bold text-gray-900">Meus Orçamentos</h1>

@@ -161,7 +161,7 @@ export default function ClientOrderTimeline() {
   const timeline = getTimelineSteps(order);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto client-panel">
       <div className="mb-8">
         <Link href="/client/orders">
           <Button variant="ghost" className="mb-4">
@@ -478,29 +478,7 @@ export default function ClientOrderTimeline() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Phone className="h-5 w-5 mr-2" />
-                Ações Rápidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" size="sm" className="w-full">
-                <Phone className="h-4 w-4 mr-2" />
-                Ligar para Vendedor
-              </Button>
-              <Button variant="outline" size="sm" className="w-full">
-                <Mail className="h-4 w-4 mr-2" />
-                Enviar Email
-              </Button>
-              <Button variant="outline" size="sm" className="w-full">
-                <Package className="h-4 w-4 mr-2" />
-                Rastrear Entrega
-              </Button>
-            </CardContent>
-          </Card>
+          
 
           {/* Additional Information */}
           {(order.vendorName || order.producerName) && (

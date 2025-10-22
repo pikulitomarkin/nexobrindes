@@ -3,6 +3,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reduzir fontes em 25% nos painéis do cliente */
+.client-panel {
+  font-size: 0.75rem; /* Redução de 25% */
+}
+
+.client-panel h1 {
+  font-size: 1.875rem; /* De 3xl para aproximadamente 2xl */
+}
+
+.client-panel h2 {
+  font-size: 1.5rem; /* De 2xl para xl */
+}
+
+.client-panel h3 {
+  font-size: 1.25rem; /* De xl para lg */
+}
+
+.client-panel .text-lg {
+  font-size: 1rem; /* De lg para base */
+}
+
+.client-panel .text-xl {
+  font-size: 1.125rem; /* De xl para lg */
+}
+
+.client-panel .text-2xl {
+  font-size: 1.5rem; /* De 2xl para xl */
+}
+
+.client-panel .text-3xl {
+  font-size: 1.875rem; /* De 3xl para 2xl */
+}
+
+.client-panel .text-sm {
+  font-size: 0.75rem; /* Mantém proporção */
+}
+
+.client-panel .text-xs {
+  font-size: 0.6875rem; /* Mantém proporção */
+}
+
 :root {
   --background: hsl(240, 5%, 96%);
   --foreground: hsl(222.2, 84%, 4.9%);

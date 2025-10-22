@@ -146,7 +146,7 @@ export default function ClientProfile() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-4xl mx-auto client-panel">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Meu Perfil</h1>
         <p className="text-gray-600">Gerencie suas informações pessoais e configurações de conta</p>

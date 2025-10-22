@@ -291,7 +291,7 @@ export default function ClientProducts() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 client-panel">
       <div className="mb-8">
         <div className="flex justify-between items-center">
           <div>

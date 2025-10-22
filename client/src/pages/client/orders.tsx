@@ -78,7 +78,7 @@ export default function ClientOrders() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 client-panel">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Pedidos</h1>
         <p className="text-gray-600">Acompanhe o status e detalhes dos seus pedidos</p>
