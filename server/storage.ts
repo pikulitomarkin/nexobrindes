@@ -3506,22 +3506,64 @@ export class MemStorage implements IStorage {
 
   // Logistics - Get paid orders that are ready to be sent to production
   async getPaidOrdersReadyForProduction(): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(order => {
-      // Pedido deve estar confirmado E ter valor pago suficiente E não ter sido enviado para produção ainda
-      const isPaid = parseFloat(order.paidValue || '0') > 0;
-      const isConfirmed = order.status === 'confirmed';
-      const notInProduction = order.status !== 'production';
+    const orders = await this.getOrders();
+    console.log(`Checking ${orders.length} orders for paid status ready for production`);
 
-      // Verificar se tem itens de produtores externos
-      let hasExternalProducers = false;
+    // Filter orders that are paid and ready to be sent to production
+    const readyOrders = orders.filter(order => {
+      console.log(`Order ${order.orderNumber}: status=${order.status}, paidValue=${order.paidValue}, totalValue=${order.totalValue}`);
+
+      // Order must be confirmed and have received payment
+      if (!['confirmed', 'paid'].includes(order.status)) {
+        console.log(`Order ${order.orderNumber} filtered out - status not confirmed/paid: ${order.status}`);
+        return false;
+      }
+
+      // Check if order has received payment
+      const paidValue = parseFloat(order.paidValue || '0');
+      const totalValue = parseFloat(order.totalValue || '0');
+
+      // Must have received some payment
+      if (paidValue <= 0) {
+        console.log(`Order ${order.orderNumber} filtered out - no payment received`);
+        return false;
+      }
+
+      // Check if minimum payment requirement is met (down payment + shipping)
+      const downPayment = parseFloat(order.downPayment || '0');
+      const shippingCost = parseFloat(order.shippingCost || '0');
+      const minimumRequired = downPayment + shippingCost;
+
+      if (minimumRequired > 0 && paidValue < minimumRequired) {
+        console.log(`Order ${order.orderNumber} filtered out - minimum payment not met: ${paidValue} < ${minimumRequired}`);
+        return false;
+      }
+
+      // Check if order has external producer items that need production
+      let hasExternalItems = false;
       if (order.items && Array.isArray(order.items)) {
-        hasExternalProducers = order.items.some((item: any) =>
+        hasExternalItems = order.items.some((item: any) => 
           item.producerId && item.producerId !== 'internal'
         );
       }
 
-      return isConfirmed && isPaid && notInProduction && hasExternalProducers;
+      if (!hasExternalItems) {
+        console.log(`Order ${order.orderNumber} filtered out - no external production items`);
+        return false; // No external production needed
+      }
+
+      // Make sure it hasn't been sent to production yet
+      const notInProduction = order.status !== 'production';
+      if (!notInProduction) {
+        console.log(`Order ${order.orderNumber} filtered out - already in production`);
+      }
+
+      console.log(`Order ${order.orderNumber} APPROVED for production - has payment and external items`);
+      return notInProduction;
     });
+
+    console.log(`Found ${readyOrders.length} paid orders ready for production`);
+    return readyOrders;
   }
 }
 

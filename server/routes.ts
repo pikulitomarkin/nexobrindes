@@ -237,6 +237,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics - Get paid orders ready for production
+  app.get("/api/logistics/paid-orders", async (req, res) => {
+    try {
+      console.log("Fetching paid orders ready for production...");
+      const paidOrders = await storage.getPaidOrdersReadyForProduction();
+      
+      console.log(`Found ${paidOrders.length} paid orders ready for production`);
+      
+      // Enrich with client names and producer information
+      const enrichedOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName;
+          
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+          
+          // If still no name, use a descriptive message
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+          
+          return {
+            ...order,
+            clientName: clientName
+          };
+        })
+      );
+      
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching paid orders:", error);
+      res.status(500).json({ error: "Failed to fetch paid orders" });
+    }
+  });
+
   // Logistics Products Routes
   app.get("/api/logistics/products", async (req, res) => {
     try {
