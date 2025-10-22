@@ -291,7 +291,6 @@ export default function FinanceIndex() {
               </CardContent>
             </Card>
           </div>
-        </div>
     </div>
   );
 }
