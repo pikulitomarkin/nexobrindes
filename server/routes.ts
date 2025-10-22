@@ -51,39 +51,90 @@ const requireAuth = async (req: any, res: any, next: any) => {
 };
 
 
-// Helper function to parse OFX buffer
-async function parseOFXBuffer(buffer: Buffer) {
+// Robust OFX Parser using node-ofx-parser library
+const Ofx = require('node-ofx-parser');
+
+interface ParsedOFXTransaction {
+  fitId: string;
+  rawFitId: string;
+  date: Date | null;
+  hasValidDate: boolean;
+  amount: string;
+  description: string;
+  bankRef: string | null;
+  type: 'credit' | 'debit' | 'other';
+  originalType: string;
+}
+
+interface ParsedOFXResult {
+  transactions: ParsedOFXTransaction[];
+  stats: {
+    totalLines: number;
+    accountId?: string;
+    bankId?: string;
+    accountType?: string;
+  };
+}
+
+async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
   const ofxContent = buffer.toString('utf-8');
-  const transactions = [];
-  const stats = { totalLines: ofxContent.split('\n').length };
-
-  // Simple regex-based OFX parsing
-  const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
-  const matches = ofxContent.match(transactionRegex);
-
-  if (matches) {
-    matches.forEach((match, index) => {
-      const trnType = match.match(/<TRNTYPE>(.*?)</)?.[1] || 'OTHER';
-      const dtPostedRaw = match.match(/<DTPOSTED>(.*?)</)?.[1] || '';
-      const trnAmt = match.match(/<TRNAMT>(.*?)</)?.[1] || '0';
-      const fitId = match.match(/<FITID>(.*?)</)?.[1] || `TXN_${Date.now()}_${index}`;
-      const memo = match.match(/<MEMO>(.*?)</)?.[1] || 'Transação bancária';
-      const refNum = match.match(/<REFNUM>(.*?)</)?.[1] || null;
-
+  const stats = { 
+    totalLines: ofxContent.split('\n').length,
+    accountId: undefined as string | undefined,
+    bankId: undefined as string | undefined,
+    accountType: undefined as string | undefined
+  };
+  
+  try {
+    // Parse OFX using node-ofx-parser
+    const ofxData = await Ofx.parse(ofxContent);
+    
+    const transactions: ParsedOFXTransaction[] = [];
+    
+    // Extract account information for better reconciliation
+    const bankAccount = ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKACCTFROM;
+    if (bankAccount) {
+      stats.accountId = bankAccount.ACCTID;
+      stats.bankId = bankAccount.BANKID;
+      stats.accountType = bankAccount.ACCTTYPE;
+    }
+    
+    // Extract transactions from the parsed OFX
+    const statementTransactions = ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST?.STMTTRN;
+    
+    if (!statementTransactions) {
+      console.warn('No transactions found in OFX file');
+      return { transactions, stats };
+    }
+    
+    // Ensure it's an array
+    const txnArray = Array.isArray(statementTransactions) ? statementTransactions : [statementTransactions];
+    
+    txnArray.forEach((txn, index) => {
+      // Extract transaction data safely
+      const trnType = txn.TRNTYPE || 'OTHER';
+      const dtPostedRaw = txn.DTPOSTED || '';
+      const trnAmt = txn.TRNAMT || '0';
+      const fitId = txn.FITID || `TXN_${Date.now()}_${index}`;
+      const memo = txn.MEMO || txn.NAME || 'Transação bancária';
+      const refNum = txn.REFNUM || txn.CHECKNUM || null;
+      
       // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
-      let transactionDate = null;
+      let transactionDate: Date | null = null;
       let hasValidDate = false;
+      
       if (dtPostedRaw && dtPostedRaw.length >= 8) {
         try {
-          const year = parseInt(dtPostedRaw.substring(0, 4));
-          const month = parseInt(dtPostedRaw.substring(4, 6)) - 1; // Month is 0-based
-          const day = parseInt(dtPostedRaw.substring(6, 8));
-
-          // Check if date components are valid numbers before creating date
+          const dateStr = String(dtPostedRaw);
+          const year = parseInt(dateStr.substring(0, 4));
+          const month = parseInt(dateStr.substring(4, 6)) - 1; // Month is 0-based
+          const day = parseInt(dateStr.substring(6, 8));
+          
           if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
             const parsedDate = new Date(year, month, day);
-            // Further validate if the created date is reasonable
-            if (parsedDate.getFullYear() === year && parsedDate.getMonth() === month && parsedDate.getDate() === day) {
+            if (parsedDate.getFullYear() === year && 
+                parsedDate.getMonth() === month && 
+                parsedDate.getDate() === day) {
               transactionDate = parsedDate;
               hasValidDate = true;
             }
@@ -92,11 +143,11 @@ async function parseOFXBuffer(buffer: Buffer) {
           console.error("Error parsing date from DTPOSTED:", dtPostedRaw, e);
         }
       }
-
-      // Improved transaction type classification for producer payments
-      let standardType = 'other';
+      
+      // Classify transaction type
+      let standardType: 'credit' | 'debit' | 'other' = 'other';
       const amount = parseFloat(trnAmt);
-
+      
       // Check for debit indicators (payments/withdrawals)
       const isDebit = amount < 0 || 
                      trnType === 'PAYMENT' || 
@@ -104,31 +155,40 @@ async function parseOFXBuffer(buffer: Buffer) {
                      trnType === 'CHECK' ||
                      trnType === 'XFER' ||
                      trnType === 'WITHDRAWAL' ||
+                     trnType === 'DEP' || // Some banks use DEP for debits
                      memo.toLowerCase().includes('pag') ||
                      memo.toLowerCase().includes('transf') ||
                      memo.toLowerCase().includes('saque') ||
                      memo.toLowerCase().includes('débito');
-
+      
       if (isDebit) {
         standardType = 'debit';
-      } else if (trnType === 'CREDIT' || amount > 0) {
+      } else if (trnType === 'CREDIT' || trnType === 'DEP' || amount > 0) {
         standardType = 'credit';
       }
-
+      
       transactions.push({
         fitId: fitId,
+        rawFitId: fitId, // Store original FITID for deduplication
         date: transactionDate,
         hasValidDate: hasValidDate,
         amount: trnAmt,
         description: memo,
         bankRef: refNum,
         type: standardType,
-        originalType: trnType // Manter tipo original para debug
+        originalType: trnType
       });
     });
+    
+    console.log(`Parsed OFX successfully: ${transactions.length} transactions found`);
+    return { transactions, stats };
+    
+  } catch (error) {
+    console.error('Error parsing OFX with node-ofx-parser:', error);
+    // Fallback: return empty result instead of throwing
+    console.warn('OFX parsing failed, returning empty transaction list');
+    return { transactions: [], stats };
   }
-
-  return { transactions, stats };
 }
 
 // Helper function to generate unique IDs (replace with a proper UUID library in production)
