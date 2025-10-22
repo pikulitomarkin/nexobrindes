@@ -522,11 +522,11 @@ export class MemStorage implements IStorage {
     };
     this.users.set(producerUser.id, producerUser);
 
-    // Create 3 partners with same admin credentials
-    const partner1 = {
+    // Create 3 partners - they can edit their names later
+    const partner1User = {
       id: "partner-1",
-      username: "admin", // Mesmas credenciais do admin
-      password: "123",   // Mesmas credenciais do admin
+      username: "socio1",
+      password: "123456",
       name: "Sócio 1",
       email: "socio1@erp.com",
       phone: null,
@@ -536,11 +536,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    const partner2 = {
+    this.users.set(partner1User.id, partner1User);
+
+    const partner2User = {
       id: "partner-2",
-      username: "admin", // Mesmas credenciais do admin
-      password: "123",   // Mesmas credenciais do admin
+      username: "socio2",
+      password: "123456",
       name: "Sócio 2",
       email: "socio2@erp.com",
       phone: null,
@@ -550,11 +551,12 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    const partner3 = {
+    this.users.set(partner2User.id, partner2User);
+
+    const partner3User = {
       id: "partner-3",
-      username: "admin", // Mesmas credenciais do admin
-      password: "123",   // Mesmas credenciais do admin
+      username: "socio3",
+      password: "123456",
       name: "Sócio 3",
       email: "socio3@erp.com",
       phone: null,
@@ -564,10 +566,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    this.users.set(partner1.id, partner1);
-    this.users.set(partner2.id, partner2);
-    this.users.set(partner3.id, partner3);
+    this.users.set(partner3User.id, partner3User);
 
     // Logistics user
     const logisticsUser = {
@@ -1593,9 +1592,9 @@ export class MemStorage implements IStorage {
           if (minimumPayment > 0 && parseFloat(newPaidValue) >= minimumPayment) {
             status = 'partial';
           } else if (minimumPayment > 0 && parseFloat(newPaidValue) < minimumPayment) {
-            status = 'pending'; // Minimum not met
+            status = 'pending';
           } else {
-            status = 'partial'; // No minimum requirement
+            status = 'partial';
           }
         } else {
           status = minimumPayment > 0 ? 'pending' : 'open';
@@ -1642,38 +1641,34 @@ export class MemStorage implements IStorage {
       };
 
       this.commissions.set(vendorCommission.id, vendorCommission);
-      console.log(`Created vendor commission: ${vendorCommissionAmount.toFixed(2)} for order ${order.orderNumber}`);
 
-      // Create partner commissions - 15% total divided by 3 partners = 5% each
-      const partnerTotalRate = 15.00; // 15% total para sócios
-      const individualPartnerRate = partnerTotalRate / 3; // 5% para cada sócio
-      const partnerCommissionAmount = (orderValue * individualPartnerRate) / 100;
+      // Create partner commissions - divide equally among 3 partners
+      const partnerRate = commissionSettings?.partnerCommissionRate || '15.00';
+      const totalPartnerCommission = (orderValue * parseFloat(partnerRate)) / 100;
+      const individualPartnerCommission = totalPartnerCommission / 3; // Divide by 3 partners
 
       const partnerIds = ['partner-1', 'partner-2', 'partner-3'];
-      
+
       for (let i = 0; i < partnerIds.length; i++) {
-        const partnerId = partnerIds[i];
         const partnerCommission: Commission = {
           id: `commission-${order.id}-partner-${i + 1}`,
-          partnerId: partnerId,
+          partnerId: partnerIds[i],
           orderId: order.id,
-          percentage: individualPartnerRate.toFixed(2),
-          amount: partnerCommissionAmount.toFixed(2),
-          status: 'pending', // Será 'confirmed' quando o pedido receber o primeiro pagamento
+          percentage: (parseFloat(partnerRate) / 3).toFixed(2), // Individual percentage
+          amount: individualPartnerCommission.toFixed(2),
+          status: 'confirmed', // Partners get paid immediately when order starts
           type: 'partner',
           orderValue: order.totalValue,
           orderNumber: order.orderNumber,
-          paidAt: null,
+          paidAt: new Date(), // Paid immediately
           createdAt: new Date()
         };
 
         this.commissions.set(partnerCommission.id, partnerCommission);
-        console.log(`Created partner commission: ${partnerCommissionAmount.toFixed(2)} for partner ${i + 1} on order ${order.orderNumber}`);
       }
 
-      // Apply auto-deduction for any previous cancelled order commissions
-      await this.autoDeductPartnerCommissions(order);
-
+      console.log(`Created vendor commission: ${vendorCommissionAmount.toFixed(2)} for order ${order.orderNumber}`);
+      console.log(`Created 3 partner commissions: ${individualPartnerCommission.toFixed(2)} each (total: ${totalPartnerCommission.toFixed(2)}) for order ${order.orderNumber}`);
     } catch (error) {
       console.error('Error calculating commissions:', error);
     }
@@ -1682,22 +1677,6 @@ export class MemStorage implements IStorage {
   // Process commission payments based on order status
   async processCommissionPayments(order: Order, status: string): Promise<void> {
     try {
-      // Check if this order has received its first payment
-      const orderPaidValue = parseFloat(order.paidValue || '0');
-      const hasReceivedPayment = orderPaidValue > 0;
-
-      // Partner commissions are confirmed when order receives first payment
-      if (hasReceivedPayment) {
-        const partnerCommissions = Array.from(this.commissions.values())
-          .filter(c => c.orderId === order.id && c.partnerId && c.status === 'pending');
-
-        for (const commission of partnerCommissions) {
-          commission.status = 'confirmed';
-          this.commissions.set(commission.id, commission);
-          console.log(`Partner commission confirmed for order ${order.orderNumber}: ${commission.amount}`);
-        }
-      }
-
       if (status === 'completed' || status === 'delivered') {
         // Update vendor commissions to paid when order is completed
         const vendorCommissions = Array.from(this.commissions.values())
@@ -1708,43 +1687,33 @@ export class MemStorage implements IStorage {
           commission.paidAt = new Date();
           this.commissions.set(commission.id, commission);
         }
+      } else if (status === 'cancelled') {
+        // When order is cancelled, partners keep their commissions but they will be deducted from next orders
+        const partnerCommissions = Array.from(this.commissions.values())
+          .filter(c => c.orderId === order.id && c.partnerId && c.status === 'confirmed');
+
+        console.log(`Order ${order.orderNumber} cancelled. Partner commissions will be deducted from future orders:`,
+          partnerCommissions.map(c => `${c.partnerId}: ${c.amount}`));
+
+        // Mark partner commissions as needing deduction (but they keep the money for now)
+        for (const commission of partnerCommissions) {
+          commission.status = 'deducted'; // This marks them for future deduction
+          commission.deductedAt = new Date();
+          this.commissions.set(commission.id, commission);
+        }
+
+        // Mark vendor commission as cancelled
+        const vendorCommissions = Array.from(this.commissions.values())
+          .filter(c => c.orderId === order.id && c.vendorId);
+
+        for (const commission of vendorCommissions) {
+          commission.status = 'cancelled';
+          this.commissions.set(commission.id, commission);
+        }
       }
     } catch (error) {
       console.error('Error processing commission payments:', error);
     }
-  }
-
-  // Create manual receivable
-  async createManualReceivable(data: any): Promise<any> {
-    const id = `manual-${randomUUID()}`;// Ensure a unique ID for manual receivables
-    const receivable = {
-      id,
-      orderId: null,
-      clientId: null,
-      vendorId: null,
-      description: data.description,
-      amount: data.amount,
-      receivedAmount: "0.00",
-      dueDate: data.dueDate,
-      status: 'pending', // Default to pending
-      minimumPayment: data.minimumPayment || '0.00', // Add minimumPayment
-      type: 'manual',
-      notes: data.notes,
-      clientName: data.clientName,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Ensure manualReceivables array exists
-    if (!this.mockData.manualReceivables) {
-      this.mockData.manualReceivables = [];
-    }
-
-    this.mockData.manualReceivables.push(receivable);
-    console.log(`Created manual receivable: ${receivable.id} for ${receivable.clientName} - ${receivable.amount}`);
-    console.log(`Total manual receivables: ${this.mockData.manualReceivables.length}`);
-
-    return receivable;
   }
 
   // Commission methods
@@ -1855,7 +1824,7 @@ export class MemStorage implements IStorage {
   // Auto-deduct partner commissions when creating new partner commissions
   async autoDeductPartnerCommissions(order: Order): Promise<void> {
     const partnerIds = ['partner-1', 'partner-2', 'partner-3'];
-    
+
     for (const partnerId of partnerIds) {
       // Find all deducted commissions for this partner
       const deductedCommissions = Array.from(this.commissions.values())
@@ -1868,7 +1837,7 @@ export class MemStorage implements IStorage {
       if (totalToDeduct > 0) {
         console.log(`Auto-deducting ${totalToDeduct.toFixed(2)} from partner ${partnerId} commissions on order ${order.orderNumber}`);
         await this.deductPartnerCommission(partnerId, totalToDeduct.toFixed(2));
-        
+
         // Mark deducted commissions as processed
         for (const commission of deductedCommissions) {
           commission.status = 'deduction_applied';
@@ -1951,25 +1920,25 @@ export class MemStorage implements IStorage {
     const partnerProfile1: Partner = {
       id: "partner-profile-1",
       userId: "partner-1",
-      commissionRate: "5.00", // 15% dividido por 3
+      commissionRate: "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     const partnerProfile2: Partner = {
       id: "partner-profile-2",
       userId: "partner-2",
-      commissionRate: "5.00", // 15% dividido por 3
+      commissionRate: "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     const partnerProfile3: Partner = {
       id: "partner-profile-3",
       userId: "partner-3",
-      commissionRate: "5.00", // 15% dividido por 3
+      commissionRate: "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -2911,7 +2880,7 @@ export class MemStorage implements IStorage {
       .map(order => {
         let clientName = order.contactName || 'Cliente não identificado';
         const minimumPayment = (parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0")).toFixed(2);
-        
+
         // Calculate remaining amount to receive (total - already paid)
         const totalValue = parseFloat(order.totalValue || "0");
         const paidValue = parseFloat(order.paidValue || "0");
