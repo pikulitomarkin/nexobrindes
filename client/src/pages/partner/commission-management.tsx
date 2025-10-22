@@ -169,20 +169,6 @@ export default function PartnerCommissionManagement() {
     commissionForm.setValue('commissionRate', partner.commissionRate);
   };
 
-  const onCommissionSubmit = (data: CommissionFormValues) => {
-    if (editingVendor) {
-      updateVendorCommissionMutation.mutate({
-        vendorId: editingVendor,
-        commissionRate: data.commissionRate
-      });
-    } else if (editingPartner) {
-      updatePartnerCommissionMutation.mutate({
-        partnerId: editingPartner,
-        commissionRate: data.commissionRate
-      });
-    }
-  };
-
   const onPartnerSubmit = (data: PartnerFormValues) => {
     createPartnerMutation.mutate(data);
   };
