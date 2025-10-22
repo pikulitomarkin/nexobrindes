@@ -146,4 +146,30 @@ const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.typ
 
 ---
 
+## 🚫 Erro: Pagamentos de produtores não aparecem na aba "Aguardando Aprovação"
+
+### Descrição do Problema
+Os pagamentos de produtores eram criados corretamente quando o produtor definia o valor da ordem de produção, mas não apareciam na aba "Aguardando Aprovação" no painel de pagamentos aos produtores.
+
+### Causa
+1. A rota `/api/finance/producer-payments/pending` não estava filtrando corretamente os pagamentos pendentes
+2. Falta de logs de depuração para identificar problemas na busca de pagamentos
+3. O filtro estava muito restritivo (apenas 'pending' em vez de 'pending' OU 'approved')
+
+### Solução
+**Arquivo:** `server/routes.ts`
+**Alteração:** 
+1. Melhorar logs de depuração na rota `/api/finance/producer-payments/pending`
+2. Expandir filtro para incluir pagamentos com status 'approved' além de 'pending'
+3. Adicionar logs detalhados para rastrear o processo de enriquecimento dos dados
+
+**Arquivo:** `server/storage.ts`
+**Alteração:**
+1. Adicionar logs de depuração no método `getProducerPayments()`
+
+### Data de Resolução
+28/01/2025
+
+---
+
 *Mantenha este documento atualizado sempre que resolver um erro recorrente!*

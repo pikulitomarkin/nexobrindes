@@ -786,12 +786,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const filteredItems = parsedDetails.items.filter((item: any) => 
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
-            
+
             // Remove duplicatas baseado em productId e producerId
             const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
               self.findIndex(i => i.productId === item.productId && i.producerId === item.producerId) === index
             );
-            
+
             // Remove valores financeiros dos itens
             parsedDetails.items = uniqueItems.map((item: any) => ({
               ...item,
@@ -804,7 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               discountValue: undefined,
               discountPercentage: undefined
             }));
-            
+
             // Remove TODOS os valores financeiros do pedido
             parsedDetails.totalValue = undefined;
             parsedDetails.downPayment = undefined;
@@ -812,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parsedDetails.shippingCost = undefined;
             parsedDetails.discountValue = undefined;
             parsedDetails.discountPercentage = undefined;
-            
+
             console.log(`Filtered items for producer ${parsedDetails.producerId}: ${parsedDetails.items.length} unique items`);
           }
           orderDetails = parsedDetails;
@@ -1293,7 +1293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return {
             ...order,
-            clientName: clientName, // Use contactName or found client name, never 'Unknown'
+            clientName: clientName, // Never use fallback 'Unknown'
             vendorName: vendor?.name || 'Vendedor',
             producerName: producer?.name || null,
             budgetPhotos: budgetPhotos,
@@ -2318,13 +2318,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Fetching pending orders for payment reconciliation...");
       const allOrders = await storage.getOrders();
-      
+
       // Filter orders that have remaining balance to be paid
       const pendingOrders = allOrders.filter(order => {
         const totalValue = parseFloat(order.totalValue);
         const paidValue = parseFloat(order.paidValue || '0');
         const remainingValue = totalValue - paidValue;
-        
+
         // Include orders that:
         // 1. Are not cancelled
         // 2. Have remaining balance > 0.01 (to avoid floating point issues)
@@ -2332,11 +2332,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const shouldInclude = order.status !== 'cancelled' && 
                              remainingValue > 0.01 && 
                              (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
-        
+
         if (shouldInclude) {
           console.log(`Including order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Remaining=${remainingValue}, Status=${order.status}`);
         }
-        
+
         return shouldInclude;
       });
 
@@ -2719,7 +2719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter only debit transactions (payments out)
-      const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.type === 'debit');
+      const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.type === 'DEBIT');
       console.log(`Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
 
       if (debitTransactions.length === 0) {
@@ -4493,14 +4493,21 @@ Para mais detalhes, entre em contato conosco!`;
           let order = null;
 
           if (productionOrder) {
-            order = await storage.getOrder(productionOrder.orderId);
+            const order = await storage.getOrder(productionOrder.orderId);
+            if (order) {
+              order = order;
+            }
           }
 
           return {
             ...payment,
+            producerName: producer?.name || 'Unknown',
             productionOrder,
             order,
-            producerName: producer?.name || 'Unknown'
+            // Add clientName, orderNumber, product from order if available
+            clientName: order?.contactName || 'Cliente não encontrado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não informado'
           };
         })
       );
@@ -4569,111 +4576,55 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
+  app.get("/api/finance/producer-payments/pending", async (req, res) => {
     try {
-      const { producerId } = req.params;
-      console.log(`Fetching payments for producer: ${producerId}`);
+      console.log("Fetching pending producer payments...");
 
-      // Get all production orders for this producer
-      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      console.log(`Found ${productionOrders.length} production orders for producer ${producerId}`);
+      // Get all producer payments that are pending approval
+      const allPayments = await storage.getProducerPayments();
+      console.log(`Total producer payments found: ${allPayments.length}`);
 
-      // Get existing producer payments
-      const existingPayments = await storage.getProducerPaymentsByProducer(producerId);
-      console.log(`Found ${existingPayments.length} existing payments`);
+      // Filter only pending payments and enrich with producer and order info
+      const pendingPayments = allPayments.filter(payment => 
+        payment.status === 'pending' || payment.status === 'approved'
+      );
+      console.log(`Pending/approved payments found: ${pendingPayments.length}`);
 
-      // Create payments data from production orders that have values
-      const allPayments = [];
+      const enrichedPayments = await Promise.all(
+        pendingPayments.map(async (payment) => {
+          const producer = await storage.getUser(payment.producerId);
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          let orderInfo = null;
+          let clientName = 'Cliente não encontrado';
 
-      for (const po of productionOrders) {
-        if (po.producerValue && parseFloat(po.producerValue) > 0) {
-          // Check if payment already exists for this production order
-          let payment = existingPayments.find(p => p.productionOrderId === po.id);
-
-          if (!payment) {
-            // Create implicit payment record from production order
-            const order = await storage.getOrder(po.orderId);
-            let clientName = order?.contactName || 'Cliente não identificado';
-
-            // Get client name using the same logic
-            if (!clientName && order?.clientId) {
-              const clientRecord = await storage.getClient(order.clientId);
-              if (clientRecord) {
-                clientName = clientRecord.name;
-              } else {
-                const clientByUserId = await storage.getClientByUserId(order.clientId);
-                if (clientByUserId) {
-                  clientName = clientByUserId.name;
-                } else {
-                  const clientUser = await storage.getUser(order.clientId);
-                  if (clientUser) {
-                    clientName = clientUser.name;
-                  }
-                }
-              }
+          if (productionOrder) {
+            const order = await storage.getOrder(productionOrder.orderId);
+            if (order) {
+              orderInfo = order;
+              clientName = order.contactName || 'Nome não informado';
             }
-
-            // Determine status based on production order status
-            let paymentStatus = 'pending';
-            if (po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered' || po.status === 'completed') {
-              paymentStatus = po.producerPaymentStatus || 'pending';
-            } else {
-              paymentStatus = 'draft';
-            }
-
-            payment = {
-              id: `implicit-${po.id}`, // Unique ID for implicit payments
-              productionOrderId: po.id,
-              producerId: producerId,
-              amount: po.producerValue,
-              status: paymentStatus,
-              createdAt: po.acceptedAt || new Date(),
-              notes: po.producerNotes || null,
-              productionOrder: po,
-              order: {
-                ...order,
-                clientName: clientName
-              }
-            };
-          } else {
-            // Enrich existing payment with production order and order data
-            const order = await storage.getOrder(po.orderId);
-            let clientName = order?.contactName || 'Cliente não identificado';
-
-            // Get client name using the same logic
-            if (!clientName && order?.clientId) {
-              const clientRecord = await storage.getClient(order.clientId);
-              if (clientRecord) {
-                clientName = clientRecord.name;
-              } else {
-                const clientByUserId = await storage.getClientByUserId(order.clientId);
-                if (clientByUserId) {
-                  clientName = clientByUserId.name;
-                } else {
-                  const clientUser = await storage.getUser(order.clientId);
-                  if (clientUser) {
-                    clientName = clientUser.name;
-                  }
-                }
-              }
-            }
-
-            payment.productionOrder = po;
-            payment.order = {
-              ...order,
-              clientName: clientName
-            };
           }
 
-          allPayments.push(payment);
-        }
-      }
+          const enrichedPayment = {
+            ...payment,
+            producerName: producer?.name || 'Produtor não encontrado',
+            productionOrder: productionOrder,
+            order: orderInfo,
+            clientName: clientName,
+            orderNumber: orderInfo?.orderNumber || 'N/A',
+            product: orderInfo?.product || 'Produto não informado'
+          };
 
-      console.log(`Returning ${allPayments.length} total payments for producer ${producerId}`);
-      res.json(allPayments);
+          console.log(`Enriched payment ${payment.id}: status=${payment.status}, producer=${enrichedPayment.producerName}, amount=${payment.amount}`);
+          return enrichedPayment;
+        })
+      );
+
+      console.log(`Returning ${enrichedPayments.length} enriched pending producer payments`);
+      res.json(enrichedPayments);
     } catch (error) {
-      console.error("Error fetching producer payments:", error);
-      res.status(500).json({ error: "Failed to fetch producer payments" });
+      console.error("Error fetching pending producer payments:", error);
+      res.status(500).json({ error: "Failed to fetch pending producer payments" });
     }
   });
 

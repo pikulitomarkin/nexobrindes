@@ -3140,7 +3140,7 @@ export class MemStorage implements IStorage {
         const minimumPayment = (parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0")).toFixed(2);
 
         // Calculate remaining amount to receive (total - already paid)
-        const totalValue = parseFloat(order.totalValue || "0");
+        const totalValue = parseFloat(order.totalValue);
         const paidValue = parseFloat(order.paidValue || "0");
         const remainingAmount = Math.max(0, totalValue - paidValue);
 
@@ -3572,8 +3572,11 @@ export class MemStorage implements IStorage {
   }
 
   // Producer Payments methods
-  async getProducerPayments(): Promise<ProducerPayment[]>{
-    return Array.from(this.producerPayments.values());
+  async getProducerPayments(): Promise<ProducerPayment[]> {
+    const payments = Array.from(this.producerPayments.values());
+    console.log(`Storage: getProducerPayments returning ${payments.length} payments:`, 
+      payments.map(p => ({ id: p.id, status: p.status, amount: p.amount, producerId: p.producerId })));
+    return payments;
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
