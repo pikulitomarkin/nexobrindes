@@ -53,7 +53,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
 
 // Helper function to parse OFX buffer
 async function parseOFXBuffer(buffer: Buffer) {
-  const ofxContent = buffer.toString('utf-utf-8');
+  const ofxContent = buffer.toString('utf-8');
   const transactions = [];
   const stats = { totalLines: ofxContent.split('\n').length };
 
