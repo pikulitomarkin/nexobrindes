@@ -237,45 +237,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-gray-900">Breakdown Contas a Pagar</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Produtores</span>
-                  <span className="font-semibold">
-                    R$ {financeOverview?.payablesBreakdown?.producers?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Comissões</span>
-                  <span className="font-semibold">
-                    R$ {financeOverview?.payablesBreakdown?.commissions?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Despesas</span>
-                  <span className="font-semibold">
-                    R$ {financeOverview?.payablesBreakdown?.expenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Reembolsos</span>
-                  <span className="font-semibold">
-                    R$ {financeOverview?.payablesBreakdown?.refunds?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Manuais</span>
-                  <span className="font-semibold">
-                    R$ {financeOverview?.payablesBreakdown?.manual?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
 
         {/* Recent Orders */}

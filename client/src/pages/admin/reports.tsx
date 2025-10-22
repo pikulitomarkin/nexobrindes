@@ -651,10 +651,7 @@ export default function AdminReports() {
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
             Filtros - {activeTab === 'overview' ? 'Visão Geral' : 
-                      activeTab === 'financeiro' ? 'Financeiro' : 
-                      activeTab === 'vendas' ? 'Vendas' : 
-                      activeTab === 'producao' ? 'Produção' : 
-                      activeTab === 'comissoes' ? 'Comissões' : 'Analytics'}
+                      activeTab === 'financeiro' ? 'Financeiro' : 'Vendas'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -767,44 +764,6 @@ export default function AdminReports() {
               </>
             )}
 
-            {activeTab === 'producao' && (
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Produtor</label>
-                  <Select value={producerFilter} onValueChange={setProducerFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Produtor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Produtores</SelectItem>
-                      {producers.map((producer: any) => (
-                        <SelectItem key={producer.id} value={producer.id}>
-                          {producer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Status de Produção</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="production">Em Produção</SelectItem>
-                      <SelectItem value="ready">Pronto</SelectItem>
-                      <SelectItem value="shipped">Enviado</SelectItem>
-                      <SelectItem value="delivered">Entregue</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
             {activeTab === 'financeiro' && (
               <>
                 <div>
@@ -836,80 +795,6 @@ export default function AdminReports() {
                       <SelectItem value="paid">Pago</SelectItem>
                       <SelectItem value="overdue">Vencido</SelectItem>
                       <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'comissoes' && (
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Vendedor</label>
-                  <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Vendedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Vendedores</SelectItem>
-                      {vendors.map((vendor: any) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Status da Comissão</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="confirmed">Confirmado</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'analytics' && (
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Categoria de Despesa</label>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as Categorias</SelectItem>
-                      <SelectItem value="operational">Operacional</SelectItem>
-                      <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="travel">Viagem</SelectItem>
-                      <SelectItem value="equipment">Equipamento</SelectItem>
-                      <SelectItem value="office">Escritório</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Status da Despesa</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="approved">Aprovado</SelectItem>
-                      <SelectItem value="rejected">Rejeitado</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1058,7 +943,7 @@ export default function AdminReports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 bg-gradient-to-r from-blue-50 to-purple-50 p-1 rounded-xl border border-gray-200 shadow-sm">
+        <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-blue-50 to-purple-50 p-1 rounded-xl border border-gray-200 shadow-sm">
           <TabsTrigger 
             value="overview" 
             className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-blue-100 text-gray-700"
@@ -1079,27 +964,6 @@ export default function AdminReports() {
           >
             <ShoppingCart className="h-4 w-4" />
             Vendas
-          </TabsTrigger>
-          <TabsTrigger 
-            value="producao" 
-            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-orange-100 text-gray-700"
-          >
-            <Factory className="h-4 w-4" />
-            Produção
-          </TabsTrigger>
-          <TabsTrigger 
-            value="comissoes" 
-            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-teal-100 text-gray-700"
-          >
-            <Percent className="h-4 w-4" />
-            Comissões
-          </TabsTrigger>
-          <TabsTrigger 
-            value="analytics" 
-            className="flex items-center gap-2 text-sm font-medium transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-indigo-100 text-gray-700"
-          >
-            <Activity className="h-4 w-4" />
-            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -1620,183 +1484,7 @@ export default function AdminReports() {
           </div>
         </TabsContent>
 
-        <TabsContent value="producao" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Status de Produção</CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'excel')}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport('pedidos-status', 'csv')}>
-                    <FileDown className="h-4 w-4 mr-2" />
-                    CSV
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-                </DropdownMenu>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {producerPayments.slice(0, 10).map((payment: any) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded">
-                    <div>
-                      <p className="font-medium">{payment.producerName}</p>
-                      <p className="text-sm text-gray-500">Pedido: {payment.orderNumber}</p>
-                    </div>
-                    <Badge variant={payment.status === 'paid' ? 'default' : 'secondary'}>
-                      {payment.status === 'paid' ? 'Pago' : 'Pendente'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="comissoes" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Comissões a Pagar</CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagar', 'excel')}>
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      Excel (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagar', 'csv')}>
-                      <FileDown className="h-4 w-4 mr-2" />
-                      CSV
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {commissions.filter((c: any) => ['pending', 'confirmed'].includes(c.status)).slice(0, 5).map((commission: any) => (
-                    <div key={commission.id} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{vendors.find((v: any) => v.id === commission.vendorId)?.name}</p>
-                        <p className="text-sm text-gray-500">Pedido: {commission.orderNumber}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-red-600">
-                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Comissões Pagas</CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Exportar
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagas', 'excel')}>
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      Excel (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport('comissoes-pagas', 'csv')}>
-                      <FileDown className="h-4 w-4 mr-2" />
-                      CSV
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {commissions.filter((c: any) => c.status === 'paid').slice(0, 5).map((commission: any) => (
-                    <div key={commission.id} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{vendors.find((v: any) => v.id === commission.vendorId)?.name}</p>
-                        <p className="text-sm text-gray-500">Pedido: {commission.orderNumber}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-600">
-                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Despesas por Categoria</CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleExport('despesas', 'excel')}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport('despesas', 'csv')}>
-                    <FileDown className="h-4 w-4 mr-2" />
-                    CSV
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-                </DropdownMenu>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {expenses.slice(0, 8).map((expense: any) => (
-                  <div key={expense.id} className="flex items-center justify-between p-3 border rounded">
-                    <div>
-                      <p className="font-medium">{expense.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {expense.category === 'operational' ? 'Operacional' : 
-                         expense.category === 'marketing' ? 'Marketing' : 
-                         expense.category === 'travel' ? 'Viagem' : 
-                         expense.category === 'equipment' ? 'Equipamento' : 'Outros'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">
-                        R$ {parseFloat(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <Badge variant={expense.status === 'approved' ? 'default' : 'secondary'}>
-                        {expense.status === 'approved' ? 'Aprovado' : 'Pendente'}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        
       </Tabs>
     </div>
   );
