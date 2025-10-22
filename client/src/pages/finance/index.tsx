@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import {
@@ -14,12 +13,8 @@ import {
   Factory
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CommissionPayouts from './commission-payouts';
-import FinancePayments from './payments';
 
 export default function FinanceIndex() {
-  const [activeTab, setActiveTab] = useState("dashboard");
   const { data: overview, isLoading } = useQuery({
     queryKey: ["/api/finance/overview"],
   });
@@ -105,20 +100,8 @@ export default function FinanceIndex() {
         <p className="text-gray-600">Controle completo das finanças do sistema</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="dashboard">Resumo</TabsTrigger>
-            <TabsTrigger value="receivables">A Receber</TabsTrigger>
-            <TabsTrigger value="payables">A Pagar</TabsTrigger>
-            <TabsTrigger value="expenses">Despesas</TabsTrigger>
-            <TabsTrigger value="reconciliation">Conciliação</TabsTrigger>
-            <TabsTrigger value="payouts">Pagamento Comissões</TabsTrigger>
-            <TabsTrigger value="payments">Dados Bancários</TabsTrigger>
-          </TabsList>
-
-        <TabsContent value="dashboard">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 mt-8">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="card-hover">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -308,28 +291,7 @@ export default function FinanceIndex() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="receivables">
-          {/* Content for Receivables */}
-        </TabsContent>
-        <TabsContent value="payables">
-          {/* Content for Payables */}
-        </TabsContent>
-        <TabsContent value="expenses">
-          {/* Content for Expenses */}
-        </TabsContent>
-        <TabsContent value="reconciliation">
-          {/* Content for Reconciliation */}
-        </TabsContent>
-        <TabsContent value="payouts">
-            <CommissionPayouts />
-          </TabsContent>
-
-          <TabsContent value="payments">
-            <FinancePayments />
-          </TabsContent>
-        </Tabs>
+        </div>
     </div>
   );
 }
