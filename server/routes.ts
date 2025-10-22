@@ -961,6 +961,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const order = await storage.getOrder(id);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Enrich with user data and budget photos/items
+      let clientName = order.contactName;
+
+      // Only if contactName is missing, try to get from client record
+      if (!clientName && order.clientId) {
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          clientName = clientRecord.name;
+        } else {
+          const clientByUserId = await storage.getClientByUserId(order.clientId);
+          if (clientByUserId) {
+            clientName = clientByUserId.name;
+          } else {
+            const clientUser = await storage.getUser(order.clientId);
+            if (clientUser) {
+              clientName = clientUser.name;
+            }
+          }
+        }
+      }
+
+      if (!clientName) {
+        clientName = "Nome não informado";
+      }
+
+      const vendor = await storage.getUser(order.vendorId);
+      const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+      // Get budget photos and items if order was converted from budget
+      let budgetPhotos = [];
+      let budgetItems = [];
+      if (order.budgetId) {
+        const photos = await storage.getBudgetPhotos(order.budgetId);
+        budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+        // Get budget items with product details
+        const items = await storage.getBudgetItems(order.budgetId);
+        budgetItems = await Promise.all(
+          items.map(async (item) => {
+            const product = await storage.getProduct(item.productId);
+            return {
+              ...item,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
+        );
+      }
+
+      // Get production order for tracking info
+      let productionOrder = null;
+      if (order.producerId) {
+        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+        productionOrder = productionOrders[0] || null;
+      }
+
+      // Get payments for this order to calculate correct paid value
+      const payments = await storage.getPaymentsByOrder(order.id);
+      const confirmedPayments = payments.filter(payment => payment.status === 'confirmed');
+      const totalPaid = confirmedPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+
+      // Get budget information if order was converted from budget
+      let budgetDownPayment = 0;
+      let originalBudgetInfo = null;
+
+      if (order.budgetId) {
+        try {
+          const budget = await storage.getBudget(order.budgetId);
+          const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+
+          if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+            budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment);
+            originalBudgetInfo = {
+              downPayment: budgetDownPayment,
+              remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+              installments: budgetPaymentInfo.installments || 1
+            };
+          }
+        } catch (error) {
+          console.log("Error fetching budget info for order:", order.id, error);
+        }
+      }
+
+      // Use budget down payment if available, otherwise use calculated payments
+      const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
+      const totalValue = parseFloat(order.totalValue);
+      const remainingBalance = Math.max(0, totalValue - actualPaidValue);
+
+      const enrichedOrder = {
+        ...order,
+        clientName: clientName,
+        vendorName: vendor?.name || 'Vendedor',
+        producerName: producer?.name || null,
+        budgetPhotos: budgetPhotos,
+        budgetItems: budgetItems,
+        trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
+        estimatedDelivery: productionOrder?.deliveryDeadline || null,
+        payments: payments.filter(p => p.status === 'confirmed'),
+        budgetInfo: originalBudgetInfo,
+        paidValue: actualPaidValue.toFixed(2),
+        remainingValue: remainingBalance.toFixed(2)
+      };
+
+      res.json(enrichedOrder);
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
   app.get("/api/orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
@@ -2722,6 +2845,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating test payment:", error);
       res.status(500).json({ error: "Failed to create test payment" });
+    }
+  });
+
+  // Confirm order delivery (client received the order)
+  app.post("/api/orders/:id/confirm-delivery", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Client confirming delivery for order: ${id}`);
+
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      if (order.status !== 'shipped') {
+        return res.status(400).json({ error: "Pedido deve estar despachado para confirmar a entrega" });
+      }
+
+      // Update order status to delivered
+      const updatedOrder = await storage.updateOrder(id, {
+        status: 'delivered',
+        updatedAt: new Date()
+      });
+
+      // Update related production orders to delivered
+      const productionOrders = await storage.getProductionOrdersByOrder(id);
+      for (const po of productionOrders) {
+        await storage.updateProductionOrderStatus(po.id, 'delivered', 'Cliente confirmou o recebimento');
+      }
+
+      console.log(`Order ${id} confirmed as delivered by client`);
+      res.json({
+        success: true,
+        order: updatedOrder,
+        message: "Entrega confirmada com sucesso!"
+      });
+    } catch (error) {
+      console.error("Error confirming delivery:", error);
+      res.status(500).json({ error: "Erro ao confirmar entrega: " + error.message });
     }
   });
 

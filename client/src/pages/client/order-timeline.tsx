@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,18 +6,35 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin, Home } from "lucide-react";
 import { Link } from "wouter";
 
+const queryClient = useQueryClient();
+
 export default function ClientOrderTimeline() {
   const [, params] = useRoute("/client/order/:id/timeline");
 
   const { data: orderData, isLoading } = useQuery({
-    queryKey: [`/api/orders/${params?.id}/timeline`],
+    queryKey: [`/api/orders/${params?.id}`],
     queryFn: async () => {
-      const response = await fetch(`/api/orders/${params?.id}/timeline`);
-      if (!response.ok) throw new Error('Failed to fetch order timeline');
+      const response = await fetch(`/api/orders/${params?.id}`);
+      if (!response.ok) throw new Error('Failed to fetch order');
       return response.json();
     },
     enabled: !!params?.id,
     refetchInterval: 30000, // Refetch every 30 seconds to get updates
+  });
+
+  const confirmDeliveryMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/orders/${params?.id}/confirm-delivery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to confirm delivery');
+      return response.json();
+    },
+    onSuccess: () => {
+      // Refresh the order data
+      queryClient.invalidateQueries({ queryKey: [`/api/orders/${params?.id}`] });
+    }
   });
 
   const getStatusBadge = (status: string) => {
@@ -141,7 +158,8 @@ export default function ClientOrderTimeline() {
     );
   }
 
-  const { order, timeline } = orderData;
+  const order = orderData;
+  const timeline = getTimelineSteps(order);
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -168,6 +186,42 @@ export default function ClientOrderTimeline() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Summary */}
         <div className="lg:col-span-2">
+          {/* Delivery Confirmation Button - Only show for shipped orders */}
+          {order.status === 'shipped' && (
+            <Card className="mb-8 border-green-200 bg-green-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-900">Pedido Despachado!</h3>
+                      <p className="text-green-700">Você já recebeu seu pedido? Confirme a entrega abaixo.</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => confirmDeliveryMutation.mutate()}
+                    disabled={confirmDeliveryMutation.isPending}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {confirmDeliveryMutation.isPending ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2 animate-spin" />
+                        Confirmando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Recebi meu pedido
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Resumo do Pedido</CardTitle>
