@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,16 @@ export default function ProducerReceivables() {
   console.log('Producer Receivables - Producer ID:', producerId);
   console.log('Producer Receivables - Payments Data:', producerPayments);
 
+  // Invalidate queries when component mounts to get fresh data
+  React.useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/producer", producerId] });
+  }, [producerId]);
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       pending: { label: "Pendente", variant: "secondary" as const, color: "bg-yellow-100 text-yellow-800" },
       approved: { label: "Aprovado", variant: "outline" as const, color: "bg-blue-100 text-blue-800" },
-      paid: { label: "Pago", variant: "default" as const, color: "bg-green-100 text-green-800" },
+      paid: { label: "Pago ✓", variant: "default" as const, color: "bg-green-100 text-green-800" },
       rejected: { label: "Rejeitado", variant: "destructive" as const, color: "bg-red-100 text-red-800" },
     };
 

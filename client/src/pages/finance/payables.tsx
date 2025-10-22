@@ -97,10 +97,12 @@ export default function FinancePayables() {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/producer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      
+
       toast({
         title: "Sucesso!",
         description: variables.payableType === 'producer' ? "Pagamento do produtor processado com sucesso" : "Pagamento processado com sucesso",
@@ -253,7 +255,8 @@ export default function FinancePayables() {
         beneficiary: payment.producerName,
         orderNumber: payment.orderNumber,
         productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
-        category: 'Produção'
+        category: 'Produção',
+        actualId: payment.id // Store the original ID
       })),
 
     // Approved expenses not reimbursed
@@ -407,6 +410,8 @@ export default function FinancePayables() {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/producer-payments/producer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -696,7 +701,7 @@ export default function FinancePayables() {
                               setSelectedPayable({
                                 ...payable,
                                 // Use the original producer payment ID (remove prefix)
-                                actualId: payable.id.replace('producer-', ''),
+                                actualId: payable.actualId, // Use the stored actualId
                                 payableType: 'producer'
                               });
                               setPaymentData({
@@ -825,7 +830,7 @@ export default function FinancePayables() {
             <DialogTitle>Registrar Pagamento Manual</DialogTitle>
             <DialogDescription>
               {selectedPayable?.type === 'producer' 
-                ? `Registrando pagamento de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.producerName || 'Produtor'}`
+                ? `Registrando pagamento de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary || 'Produtor'}`
                 : `Registrando pagamento de ${selectedPayable?.type || 'item'}`}
             </DialogDescription>
           </DialogHeader>
@@ -932,9 +937,9 @@ export default function FinancePayables() {
               <Button
                 className="gradient-bg text-white px-6"
                 onClick={handlePay}
-                disabled={!paymentData.amount || !paymentData.method || payProducerMutation.isPending}
+                disabled={!paymentData.amount || !paymentData.method || payProducerMutation.isPending || payManualPayableMutation.isPending}
               >
-                {payProducerMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+                {payProducerMutation.isPending || payManualPayableMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
               </Button>
             </div>
           </div>
