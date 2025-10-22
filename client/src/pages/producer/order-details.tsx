@@ -211,8 +211,16 @@ export default function ProducerOrderDetails() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Produto</Label>
-                  <p className="text-lg font-semibold">{productionOrder.order?.product || 'N/A'}</p>
+                  <p className="text-lg font-semibold">{productionOrder.orderDetails?.product || productionOrder.order?.product || 'N/A'}</p>
                 </div>
+                {productionOrder.orderDetails?.totalValue && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Valor dos Seus Itens</Label>
+                    <p className="text-lg font-bold text-green-600">
+                      R$ {parseFloat(productionOrder.orderDetails.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {productionOrder.order?.description && (
@@ -308,14 +316,22 @@ export default function ProducerOrderDetails() {
           </Card>
 
           {/* Items */}
-          {productionOrder.order?.items && productionOrder.order.items.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Itens do Pedido para Produção</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {productionOrder.order.items.map((item: any, index: number) => (
+          {(() => {
+            // Get items from orderDetails if available (filtered for this producer), otherwise use order.items
+            const itemsToShow = productionOrder.orderDetails?.items || 
+              (productionOrder.order?.items?.filter((item: any) => 
+                item.producerId === productionOrder.producerId || 
+                (item.producerId === 'internal' && productionOrder.producerId === 'internal')
+              )) || [];
+            
+            return itemsToShow && itemsToShow.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Itens do Pedido para Produção ({itemsToShow.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {itemsToShow.map((item: any, index: number) => (
                     <div key={index} className="border rounded-lg p-4 bg-gray-50">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
@@ -440,7 +456,8 @@ export default function ProducerOrderDetails() {
                 </div>
               </CardContent>
             </Card>
-          )}
+            );
+          })()}
 
           {/* Descrição Geral do Pedido */}
           {productionOrder.order?.description && (

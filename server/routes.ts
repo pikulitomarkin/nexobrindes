@@ -388,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderNumber: order.orderNumber,
           product: `${order.product} - Produção: ${producer.name}`,
           description: order.description,
-          totalValue: producerTotalValue.toFixed(2),
+          totalValue: producerTotalValue.toFixed(2), // Value only for this producer's items
           deadline: order.deadline,
           deliveryDeadline: order.deliveryDeadline,
           clientDetails: {
@@ -399,8 +399,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shippingAddress: order.deliveryType === 'pickup' 
             ? 'Sede Principal - Retirada no Local'
             : (order.shippingAddress || 'Endereço não informado'),
-          items: items, // Only items for this producer
-          photos: photos
+          items: items.filter(item => item.producerId === currentProducerId), // Filter items for this producer only
+          photos: photos,
+          producerId: currentProducerId, // Add producer ID to identify items
+          producerName: producer.name
         };
 
         // Check if production order already exists for this producer
@@ -759,11 +761,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         photos = budgetPhotos.map(photo => photo.photoUrl || photo.imageUrl);
       }
 
-      // Parse order details if available
+      // Parse order details if available and filter items for this producer
       let orderDetails = null;
       if (productionOrder.orderDetails) {
         try {
-          orderDetails = JSON.parse(productionOrder.orderDetails);
+          const parsedDetails = JSON.parse(productionOrder.orderDetails);
+          // Filter items to show only those for this producer
+          if (parsedDetails.items && parsedDetails.producerId) {
+            parsedDetails.items = parsedDetails.items.filter((item: any) => 
+              item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
+            );
+            console.log(`Filtered items for producer ${parsedDetails.producerId}: ${parsedDetails.items.length} items`);
+          }
+          orderDetails = parsedDetails;
         } catch (e) {
           console.log(`Error parsing order details for production order ${id}:`, e);
         }

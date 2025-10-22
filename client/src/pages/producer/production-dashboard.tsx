@@ -37,7 +37,7 @@ export default function ProductionDashboard() {
     queryKey: ["/api/producer", producerId, "stats"],
   });
 
-  
+
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, notes }: {
