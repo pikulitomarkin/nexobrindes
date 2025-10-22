@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,7 +135,7 @@ export default function CommissionManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!response.ok) throw new Error("Erro ao atualizar nome");
+      if (!response.ok) throw new Error("Erro ao atualizar nome do sócio");
       return response.json();
     },
     onSuccess: () => {
@@ -171,7 +170,7 @@ export default function CommissionManagement() {
     },
   });
 
-  
+
 
   const updateCommissionStatusMutation = useMutation({
     mutationFn: async ({ commissionId, status }: { commissionId: string, status: string }) => {
@@ -212,7 +211,7 @@ export default function CommissionManagement() {
     if (editingPartnerName) {
       updatePartnerNameMutation.mutate({
         partnerId: editingPartnerName,
-        name: data.name
+        name: data.name,
       });
     }
   };
@@ -235,7 +234,7 @@ export default function CommissionManagement() {
     createPartnerMutation.mutate(data);
   };
 
-  
+
 
   // Calculate totals
   const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
@@ -329,7 +328,7 @@ export default function CommissionManagement() {
           <TabsTrigger value="commissions">Histórico</TabsTrigger>
         </TabsList>
 
-        
+
 
         <TabsContent value="vendors" className="space-y-6">
           <Card>
@@ -422,9 +421,9 @@ export default function CommissionManagement() {
                               control={partnerNameForm.control}
                               name="name"
                               render={({ field }) => (
-                                <FormItem className="flex-1">
+                                <FormItem>
                                   <FormControl>
-                                    <Input {...field} placeholder="Nome do sócio" />
+                                    <Input className="w-40" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -466,7 +465,7 @@ export default function CommissionManagement() {
                     </div>
                   </div>
                 ))}
-                
+
                 {(!partners || partners.length === 0) && (
                   <div className="text-center py-8">
                     <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -586,7 +585,7 @@ export default function CommissionManagement() {
                   </tbody>
                 </table>
               </div>
-              
+
               {(!commissions || commissions.length === 0) && (
                 <div className="text-center py-8">
                   <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-3" />
