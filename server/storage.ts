@@ -643,271 +643,43 @@ export class MemStorage implements IStorage {
     };
     this.vendors.set(vendor.id, vendor);
 
-    // Create partner profile
-    const partner: Partner = {
-      id: "partner-profile-1",
-      userId: "partner-1",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.partners.set(partner.id, partner);
-
-    // Create sample clients
-    const sampleClient: Client = {
+    // Create client profiles
+    const client1: Client = {
       id: "client-1",
       userId: "client-1",
       name: "João Silva",
       email: "joao@gmail.com",
       phone: "(11) 98765-4321",
-      whatsapp: "(11) 98765-4321",
-      cpfCnpj: "123.456.789-00",
-      address: "Rua das Flores, 123, São Paulo, SP",
+      whatsapp: null,
+      cpfCnpj: null,
+      address: "Rua das Flores, 123 - São Paulo",
       vendorId: "vendor-1",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.clients.set(sampleClient.id, sampleClient);
 
-    // Create additional sample client to ensure we have test data
-    const sampleClient2: Client = {
+    const client2: Client = {
       id: "client-2",
-      userId: "client-2",
+      userId: null,
       name: "Maria Santos",
-      email: "maria@gmail.com",
-      phone: "(11) 99876-5432",
-      whatsapp: "(11) 99876-5432",
-      cpfCnpj: "987.654.321-00",
-      address: "Av. Paulista, 456, São Paulo, SP",
+      email: "maria@email.com",
+      phone: "(11) 99999-8888",
+      whatsapp: null,
+      cpfCnpj: null,
+      address: "Av. Principal, 456 - São Paulo",
       vendorId: "vendor-1",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.clients.set(sampleClient2.id, sampleClient2);
 
-    // Create sample orders
-    mockOrders = [
-      {
-        id: "order-1",
-        orderNumber: "#12345",
-        clientId: "client-1",
-        vendorId: "vendor-1",
-        producerId: "producer-1",
-        budgetId: null,
-        product: "Mesa de Jantar Personalizada",
-        description: "Mesa de madeira maciça para 6 pessoas",
-        totalValue: "2450.00",
-        paidValue: "1470.00", // Entrada + frete já pagos
-        status: "production",
-        deadline: new Date("2024-11-22"),
-        trackingCode: null,
-        // Campos de pagamento
-        downPayment: "1250.00", // Entrada de R$ 1.250
-        shippingCost: "220.00", // Frete de R$ 220
-        remainingAmount: "980.00", // Restante após entrada e frete
-        deliveryType: "delivery",
-        paymentMethodId: "pm-1",
-        shippingMethodId: "sm-2",
-        installments: 1,
-        hasDiscount: false,
-        discountType: "percentage",
-        discountPercentage: "0.00",
-        discountValue: "0.00",
-        contactName: "João Silva",
-        contactPhone: "(11) 98765-4321",
-        contactEmail: "joao@gmail.com",
-        items: [],
-        createdAt: new Date("2024-11-15"),
-        updatedAt: new Date("2024-11-16")
-      },
-      {
-        id: "order-2",
-        orderNumber: "#12346",
-        clientId: "client-2",
-        vendorId: "vendor-1",
-        producerId: null,
-        budgetId: null,
-        product: "Estante Personalizada",
-        description: "Estante de madeira com 5 prateleiras",
-        totalValue: "1890.00",
-        paidValue: "567.00", // Pagamento parcial
-        status: "pending",
-        deadline: new Date("2024-11-25"),
-        trackingCode: null,
-        // Campos de pagamento
-        downPayment: "945.00", // Entrada de R$ 945 (50%)
-        shippingCost: "150.00", // Frete de R$ 150
-        remainingAmount: "795.00", // Restante após entrada e frete
-        deliveryType: "delivery",
-        paymentMethodId: "pm-2",
-        shippingMethodId: "sm-1",
-        installments: 2,
-        hasDiscount: false,
-        discountType: "percentage",
-        discountPercentage: "0.00",
-        discountValue: "0.00",
-        contactName: "Maria Santos",
-        contactPhone: "(11) 99876-5432",
-        contactEmail: "maria@gmail.com",
-        items: [],
-        createdAt: new Date("2024-11-14"),
-        updatedAt: new Date("2024-11-14")
-      }
-    ];
+    this.clients.set(client1.id, client1);
+    this.clients.set(client2.id, client2);
 
-    mockOrders.forEach(order => {
-      this.orders.set(order.id, order);
-    });
-
-    // Create production order
-    const productionOrder: ProductionOrder = {
-      id: "po-1",
-      orderId: "order-1",
-      producerId: "producer-1",
-      status: "production",
-      deadline: new Date("2024-11-20"),
-      acceptedAt: new Date("2024-11-16"),
-      completedAt: null,
-      notes: "Produção iniciada conforme especificações",
-      producerValue: "850.00",
-      producerPaymentStatus: "pending",
-      producerNotes: "Valor inclui material e mão de obra",
-      producerValueLocked: false,
-      deliveryDeadline: new Date("2024-11-22"),
-      hasUnreadNotes: false,
-      lastNoteAt: null,
-      trackingCode: null,
-      shippingAddress: null
-    };
-    this.productionOrders.set(productionOrder.id, productionOrder);
-    console.log("Initialized production order:", productionOrder.id, "for producer:", productionOrder.producerId);
-
-    // Create sample payment
-    const payment: Payment = {
-      id: "payment-1",
-      orderId: "order-1",
-      amount: "735.00",
-      method: "pix",
-      status: "confirmed",
-      transactionId: "PIX123456789",
-      paidAt: new Date("2024-11-15"),
-      createdAt: new Date("2024-11-15")
-    };
-    this.payments.set(payment.id, payment);
-
-    // Create commission
-    const commission: Commission = {
-      id: "commission-1",
-      vendorId: "vendor-1",
-      orderId: "order-1",
-      percentage: "10.00",
-      amount: "245.00",
-      status: "pending",
-      paidAt: null,
-      createdAt: new Date("2024-11-15")
-    };
-    this.commissions.set(commission.id, commission);
-
-    // Create additional sample payments for recent orders to show correct values
-    const allOrders = Array.from(this.orders.values());
-
-    // Find orders that need test payments and ensure all orders have some payment
-    const ordersToAddPayments = allOrders.filter(o =>
-      o.orderNumber?.includes("PED-") || o.orderNumber?.includes("#12346") || o.orderNumber?.includes("#12345")
-    );
-
-    ordersToAddPayments.forEach((order, index) => {
-      // Create test payment for each order with better amounts
-      let paymentAmount = "567.00"; // Default
-
-      if (order.orderNumber?.includes("#12345")) {
-        paymentAmount = "735.00"; // 30% of 2450
-      } else if (order.orderNumber?.includes("#12346")) {
-        paymentAmount = "567.00"; // 30% of 1890
-      } else if (order.orderNumber?.includes("PED-")) {
-        paymentAmount = "3000.00"; // Example for newer orders
-      }
-
-      const testPayment: Payment = {
-        id: `payment-visible-${index + 1}`,
-        orderId: order.id,
-        amount: paymentAmount,
-        method: "pix",
-        status: "confirmed",
-        transactionId: `PIX-ENTRADA-${order.orderNumber?.replace(/[#\-]/g, '')}`,
-        paidAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000)), // Different dates, more recent
-        createdAt: new Date(Date.now() - (index * 12 * 60 * 60 * 1000))
-      };
-      this.payments.set(testPayment.id, testPayment);
-
-      // Update the order's paid value immediately
-      this.updateOrderPaidValue(order.id);
-    });
-
-    // Initialize mock budgets
-    mockBudgets = [
-      {
-        id: "budget-1",
-        budgetNumber: "ORC-2024-001",
-        title: "Orçamento Mesa de Jantar Personalizada",
-        description: "Mesa de jantar em madeira maciça com personalização especial",
-        vendorId: "vendor-1",
-        clientId: "client-1",
-        contactName: "Maria Silva",
-        contactPhone: "(11) 99999-9999",
-        contactEmail: "maria@email.com",
-        status: "draft",
-        validUntil: "2024-12-31",
-        deliveryDeadline: "2025-01-15",
-        totalValue: 2500.00,
-        shippingCost: 150.00,
-        hasDiscount: true,
-        discountType: "percentage",
-        discountPercentage: 10,
-        discountValue: 0,
-        paymentMethodId: "pm-1",
-        shippingMethodId: "sm-1",
-        installments: 3,
-        downPayment: 800.00,
-        remainingAmount: 1700.00,
-        items: [
-          {
-            id: "item-1",
-            productId: "product-1",
-            productName: "Mesa de Jantar Premium",
-            quantity: 1,
-            unitPrice: 2500.00,
-            totalPrice: 2500.00,
-            hasItemCustomization: true,
-            itemCustomizationValue: 300.00,
-            itemCustomizationDescription: "Gravação personalizada no tampo",
-            customizationPhoto: "/uploads/image-1757959263873-hw4asmucqgh.png",
-            productWidth: "180",
-            productHeight: "75",
-            productDepth: "90"
-          }
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'budget-2',
-        budgetNumber: 'ORC-002',
-        clientId: 'client-2',
-        vendorId: 'vendor-1',
-        title: 'Estante Personalizada',
-        description: 'Estante sob medida para escritório',
-        totalValue: '3200.00',
-        status: 'approved',
-        validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
-    mockBudgets.forEach(budget => this.budgets.set(budget.id, budget));
+    // Limpar todos os dados de pedidos, orçamentos, etc.
+    mockOrders = [];
+    mockBudgets = [];
 
     // Initialize mock products
     mockProducts = [
@@ -965,23 +737,23 @@ export class MemStorage implements IStorage {
       },
       {
         id: 'product-5',
-        name: 'Camiseta Básica',
-        description: 'Camiseta 100% algodão, disponível em várias cores',
-        category: 'Vestuário',
-        basePrice: '25.90',
+        name: 'Mochila Promocional',
+        description: 'Mochila em nylon resistente com compartimentos',
+        category: 'Mochila',
+        basePrice: '85.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1',
-        type: 'external',
+        producerId: 'internal',
+        type: 'internal',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
       {
         id: 'product-6',
-        name: 'Mouse Pad Personalizado',
-        description: 'Mouse pad retangular 23x19cm para sublimação',
-        category: 'Informática',
-        basePrice: '8.75',
+        name: 'Camiseta Personalizada',
+        description: 'Camiseta 100% algodão para estampa',
+        category: 'Vestuário',
+        basePrice: '25.00',
         unit: 'un',
         isActive: true,
         producerId: 'internal',
@@ -991,10 +763,10 @@ export class MemStorage implements IStorage {
       },
       {
         id: 'product-7',
-        name: 'Chaveiro Personalizado',
-        description: 'Chaveiro de acrílico para sublimação',
-        category: 'Brindes',
-        basePrice: '5.50',
+        name: 'Agenda Executiva',
+        description: 'Agenda capa dura com logomarca personalizada',
+        category: 'Papelaria',
+        basePrice: '45.00',
         unit: 'un',
         isActive: true,
         producerId: 'internal',
@@ -1004,29 +776,114 @@ export class MemStorage implements IStorage {
       },
       {
         id: 'product-8',
-        name: 'Quadro Decorativo',
-        description: 'Quadro de madeira com moldura artesanal',
-        category: 'Decoração',
-        basePrice: '89.90',
+        name: 'Copo Térmico',
+        description: 'Copo térmico em aço inox com tampa',
+        category: 'Copo',
+        basePrice: '35.00',
         unit: 'un',
         isActive: true,
-        producerId: 'producer-1',
-        type: 'external',
+        producerId: 'internal',
+        type: 'internal',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
     ];
-    mockProducts.forEach(product => this.products.set(product.id, product));
 
-    // Create sample commission settings
+    mockProducts.forEach(product => {
+      this.products.set(product.id, product);
+    });
+
+    // Create sample payment methods
+    this.paymentMethods = [
+      {
+        id: "pm-1",
+        name: "PIX",
+        type: "pix",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "pm-2",
+        name: "Cartão de Crédito",
+        type: "credit_card",
+        maxInstallments: 12,
+        installmentInterest: "2.50",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "pm-3",
+        name: "Transferência Bancária",
+        type: "transfer",
+        maxInstallments: 1,
+        installmentInterest: "0.00",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    // Create sample shipping methods
+    this.shippingMethods = [
+      {
+        id: "sm-1",
+        name: "Correios PAC",
+        type: "calculated",
+        basePrice: "0.00",
+        freeShippingThreshold: "200.00",
+        estimatedDays: 8,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "sm-2",
+        name: "Correios SEDEX",
+        type: "calculated",
+        basePrice: "0.00",
+        freeShippingThreshold: "300.00",
+        estimatedDays: 3,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "sm-3",
+        name: "Entrega Própria",
+        type: "fixed",
+        basePrice: "50.00",
+        freeShippingThreshold: "500.00",
+        estimatedDays: 1,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "sm-4",
+        name: "Retirada no Local",
+        type: "free",
+        basePrice: "0.00",
+        freeShippingThreshold: "0.00",
+        estimatedDays: 0,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+
+    // Initialize default commission settings
     const defaultCommissionSettings: CommissionSettings = {
-      id: "settings-1",
+      id: "commission-settings-1",
       vendorCommissionRate: "10.00",
       partnerCommissionRate: "15.00",
       vendorPaymentTiming: "order_completion",
       partnerPaymentTiming: "order_start",
       isActive: true,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
     this.mockData.commissionSettings.push(defaultCommissionSettings);
 
@@ -1071,185 +928,12 @@ export class MemStorage implements IStorage {
     ];
     this.mockData.customizationOptions.push(...sampleCustomizations);
 
-    // Initialize financial integration - Create AccountsReceivable automatically based on existing orders
-    this.initializeFinancialIntegration();
-  }
-
-  private initializeFinancialIntegration() {
-    // Create AccountsReceivable entries for all existing orders
-    const allOrders = Array.from(this.orders.values());
-
-    allOrders.forEach(order => {
-      // Create receivable entry for each order
-      const totalValue = parseFloat(order.totalValue);
-      const paidValue = parseFloat(order.paidValue);
-      const remainingAmount = totalValue - paidValue;
-
-      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-      if (paidValue >= totalValue) {
-        status = 'paid';
-      } else if (paidValue > 0) {
-        status = 'partial';
-      }
-
-      // Check if overdue
-      const dueDate = order.deadline ? new Date(order.deadline) : null;
-      if (dueDate && new Date() > dueDate && status !== 'paid') {
-        status = 'overdue';
-      }
-
-      const receivable: AccountsReceivable = {
-        id: `ar-${order.id}`,
-        orderId: order.id,
-        clientId: order.clientId,
-        vendorId: order.vendorId,
-        description: `Venda: ${order.product}`,
-        amount: order.totalValue,
-        receivedAmount: order.paidValue,
-        dueDate: order.deadline,
-        status: status,
-        type: 'sale',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      this.accountsReceivable.set(receivable.id, receivable);
-
-      // If there are payments for this order, create payment allocations
-      const orderPayments = Array.from(this.payments.values()).filter(p => p.orderId === order.id);
-      orderPayments.forEach(payment => {
-        if (payment.status === 'confirmed') {
-          const allocation: PaymentAllocation = {
-            id: `allocation-${payment.id}-${receivable.id}`,
-            paymentId: payment.id,
-            receivableId: receivable.id,
-            amount: payment.amount,
-            allocatedAt: payment.paidAt || payment.createdAt
-          };
-          this.paymentAllocations.set(allocation.id, allocation);
-        }
-      });
-    });
-
-    // Create Commission Payouts based on existing commissions
-    const allCommissions = Array.from(this.commissions.values());
-
-    // Group commissions by vendor to create payout batches
-    const commissionsByVendor = new Map<string, Commission[]>();
-    allCommissions.forEach(commission => {
-      if (!commissionsByVendor.has(commission.vendorId)) {
-        commissionsByVendor.set(commission.vendorId, []);
-      }
-      commissionsByVendor.get(commission.vendorId)!.push(commission);
-    });
-
-    // Create commission payouts for each vendor
-    commissionsByVendor.forEach((commissions, vendorId) => {
-      const totalAmount = commissions.reduce((sum, comm) => sum + parseFloat(comm.amount), 0);
-
-      if (totalAmount > 0) {
-        const payout: CommissionPayout = {
-          id: `payout-vendor-${vendorId}`,
-          userId: vendorId,
-          type: 'vendor',
-          description: `Comissões acumuladas - ${commissions.length} pedidos`,
-          totalAmount: totalAmount.toFixed(2),
-          commissionIds: commissions.map(c => c.id),
-          status: commissions.every(c => c.status === 'paid') ? 'paid' : 'pending',
-          paidAt: commissions.every(c => c.status === 'paid') ? new Date() : null,
-          createdAt: new Date()
-        };
-
-        this.commissionPayouts.set(payout.id, payout);
-      }
-    });
-
-    // Create sample expense notes
-    const sampleExpenses: ExpenseNote[] = [
-      {
-        id: "expense-1",
-        vendorId: "vendor-1",
-        orderId: "order-1",
-        description: "Material para Mesa de Jantar - Madeira Premium",
-        amount: "850.00",
-        category: "material",
-        attachmentUrl: null,
-        status: "approved",
-        approvedBy: "admin-1",
-        approvedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: "expense-2",
-        vendorId: "vendor-1",
-        orderId: null,
-        description: "Transporte - Entrega de produtos",
-        amount: "120.00",
-        category: "transport",
-        attachmentUrl: null,
-        status: "pending",
-        approvedBy: null,
-        approvedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
-
-    sampleExpenses.forEach(expense => {
-      this.mockData.expenseNotes.push(expense);
-    });
-
-    // Create sample customization options - apenas 3 diferentes
-    const sampleCustomizationOptions = [
-      {
-        id: "custom-1",
-        name: "Serigrafia 1 cor",
-        description: "Impressão serigrafica em 1 cor",
-        category: "mochila",
-        minQuantity: 50,
-        price: "50.00",
-        isActive: true,
-        createdBy: "admin-1",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: "custom-2",
-        name: "Bordado",
-        description: "Bordado personalizado",
-        category: "mochila",
-        minQuantity: 20,
-        price: "80.00",
-        isActive: true,
-        createdBy: "admin-1",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: "custom-3",
-        name: "Gravação Laser",
-        description: "Gravação a laser em madeira",
-        category: "móveis",
-        minQuantity: 1,
-        price: "120.00",
-        isActive: true,
-        createdBy: "admin-1",
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
-
-    sampleCustomizationOptions.forEach(option => {
-      this.mockData.customizationOptions.push(option);
-      // Also add categories to the list
-      if (!this.mockData.customizationCategories.includes(option.category)) {
-        this.mockData.customizationCategories.push(option.category);
-      }
-    });
-
-    // Initialize accounts receivable - deixar vazio para ser criado automaticamente pelos pedidos
+    // Limpar dados financeiros e transacionais
     this.mockData.accountsReceivable = [];
+    this.mockData.expenseNotes = [];
+    this.mockData.manualReceivables = [];
+    this.mockData.manualPayables = [];
+    this.mockData.bankTransactions = [];
   }
 
   // User methods
