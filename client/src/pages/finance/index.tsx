@@ -240,57 +240,6 @@ export default function FinanceIndex() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Recent Activity */}
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Atividades Recentes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">Pagamento recebido - Pedido #12345</p>
-                        <p className="text-xs text-gray-500">Há 2 horas</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-green-600">R$ 1.500,00</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Calculator className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">Arquivo OFX importado</p>
-                        <p className="text-xs text-gray-500">Há 5 horas</p>
-                      </div>
-                    </div>
-                    <span className="text-sm text-gray-600">15 transações</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                        <Receipt className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">Nova despesa registrada</p>
-                        <p className="text-xs text-gray-500">Ontem</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-red-600">R$ 350,00</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
     </div>
   );
 }
