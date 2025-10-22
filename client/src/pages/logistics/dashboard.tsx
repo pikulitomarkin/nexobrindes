@@ -772,37 +772,37 @@ export default function LogisticsDashboard() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Número do Pedido</label>
-                      <p className="text-lg font-bold">{selectedOrder.orderNumber}</p>
+                      <p className="text-lg font-bold">{selectedOrder.orderNumber || selectedOrder.order?.orderNumber}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Cliente</label>
-                      <p>{selectedOrder.clientName}</p>
+                      <p>{selectedOrder.clientName || selectedOrder.order?.clientName}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Contato</label>
                       <p className="text-sm text-gray-600">
-                        {selectedOrder.contactPhone && (
-                          <span>Tel: {selectedOrder.contactPhone}<br /></span>
+                        {(selectedOrder.contactPhone || selectedOrder.order?.contactPhone) && (
+                          <span>Tel: {selectedOrder.contactPhone || selectedOrder.order?.contactPhone}<br /></span>
                         )}
-                        {selectedOrder.contactEmail && (
-                          <span>Email: {selectedOrder.contactEmail}</span>
+                        {(selectedOrder.contactEmail || selectedOrder.order?.contactEmail) && (
+                          <span>Email: {selectedOrder.contactEmail || selectedOrder.order?.contactEmail}</span>
                         )}
                       </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Produto Principal</label>
-                      <p className="font-medium">{selectedOrder.product}</p>
+                      <p className="font-medium">{selectedOrder.product || selectedOrder.order?.product}</p>
                     </div>
-                    {selectedOrder.description && (
+                    {(selectedOrder.description || selectedOrder.order?.description) && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Descrição</label>
-                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.description}</p>
+                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.description || selectedOrder.order?.description}</p>
                       </div>
                     )}
-                    {selectedOrder.deadline && (
+                    {(selectedOrder.deadline || selectedOrder.order?.deadline) && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Prazo</label>
-                        <p>{new Date(selectedOrder.deadline).toLocaleDateString('pt-BR')}</p>
+                        <p>{new Date(selectedOrder.deadline || selectedOrder.order?.deadline).toLocaleDateString('pt-BR')}</p>
                       </div>
                     )}
                   </div>
@@ -816,20 +816,24 @@ export default function LogisticsDashboard() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Tipo de Entrega</label>
-                      <p className="font-medium">{selectedOrder.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}</p>
+                      <p className="font-medium">
+                        {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Contato do Cliente</label>
-                      <p className="font-medium">{selectedOrder.contactPhone || 'Não informado'}</p>
+                      <p className="font-medium">{selectedOrder.contactPhone || selectedOrder.order?.contactPhone || 'Não informado'}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Data de Criação</label>
-                      <p>{new Date(selectedOrder.createdAt).toLocaleDateString('pt-BR')}</p>
+                      <p>{new Date(selectedOrder.createdAt || selectedOrder.order?.createdAt).toLocaleDateString('pt-BR')}</p>
                     </div>
-                    {selectedOrder.deliveryType === 'delivery' && (
+                    {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'delivery' && (
                       <div className="col-span-2">
                         <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
-                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.shippingAddress || 'Endereço não informado'}</p>
+                        <p className="text-gray-700 bg-gray-50 p-2 rounded">
+                          {selectedOrder.shippingAddress || selectedOrder.order?.shippingAddress || 'Endereço não informado'}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -837,111 +841,119 @@ export default function LogisticsDashboard() {
               </div>
 
               {/* Itens do Pedido */}
-              {selectedOrder.items && selectedOrder.items.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Itens para Produção ({selectedOrder.items.length})</h3>
-                  <div className="space-y-3">
-                    {selectedOrder.items.map((item: any, index: number) => {
-                      const isExternal = item.producerId && item.producerId !== 'internal';
-                      return (
-                        <div key={index} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Package className="h-4 w-4 text-gray-500" />
-                                  <span className="font-medium">{item.productName}</span>
-                                  {isExternal && (
-                                    <Badge variant="outline" className="text-orange-700 border-orange-300">
-                                      Produção Externa
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-gray-500">Quantidade:</span>
-                                    <p className="font-medium">{item.quantity}</p>
+              {(() => {
+                // Definir quais itens mostrar baseado na estrutura do pedido
+                const itemsToShow = selectedOrder.items || selectedOrder.order?.items || [];
+                
+                return itemsToShow && itemsToShow.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Itens para Produção ({itemsToShow.length})</h3>
+                    <div className="space-y-3">
+                      {itemsToShow.map((item: any, index: number) => {
+                        const isExternal = item.producerId && item.producerId !== 'internal';
+                        return (
+                          <div key={`${item.id || index}-${item.productName || 'item'}`} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Package className="h-4 w-4 text-gray-500" />
+                                    <span className="font-medium">{item.productName}</span>
+                                    {isExternal && (
+                                      <Badge variant="outline" className="text-orange-700 border-orange-300">
+                                        Produção Externa
+                                      </Badge>
+                                    )}
                                   </div>
-                                  <div>
-                                    <span className="text-gray-500">Especificações:</span>
-                                    <p className="font-medium">
-                                      {item.productWidth && item.productHeight && item.productDepth ?
-                                        `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
-                                        'Não informado'
-                                      }
-                                    </p>
-                                  </div>
-
-                                  {/* Produtor do Item */}
-                                  <div className="col-span-2">
-                                    <span className="text-gray-500">Produtor:</span>
-                                    <p className="font-medium text-orange-700">
-                                      {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
-                                    </p>
-                                  </div>
-
-                                  {/* Personalização do Item */}
-                                  {item.hasItemCustomization && (
-                                    <div className="col-span-2 bg-blue-50 p-2 rounded">
-                                      <span className="text-blue-700 font-medium">Personalização do Item:</span>
-                                      <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
-                                      {item.additionalCustomizationNotes && (
-                                        <p className="text-sm text-blue-500 mt-1">Obs: {item.additionalCustomizationNotes}</p>
-                                      )}
-                                      {item.customizationPhoto && (
-                                        <div className="mt-2">
-                                          <img
-                                            src={item.customizationPhoto}
-                                            alt="Personalização"
-                                            className="w-16 h-16 object-cover rounded border"
-                                          />
-                                        </div>
-                                      )}
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-gray-500">Quantidade:</span>
+                                      <p className="font-medium">{item.quantity}</p>
                                     </div>
-                                  )}
-
-                                  {/* Personalização Geral */}
-                                  {item.hasGeneralCustomization && (
-                                    <div className="col-span-2 bg-green-50 p-2 rounded">
-                                      <span className="text-green-700 font-medium">Personalização Geral:</span>
-                                      <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>
+                                    <div>
+                                      <span className="text-gray-500">Especificações:</span>
+                                      <p className="font-medium">
+                                        {item.productWidth && item.productHeight && item.productDepth ?
+                                          `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
+                                          'Não informado'
+                                        }
+                                      </p>
                                     </div>
-                                  )}
+
+                                    {/* Produtor do Item */}
+                                    <div className="col-span-2">
+                                      <span className="text-gray-500">Produtor:</span>
+                                      <p className="font-medium text-orange-700">
+                                        {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
+                                      </p>
+                                    </div>
+
+                                    {/* Personalização do Item */}
+                                    {item.hasItemCustomization && (
+                                      <div className="col-span-2 bg-blue-50 p-2 rounded">
+                                        <span className="text-blue-700 font-medium">Personalização do Item:</span>
+                                        <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                                        {item.additionalCustomizationNotes && (
+                                          <p className="text-sm text-blue-500 mt-1">Obs: {item.additionalCustomizationNotes}</p>
+                                        )}
+                                        {item.customizationPhoto && (
+                                          <div className="mt-2">
+                                            <img
+                                              src={item.customizationPhoto}
+                                              alt="Personalização"
+                                              className="w-16 h-16 object-cover rounded border"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Personalização Geral */}
+                                    {item.hasGeneralCustomization && (
+                                      <div className="col-span-2 bg-green-50 p-2 rounded">
+                                        <span className="text-green-700 font-medium">Personalização Geral:</span>
+                                        <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-green-600">
-                                  R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-green-600">
+                                    R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Fotos anexadas */}
-              {selectedOrder.budgetPhotos && selectedOrder.budgetPhotos.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Fotos de Referência ({selectedOrder.budgetPhotos.length})</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {selectedOrder.budgetPhotos.map((photoUrl: string, index: number) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={photoUrl}
-                          alt={`Referência ${index + 1}`}
-                          className="w-full h-24 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
-                          onClick={() => window.open(photoUrl, '_blank')}
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
-                          <span className="text-white text-xs opacity-0 group-hover:opacity-100">Ampliar</span>
+              {(() => {
+                const photos = selectedOrder.budgetPhotos || selectedOrder.photos || selectedOrder.order?.budgetPhotos || selectedOrder.order?.photos || [];
+                return photos && photos.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Fotos de Referência ({photos.length})</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {photos.map((photoUrl: string, index: number) => (
+                        <div key={`photo-${index}-${photoUrl.slice(-10)}`} className="relative group">
+                          <img
+                            src={photoUrl}
+                            alt={`Referência ${index + 1}`}
+                            className="w-full h-24 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
+                            onClick={() => window.open(photoUrl, '_blank')}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
+                            <span className="text-white text-xs opacity-0 group-hover:opacity-100">Ampliar</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </DialogContent>
