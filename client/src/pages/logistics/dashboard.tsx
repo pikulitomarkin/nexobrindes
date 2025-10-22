@@ -49,20 +49,25 @@ export default function LogisticsDashboard() {
 
 
 
-  // Enviar pedido para produtor específico
+  // Enviar pedido para produtor específico ou todos
   const sendToProductionMutation = useMutation({
-    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId: string }) => {
+    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId?: string }) => {
+      const body: any = {};
+      if (producerId) {
+        body.producerId = producerId;
+      }
+      
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ producerId }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Erro ao enviar para produção");
       }
       return response.json();
-    },
+    },</old_str>
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
@@ -534,14 +539,47 @@ export default function LogisticsDashboard() {
                                   );
                                 }
 
-                                // Se status é confirmed/paid, mostrar botões para enviar (um embaixo do outro)
+                                // Se apenas 1 produtor, mostrar botão para enviar tudo
+                                if (producersMap.size === 1) {
+                                  const [producerId, producerInfo] = Array.from(producersMap.entries())[0];
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                                      onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
+                                      disabled={sendToProductionMutation.isPending}
+                                      title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
+                                    >
+                                      <Send className="h-4 w-4 mr-1" />
+                                      {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
+                                    </Button>
+                                  );
+                                }
+
+                                // Se múltiplos produtores, mostrar botão para enviar para todos + botões individuais
                                 return (
                                   <div className="flex flex-col gap-1 w-full">
+                                    {/* Botão para enviar para todos */}
+                                    <Button
+                                      size="sm"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                                      onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
+                                      disabled={sendToProductionMutation.isPending}
+                                      title={`Criar ordens separadas para todos os ${producersMap.size} produtores`}
+                                    >
+                                      <Send className="h-4 w-4 mr-1" />
+                                      {sendToProductionMutation.isPending ? 'Enviando...' : `📤 Enviar para Todos (${producersMap.size})`}
+                                    </Button>
+                                    
+                                    <div className="text-xs text-gray-500 text-center py-1">ou individualmente:</div>
+                                    
+                                    {/* Botões individuais por produtor */}
                                     {Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
                                       <Button
                                         key={producerId}
                                         size="sm"
-                                        className="bg-green-600 hover:bg-green-700 text-white text-xs whitespace-nowrap"
+                                        variant="outline"
+                                        className="text-xs border-green-300 hover:bg-green-50"
                                         onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
                                         disabled={sendToProductionMutation.isPending}
                                         title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
@@ -552,7 +590,7 @@ export default function LogisticsDashboard() {
                                     ))}
                                   </div>
                                 );
-                              })()}
+                              })()}</old_str>
                             </div>
                           </td>
                         </tr>

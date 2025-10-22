@@ -314,77 +314,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send order to production
+  // Send order to production - creates separate production orders for each producer
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
       const { id } = req.params;
-      const { producerId } = req.body;
+      const { producerId } = req.body; // Optional - if provided, only send to this producer
 
-      console.log(`Sending order ${id} to production for producer ${producerId}`);
+      console.log(`Sending order ${id} to production. Producer filter: ${producerId || 'all'}`);
 
       const order = await storage.getOrder(id);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
 
-      // Update order status to production
-      await storage.updateOrder(id, { status: 'production' });
-
-      // Get producer information
-      const producer = await storage.getUser(producerId);
-      if (!producer) {
-        return res.status(404).json({ error: "Produtor não encontrado" });
-      }
-
-      // Create detailed order information for the producer
-      const orderDetails = {
-        orderNumber: order.orderNumber,
-        product: order.product,
-        description: order.description,
-        totalValue: order.totalValue,
-        deadline: order.deadline,
-        deliveryDeadline: order.deliveryDeadline,
-        clientDetails: {
-          name: order.contactName,
-          phone: order.contactPhone,
-          email: order.contactEmail
-        },
-        shippingAddress: order.deliveryType === 'pickup' 
-          ? 'Sede Principal - Retirada no Local'
-          : (order.shippingAddress || 'Endereço não informado'),
-        items: order.items ? order.items.filter((item: any) => 
-          item.producerId === producerId
-        ) : [],
-        photos: [] // Will be populated if budget photos exist
-      };
-
-      // Get budget photos if order was converted from budget
+      // Get all items from the order (including budget items)
+      let allItems = [];
       if (order.budgetId) {
-        const photos = await storage.getBudgetPhotos(order.budgetId);
-        orderDetails.photos = photos.map(photo => photo.photoUrl || photo.imageUrl);
+        const budgetItems = await storage.getBudgetItems(order.budgetId);
+        allItems = budgetItems;
+      } else if (order.items) {
+        allItems = order.items;
       }
 
-      // Create production order
-      const productionOrder = await storage.createProductionOrder({
-        orderId: id,
-        producerId: producerId,
-        status: 'pending',
-        deadline: order.deadline,
-        deliveryDeadline: order.deliveryDeadline,
-        shippingAddress: orderDetails.shippingAddress,
-        orderDetails: JSON.stringify(orderDetails), // Store detailed order info
-        producerValue: '0.00',
-        producerValueLocked: false
+      console.log(`Order ${id} has ${allItems.length} total items`);
+
+      // Group items by producer
+      const itemsByProducer = new Map();
+      allItems.forEach((item: any) => {
+        if (item.producerId && item.producerId !== 'internal') {
+          // Only send to specified producer if producerId is provided
+          if (producerId && item.producerId !== producerId) {
+            return; // Skip this item
+          }
+
+          if (!itemsByProducer.has(item.producerId)) {
+            itemsByProducer.set(item.producerId, []);
+          }
+          itemsByProducer.get(item.producerId).push(item);
+        }
       });
 
-      console.log(`Created production order ${productionOrder.id} for producer ${producer.name}`);
+      console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
+
+      if (itemsByProducer.size === 0) {
+        return res.status(400).json({ error: "Nenhum item de produção externa encontrado" });
+      }
+
+      const createdOrders = [];
+      const producerNames = [];
+
+      // Get budget photos if order was converted from budget
+      let photos = [];
+      if (order.budgetId) {
+        const budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
+        photos = budgetPhotos.map(photo => photo.photoUrl || photo.imageUrl);
+      }
+
+      // Create a separate production order for each producer
+      for (const [currentProducerId, items] of itemsByProducer) {
+        const producer = await storage.getUser(currentProducerId);
+        if (!producer) {
+          console.log(`Producer not found: ${currentProducerId}`);
+          continue;
+        }
+
+        // Calculate total value for this producer's items
+        const producerTotalValue = items.reduce((sum: number, item: any) => 
+          sum + parseFloat(item.totalPrice || '0'), 0
+        );
+
+        // Create detailed order information specific to this producer
+        const orderDetails = {
+          orderNumber: order.orderNumber,
+          product: `${order.product} - Produção: ${producer.name}`,
+          description: order.description,
+          totalValue: producerTotalValue.toFixed(2),
+          deadline: order.deadline,
+          deliveryDeadline: order.deliveryDeadline,
+          clientDetails: {
+            name: order.contactName,
+            phone: order.contactPhone,
+            email: order.contactEmail
+          },
+          shippingAddress: order.deliveryType === 'pickup' 
+            ? 'Sede Principal - Retirada no Local'
+            : (order.shippingAddress || 'Endereço não informado'),
+          items: items, // Only items for this producer
+          photos: photos
+        };
+
+        // Check if production order already exists for this producer
+        const existingOrders = await storage.getProductionOrdersByOrder(id);
+        const existingForProducer = existingOrders.find(po => po.producerId === currentProducerId);
+
+        if (existingForProducer) {
+          console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
+          continue;
+        }
+
+        // Create production order
+        const productionOrder = await storage.createProductionOrder({
+          orderId: id,
+          producerId: currentProducerId,
+          status: 'pending',
+          deadline: order.deadline,
+          deliveryDeadline: order.deliveryDeadline,
+          shippingAddress: orderDetails.shippingAddress,
+          orderDetails: JSON.stringify(orderDetails),
+          producerValue: '0.00',
+          producerValueLocked: false
+        });
+
+        createdOrders.push(productionOrder);
+        producerNames.push(producer.name);
+
+        console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
+      }
+
+      // Update order status to production only if we created orders
+      if (createdOrders.length > 0) {
+        await storage.updateOrder(id, { status: 'production' });
+      }
+
+      const message = producerId 
+        ? `Pedido enviado para produção - ${producerNames[0]}`
+        : `Pedido enviado para produção - ${createdOrders.length} ordem(ns) criada(s) para: ${producerNames.join(', ')}`;
 
       res.json({
         success: true,
-        productionOrder: productionOrder,
-        productionOrdersCreated: 1,
-        producerNames: [producer.name],
-        message: `Pedido enviado para produção - ${producer.name}`
+        productionOrders: createdOrders,
+        productionOrdersCreated: createdOrders.length,
+        producerNames: producerNames,
+        message: message
       });
     } catch (error) {
       console.error("Error sending order to production:", error);
