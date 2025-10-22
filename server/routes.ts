@@ -2478,8 +2478,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let paymentsCreated = 0;
-      let errors = [];
+      let errors: string[] = [];
       let actualTotalAmount = 0;
+      let duplicateCount = 0;
 
       // Process each transaction
       for (const txn of transactions) {
@@ -2492,6 +2493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (transaction.status === 'matched') {
             errors.push(`Transação ${txn.transactionId} já foi conciliada`);
+            duplicateCount++;
             continue;
           }
 
@@ -2536,7 +2538,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         paymentsCreated,
         totalAmount: actualTotalAmount.toFixed(2),
-        errors
+        errors,
+        duplicates: duplicateCount
       });
     } catch (error) {
       console.error("Error in multiple payment association:", error);
@@ -2791,36 +2794,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Created import record: ${importRecord.id}`);
 
-      // Process each transaction
       let importedCount = 0;
       let skippedCount = 0;
+      let errors: string[] = [];
 
+      // Process and store transactions
       for (const transaction of transactions) {
         try {
-          // Check if transaction already exists
+          // Check if transaction already exists by fitId
           const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
-
           if (existingTransaction) {
-            console.log(`Transaction ${transaction.fitId} already exists, skipping`);
+            console.log(`Transaction already exists: ${transaction.fitId}`);
             skippedCount++;
             continue;
           }
 
-          // Create new transaction
-          await storage.createBankTransaction({
+          // Create new transaction with proper validation
+          if (!transaction.fitId || !transaction.amount) {
+            console.log(`Skipping invalid transaction:`, transaction);
+            errors.push(`Transação inválida: faltam dados essenciais`);
+            continue;
+          }
+
+          const newTransaction = await storage.createBankTransaction({
             importId: importRecord.id,
             fitId: transaction.fitId,
-            date: new Date(transaction.date),
+            date: transaction.date,
+            hasValidDate: transaction.hasValidDate,
             amount: transaction.amount,
             description: transaction.description,
-            type: transaction.type,
             bankRef: transaction.bankRef,
+            type: transaction.type,
             status: 'unmatched'
           });
 
+          console.log(`Created transaction: ${newTransaction.id} - ${transaction.description} - ${transaction.amount}`);
           importedCount++;
-        } catch (transactionError) {
-          console.error(`Error importing transaction ${transaction.fitId}:`, transactionError);
+        } catch (error) {
+          console.error("Error saving transaction:", error);
+          errors.push(`Erro ao salvar transação ${transaction.fitId}: ${error.message}`);
         }
       }
 
@@ -2842,7 +2854,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           imported: importedCount,
           skipped: skippedCount,
           ...stats
-        }
+        },
+        errors: errors.length > 0 ? errors : undefined
       });
     } catch (error) {
       console.error("OFX import error:", error);
@@ -2874,13 +2887,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
       }
 
-      // Filter only debit transactions (payments out)
-      const debitTransactions = transactions.filter(t => t.type === 'PAYMENT' || t.type === 'DEBIT');
-      console.log(`Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
+      // Filter debit transactions (payments to producers - money going out)
+    // Accept both parsed 'debit' type AND original OFX types like 'PAYMENT', 'DEBIT'
+    const debitTransactions = transactions.filter(t => 
+      t.type === 'debit' || 
+      t.originalType === 'PAYMENT' || 
+      t.originalType === 'DEBIT' || 
+      t.originalType === 'XFER' ||
+      parseFloat(t.amount) < 0 // Also accept negative amounts as debits
+    );
 
-      if (debitTransactions.length === 0) {
-        return res.status(400).json({ error: 'Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX' });
-      }
+    console.log(`Processing producer payment OFX file: Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
+    console.log(`Sample transactions:`, transactions.slice(0, 3).map(t => ({ 
+      type: t.type, 
+      originalType: t.originalType, 
+      amount: t.amount, 
+      description: t.description 
+    })));
+
+    if (debitTransactions.length === 0) {
+      return res.status(400).json({ 
+        error: "Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX" 
+      });
+    }
 
       // Create bank import record for producer payments
       const importRecord = await storage.createBankImport({
@@ -2894,10 +2923,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Created producer payment import record: ${importRecord.id}`);
 
-      // Process each debit transaction
       let importedCount = 0;
       let skippedCount = 0;
+      let errors: string[] = [];
 
+      // Process each debit transaction
       for (const transaction of debitTransactions) {
         try {
           // Check if transaction already exists
@@ -2924,6 +2954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           importedCount++;
         } catch (transactionError) {
           console.error(`Error importing producer payment transaction ${transaction.fitId}:`, transactionError);
+          errors.push(`Erro ao importar transação ${transaction.fitId}: ${transactionError.message}`);
         }
       }
 
@@ -2946,7 +2977,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           imported: importedCount,
           skipped: skippedCount,
           ...stats
-        }
+        },
+        errors: errors.length > 0 ? errors : undefined
       });
     } catch (error) {
       console.error("Producer payment OFX import error:", error);
@@ -3841,52 +3873,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quote-requests/client/:clientId", async (req, res) => {
-    try {
-      const { clientId } = req.params;
-      console.log(`Fetching quote requests for client: ${clientId}`);
-
-      const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
-      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}`);
-
-      // Enrich with vendor names and product details
-      const enrichedRequests = await Promise.all(
-        quoteRequests.map(async (request) => {
-          const vendor = request.vendorId ? await storage.getUser(request.vendorId) : null;
-
-          // Para solicitações consolidadas, criar um resumo dos produtos
-          let productSummary = 'Produtos solicitados';
-          let totalProducts = 1;
-
-          if (request.products && Array.isArray(request.products)) {
-            totalProducts = request.products.length;
-            if (totalProducts === 1) {
-              productSummary = request.products[0].productName;
-            } else {
-              productSummary = `${totalProducts} produtos solicitados`;
-            }
-          } else if (request.productName) {
-            productSummary = request.productName;
-          }
-
-          return {
-            ...request,
-            vendorName: vendor?.name || 'Vendedor não atribuído',
-            productName: productSummary, // Para compatibilidade com a interface
-            productSummary: productSummary,
-            totalEstimatedValue: request.totalEstimatedValue || 0
-          };
-        })
-      );
-
-      console.log(`Returning ${enrichedRequests.length} enriched quote requests`);
-      res.json(enrichedRequests);
-    } catch (error) {
-      console.error("Error fetching client quote requests:", error);
-      res.status(500).json({ error: "Failed to fetch client quote requests" });
-    }
-  });
-
   app.post("/api/budgets", async (req, res) => {
     try {
       // Validar personalizações antes de criar o orçamento - apenas logar alertas
@@ -4644,8 +4630,8 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich with production order and producer data
       const enrichedPayments = await Promise.all(
         payments.map(async (payment) => {
-          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
           const producer = await storage.getUser(payment.producerId);
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
           let order = null;
 
           if (productionOrder) {
@@ -4751,13 +4737,13 @@ Para mais detalhes, entre em contato conosco!`;
           const producer = await storage.getUser(payment.producerId);
           const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
           let orderInfo = null;
-          let clientName = 'Cliente não encontrado';
+          let clientName = "Cliente não informado";
 
           if (productionOrder) {
             const order = await storage.getOrder(productionOrder.orderId);
             if (order) {
               orderInfo = order;
-              clientName = order.contactName || 'Nome não informado';
+              clientName = order.contactName || "Nome não informado";
             }
           }
 
