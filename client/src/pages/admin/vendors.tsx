@@ -293,7 +293,7 @@ export default function AdminVendors() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vendors?.map((vendor: any) => (
+            {vendors?.filter((vendor: any) => vendor && vendor.id && vendor.name).map((vendor: any) => (
               <Card key={vendor.id} className="card-hover">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">

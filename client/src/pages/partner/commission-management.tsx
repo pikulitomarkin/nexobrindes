@@ -183,20 +183,6 @@ export default function PartnerCommissionManagement() {
     }
   };
 
-  const onCommissionSubmit = (data: CommissionFormValues) => {
-    if (editingVendor) {
-      updateVendorCommissionMutation.mutate({
-        vendorId: editingVendor,
-        commissionRate: data.commissionRate
-      });
-    } else if (editingPartner) {
-      updatePartnerCommissionMutation.mutate({
-        partnerId: editingPartner,
-        commissionRate: data.commissionRate
-      });
-    }
-  };
-
   const onPartnerSubmit = (data: PartnerFormValues) => {
     createPartnerMutation.mutate(data);
   };
@@ -512,7 +498,7 @@ export default function PartnerCommissionManagement() {
                     </div>
                   </div>
                 ))}
-                
+
                 {(!partners || partners.length === 0) && (
                   <div className="text-center py-8">
                     <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
