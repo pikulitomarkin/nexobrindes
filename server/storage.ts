@@ -278,16 +278,6 @@ export class MemStorage implements IStorage {
   private budgets: Map<string, any>;
   private budgetItems: Map<string, any>; // Changed to Map
   private budgetPhotos: Map<string, any>; // Changed to Map
-
-  // Payment data for finance
-  private paymentData: any = {
-    pix: '',
-    bankAccount: '',
-    paymentLink: '',
-    instructions: ''
-  };
-
-  private commissionSettings: CommissionSettings;
   private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
   private quoteRequests: any[] = []; // Added for quote requests
 
@@ -2673,7 +2663,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any) {
+  async createBudgetItem(budgetId: string, itemData: any>) {
     const id = generateId('budget-item');
 
     const item = {
@@ -3252,135 +3242,108 @@ export class MemStorage implements IStorage {
 
   // Financial module methods - Bank Imports & Transactions
   async getBankImports(): Promise<BankImport[]> {
-    return this.mockData.bankImports || [];
+    return Array.from(this.bankImports.values());
   }
 
   async getBankImport(id: string): Promise<BankImport | undefined> {
-    return this.mockData.bankImports.find(imp => imp.id === id);
+    return this.bankImports.get(id);
   }
 
-  async createBankImport(data: InsertBankImport): Promise<BankImport> {
-    const id = `import-${Date.now()}`;
-    const bankImport: BankImport = {
-      id,
+  async createBankImport(data: InsertBankImport & { importType?: string }): Promise<BankImport> {
+    const id = randomUUID();
+    const bankImport: BankImport & { importType?: string } = {
       ...data,
-      uploadedAt: new Date(),
+      id,
+      importType: (data as any).importType || 'general',
+      processedTransactions: data.processedTransactions || 0,
+      skippedTransactions: data.skippedTransactions || 0,
+      errorMessage: data.errorMessage || null,
+      createdAt: new Date(),
       updatedAt: new Date()
     };
-    this.mockData.bankImports.push(bankImport);
+    this.bankImports.set(id, bankImport);
+    console.log(`Created bank import: ${id} with ${data.transactionCount} transactions`);
     return bankImport;
   }
 
   async updateBankImport(id: string, data: Partial<InsertBankImport>): Promise<BankImport | undefined> {
-    const existing = this.mockData.bankImports.find(imp => imp.id === id);
-    if (!existing) return undefined;
-
-    const updated: BankImport = {
-      ...existing,
-      ...data,
-      updatedAt: new Date()
-    };
-
-    const index = this.mockData.bankImports.findIndex(imp => imp.id === id);
-    if (index !== -1) {
-      this.mockData.bankImports[index] = updated;
+    const bankImport = this.bankImports.get(id);
+    if (bankImport) {
+      const updated = {
+        ...bankImport,
+        ...data,
+        updatedAt: new Date()
+      };
+      this.bankImports.set(id, updated);
+      return updated;
     }
-    return updated;
+    return undefined;
   }
 
   async getBankTransactionsByImport(importId: string): Promise<BankTransaction[]> {
-    return this.mockData.bankTransactions.filter(txn => txn.importId === importId) || [];
+    return Array.from(this.bankTransactions.values())
+      .filter(transaction => transaction.importId === importId);
   }
 
   async getBankTransactions(): Promise<BankTransaction[]> {
-    return this.mockData.bankTransactions || [];
+    return Array.from(this.bankTransactions.values());
   }
 
   async getBankTransaction(id: string): Promise<BankTransaction | undefined> {
-    return this.mockData.bankTransactions.find(txn => txn.id === id);
+    return this.bankTransactions.get(id);
   }
 
   async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | undefined> {
-    return this.mockData.bankTransactions.find(txn => txn.fitId === fitId);
+    return Array.from(this.bankTransactions.values())
+      .find(transaction => transaction.fitId === fitId);
   }
 
-  async createBankTransaction(transaction: any): Promise<BankTransaction> {
-    // Validar a data sem usar fallback para data atual
-    let validDate = null;
-    if (transaction.date) {
-      const parsedDate = new Date(transaction.date);
-      if (!isNaN(parsedDate.getTime())) {
-        validDate = parsedDate;
-      } else {
-        console.error('Invalid date provided:', transaction.date, 'transaction will have null date');
-      }
-    } else {
-      console.error('No date provided for transaction, date will be null');
-    }
-
-    // Validar valor da transação
-    const amount = parseFloat(transaction.amount);
-    if (isNaN(amount)) {
-      throw new Error(`Invalid amount: ${transaction.amount}`);
-    }
-
-    const newTransaction: BankTransaction = {
-      id: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      importId: transaction.importId || 'unknown',
-      fitId: transaction.fitId || `fit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      amount: transaction.amount.toString(),
-      date: validDate,
-      description: transaction.description || 'Transação sem descrição',
-      type: transaction.type || (amount > 0 ? 'credit' : 'debit'),
-      status: transaction.status || 'unmatched',
-      matchedOrderId: transaction.matchedOrderId || null,
-      matchedAt: transaction.matchedAt || null,
-      bankRef: transaction.bankRef || null,
-      notes: transaction.notes || null,
+  async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
+    const id = randomUUID();
+    const transaction: BankTransaction = {
+      ...data,
+      id,
+      matchedReceivableId: data.matchedReceivableId || null,
+      matchedPaymentId: data.matchedPaymentId || null,
+      matchedOrderId: data.matchedOrderId || null,
+      matchedAt: data.matchedAt || null,
+      notes: data.notes || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-
-    // Garantir que o array existe
-    if (!this.mockData.bankTransactions) {
-      this.mockData.bankTransactions = [];
-    }
-
-    this.mockData.bankTransactions.push(newTransaction);
-    console.log("Created bank transaction:", {
-      id: newTransaction.id,
-      amount: newTransaction.amount,
-      type: newTransaction.type,
-      status: newTransaction.status,
-      date: validDate.toISOString(),
-      fitId: newTransaction.fitId,
-      notes: newTransaction.notes
-    });
-    return newTransaction;
+    this.bankTransactions.set(id, transaction);
+    console.log(`Created bank transaction: ${id} - ${transaction.type} - R$ ${transaction.amount}`);
+    return transaction;
   }
 
-  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction & { matchedOrderId?: string; matchedAt?: Date; matchedPaymentId?: string }>): Promise<BankTransaction | undefined> {
-    const existing = this.mockData.bankTransactions.find(txn => txn.id === id);
-    if (!existing) return undefined;
-
-    const updated: BankTransaction = {
-      ...existing,
-      ...data,
-      updatedAt: new Date()
-    };
-
-    const index = this.mockData.bankTransactions.findIndex(txn => txn.id === id);
-    this.mockData.bankTransactions[index] = updated;
-
-    return updated;
+  async updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined> {
+    const transaction = this.bankTransactions.get(id);
+    if (transaction) {
+      const updated = {
+        ...transaction,
+        ...data,
+        updatedAt: new Date()
+      };
+      this.bankTransactions.set(id, updated);
+      return updated;
+    }
+    return undefined;
   }
 
   async matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined> {
-    return await this.updateBankTransaction(transactionId, {
-      status: 'matched',
-      matchedReceivableId: receivableId,
-      matchedAt: new Date()
-    });
+    const transaction = this.bankTransactions.get(transactionId);
+    if (transaction) {
+      const updated = {
+        ...transaction,
+        status: 'matched' as const,
+        matchedReceivableId: receivableId,
+        matchedAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.bankTransactions.set(transactionId, updated);
+      return updated;
+    }
+    return undefined;
   }
 
   // Financial module methods - Expense Notes

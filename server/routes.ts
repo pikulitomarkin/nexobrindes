@@ -55,6 +55,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
 async function parseOFXBuffer(buffer: Buffer) {
   const ofxContent = buffer.toString('utf-utf-8');
   const transactions = [];
+  const stats = { totalLines: ofxContent.split('\n').length };
 
   // Simple regex-based OFX parsing
   const transactionRegex = /<STMTTRN>(.*?)<\/STMTTRN>/gs;
@@ -94,17 +95,17 @@ async function parseOFXBuffer(buffer: Buffer) {
 
       transactions.push({
         fitId: fitId,
-        dtPosted: transactionDate,
+        date: transactionDate,
         hasValidDate: hasValidDate,
         amount: trnAmt,
-        memo: memo,
-        refNum: refNum,
+        description: memo,
+        bankRef: refNum,
         type: trnType
       });
     });
   }
 
-  return { transactions };
+  return { transactions, stats };
 }
 
 // Helper function to generate unique IDs (replace with a proper UUID library in production)
@@ -990,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const order = await storage.getOrder(id);
-      
+
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
@@ -2401,7 +2402,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Financial data
+  // OFX Import for general reconciliation (receivables)
+  app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo OFX enviado' });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: 'Arquivo deve ter extensão .ofx' });
+      }
+
+      console.log(`Processing OFX file: ${req.file.originalname} (${req.file.size} bytes)`);
+
+      // Parse OFX content
+      const parseResult = await parseOFXBuffer(req.file.buffer);
+      const { transactions, stats } = parseResult;
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
+      }
+
+      // Create bank import record
+      const importRecord = await storage.createBankImport({
+        fileName: req.file.originalname,
+        fileSize: req.file.size.toString(),
+        transactionCount: transactions.length,
+        importedAt: new Date(),
+        status: 'completed'
+      });
+
+      console.log(`Created import record: ${importRecord.id}`);
+
+      // Process each transaction
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      for (const transaction of transactions) {
+        try {
+          // Check if transaction already exists
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+
+          if (existingTransaction) {
+            console.log(`Transaction ${transaction.fitId} already exists, skipping`);
+            skippedCount++;
+            continue;
+          }
+
+          // Create new transaction
+          await storage.createBankTransaction({
+            importId: importRecord.id,
+            fitId: transaction.fitId,
+            date: new Date(transaction.date),
+            amount: transaction.amount,
+            description: transaction.description,
+            type: transaction.type,
+            bankRef: transaction.bankRef,
+            status: 'unmatched'
+          });
+
+          importedCount++;
+        } catch (transactionError) {
+          console.error(`Error importing transaction ${transaction.fitId}:`, transactionError);
+        }
+      }
+
+      // Update import record with results
+      await storage.updateBankImport(importRecord.id, {
+        status: 'completed',
+        processedTransactions: importedCount,
+        skippedTransactions: skippedCount
+      });
+
+      console.log(`OFX import completed: ${importedCount} imported, ${skippedCount} skipped`);
+
+      res.json({
+        success: true,
+        message: `Arquivo OFX importado com sucesso! ${importedCount} transações importadas, ${skippedCount} duplicatas ignoradas.`,
+        importId: importRecord.id,
+        stats: {
+          total: transactions.length,
+          imported: importedCount,
+          skipped: skippedCount,
+          ...stats
+        }
+      });
+    } catch (error) {
+      console.error("OFX import error:", error);
+      res.status(500).json({ 
+        error: "Erro ao importar arquivo OFX", 
+        details: error.message 
+      });
+    }
+  });
+
+  // OFX Import for producer payments (payables)
+  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo OFX enviado' });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: 'Arquivo deve ter extensão .ofx' });
+      }
+
+      console.log(`Processing producer payment OFX file: ${req.file.originalname} (${req.file.size} bytes)`);
+
+      // Parse OFX content
+      const parseResult = await parseOFXBuffer(req.file.buffer);
+      const { transactions, stats } = parseResult;
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
+      }
+
+      // Filter only debit transactions (payments out)
+      const debitTransactions = transactions.filter(t => t.type === 'debit');
+      console.log(`Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
+
+      if (debitTransactions.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX' });
+      }
+
+      // Create bank import record for producer payments
+      const importRecord = await storage.createBankImport({
+        fileName: req.file.originalname,
+        fileSize: req.file.size.toString(),
+        transactionCount: debitTransactions.length,
+        importedAt: new Date(),
+        status: 'completed',
+        importType: 'producer_payments'
+      });
+
+      console.log(`Created producer payment import record: ${importRecord.id}`);
+
+      // Process each debit transaction
+      let importedCount = 0;
+      let skippedCount = 0;
+
+      for (const transaction of debitTransactions) {
+        try {
+          // Check if transaction already exists
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+
+          if (existingTransaction) {
+            console.log(`Transaction ${transaction.fitId} already exists, skipping`);
+            skippedCount++;
+            continue;
+          }
+
+          // Create new transaction with absolute amount for display
+          await storage.createBankTransaction({
+            importId: importRecord.id,
+            fitId: transaction.fitId,
+            date: new Date(transaction.date),
+            amount: transaction.amount, // Keep original negative value
+            description: transaction.description,
+            type: transaction.type,
+            bankRef: transaction.bankRef,
+            status: 'unmatched'
+          });
+
+          importedCount++;
+        } catch (transactionError) {
+          console.error(`Error importing producer payment transaction ${transaction.fitId}:`, transactionError);
+        }
+      }
+
+      // Update import record with results
+      await storage.updateBankImport(importRecord.id, {
+        status: 'completed',
+        processedTransactions: importedCount,
+        skippedTransactions: skippedCount
+      });
+
+      console.log(`Producer payment OFX import completed: ${importedCount} imported, ${skippedCount} skipped`);
+
+      res.json({
+        success: true,
+        message: `Arquivo OFX de pagamentos importado com sucesso! ${importedCount} transações de débito importadas, ${skippedCount} duplicatas ignoradas.`,
+        importId: importRecord.id,
+        stats: {
+          total: transactions.length,
+          debits: debitTransactions.length,
+          imported: importedCount,
+          skipped: skippedCount,
+          ...stats
+        }
+      });
+    } catch (error) {
+      console.error("Producer payment OFX import error:", error);
+      res.status(500).json({ 
+        error: "Erro ao importar arquivo OFX de pagamentos", 
+        details: error.message 
+      });
+    }
+  });
+
+  // Financial overview data
   app.get("/api/finance/overview", async (req, res) => {
     try {
       const orders = await storage.getOrders();
