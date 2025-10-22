@@ -1381,8 +1381,8 @@ export class MemStorage implements IStorage {
     return productionOrder;
   }
 
-  async getProductionOrder(id: string): Promise<ProductionOrder | null> {
-    return this.productionOrders.get(id) || null;
+  async getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
+    return this.productionOrders.get(id);
   }
 
   async updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined> {
@@ -1491,10 +1491,6 @@ export class MemStorage implements IStorage {
     }
 
     return updated;
-  }
-
-  async getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
-    return this.productionOrders.get(id);
   }
 
   async getProductionOrdersByOrder(orderId: string): Promise<ProductionOrder[]> {

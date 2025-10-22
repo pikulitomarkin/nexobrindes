@@ -523,6 +523,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update production order status
+  app.patch("/api/production-orders/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, notes, deliveryDate, trackingCode } = req.body;
+
+      console.log(`Updating production order ${id} status to: ${status}`);
+
+      const updatedPO = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate, trackingCode);
+      if (!updatedPO) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      console.log(`Production order ${id} status updated successfully to: ${status}`);
+      res.json(updatedPO);
+    } catch (error) {
+      console.error("Error updating production order status:", error);
+      res.status(500).json({ error: "Erro ao atualizar status da ordem de produção: " + error.message });
+    }
+  });
+
   // Get production orders for a specific producer
   app.get("/api/production-orders/producer/:producerId", async (req, res) => {
     try {
@@ -586,6 +607,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching production orders for producer:", error);
       res.status(500).json({ error: "Failed to fetch production orders for producer" });
+    }
+  });
+
+  // Get specific production order by ID
+  app.get("/api/production-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Fetching production order: ${id}`);
+
+      const productionOrder = await storage.getProductionOrder(id);
+      if (!productionOrder) {
+        console.log(`Production order not found: ${id}`);
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Get the related order
+      const order = await storage.getOrder(productionOrder.orderId);
+      if (!order) {
+        console.log(`Related order not found for production order: ${id}`);
+        return res.status(404).json({ error: "Pedido relacionado não encontrado" });
+      }
+
+      // Get client information
+      let clientName = order.contactName;
+      let clientPhone = order.contactPhone;
+      let clientEmail = order.contactEmail;
+      let clientAddress = null;
+
+      if (!clientName && order.clientId) {
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          clientName = clientRecord.name;
+          clientPhone = clientRecord.phone || order.contactPhone;
+          clientEmail = clientRecord.email || order.contactEmail;
+          clientAddress = clientRecord.address;
+        } else {
+          const clientByUserId = await storage.getClientByUserId(order.clientId);
+          if (clientByUserId) {
+            clientName = clientByUserId.name;
+            clientPhone = clientByUserId.phone || order.contactPhone;
+            clientEmail = clientByUserId.email || order.contactEmail;
+            clientAddress = clientByUserId.address;
+          } else {
+            const clientUser = await storage.getUser(order.clientId);
+            if (clientUser) {
+              clientName = clientUser.name;
+              clientPhone = clientUser.phone || order.contactPhone;
+              clientEmail = clientUser.email || order.contactEmail;
+              clientAddress = clientUser.address;
+            }
+          }
+        }
+      }
+
+      if (!clientName) {
+        clientName = "Nome não informado";
+      }
+
+      // Get budget photos if order was converted from budget
+      let photos = [];
+      if (order.budgetId) {
+        const budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
+        photos = budgetPhotos.map(photo => photo.photoUrl || photo.imageUrl);
+      }
+
+      // Parse order details if available
+      let orderDetails = null;
+      if (productionOrder.orderDetails) {
+        try {
+          orderDetails = JSON.parse(productionOrder.orderDetails);
+        } catch (e) {
+          console.log(`Error parsing order details for production order ${id}:`, e);
+        }
+      }
+
+      const enrichedProductionOrder = {
+        ...productionOrder,
+        order: {
+          ...order,
+          clientName: clientName,
+          clientPhone: clientPhone,
+          clientEmail: clientEmail,
+          clientAddress: clientAddress,
+          shippingAddress: order.deliveryType === 'pickup' 
+            ? 'Sede Principal - Retirada no Local' 
+            : (clientAddress || order.contactName ? `${clientName}` : 'Endereço não informado')
+        },
+        photos: photos,
+        orderDetails: orderDetails
+      };
+
+      console.log(`Returning enriched production order: ${id}`);
+      res.json(enrichedProductionOrder);
+    } catch (error) {
+      console.error("Error fetching production order:", error);
+      res.status(500).json({ error: "Erro ao buscar ordem de produção: " + error.message });
     }
   });
 
