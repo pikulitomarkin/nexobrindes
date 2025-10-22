@@ -242,7 +242,7 @@ export default function CommissionManagement() {
     (c.vendorName || c.partnerName) && 
     c.orderNumber
   ) || [];
-  
+
   const totalCommissions = validCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const pendingCommissions = validCommissions.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const paidCommissions = validCommissions.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
@@ -598,14 +598,14 @@ export default function CommissionManagement() {
                           R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`status-badge ${
-                            commission.status === 'paid' ? 'status-confirmed' : 
-                            commission.status === 'confirmed' ? 'status-production' : 
-                            commission.status === 'pending' ? 'status-pending' : 
-                            commission.status === 'deducted' ? 'status-cancelled' :
-                            commission.status === 'cancelled' ? 'status-cancelled' :
-                            'status-production'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            commission.status === 'paid' ? 'bg-green-100 text-green-800' : 
+                            commission.status === 'confirmed' ? 'bg-blue-100 text-blue-800' : 
+                            commission.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                            commission.status === 'deducted' ? 'bg-gray-100 text-gray-800' :
+                            commission.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                              }`}>
                             {commission.status === 'paid' ? 'Paga' : 
                              commission.status === 'confirmed' ? 'Confirmada (A Pagar)' : 
                              commission.status === 'pending' ? 'Pendente' : 

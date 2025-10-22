@@ -63,16 +63,16 @@ export default function FinanceCommissionPayouts() {
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      pending: { label: "Pendente", variant: "secondary" as const, color: "text-yellow-600" },
-      confirmed: { label: "Confirmada", variant: "default" as const, color: "text-blue-600" },
-      paid: { label: "Paga", variant: "default" as const, color: "text-green-600" },
-      cancelled: { label: "Cancelada", variant: "destructive" as const, color: "text-red-600" },
+      pending: { label: "Pendente", className: "bg-yellow-100 text-yellow-800" },
+      confirmed: { label: "Confirmada", className: "bg-blue-100 text-blue-800" },
+      paid: { label: "Paga", className: "bg-green-100 text-green-800" },
+      cancelled: { label: "Cancelada", className: "bg-red-100 text-red-800" },
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;
 
     return (
-      <Badge variant={statusInfo.variant} className={`capitalize ${statusInfo.color}`}>
+      <Badge className={`capitalize ${statusInfo.className}`}>
         {statusInfo.label}
       </Badge>
     );
