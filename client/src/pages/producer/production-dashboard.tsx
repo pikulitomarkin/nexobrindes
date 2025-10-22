@@ -223,17 +223,19 @@ export default function ProductionDashboard() {
               size="sm"
               className="bg-green-600 hover:bg-green-700"
               onClick={() => handleStatusUpdate(order, 'accepted')}
+              disabled={updateStatusMutation.isPending}
             >
               <CheckCircle className="h-4 w-4 mr-1" />
-              Aceitar
+              {updateStatusMutation.isPending ? 'Aceitando...' : 'Aceitar'}
             </Button>
             <Button
               size="sm"
               variant="destructive"
               onClick={() => handleStatusUpdate(order, 'rejected')}
+              disabled={updateStatusMutation.isPending}
             >
               <AlertTriangle className="h-4 w-4 mr-1" />
-              Rejeitar
+              {updateStatusMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
             </Button>
           </div>
         );
@@ -247,7 +249,7 @@ export default function ProductionDashboard() {
               title={(!order.producerValue || parseFloat(order.producerValue) <= 0) ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
             >
               <Clock className="h-4 w-4 mr-1" />
-              Iniciar Produção
+              {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}
             </Button>
           );
       case 'production':
@@ -260,7 +262,7 @@ export default function ProductionDashboard() {
             title={!order.producerValue ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
           >
             <Package className="h-4 w-4 mr-1" />
-            Marcar Pronto
+            {updateStatusMutation.isPending ? 'Finalizando...' : 'Marcar Pronto'}
           </Button>
         );
       case 'ready':

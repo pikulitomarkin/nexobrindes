@@ -568,7 +568,7 @@ export default function ProducerOrderDetails() {
                     title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de aceitar a ordem" : ""}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Aceitar Ordem
+                    {updateStatusMutation.isPending ? 'Aceitando...' : 'Aceitar Ordem'}
                   </Button>
                   <Button
                     variant="destructive"
@@ -577,7 +577,7 @@ export default function ProducerOrderDetails() {
                     disabled={updateStatusMutation.isPending}
                   >
                     <AlertTriangle className="h-4 w-4 mr-2" />
-                    Rejeitar
+                    {updateStatusMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
                   </Button>
                 </>
               )}
@@ -586,11 +586,11 @@ export default function ProducerOrderDetails() {
                 <Button
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   onClick={() => handleStatusUpdate('production')}
-                  disabled={!productionOrder.producerValue}
+                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
                   title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
                 >
                   <Clock className="h-4 w-4 mr-2" />
-                  Iniciar Produção
+                  {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}
                 </Button>
               )}
 
@@ -601,7 +601,7 @@ export default function ProducerOrderDetails() {
                   disabled={updateStatusMutation.isPending}
                 >
                   <Package className="h-4 w-4 mr-2" />
-                  Marcar Pronto
+                  {updateStatusMutation.isPending ? 'Finalizando...' : 'Marcar Pronto'}
                 </Button>
               )}
 
