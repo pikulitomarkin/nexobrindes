@@ -6,10 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin, Home } from "lucide-react";
 import { Link } from "wouter";
 
-const queryClient = useQueryClient();
-
 export default function ClientOrderTimeline() {
   const [, params] = useRoute("/client/order/:id/timeline");
+  const queryClient = useQueryClient();
 
   const { data: orderData, isLoading } = useQuery({
     queryKey: [`/api/orders/${params?.id}`],
