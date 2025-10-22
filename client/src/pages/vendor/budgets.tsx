@@ -1015,15 +1015,24 @@ export default function VendorBudgets() {
 
                             {/* Image Upload for Product Customization */}                            
                             <div>
-                              <Label>Imagem da Personalização deste Produto</Label>
+                              <Label>
+                                Imagem da Personalização - {item.productName}
+                                <span className="text-xs text-gray-500 ml-2">
+                                  ({item.producerId === 'internal' ? 'Produto Interno' : 
+                                    producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
+                                </span>
+                              </Label>
                               <div className="mt-2 space-y-2">
                                 <div className="flex items-center justify-center w-full">
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                                     <div className="flex flex-col items-center justify-center pt-2 pb-2">
                                       <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
                                       </svg>
                                       <p className="text-xs text-gray-500">Clique para enviar imagem</p>
+                                      <p className="text-xs text-blue-600 font-medium">
+                                        Para: {item.productName}
+                                      </p>
                                     </div>
                                     <input
                                       type="file"
@@ -1768,8 +1777,11 @@ export default function VendorBudgets() {
                       </Button>
                       <Button 
                         size="sm"
-                        onClick={() => handleConvertClick(budget.id)}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="gradient-bg text-white"
+                        onClick={() => {
+                          setBudgetToConvert(budget.id);
+                          setConvertDialogOpen(true);
+                        }}
                       >
                         🏷️ Converter em Pedido
                       </Button>

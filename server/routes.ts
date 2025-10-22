@@ -575,6 +575,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Final clientId for order:", finalClientId);
 
+      // Generate order number
+      const orderNumber = `PED-${Date.now()}`;
+
       // Create order with contact name as primary identifier and proper items handling
       const newOrder = await storage.createOrder({
         orderNumber,
