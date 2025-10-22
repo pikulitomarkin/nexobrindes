@@ -104,6 +104,9 @@ export const payments = pgTable("payments", {
   transactionId: text("transaction_id"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Reconciliation fields
+  reconciliationStatus: text("reconciliation_status").notNull().default('pending'), // 'pending', 'manual', 'ofx'
+  bankTransactionId: varchar("bank_transaction_id"), // FK to bankTransactions when reconciled via OFX
 });
 
 export const commissions = pgTable("commissions", {
@@ -347,6 +350,11 @@ export const bankTransactions = pgTable("bank_transactions", {
   notes: text("notes"), // Additional notes about the transaction
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // Enhanced reconciliation fields
+  sourceAccountId: varchar("source_account_id"), // Account/bank identifier for grouping
+  rawFitId: text("raw_fit_id"), // Original FITID from OFX for deduplication
+  matchedEntityType: text("matched_entity_type"), // 'payment', 'producer_payment', 'receivable', null
+  matchedEntityId: varchar("matched_entity_id"), // Generic FK to matched entity
 });
 
 export const expenseNotes = pgTable("expense_notes", {
@@ -408,6 +416,9 @@ export const producerPayments = pgTable("producer_payments", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // Reconciliation fields
+  reconciliationStatus: text("reconciliation_status").notNull().default('pending'), // 'pending', 'manual', 'ofx'
+  bankTransactionId: varchar("bank_transaction_id"), // FK to bankTransactions when reconciled via OFX
 });
 
 export const quoteRequests = pgTable("quote_requests", {
