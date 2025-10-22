@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash, Send, Package, AlertCircle, Check, Search, X } from "lucide-react";
+import { Plus, Eye, Edit, Send, Package, AlertCircle, Check, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 
@@ -436,17 +436,6 @@ export default function AdminOrders() {
                               <Check className="h-4 w-4" />
                             </Button>
                           )}
-                          {order.status === 'confirmed' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => sendToProductionMutation.mutate(order.id)}
-                              disabled={sendToProductionMutation.isPending}
-                              title="Enviar para produção"
-                            >
-                              <Package className="h-4 w-4" />
-                            </Button>
-                          )}
                           {order.status !== 'cancelled' && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -478,37 +467,6 @@ export default function AdminOrders() {
                               </AlertDialogContent>
                             </AlertDialog>
                           )}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800" title="Excluir pedido permanentemente">
-                                <Trash className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja excluir permanentemente este pedido? Esta ação:
-                                  <br />• Remove completamente o pedido do sistema
-                                  <br />• Remove todas as comissões relacionadas
-                                  <br />• Remove todos os pagamentos relacionados
-                                  <br />• Esta ação NÃO PODE ser desfeita
-                                  <br /><br />
-                                  <strong>Recomendamos cancelar o pedido ao invés de excluir.</strong>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteOrderMutation.mutate(order.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                  disabled={deleteOrderMutation.isPending}
-                                >
-                                  {deleteOrderMutation.isPending ? "Excluindo..." : "Excluir Permanentemente"}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
                         </div>
                       </td>
                     </tr>
