@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -1208,120 +1208,151 @@ export default function VendorBudgets() {
                 )}
 
                 {/* Add Products */}                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Factory className="h-5 w-5" />
-                      Adicionar Produtos
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Adicionar Produtos ao Orçamento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!selectedProducerId ? (
+                    <div className="text-center py-8">
+                      <Button
+                        type="button"
+                        className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white"
+                        onClick={() => setSelectedProducerId("select")}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Produto
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-2">Clique para escolher um produto</p>
+                    </div>
+                  ) : selectedProducerId === "select" ? (
                     <div className="space-y-4">
-                      {/* Producer Selection */}                      
-                      <div>
+                      <div className="flex items-center justify-between">
                         <Label>Selecionar Produtor</Label>
-                        <Select 
-                          value={selectedProducerId || ""} 
-                          onValueChange={setSelectedProducerId}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedProducerId("")}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Escolha um produtor" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="internal">Produtos Internos</SelectItem>
-                            {producers?.map((producer: any) => (
-                              <SelectItem key={producer.id} value={producer.id}>
-                                {producer.name} - {producer.specialty}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Select 
+                        value="" 
+                        onValueChange={(value) => setSelectedProducerId(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Escolha um produtor para ver seus produtos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="internal">Produtos Internos</SelectItem>
+                          {producers?.map((producer: any) => (
+                            <SelectItem key={producer.id} value={producer.id}>
+                              {producer.name} - {producer.specialty}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-gray-800">
+                          {selectedProducerId === 'internal' ? 'Produtos Internos' : 
+                            producers?.find((p: any) => p.id === selectedProducerId)?.name}
+                        </h4>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedProducerId("select")}
+                          >
+                            Trocar Produtor
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedProducerId("")}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
 
-                      {/* Product Search */}                      
-                      {selectedProducerId && (
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Buscar produtos do produtor..."
-                            value={budgetProductSearch}
-                            onChange={(e) => setBudgetProductSearch(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
-                      )}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Buscar produtos..."
+                          value={budgetProductSearch}
+                          onChange={(e) => setBudgetProductSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
 
-                      {/* Products List */}                      
-                      {selectedProducerId && (
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                          <div className="mb-3">
-                            <h4 className="font-medium text-gray-800">
-                              {selectedProducerId === 'internal' ? 'Produtos Internos' : 
-                                producers?.find((p: any) => p.id === selectedProducerId)?.name}
-                            </h4>
-                          </div>
+                      <div className="border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {(() => {
+                            const producerProducts = productsByProducer[selectedProducerId] || [];
+                            const filteredProducts = producerProducts.filter((product: any) => 
+                              !budgetProductSearch || 
+                              product.name.toLowerCase().includes(budgetProductSearch.toLowerCase())
+                            );
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                            {(() => {
-                              const producerProducts = productsByProducer[selectedProducerId] || [];
-                              const filteredProducts = producerProducts.filter((product: any) => 
-                                !budgetProductSearch || 
-                                product.name.toLowerCase().includes(budgetProductSearch.toLowerCase())
+                            if (filteredProducts.length === 0) {
+                              return (
+                                <div className="col-span-full text-center py-8">
+                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                  <p className="text-gray-500">
+                                    {budgetProductSearch ? 'Nenhum produto encontrado' : 'Nenhum produto disponível'}
+                                  </p>
+                                </div>
                               );
+                            }
 
-                              if (filteredProducts.length === 0) {
-                                return (
-                                  <div className="col-span-full text-center py-8">
-                                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                    <p className="text-gray-500">
-                                      {budgetProductSearch ? 'Nenhum produto encontrado' : 'Nenhum produto disponível para este produtor'}
-                                    </p>
-                                  </div>
-                                );
-                              }
-
-                              return filteredProducts.map((product: any) => (
-                                <div 
-                                  key={product.id} 
-                                  className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors" 
-                                  onClick={() => addProductToBudget(product, selectedProducerId)}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    {product.imageLink ? (
-                                      <img src={product.imageLink} alt={product.name} className="w-10 h-10 object-cover rounded" />
-                                    ) : (
-                                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-                                        <Package className="h-5 w-5 text-gray-400" />
-                                      </div>
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate">{product.name}</p>
-                                      <p className="text-xs text-gray-500">
-                                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                      </p>
-                                      {product.category && (
-                                        <p className="text-xs text-blue-600">{product.category}</p>
-                                      )}
+                            return filteredProducts.map((product: any) => (
+                              <div 
+                                key={product.id} 
+                                className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors" 
+                                onClick={() => {
+                                  addProductToBudget(product, selectedProducerId);
+                                  setSelectedProducerId(""); // Reset after adding
+                                  setBudgetProductSearch(""); // Clear search
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {product.imageLink ? (
+                                    <img src={product.imageLink} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                                  ) : (
+                                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                                      <Package className="h-5 w-5 text-gray-400" />
                                     </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{product.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    {product.category && (
+                                      <p className="text-xs text-blue-600">{product.category}</p>
+                                    )}
                                   </div>
                                 </div>
-                              ));
-                            })()}
-                          </div>
+                              </div>
+                            ));
+                          })()}
                         </div>
-                      )}
-
-                      {!selectedProducerId && (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                          <Factory className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500 font-medium">Selecione um produtor acima</p>
-                          <p className="text-sm text-gray-400">Escolha um produtor para ver seus produtos disponíveis</p>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
               {/* Payment and Shipping Configuration */}              
               <Separator />

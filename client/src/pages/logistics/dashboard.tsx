@@ -56,7 +56,7 @@ export default function LogisticsDashboard() {
       if (producerId) {
         body.producerId = producerId;
       }
-      
+
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -498,7 +498,7 @@ export default function LogisticsDashboard() {
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver
                               </Button>
-                              
+
                               {/* Mostrar botões para cada produtor */}
                               {(() => {
                                 const producersMap = new Map();
@@ -518,77 +518,28 @@ export default function LogisticsDashboard() {
 
                                 if (producersMap.size === 0) {
                                   return (
-                                    <Button size="sm" variant="outline" disabled>
-                                      Apenas itens internos
-                                    </Button>
+                                    <span className="text-xs text-gray-500 italic">
+                                      Sem itens para produção externa
+                                    </span>
                                   );
                                 }
 
-                                // Mostrar status baseado no status do pedido
-                                if (order.status === 'production') {
-                                  return (
-                                    <div className="flex flex-col gap-1">
-                                      <Button size="sm" variant="outline" disabled className="text-green-600 border-green-300 bg-green-50">
-                                        <Send className="h-4 w-4 mr-1" />
-                                        Enviado para Produção
-                                      </Button>
-                                      <span className="text-xs text-gray-500">
-                                        {producersMap.size} produtor(es) notificado(s)
-                                      </span>
-                                    </div>
-                                  );
-                                }
+                                // Sempre mostrar apenas o botão "Enviar para Todos os Produtores"
+                                const producersText = producersMap.size === 1
+                                  ? Array.from(producersMap.values())[0].name
+                                  : `Todos (${producersMap.size})`;
 
-                                // Se apenas 1 produtor, mostrar botão para enviar tudo
-                                if (producersMap.size === 1) {
-                                  const [producerId, producerInfo] = Array.from(producersMap.entries())[0];
-                                  return (
-                                    <Button
-                                      size="sm"
-                                      className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                                      onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
-                                      disabled={sendToProductionMutation.isPending}
-                                      title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
-                                    >
-                                      <Send className="h-4 w-4 mr-1" />
-                                      {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
-                                    </Button>
-                                  );
-                                }
-
-                                // Se múltiplos produtores, mostrar botão para enviar para todos + botões individuais
                                 return (
-                                  <div className="flex flex-col gap-1 w-full">
-                                    {/* Botão para enviar para todos */}
-                                    <Button
-                                      size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
-                                      onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
-                                      disabled={sendToProductionMutation.isPending}
-                                      title={`Criar ordens separadas para todos os ${producersMap.size} produtores`}
-                                    >
-                                      <Send className="h-4 w-4 mr-1" />
-                                      {sendToProductionMutation.isPending ? 'Enviando...' : `📤 Enviar para Todos (${producersMap.size})`}
-                                    </Button>
-                                    
-                                    <div className="text-xs text-gray-500 text-center py-1">ou individualmente:</div>
-                                    
-                                    {/* Botões individuais por produtor */}
-                                    {Array.from(producersMap.entries()).map(([producerId, producerInfo]: [string, any]) => (
-                                      <Button
-                                        key={producerId}
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-xs border-green-300 hover:bg-green-50"
-                                        onClick={() => sendToProductionMutation.mutate({ orderId: order.id, producerId })}
-                                        disabled={sendToProductionMutation.isPending}
-                                        title={`${producerInfo.items.length} item(ns) para ${producerInfo.name}`}
-                                      >
-                                        <Send className="h-4 w-4 mr-1" />
-                                        {sendToProductionMutation.isPending ? 'Enviando...' : `→ ${producerInfo.name}`}
-                                      </Button>
-                                    ))}
-                                  </div>
+                                  <Button
+                                    size="sm"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                                    onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
+                                    disabled={sendToProductionMutation.isPending}
+                                    title={`Criar ordens separadas para todos os ${producersMap.size} produtores`}
+                                  >
+                                    <Send className="h-4 w-4 mr-1" />
+                                    {sendToProductionMutation.isPending ? 'Enviando...' : `📤 Enviar p/ ${producersText}`}
+                                  </Button>
                                 );
                               })()}
                             </div>
@@ -911,8 +862,8 @@ export default function LogisticsDashboard() {
                                   <div>
                                     <span className="text-gray-500">Especificações:</span>
                                     <p className="font-medium">
-                                      {item.productWidth && item.productHeight && item.productDepth ? 
-                                        `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                                      {item.productWidth && item.productHeight && item.productDepth ?
+                                        `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
                                         'Não informado'
                                       }
                                     </p>
@@ -928,9 +879,9 @@ export default function LogisticsDashboard() {
                                       )}
                                       {item.customizationPhoto && (
                                         <div className="mt-2">
-                                          <img 
-                                            src={item.customizationPhoto} 
-                                            alt="Personalização" 
+                                          <img
+                                            src={item.customizationPhoto}
+                                            alt="Personalização"
                                             className="w-16 h-16 object-cover rounded border"
                                           />
                                         </div>
@@ -967,8 +918,8 @@ export default function LogisticsDashboard() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {selectedOrder.budgetPhotos.map((photoUrl: string, index: number) => (
                       <div key={index} className="relative group">
-                        <img 
-                          src={photoUrl} 
+                        <img
+                          src={photoUrl}
                           alt={`Referência ${index + 1}`}
                           className="w-full h-24 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
                           onClick={() => window.open(photoUrl, '_blank')}
