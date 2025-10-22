@@ -1,4 +1,3 @@
-
 # 📋 Erros Recorrentes e Soluções
 
 Este documento registra os erros mais comuns encontrados no sistema e suas respectivas soluções para referência futura.
@@ -56,7 +55,7 @@ async createManualReceivable(data: any): Promise<any> {
     createdAt: new Date(),
     updatedAt: new Date()
   };
-  
+
   this.mockData.manualReceivables.push(receivable);
   console.log(`Created manual receivable: ${id} for ${data.description} - R$ ${data.amount}`);
   return receivable;
@@ -169,6 +168,69 @@ Os pagamentos de produtores eram criados corretamente quando o produtor definia 
 
 ### Data de Resolução
 28/01/2025
+
+---
+
+## Erro: Importação OFX não funcionando corretamente em Pagamentos de Produtores
+
+**Problema:** 
+- A importação de OFX estava falhando na tela de Pagamentos de Produtores
+- As transações não estavam sendo importadas corretamente
+- O endpoint específico para produtores não estava funcionando
+
+**Causa:** 
+- Faltava o endpoint `/api/finance/producer-ofx-import` no routes.ts
+- O endpoint não estava filtrando apenas transações de débito (pagamentos)
+- A interface não estava chamando o endpoint correto
+
+**Solução aplicada:**
+1. Criado endpoint específico `/api/finance/producer-ofx-import` que:
+   - Filtra apenas transações DEBIT/PAYMENT (saídas de dinheiro)
+   - Processa apenas transações de pagamento aos produtores
+   - Mantém os mesmos padrões de importação mas focado em débitos
+2. Corrigido o mutation na interface para chamar o endpoint correto
+3. Adicionado logs específicos para debug do processo
+
+**Como identificar:** Se a importação OFX falhar na tela de produtores ou não mostrar transações de débito
+
+**Data da correção:** Janeiro 2025
+
+---
+
+## Erro: Conciliação Bancária não mostra transações OFX e botão de conciliação não funciona
+
+**Problema:** 
+- Transações OFX são importadas mas não aparecem na seção "Histórico de Importações OFX"
+- Botão "Confirmar Entrada" não funciona
+- Modal de associação de pagamentos não abre
+- Transações não são filtradas corretamente para conciliação
+
+**Causa:** 
+- Interface da conciliação não estava renderizando as transações corretamente
+- Faltavam endpoints `/api/finance/associate-payment` e `/api/finance/associate-multiple-payments`
+- Filtros de transação não consideravam diferentes tipos (credit/debit)
+- Métodos `getBankTransaction` e `updateBankTransaction` não existiam no storage
+
+**Solução aplicada:**
+1. Corrigida a renderização das transações OFX na interface:
+   - Separa transações não conciliadas e conciliadas
+   - Mostra detalhes completos das transações
+   - Filtros melhorados para mostrar apenas entradas de dinheiro
+2. Adicionados endpoints de associação:
+   - `/api/finance/associate-payment` para associação única
+   - `/api/finance/associate-multiple-payments` para múltiplas transações
+3. Implementados métodos no storage:
+   - `getBankTransaction()` para buscar transação por ID
+   - `updateBankTransaction()` para atualizar status das transações
+4. Corrigidos filtros de transação para aceitar valores positivos OU tipo 'credit'
+5. Modal de conciliação agora funciona corretamente com seleção múltipla
+
+**Como identificar:** 
+- Transações OFX importadas mas não visíveis na conciliação
+- Botões de "Confirmar Entrada" não funcionam
+- Modal não abre ao clicar em conciliação
+
+**Data da correção:** Janeiro 2025
 
 ---
 

@@ -2443,6 +2443,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Associate multiple payments endpoint
+  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
+    try {
+      const { transactions, orderId, totalAmount } = req.body;
+
+      console.log("Processing multiple payment association:", { 
+        transactionCount: transactions?.length, 
+        orderId, 
+        totalAmount 
+      });
+
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação fornecida" });
+      }
+
+      if (!orderId) {
+        return res.status(400).json({ error: "ID do pedido não fornecido" });
+      }
+
+      let paymentsCreated = 0;
+      let errors = [];
+      let actualTotalAmount = 0;
+
+      // Process each transaction
+      for (const txn of transactions) {
+        try {
+          const transaction = await storage.getBankTransaction(txn.transactionId);
+          if (!transaction) {
+            errors.push(`Transação ${txn.transactionId} não encontrada`);
+            continue;
+          }
+
+          if (transaction.status === 'matched') {
+            errors.push(`Transação ${txn.transactionId} já foi conciliada`);
+            continue;
+          }
+
+          const amount = Math.abs(parseFloat(transaction.amount));
+          
+          // Create payment record
+          const payment = await storage.createPayment({
+            orderId: orderId,
+            amount: amount.toFixed(2),
+            method: "bank_transfer",
+            status: "confirmed",
+            transactionId: transaction.fitId || `TXN-${Date.now()}`,
+            notes: `Conciliação OFX - ${transaction.description}`,
+            paidAt: new Date(transaction.date)
+          });
+
+          // Mark transaction as matched
+          await storage.updateBankTransaction(txn.transactionId, {
+            status: 'matched',
+            matchedOrderId: orderId,
+            matchedPaymentId: payment.id,
+            matchedAt: new Date(),
+            notes: `Conciliado com pedido ${orderId}`
+          });
+
+          paymentsCreated++;
+          actualTotalAmount += amount;
+          
+          console.log(`Created payment ${payment.id} for R$ ${amount} from transaction ${txn.transactionId}`);
+        } catch (error) {
+          console.error(`Error processing transaction ${txn.transactionId}:`, error);
+          errors.push(`Erro ao processar transação ${txn.transactionId}: ${error.message}`);
+        }
+      }
+
+      // Update order paid value
+      if (paymentsCreated > 0) {
+        await storage.updateOrderPaidValue(orderId);
+      }
+
+      res.json({
+        success: true,
+        paymentsCreated,
+        totalAmount: actualTotalAmount.toFixed(2),
+        errors
+      });
+    } catch (error) {
+      console.error("Error in multiple payment association:", error);
+      res.status(500).json({ error: "Erro ao processar associação múltipla de pagamentos: " + error.message });
+    }
+  });
+
+  // Single payment association endpoint
+  app.post("/api/finance/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, orderId, amount } = req.body;
+
+      console.log("Processing single payment association:", { transactionId, orderId, amount });
+
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      if (transaction.status === 'matched') {
+        return res.status(400).json({ error: "Transação já foi conciliada" });
+      }
+
+      const paymentAmount = parseFloat(amount);
+      const transactionAmount = Math.abs(parseFloat(transaction.amount));
+
+      // Create payment record
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: paymentAmount.toFixed(2),
+        method: "bank_transfer",
+        status: "confirmed",
+        transactionId: transaction.fitId || `TXN-${Date.now()}`,
+        notes: `Conciliação OFX - ${transaction.description}`,
+        paidAt: new Date(transaction.date)
+      });
+
+      // Mark transaction as matched
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedOrderId: orderId,
+        matchedPaymentId: payment.id,
+        matchedAt: new Date(),
+        notes: `Conciliado com pedido ${orderId}`
+      });
+
+      // Update order paid value
+      await storage.updateOrderPaidValue(orderId);
+
+      console.log(`Created payment ${payment.id} for R$ ${paymentAmount}`);
+
+      res.json({
+        success: true,
+        payment: payment,
+        message: "Pagamento associado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error in payment association:", error);
+      res.status(500).json({ error: "Erro ao associar pagamento: " + error.message });
+    }
+  });
+
   // Receivables payment endpoint
   app.post("/api/receivables/:id/payment", async (req, res) => {
     try {

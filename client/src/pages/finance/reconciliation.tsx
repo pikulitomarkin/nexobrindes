@@ -336,20 +336,28 @@ export default function FinanceReconciliation() {
     if (!bankTransactions) return [];
 
     const tolerance = 0.05; // 5% de tolerância
-    return bankTransactions.filter((transaction: any) => 
-      transaction.status === 'unmatched' &&
-      parseFloat(transaction.amount) > 0 && // Apenas entradas (valores positivos)
-      Math.abs(parseFloat(transaction.amount) - orderValue) <= (orderValue * tolerance)
-    );
+    return bankTransactions.filter((transaction: any) => {
+      const amount = parseFloat(transaction.amount);
+      const isUnmatched = transaction.status === 'unmatched' || !transaction.status;
+      const isCredit = amount > 0 || transaction.type === 'credit'; // Aceita valores positivos ou tipo credit
+      const isCompatible = Math.abs(Math.abs(amount) - orderValue) <= (orderValue * tolerance);
+      
+      console.log(`Transaction ${transaction.id}: amount=${amount}, type=${transaction.type}, isCredit=${isCredit}, isCompatible=${isCompatible}, isUnmatched=${isUnmatched}`);
+      
+      return isUnmatched && isCredit && isCompatible;
+    });
   };
 
   const getAllUnmatchedIncomingTransactions = () => {
     if (!bankTransactions) return [];
 
-    return bankTransactions.filter((transaction: any) => 
-      (transaction.status === 'unmatched' || !transaction.status) &&
-      parseFloat(transaction.amount) > 0 // Apenas entradas (valores positivos)
-    );
+    return bankTransactions.filter((transaction: any) => {
+      const amount = parseFloat(transaction.amount);
+      const isUnmatched = transaction.status === 'unmatched' || !transaction.status;
+      const isCredit = amount > 0 || transaction.type === 'credit'; // Aceita valores positivos ou tipo credit
+      
+      return isUnmatched && isCredit;
+    });
   };
 
   const getAvailableTransactions = (transactions: any[]) => {
@@ -1167,37 +1175,108 @@ export default function FinanceReconciliation() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card>
           <CardHeader>
-            <CardTitle>Histórico de Importações OFX</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              Histórico de Importações OFX
+              <Badge variant="secondary" className="text-sm">
+                {bankTransactions?.length || 0} transações
+              </Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {(bankTransactions || [])?.slice(0, 5).map((transaction: any, index: number) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{(() => {
-                      if (!transaction.date) return 'Data não disponível';
-                      try {
-                        const date = new Date(transaction.date);
-                        if (isNaN(date.getTime())) return 'Data inválida';
-                        return date.toLocaleDateString('pt-BR');
-                      } catch (error) {
-                        return 'Erro ao processar data';
-                      }
-                    })()}</p>
-                    <p className="text-sm text-gray-600">{transaction.description}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-green-600">
-                      R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className={`status-badge ${
-                      transaction.status === 'matched' ? 'status-confirmed' : 'status-pending'
-                    }`}>
-                      {transaction.status === 'matched' ? 'Conciliado' : 'Pendente'}
-                    </span>
-                  </div>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {bankTransactions && bankTransactions.length > 0 ? (
+                <>
+                  {/* Unreconciled Transactions */}
+                  {unreconciled.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-orange-700 mb-3 flex items-center">
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Pendentes de Conciliação ({unreconciled.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {unreconciled.slice(0, 10).map((transaction: any) => (
+                          <div key={transaction.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{(() => {
+                                  if (!transaction.date) return 'Data não disponível';
+                                  try {
+                                    const date = new Date(transaction.date);
+                                    if (isNaN(date.getTime())) return 'Data inválida';
+                                    return date.toLocaleDateString('pt-BR');
+                                  } catch (error) {
+                                    return 'Data inválida';
+                                  }
+                                })()}</p>
+                                <p className="text-sm text-gray-600 truncate max-w-[200px]">{transaction.description}</p>
+                                {transaction.bankRef && (
+                                  <p className="text-xs text-gray-500">Ref: {transaction.bankRef}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-green-600">
+                                  R$ {Math.abs(parseFloat(transaction.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                                  Não Conciliado
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reconciled Transactions */}
+                  {reconciled.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Já Conciliadas ({reconciled.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {reconciled.slice(0, 5).map((transaction: any) => (
+                          <div key={transaction.id} className="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{(() => {
+                                  if (!transaction.date) return 'Data não disponível';
+                                  try {
+                                    const date = new Date(transaction.date);
+                                    if (isNaN(date.getTime())) return 'Data inválida';
+                                    return date.toLocaleDateString('pt-BR');
+                                  } catch (error) {
+                                    return 'Data inválida';
+                                  }
+                                })()}</p>
+                                <p className="text-sm text-gray-600 truncate max-w-[200px]">{transaction.description}</p>
+                                {transaction.notes && (
+                                  <p className="text-xs text-gray-600 mt-1 italic">{transaction.notes}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-green-600">
+                                  R$ {Math.abs(parseFloat(transaction.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <Badge className="bg-green-100 text-green-800 text-xs mt-1">
+                                  Conciliado
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma transação OFX importada</h3>
+                  <p className="text-gray-500 mb-4">Clique no botão "Importar OFX" para carregar transações bancárias</p>
                 </div>
-              )) || []}
+              )}
             </div>
           </CardContent>
         </Card>

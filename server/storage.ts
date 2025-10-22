@@ -3341,8 +3341,9 @@ export class MemStorage implements IStorage {
   }
 
   async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | undefined> {
-    return Array.from(this.bankTransactions.values())
-      .find(transaction => transaction.fitId === fitId);
+    const transaction = Array.from(this.bankTransactions.values()).find(t => t.fitId === fitId);
+    console.log(`Looking for transaction with fitId ${fitId}: ${transaction ? 'found' : 'not found'}`);
+    return transaction;
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
@@ -3350,6 +3351,7 @@ export class MemStorage implements IStorage {
     const transaction: BankTransaction = {
       ...data,
       id,
+      status: data.status || 'unmatched',
       matchedReceivableId: data.matchedReceivableId || null,
       matchedPaymentId: data.matchedPaymentId || null,
       matchedOrderId: data.matchedOrderId || null,
@@ -3365,16 +3367,17 @@ export class MemStorage implements IStorage {
 
   async updateBankTransaction(id: string, data: Partial<InsertBankTransaction>): Promise<BankTransaction | undefined> {
     const transaction = this.bankTransactions.get(id);
-    if (transaction) {
-      const updated = {
-        ...transaction,
-        ...data,
-        updatedAt: new Date()
-      };
-      this.bankTransactions.set(id, updated);
-      return updated;
-    }
-    return undefined;
+    if (!transaction) return undefined;
+
+    const updatedTransaction = {
+      ...transaction,
+      ...data,
+      updatedAt: new Date()
+    };
+
+    this.bankTransactions.set(id, updatedTransaction);
+    console.log(`Updated bank transaction: ${id} - status: ${updatedTransaction.status}`);
+    return updatedTransaction;
   }
 
   async matchTransactionToReceivable(transactionId: string, receivableId: string): Promise<BankTransaction | undefined> {
@@ -3574,7 +3577,7 @@ export class MemStorage implements IStorage {
   // Producer Payments methods
   async getProducerPayments(): Promise<ProducerPayment[]> {
     const payments = Array.from(this.producerPayments.values());
-    console.log(`Storage: getProducerPayments returning ${payments.length} payments:`, 
+    console.log(`Storage: getProducerPayments returning ${payments.length} payments:`,
       payments.map(p => ({ id: p.id, status: p.status, amount: p.amount, producerId: p.producerId })));
     return payments;
   }
