@@ -52,7 +52,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
 
 
 // Robust OFX Parser using node-ofx-parser library
-const Ofx = require('node-ofx-parser');
+import Ofx from 'node-ofx-parser';
 
 interface ParsedOFXTransaction {
   fitId: string;
@@ -654,14 +654,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
         notes: notes || null,
-        transactionId: transactionId || null
+        transactionId: transactionId || null,
+        // Mark as manual payment to prevent OFX reconciliation
+        reconciliationStatus: 'manual',
+        bankTransactionId: null
       });
 
       if (!updatedPayment) {
         return res.status(404).json({ error: "Pagamento do produtor não encontrado" });
       }
 
-      console.log(`Producer payment ${id} marked as paid successfully`);
+      console.log(`Producer payment ${id} marked as paid manually (reconciliationStatus=manual)`);
 
       res.json({
         success: true,
@@ -2559,7 +2562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const amount = Math.abs(parseFloat(transaction.amount));
 
-          // Create payment record
+          // Create payment record with OFX reconciliation
           const payment = await storage.createPayment({
             orderId: orderId,
             amount: amount.toFixed(2),
@@ -2567,7 +2570,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: "confirmed",
             transactionId: transaction.fitId || `TXN-${Date.now()}`,
             notes: `Conciliação OFX - ${transaction.description}`,
-            paidAt: new Date(transaction.date)
+            paidAt: new Date(transaction.date),
+            // Mark as OFX reconciled to prevent manual payment
+            reconciliationStatus: 'ofx',
+            bankTransactionId: txn.transactionId
           });
 
           // Mark transaction as matched
@@ -2576,7 +2582,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             matchedOrderId: orderId,
             matchedPaymentId: payment.id,
             matchedAt: new Date(),
-            notes: `Conciliado com pedido ${orderId}`
+            notes: `Conciliado com pedido ${orderId}`,
+            matchedEntityType: 'payment',
+            matchedEntityId: payment.id
           });
 
           paymentsCreated++;
@@ -2626,7 +2634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentAmount = parseFloat(amount);
       const transactionAmount = Math.abs(parseFloat(transaction.amount));
 
-      // Create payment record
+      // Create payment record with OFX reconciliation
       const payment = await storage.createPayment({
         orderId: orderId,
         amount: paymentAmount.toFixed(2),
@@ -2634,7 +2642,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "confirmed",
         transactionId: transaction.fitId || `TXN-${Date.now()}`,
         notes: `Conciliação OFX - ${transaction.description}`,
-        paidAt: new Date(transaction.date)
+        paidAt: new Date(transaction.date),
+        // Mark as OFX reconciled to prevent manual payment
+        reconciliationStatus: 'ofx',
+        bankTransactionId: transactionId
       });
 
       // Mark transaction as matched
@@ -2643,7 +2654,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         matchedOrderId: orderId,
         matchedPaymentId: payment.id,
         matchedAt: new Date(),
-        notes: `Conciliado com pedido ${orderId}`
+        notes: `Conciliado com pedido ${orderId}`,
+        matchedEntityType: 'payment',
+        matchedEntityId: payment.id
       });
 
       // Update order paid value
@@ -4752,7 +4765,10 @@ Para mais detalhes, entre em contato conosco!`;
         paidBy: 'admin-1', // Could be req.user.id in real auth
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
-        notes: notes || payment.notes
+        notes: notes || payment.notes,
+        // Mark as manual payment to prevent OFX reconciliation
+        reconciliationStatus: 'manual',
+        bankTransactionId: null
       });
 
       // Update production order payment status
@@ -4783,11 +4799,13 @@ Para mais detalhes, entre em contato conosco!`;
       const allPayments = await storage.getProducerPayments();
       console.log(`Total producer payments found: ${allPayments.length}`);
 
-      // Filter only pending payments and enrich with producer and order info
+      // Filter only pending payments that haven't been reconciled yet
+      // Mutual exclusivity: only show payments with reconciliationStatus='pending'
       const pendingPayments = allPayments.filter(payment => 
-        payment.status === 'pending' || payment.status === 'approved'
+        (payment.status === 'pending' || payment.status === 'approved') &&
+        (payment.reconciliationStatus === 'pending' || !payment.reconciliationStatus)
       );
-      console.log(`Pending/approved payments found: ${pendingPayments.length}`);
+      console.log(`Pending/approved payments (not reconciled) found: ${pendingPayments.length}`);
 
       const enrichedPayments = await Promise.all(
         pendingPayments.map(async (payment) => {

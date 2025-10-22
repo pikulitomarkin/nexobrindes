@@ -1632,7 +1632,10 @@ export class MemStorage implements IStorage {
       status: insertPayment.status || 'pending',
       transactionId: insertPayment.transactionId || null,
       paidAt: insertPayment.paidAt || null,
-      createdAt: new Date()
+      createdAt: new Date(),
+      // Reconciliation fields - default to 'manual' for manual payments
+      reconciliationStatus: insertPayment.reconciliationStatus || 'manual',
+      bankTransactionId: insertPayment.bankTransactionId || null
     };
     this.payments.set(id, payment);
 
@@ -3589,6 +3592,10 @@ export class MemStorage implements IStorage {
       ...data,
       createdAt: new Date(),
       updatedAt: new Date(),
+      // Reconciliation fields - default to 'pending' for new payments awaiting reconciliation
+      // or 'manual' if paidAt is provided (manual payment)
+      reconciliationStatus: data.reconciliationStatus || (data.paidAt ? 'manual' : 'pending'),
+      bankTransactionId: data.bankTransactionId || null
     };
     this.producerPayments.set(newPayment.id, newPayment);
     return newPayment;
