@@ -38,12 +38,17 @@ const partnerFormSchema = z.object({
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
 });
 
+const partnerNameFormSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório"),
+});
+
 type CommissionFormValues = z.infer<typeof commissionFormSchema>;
 type PartnerFormValues = z.infer<typeof partnerFormSchema>;
 
 export default function CommissionManagement() {
   const [editingVendor, setEditingVendor] = useState<string | null>(null);
   const [editingPartner, setEditingPartner] = useState<string | null>(null);
+  const [editingPartnerName, setEditingPartnerName] = useState<string | null>(null);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -74,6 +79,11 @@ export default function CommissionManagement() {
       username: "",
       commissionRate: "15.00",
     },
+  });
+
+  const partnerNameForm = useForm<z.infer<typeof partnerNameFormSchema>>({
+    resolver: zodResolver(partnerNameFormSchema),
+    defaultValues: { name: "" },
   });
 
   // Mutations
@@ -116,6 +126,27 @@ export default function CommissionManagement() {
     },
     onError: () => {
       toast({ title: "Erro", description: "Não foi possível atualizar a comissão", variant: "destructive" });
+    },
+  });
+
+  const updatePartnerNameMutation = useMutation({
+    mutationFn: async ({ partnerId, name }: { partnerId: string, name: string }) => {
+      const response = await fetch(`/api/partners/${partnerId}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar nome");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
+      setEditingPartnerName(null);
+      partnerNameForm.reset();
+      toast({ title: "Sucesso!", description: "Nome do sócio atualizado" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar o nome", variant: "destructive" });
     },
   });
 
@@ -170,6 +201,20 @@ export default function CommissionManagement() {
   const handleEditPartnerCommission = (partner: any) => {
     setEditingPartner(partner.id);
     commissionForm.setValue('commissionRate', partner.commissionRate);
+  };
+
+  const handleEditPartnerName = (partner: any) => {
+    setEditingPartnerName(partner.id);
+    partnerNameForm.setValue('name', partner.name);
+  };
+
+  const onPartnerNameSubmit = (data: z.infer<typeof partnerNameFormSchema>) => {
+    if (editingPartnerName) {
+      updatePartnerNameMutation.mutate({
+        partnerId: editingPartnerName,
+        name: data.name
+      });
+    }
   };
 
   const onCommissionSubmit = (data: CommissionFormValues) => {
@@ -359,119 +404,27 @@ export default function CommissionManagement() {
         <TabsContent value="partners" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Comissões dos Sócios</CardTitle>
-                <Dialog open={isPartnerDialogOpen} onOpenChange={setIsPartnerDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="gradient-bg text-white">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Novo Sócio
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Novo Sócio</DialogTitle>
-                      <DialogDescription>
-                        Cadastre um novo sócio no sistema
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...partnerForm}>
-                      <form onSubmit={partnerForm.handleSubmit(onPartnerSubmit)} className="space-y-4">
-                        <FormField
-                          control={partnerForm.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="commissionRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Taxa de Comissão (%)</FormLabel>
-                              <FormControl>
-                                <Input type="number" step="0.01" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button 
-                          type="submit" 
-                          className="w-full gradient-bg text-white"
-                          disabled={createPartnerMutation.isPending}
-                        >
-                          Criar Sócio
-                        </Button>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <CardTitle>Sócios do Sistema (3 sócios - comissão dividida igualmente)</CardTitle>
+              <p className="text-sm text-gray-600">
+                Comissões dos sócios são confirmadas quando o cliente paga o pedido. Em caso de cancelamento, 
+                o valor será descontado dos próximos pedidos.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {partners?.map((partner: any) => (
                   <div key={partner.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{partner.name}</h3>
-                      <p className="text-sm text-gray-600">{partner.email}</p>
-                      <p className="text-xs text-gray-500">
-                        Total: R$ {partner.totalCommissions?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      {editingPartner === partner.id ? (
-                        <Form {...commissionForm}>
-                          <form onSubmit={commissionForm.handleSubmit(onCommissionSubmit)} className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      {editingPartnerName === partner.id ? (
+                        <Form {...partnerNameForm}>
+                          <form onSubmit={partnerNameForm.handleSubmit(onPartnerNameSubmit)} className="flex items-center space-x-2">
                             <FormField
-                              control={commissionForm.control}
-                              name="commissionRate"
+                              control={partnerNameForm.control}
+                              name="name"
                               render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="flex-1">
                                   <FormControl>
-                                    <div className="flex items-center space-x-1">
-                                      <Input 
-                                        type="number" 
-                                        step="0.01" 
-                                        className="w-20" 
-                                        {...field} 
-                                      />
-                                      <span className="text-sm text-gray-500">%</span>
-                                    </div>
+                                    <Input {...field} placeholder="Nome do sócio" />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -484,24 +437,32 @@ export default function CommissionManagement() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setEditingPartner(null)}
+                              onClick={() => setEditingPartnerName(null)}
                             >
                               Cancelar
                             </Button>
                           </form>
                         </Form>
                       ) : (
-                        <>
-                          <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
+                        <div className="flex items-center space-x-2">
+                          <div>
+                            <h3 className="font-semibold">{partner.name}</h3>
+                            <p className="text-sm text-gray-600">{partner.email}</p>
+                          </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEditPartnerCommission(partner)}
+                            onClick={() => handleEditPartnerName(partner)}
+                            title="Editar nome"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                        </>
+                        </div>
                       )}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
+                      <span className="text-sm text-gray-500">(de cada pedido)</span>
                     </div>
                   </div>
                 ))}
@@ -509,7 +470,7 @@ export default function CommissionManagement() {
                 {(!partners || partners.length === 0) && (
                   <div className="text-center py-8">
                     <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Nenhum sócio cadastrado</p>
+                    <p className="text-gray-500">Carregando sócios...</p>
                   </div>
                 )}
               </div>

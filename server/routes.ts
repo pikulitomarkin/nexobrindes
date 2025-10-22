@@ -1616,14 +1616,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await storage.getUsers();
       const partners = users.filter(user => user.role === 'partner');
 
-      const partnersWithDetails = partners.map((partner) => ({
-        id: partner.id,
-        name: partner.name,
-        email: partner.email || "",
-        accessCode: partner.username || "",
-        phone: partner.phone || "",
-        createdAt: partner.createdAt,
-        isActive: true
+      const partnersWithDetails = await Promise.all(partners.map(async (partner) => {
+        const partnerProfile = await storage.getPartner(partner.id);
+        return {
+          id: partner.id,
+          name: partner.name,
+          email: partner.email || "",
+          accessCode: partner.username || "",
+          phone: partner.phone || "",
+          commissionRate: partnerProfile?.commissionRate || '5.00',
+          createdAt: partner.createdAt,
+          isActive: true
+        };
       }));
 
       res.json(partnersWithDetails);
@@ -1688,6 +1692,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating partner commission:", error);
       res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
+  // Update partner name
+  app.put("/api/partners/:partnerId/name", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { name } = req.body;
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      const updatedUser = await storage.updateUser(partnerId, { name: name.trim() });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      res.json({ success: true, user: updatedUser });
+    } catch (error) {
+      console.error("Error updating partner name:", error);
+      res.status(500).json({ error: "Failed to update partner name" });
     }
   });
 
