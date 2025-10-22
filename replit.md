@@ -6,6 +6,13 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 22, 2025**
+- **OFX PARSER CORRIGIDO**: Substituído parsing regex por biblioteca node-ofx-parser robusta
+- Corrigido caminho de acesso: ofxData.OFX (não ofxData.body.OFX) - parser retorna estrutura diretamente
+- Importação OFX agora funcional com deduplicação por FITID e hash determinístico SHA256
+- Sistema de mutual exclusivity implementado: manual bloqueia OFX e vice-versa
+- Adicionados campos reconciliationStatus, bankTransactionId, rawFitId aos payments/producerPayments
+
 **October 16, 2025**
 - Fixed critical bug in product import: storage.importProducts now correctly preserves producerId and type fields when importing JSON products
 - Product imports in Logistics panel now correctly associate products with the selected producer instead of defaulting to "internal"

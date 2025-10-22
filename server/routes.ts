@@ -86,13 +86,13 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
     accountType: undefined as string | undefined
   };
   
-  // Parse OFX using node-ofx-parser - let errors propagate
-  const ofxData = await Ofx.parse(ofxContent);
+  // Parse OFX using node-ofx-parser (synchronous, no await needed but doesn't hurt)
+  const ofxData = Ofx.parse(ofxContent);
   
   const transactions: ParsedOFXTransaction[] = [];
   
   // Normalize STMTTRNRS to array (node-ofx-parser may return single object or array)
-  const stmtTrnRsList = ofxData?.body?.OFX?.BANKMSGSRSV1?.STMTTRNRS;
+  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS;
   if (!stmtTrnRsList) {
     console.warn('No STMTTRNRS found in OFX file');
     return { transactions, stats };
