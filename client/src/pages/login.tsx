@@ -66,6 +66,9 @@ export default function Login() {
             case "partner":
               window.location.href = "/partner/clients";
               break;
+            case "finance":
+              window.location.href = "/finance";
+              break;
             default:
               window.location.href = "/dashboard";
           }
@@ -95,6 +98,7 @@ export default function Login() {
     { username: "cliente1", password: "123456", role: "client", label: "Cliente", icon: User, color: "text-green-600" },
     { username: "produtor1", password: "123456", role: "producer", label: "Produtor", icon: Factory, color: "text-purple-600" },
     { username: "logistica1", password: "123456", role: "logistics", label: "Logística", icon: Factory, color: "text-indigo-600" },
+    { username: "financeiro1", password: "123456", role: "finance", label: "Financeiro", icon: DollarSign, color: "text-green-600" },
     { username: "admin", password: "123456", role: "partner", label: "Sócio", icon: DollarSign, color: "text-yellow-600" },
   ];
 
@@ -140,6 +144,12 @@ export default function Login() {
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-2" />
                         Sócio
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="finance">
+                      <div className="flex items-center">
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Financeiro
                       </div>
                     </SelectItem>
                   </SelectContent>

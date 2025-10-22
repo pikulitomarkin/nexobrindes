@@ -483,6 +483,66 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
           />
         </nav>
       )}
+
+      {/* Finance User Specific Menu */}
+      {user?.role === 'finance' && (
+        <nav className="mt-8">
+          <div className="px-6 mb-4">
+            <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">
+              Módulo Financeiro
+            </p>
+          </div>
+          <SidebarItem
+            icon={<DollarSign className="h-5 w-5" />}
+            label="Dashboard Financeiro"
+            path="/finance"
+            isActive={pathname === "/finance"}
+            onClick={() => navigate("/finance")}
+          />
+          <SidebarItem
+            icon={<DollarSign className="h-5 w-5" />}
+            label="Contas a Receber"
+            path="/finance/receivables"
+            isActive={pathname === "/finance/receivables"}
+            onClick={() => navigate("/finance/receivables")}
+          />
+          <SidebarItem
+            icon={<TrendingDown className="h-5 w-5" />}
+            label="Contas a Pagar"
+            path="/finance/payables"
+            isActive={pathname === "/finance/payables"}
+            onClick={() => navigate("/finance/payables")}
+          />
+          <SidebarItem
+            icon={<Receipt className="h-5 w-5" />}
+            label="Notas de Despesas"
+            path="/finance/expenses"
+            isActive={pathname === "/finance/expenses"}
+            onClick={() => navigate("/finance/expenses")}
+          />
+          <SidebarItem
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Pagamentos de Comissão"
+            path="/finance/commission-payouts"
+            isActive={pathname === "/finance/commission-payouts"}
+            onClick={() => navigate("/finance/commission-payouts")}
+          />
+          <SidebarItem
+            icon={<Calculator className="h-5 w-5" />}
+            label="Conciliação Bancária"
+            path="/finance/reconciliation"
+            isActive={pathname === "/finance/reconciliation"}
+            onClick={() => navigate("/finance/reconciliation")}
+          />
+          <SidebarItem
+            icon={<CreditCard className="h-5 w-5" />}
+            label="Histórico de Pagamentos"
+            path="/finance/payments"
+            isActive={pathname === "/finance/payments"}
+            onClick={() => navigate("/finance/payments")}
+          />
+        </nav>
+      )}
     </div>
   );
 }

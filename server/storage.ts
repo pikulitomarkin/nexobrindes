@@ -573,6 +573,22 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(logisticsUser.id, logisticsUser);
+
+    // Finance user
+    const financeUser = {
+      id: "finance-1",
+      username: "financeiro1",
+      password: "123456",
+      name: "Departamento Financeiro",
+      email: "financeiro@erp.com",
+      phone: "(11) 98765-2222",
+      vendorId: null,
+      role: "finance",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.users.set(financeUser.id, financeUser);
   }
 
   private initializeData() {
