@@ -213,14 +213,7 @@ export default function ProducerOrderDetails() {
                   <Label className="text-sm font-medium text-gray-500">Produto</Label>
                   <p className="text-lg font-semibold">{productionOrder.orderDetails?.product || productionOrder.order?.product || 'N/A'}</p>
                 </div>
-                {productionOrder.orderDetails?.totalValue && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Valor dos Seus Itens</Label>
-                    <p className="text-lg font-bold text-green-600">
-                      R$ {parseFloat(productionOrder.orderDetails.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                )}
+                {/* Removed producerValue from here */}
               </div>
 
               {productionOrder.order?.description && (
@@ -318,12 +311,12 @@ export default function ProducerOrderDetails() {
           {/* Items */}
           {(() => {
             // Get items from orderDetails if available (filtered for this producer), otherwise use order.items
-            const itemsToShow = productionOrder.orderDetails?.items || 
-              (productionOrder.order?.items?.filter((item: any) => 
-                item.producerId === productionOrder.producerId || 
+            const itemsToShow = productionOrder.orderDetails?.items ||
+              (productionOrder.order?.items?.filter((item: any) =>
+                item.producerId === productionOrder.producerId ||
                 (item.producerId === 'internal' && productionOrder.producerId === 'internal')
               )) || [];
-            
+
             return itemsToShow && itemsToShow.length > 0 && (
               <Card>
                 <CardHeader>
@@ -428,7 +421,7 @@ export default function ProducerOrderDetails() {
                         <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded">
                           <h5 className="font-medium text-orange-800 mb-1">Desconto Aplicado:</h5>
                           <div className="text-sm text-gray-600">
-                            {item.itemDiscountType === 'percentage' 
+                            {item.itemDiscountType === 'percentage'
                               ? `${item.itemDiscountPercentage}% de desconto`
                               : `Desconto fixo aplicado`
                             }

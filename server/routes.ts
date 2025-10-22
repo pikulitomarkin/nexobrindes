@@ -678,11 +678,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...po,
             orderNumber: order.orderNumber,
             product: order.product,
-            totalValue: order.totalValue,
             clientName: clientName,
             order: {
               ...order,
-              clientName: clientName
+              clientName: clientName,
+              // Remove valores financeiros para produtores
+              totalValue: undefined,
+              downPayment: undefined,
+              remainingAmount: undefined,
+              shippingCost: undefined
             }
           };
         })
@@ -768,10 +772,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parsedDetails = JSON.parse(productionOrder.orderDetails);
           // Filter items to show only those for this producer
           if (parsedDetails.items && parsedDetails.producerId) {
-            parsedDetails.items = parsedDetails.items.filter((item: any) => 
+            const filteredItems = parsedDetails.items.filter((item: any) => 
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
-            console.log(`Filtered items for producer ${parsedDetails.producerId}: ${parsedDetails.items.length} items`);
+            
+            // Remove duplicatas baseado em productId
+            const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
+              self.findIndex(i => i.productId === item.productId && i.productName === item.productName) === index
+            );
+            
+            // Remove valores financeiros dos itens
+            parsedDetails.items = uniqueItems.map((item: any) => ({
+              ...item,
+              unitPrice: undefined,
+              totalPrice: undefined,
+              itemCustomizationValue: undefined,
+              generalCustomizationValue: undefined,
+              itemDiscountValue: undefined
+            }));
+            
+            // Remove valores financeiros do pedido
+            parsedDetails.totalValue = undefined;
+            
+            console.log(`Filtered items for producer ${parsedDetails.producerId}: ${parsedDetails.items.length} unique items`);
           }
           orderDetails = parsedDetails;
         } catch (e) {
