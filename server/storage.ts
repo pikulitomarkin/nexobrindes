@@ -263,6 +263,8 @@ export interface IStorage {
 
   // Logistics - Get paid orders that are ready to be sent to production
   getPaidOrdersReadyForProduction(): Promise<Order[]>;
+  // Reconciliation - Get orders with remaining balance
+  getPendingOrdersForReconciliation(): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -3735,67 +3737,76 @@ export class MemStorage implements IStorage {
 
   // Logistics - Get paid orders that are ready to be sent to production
   async getPaidOrdersReadyForProduction(): Promise<Order[]> {
-    const orders = await this.getOrders();
-    console.log(`Checking ${orders.length} orders for paid status ready for production`);
+    console.log("Storage: Getting paid orders ready for production...");
 
-    // Filter orders that are paid and ready to be sent to production
-    const readyOrders = orders.filter(order => {
-      console.log(`Order ${order.orderNumber}: status=${order.status}, paidValue=${order.paidValue}, totalValue=${order.totalValue}`);
+    const allOrders = Array.from(this.orders.values());
+    console.log(`Storage: Found ${allOrders.length} total orders`);
 
-      // Order must be confirmed and have received payment (but can also be in production status for tracking)
-      if (!['confirmed', 'paid', 'production'].includes(order.status)) {
-        console.log(`Order ${order.orderNumber} filtered out - status not confirmed/paid/production: ${order.status}`);
-        return false;
-      }
-
-      // Check if order has received payment
+    // Filter orders that are paid and ready for production
+    const paidOrders = allOrders.filter(order => {
+      const totalValue = parseFloat(order.totalValue);
       const paidValue = parseFloat(order.paidValue || '0');
-      const totalValue = parseFloat(order.totalValue || '0');
+      const remainingValue = totalValue - paidValue;
 
-      // Must have received some payment
-      if (paidValue <= 0) {
-        console.log(`Order ${order.orderNumber} filtered out - no payment received`);
-        return false;
-      }
+      // Order is ready for production if:
+      // 1. Status is 'confirmed'
+      // 2. Has minimum payment (if required) or is fully paid
+      // 3. Not already in production, shipped, delivered, or cancelled
 
-      // Check if minimum payment requirement is met (down payment + shipping)
+      let hasMinimumPayment = true;
       const downPayment = parseFloat(order.downPayment || '0');
       const shippingCost = parseFloat(order.shippingCost || '0');
-      const minimumRequired = downPayment + shippingCost;
 
-      if (minimumRequired > 0 && paidValue < minimumRequired) {
-        console.log(`Order ${order.orderNumber} filtered out - minimum payment not met: ${paidValue} < ${minimumRequired}`);
-        return false;
+      if (downPayment > 0) {
+        const minimumRequired = downPayment + shippingCost;
+        hasMinimumPayment = paidValue >= minimumRequired;
       }
 
-      // Check if order has external producer items that need production
-      let hasExternalItems = false;
-      if (order.items && Array.isArray(order.items)) {
-        hasExternalItems = order.items.some((item: any) =>
-          item.producerId && item.producerId !== 'internal'
-        );
+      const isReadyForProduction = order.status === 'confirmed' &&
+                                   hasMinimumPayment &&
+                                   remainingValue >= 0;
+
+      if (isReadyForProduction) {
+        console.log(`Storage: Order ${order.orderNumber} is ready for production - Total: ${totalValue}, Paid: ${paidValue}, Status: ${order.status}`);
       }
 
-      // Also check if there are external items in budget items
-      if (!hasExternalItems && order.budgetId) {
-        const budgetItems = Array.from(this.budgetItems.values()).filter(item => item.budgetId === order.budgetId);
-        hasExternalItems = budgetItems.some((item: any) =>
-          item.producerId && item.producerId !== 'internal'
-        );
-        console.log(`Order ${order.orderNumber} - checked budget items, hasExternalItems: ${hasExternalItems}`);
-      }
-
-      if (!hasExternalItems) {
-        console.log(`Order ${order.orderNumber} filtered out - no external production items`);
-        return false; // No external production needed
-      }
-
-      console.log(`Order ${order.orderNumber} APPROVED for logistics tracking - has payment and external items`);
-      return true;
+      return isReadyForProduction;
     });
 
-    console.log(`Found ${readyOrders.length} paid orders for logistics tracking`);
-    return readyOrders;
+    console.log(`Storage: Found ${paidOrders.length} paid orders ready for production`);
+    return paidOrders;
+  }
+
+  // Get pending orders for reconciliation (orders with remaining balance)
+  async getPendingOrdersForReconciliation(): Promise<Order[]> {
+    console.log("Storage: Getting pending orders for reconciliation...");
+
+    const allOrders = Array.from(this.orders.values());
+    console.log(`Storage: Found ${allOrders.length} total orders`);
+
+    // Filter orders that have remaining balance to be paid
+    const pendingOrders = allOrders.filter(order => {
+      const totalValue = parseFloat(order.totalValue);
+      const paidValue = parseFloat(order.paidValue || '0');
+      const remainingValue = totalValue - paidValue;
+
+      // Include orders that:
+      // 1. Are not cancelled
+      // 2. Have remaining balance > 0.01 (to avoid floating point issues)
+      // 3. Are confirmed (not just drafts)
+      const shouldInclude = order.status !== 'cancelled' &&
+                           remainingValue > 0.01 &&
+                           (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
+
+      if (shouldInclude) {
+        console.log(`Storage: Including order ${order.orderNumber} for reconciliation - Total: ${totalValue}, Paid: ${paidValue}, Remaining: ${remainingValue}, Status: ${order.status}`);
+      }
+
+      return shouldInclude;
+    });
+
+    console.log(`Storage: Found ${pendingOrders.length} pending orders for reconciliation`);
+    return pendingOrders;
   }
 }
 

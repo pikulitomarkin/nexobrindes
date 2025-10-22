@@ -2313,6 +2313,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending orders for payment reconciliation
+  app.get("/api/finance/pending-orders", async (req, res) => {
+    try {
+      console.log("Fetching pending orders for payment reconciliation...");
+      const allOrders = await storage.getOrders();
+      
+      // Filter orders that have remaining balance to be paid
+      const pendingOrders = allOrders.filter(order => {
+        const totalValue = parseFloat(order.totalValue);
+        const paidValue = parseFloat(order.paidValue || '0');
+        const remainingValue = totalValue - paidValue;
+        
+        // Include orders that:
+        // 1. Are not cancelled
+        // 2. Have remaining balance > 0.01 (to avoid floating point issues)
+        // 3. Are confirmed (not just drafts)
+        const shouldInclude = order.status !== 'cancelled' && 
+                             remainingValue > 0.01 && 
+                             (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
+        
+        if (shouldInclude) {
+          console.log(`Including order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Remaining=${remainingValue}, Status=${order.status}`);
+        }
+        
+        return shouldInclude;
+      });
+
+      // Enrich with client names and additional info
+      const enrichedOrders = await Promise.all(
+        pendingOrders.map(async (order) => {
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName;
+
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          // Get budget payment info if order was converted from budget
+          let budgetInfo = null;
+          if (order.budgetId) {
+            try {
+              const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+              if (budgetPaymentInfo) {
+                budgetInfo = {
+                  downPayment: parseFloat(budgetPaymentInfo.downPayment || '0'),
+                  remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                  installments: budgetPaymentInfo.installments || 1
+                };
+              }
+            } catch (error) {
+              console.log("Error fetching budget info for order:", order.id, error);
+            }
+          }
+
+          return {
+            ...order,
+            clientName: clientName,
+            budgetInfo: budgetInfo
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} pending orders for payment reconciliation`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching pending orders:", error);
+      res.status(500).json({ error: "Failed to fetch pending orders for payment reconciliation" });
+    }
+  });
+
   // Create expense note
   app.post("/api/finance/expenses", async (req, res) => {
     try {
