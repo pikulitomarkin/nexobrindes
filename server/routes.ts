@@ -460,7 +460,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
 
       if (itemsByProducer.size === 0) {
-        return res.status(400).json({ error: "Nenhum item de produção externa encontrado" });
+        const errorMsg = producerId ? 
+          `Nenhum item encontrado para o produtor especificado` : 
+          `Nenhum item de produção externa encontrado`;
+        return res.status(400).json({ error: errorMsg });
+      }
+
+      // If a specific producer was requested, make sure it exists in the items
+      if (producerId && !itemsByProducer.has(producerId)) {
+        return res.status(400).json({ error: "Produtor especificado não possui itens neste pedido" });
       }
 
       const createdOrders = [];
@@ -514,7 +522,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingForProducer) {
           console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
-          // Still add to created orders list so response shows success
+          
+          // If sending to specific producer and order already exists, return error
+          if (producerId) {
+            return res.status(400).json({ 
+              error: `Ordem de produção para ${producer.name} já foi criada anteriormente` 
+            });
+          }
+          
+          // Otherwise, just add to the list and continue
           createdOrders.push(existingForProducer);
           producerNames.push(producer.name);
           continue;
@@ -539,13 +555,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
       }
 
-      // Update order status to production only if we created orders
-      if (createdOrders.length > 0) {
+      // Update order status to production only if we created orders and it's not already in production
+      if (createdOrders.length > 0 && order.status !== 'production') {
         await storage.updateOrder(id, { status: 'production' });
       }
 
       const message = producerId 
-        ? `Pedido enviado para produção - ${producerNames[0]}`
+        ? `Ordem de produção criada para ${producerNames[0]}`
         : `Pedido enviado para produção - ${createdOrders.length} ordem(ns) criada(s) para: ${producerNames.join(', ')}`;
 
       res.json({
@@ -553,7 +569,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productionOrders: createdOrders,
         productionOrdersCreated: createdOrders.length,
         producerNames: producerNames,
-        message: message
+        message: message,
+        isSpecificProducer: !!producerId
       });
     } catch (error) {
       console.error("Error sending order to production:", error);

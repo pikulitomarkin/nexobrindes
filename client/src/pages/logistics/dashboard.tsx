@@ -226,21 +226,141 @@ export default function LogisticsDashboard() {
     );
   };
 
-  // Filtrar pedidos pagos
-  const filteredPaidOrders = paidOrders?.filter((order: any) => {
+  // Expandir pedidos pagos por produtor - cada produtor vira uma linha separada
+  const expandPaidOrdersByProducer = (orders: any[]) => {
+    const expandedOrders: any[] = [];
+    
+    orders?.forEach((order: any) => {
+      if (order.items && Array.isArray(order.items)) {
+        // Agrupar itens por produtor
+        const itemsByProducer = new Map();
+        order.items.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            if (!itemsByProducer.has(item.producerId)) {
+              itemsByProducer.set(item.producerId, {
+                producerId: item.producerId,
+                producerName: item.producerName || `Produtor ${item.producerId.slice(-6)}`,
+                items: []
+              });
+            }
+            itemsByProducer.get(item.producerId).items.push(item);
+          }
+        });
+
+        // Se há produtores externos, criar uma entrada para cada um
+        if (itemsByProducer.size > 0) {
+          Array.from(itemsByProducer.values()).forEach((producerGroup: any, index: number) => {
+            const producerValue = producerGroup.items.reduce((sum: number, item: any) => 
+              sum + parseFloat(item.totalPrice || '0'), 0
+            );
+
+            expandedOrders.push({
+              ...order,
+              // Identificadores únicos para este produtor
+              uniqueKey: `${order.id}-${producerGroup.producerId}`,
+              isGrouped: itemsByProducer.size > 1, // Indica se faz parte de um grupo
+              groupIndex: index, // Posição no grupo (0, 1, 2...)
+              groupTotal: itemsByProducer.size, // Total de produtores no pedido
+              // Dados específicos do produtor
+              currentProducerId: producerGroup.producerId,
+              currentProducerName: producerGroup.producerName,
+              producerItems: producerGroup.items,
+              producerValue: producerValue.toFixed(2),
+              // Produto principal deste produtor
+              product: producerGroup.items.length > 1 
+                ? `${producerGroup.items[0].productName} +${producerGroup.items.length - 1} mais`
+                : producerGroup.items[0].productName
+            });
+          });
+        } else {
+          // Sem produtores externos, manter como está
+          expandedOrders.push({
+            ...order,
+            uniqueKey: order.id,
+            isGrouped: false,
+            groupIndex: 0,
+            groupTotal: 1,
+            currentProducerId: null,
+            currentProducerName: null,
+            producerItems: [],
+            producerValue: '0.00'
+          });
+        }
+      } else {
+        // Sem itens, manter como está
+        expandedOrders.push({
+          ...order,
+          uniqueKey: order.id,
+          isGrouped: false,
+          groupIndex: 0,
+          groupTotal: 1,
+          currentProducerId: null,
+          currentProducerName: null,
+          producerItems: [],
+          producerValue: '0.00'
+        });
+      }
+    });
+
+    return expandedOrders;
+  };
+
+  // Aplicar a expansão por produtor nos pedidos pagos
+  const expandedPaidOrders = expandPaidOrdersByProducer(paidOrders || []);
+
+  // Filtrar pedidos pagos expandidos
+  const filteredPaidOrders = expandedPaidOrders?.filter((order: any) => {
     const matchesSearch = searchTerm === "" ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.currentProducerName?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
-  // Filtrar pedidos em produção
-  const filteredProductionOrders = productionOrders?.filter((order: any) => {
+  // Expandir pedidos em produção por produtor, similar aos pedidos pagos
+  const expandProductionOrdersByProducer = (orders: any[]) => {
+    // Como os pedidos em produção já são separados por produtor, apenas adicionar info de agrupamento
+    const expandedOrders: any[] = [];
+    
+    // Agrupar por orderId para identificar pedidos multi-produtor
+    const orderGroups = new Map();
+    orders?.forEach((productionOrder: any) => {
+      const orderId = productionOrder.orderId;
+      if (!orderGroups.has(orderId)) {
+        orderGroups.set(orderId, []);
+      }
+      orderGroups.get(orderId).push(productionOrder);
+    });
+
+    // Processar cada grupo
+    orderGroups.forEach((group: any[], orderId: string) => {
+      const isMultiProducer = group.length > 1;
+      
+      group.forEach((productionOrder: any, index: number) => {
+        expandedOrders.push({
+          ...productionOrder,
+          uniqueKey: `${productionOrder.id}`,
+          isGrouped: isMultiProducer,
+          groupIndex: index,
+          groupTotal: group.length,
+          originalOrderId: orderId
+        });
+      });
+    });
+
+    return expandedOrders;
+  };
+
+  const expandedProductionOrders = expandProductionOrdersByProducer(productionOrders || []);
+
+  // Filtrar pedidos em produção expandidos
+  const filteredProductionOrders = expandedProductionOrders?.filter((order: any) => {
     const matchesSearch = searchTerm === "" ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.producerName?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -261,9 +381,11 @@ export default function LogisticsDashboard() {
     );
   }
 
-  const paidOrdersCount = paidOrders?.length || 0;
-  const inProductionCount = productionOrders?.filter((o: any) => o.status === 'production')?.length || 0;
-  const readyToShipCount = productionOrders?.filter((o: any) => o.status === 'ready')?.length || 0;
+  // Ajustar contadores para a nova estrutura
+  const paidOrdersCount = expandedPaidOrders?.filter(o => o.currentProducerId).length || 0; // Conta apenas linhas com produtores
+  const uniquePaidOrdersCount = paidOrders?.length || 0; // Pedidos únicos pagos
+  const inProductionCount = expandedProductionOrders?.filter((o: any) => o.status === 'production')?.length || 0;
+  const readyToShipCount = expandedProductionOrders?.filter((o: any) => o.status === 'ready')?.length || 0;
 
   // Determinar qual seção mostrar baseado na rota
   const getCurrentSection = () => {
@@ -322,8 +444,14 @@ export default function LogisticsDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-700">Pagos - Aguardando Envio</p>
-                    <p className="text-3xl font-bold text-green-900 mt-2">{paidOrdersCount}</p>
-                    <p className="text-xs text-green-600 mt-1">Para produção</p>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-900">{uniquePaidOrdersCount}</p>
+                      <p className="text-xs text-green-600">Pedidos únicos</p>
+                    </div>
+                    <div className="text-center border-l border-green-300 pl-2">
+                      <p className="text-xl font-bold text-green-700">{paidOrdersCount}</p>
+                      <p className="text-xs text-green-600">Linhas produção</p>
+                    </div>
                   </div>
                   <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-white" />
@@ -373,10 +501,18 @@ export default function LogisticsDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-700">Total em Acompanhamento</p>
-                    <p className="text-3xl font-bold text-blue-900 mt-2">
-                      {(paidOrders?.length || 0) + (productionOrders?.length || 0)}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">Pedidos ativos</p>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-900">
+                        {(paidOrders?.length || 0) + (Array.from(new Set(productionOrders?.map(o => o.orderId))).length || 0)}
+                      </p>
+                      <p className="text-xs text-blue-600">Pedidos únicos</p>
+                    </div>
+                    <div className="text-center border-l border-blue-300 pl-2">
+                      <p className="text-xl font-bold text-blue-700">
+                        {paidOrdersCount + (productionOrders?.length || 0)}
+                      </p>
+                      <p className="text-xs text-blue-600">Total linhas</p>
+                    </div>
                   </div>
                   <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
                     <ShoppingCart className="h-6 w-6 text-white" />
@@ -446,110 +582,123 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {(() => {
-                    // Agrupar pedidos por cliente
-                    const groupedOrders = {};
-                    filteredPaidOrders?.forEach((order: any) => {
-                      const clientKey = order.clientName || 'Cliente não identificado';
-                      if (!groupedOrders[clientKey]) {
-                        groupedOrders[clientKey] = [];
-                      }
-                      groupedOrders[clientKey].push(order);
-                    });
+                  {filteredPaidOrders?.map((order: any) => {
+                    // Determinar estilos de agrupamento
+                    const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
+                    const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
+                    const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
+                    
+                    let groupClasses = "hover:bg-gray-50";
+                    if (isFirstInGroup) {
+                      groupClasses += " border-t-4 border-blue-500 bg-blue-50";
+                    } else if (isMiddleInGroup) {
+                      groupClasses += " border-l-4 border-blue-300 bg-blue-25";
+                    } else if (isLastInGroup) {
+                      groupClasses += " border-l-4 border-blue-300 bg-blue-25 border-b-2 border-blue-200";
+                    }
 
-                    return Object.entries(groupedOrders).map(([clientName, orders]: [string, any]) => (
-                      orders.map((order: any, index: number) => (
-                        <tr key={order.id} className={`hover:bg-gray-50 ${index === 0 ? 'border-t-2 border-blue-200' : ''}`}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                            <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm font-medium ${index === 0 ? 'text-blue-700 bg-blue-50 px-2 py-1 rounded' : 'text-gray-900'}`}>
-                              {order.clientName}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{order.product}</div>
-                            {order.items && order.items.length > 1 && (
-                              <div className="text-xs text-gray-500">
-                                {order.items.length} itens no pedido
+                    return (
+                      <tr key={order.uniqueKey} className={groupClasses}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {order.isGrouped && (
+                              <div className="mr-2 text-xs text-blue-600 font-mono bg-blue-100 px-1 rounded">
+                                {order.groupIndex + 1}/{order.groupTotal}
                               </div>
                             )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
+                            <div>
+                              <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                              <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                              {order.isGrouped && order.groupIndex === 0 && (
+                                <div className="text-xs text-blue-600 font-medium mt-1">
+                                  📦 Pedido Multi-Produtor
+                                </div>
+                              )}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2 flex-wrap gap-1">
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {order.clientName}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{order.product}</div>
+                          {order.currentProducerName && (
+                            <div className="text-xs text-purple-600 font-medium mt-1">
+                              🏭 {order.currentProducerName}
+                            </div>
+                          )}
+                          {order.producerItems && order.producerItems.length > 1 && (
+                            <div className="text-xs text-gray-500">
+                              {order.producerItems.length} itens deste produtor
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
+                          </div>
+                          {order.producerValue && parseFloat(order.producerValue) > 0 && (
+                            <div className="text-xs text-green-600 font-medium">
+                              R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2 flex-wrap gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Criar um objeto de pedido específico para este produtor
+                                const producerSpecificOrder = {
+                                  ...order,
+                                  // Filtrar apenas os itens deste produtor
+                                  items: order.currentProducerId ? order.producerItems : order.items,
+                                  // Marcar como visualização específica do produtor
+                                  viewingProducer: order.currentProducerId,
+                                  viewingProducerName: order.currentProducerName
+                                };
+                                setSelectedOrder(producerSpecificOrder);
+                                setShowOrderDetailsModal(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver {order.currentProducerName ? 'Produtor' : 'Pedido'}
+                            </Button>
+
+                            {/* Botão específico para enviar apenas para este produtor */}
+                            {order.currentProducerId ? (
                               <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedOrder(order);
-                                  setShowOrderDetailsModal(true);
-                                }}
+                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => sendToProductionMutation.mutate({ 
+                                  orderId: order.id,
+                                  producerId: order.currentProducerId 
+                                })}
+                                disabled={sendToProductionMutation.isPending || order.status === 'production'}
+                                title={order.status === 'production' ? 'Já enviado para produção' : `Enviar apenas para ${order.currentProducerName}`}
                               >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Ver
+                                <Send className="h-4 w-4 mr-1" />
+                                {sendToProductionMutation.isPending ? 'Enviando...' : 
+                                 order.status === 'production' ? '✓ Enviado' : 
+                                 `📤 Enviar`}
                               </Button>
-
-                              {/* Mostrar botões para cada produtor */}
-                              {(() => {
-                                const producersMap = new Map();
-                                if (order.items && Array.isArray(order.items)) {
-                                  order.items.forEach((item: any) => {
-                                    if (item.producerId && item.producerId !== 'internal') {
-                                      if (!producersMap.has(item.producerId)) {
-                                        producersMap.set(item.producerId, {
-                                          items: [],
-                                          name: item.producerName || `Produtor ${item.producerId.slice(-6)}`
-                                        });
-                                      }
-                                      producersMap.get(item.producerId).items.push(item);
-                                    }
-                                  });
-                                }
-
-                                if (producersMap.size === 0) {
-                                  return (
-                                    <span className="text-xs text-gray-500 italic">
-                                      Sem itens para produção externa
-                                    </span>
-                                  );
-                                }
-
-                                // Sempre mostrar apenas o botão "Enviar para Todos os Produtores"
-                                const producersText = producersMap.size === 1
-                                  ? Array.from(producersMap.values())[0].name
-                                  : `Todos (${producersMap.size})`;
-
-                                return (
-                                  <Button
-                                    size="sm"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={() => sendToProductionMutation.mutate({ orderId: order.id })}
-                                    disabled={sendToProductionMutation.isPending || order.status === 'production'}
-                                    title={order.status === 'production' ? 'Já enviado para produção' : `Criar ordens separadas para todos os ${producersMap.size} produtores`}
-                                  >
-                                    <Send className="h-4 w-4 mr-1" />
-                                    {sendToProductionMutation.isPending ? 'Enviando...' : 
-                                     order.status === 'production' ? '✓ Enviado' : 
-                                     `📤 Enviar p/ ${producersText}`}
-                                  </Button>
-                                );
-                              })()}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ));
-                  })()}
+                            ) : (
+                              <span className="text-xs text-gray-500 italic">
+                                Sem produtores externos
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
                 </tbody>
               </table>
             </div>
@@ -580,53 +729,98 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredProductionOrders?.map((order: any) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.clientName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.producerName || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(order.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setShowOrderDetailsModal(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Ver
-                          </Button>
-                          {order.status === 'ready' && (
-                            <Button
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700 text-white"
-                              onClick={() => handleDispatchOrder(order)}
-                              disabled={dispatchOrderMutation.isPending}
-                              title="Produto está pronto - clique para despachar ao cliente"
-                            >
-                              <Truck className="h-4 w-4 mr-1" />
-                              {dispatchOrderMutation.isPending ? 'Despachando...' : 'Despachar para Cliente'}
-                            </Button>
+                  {filteredProductionOrders?.map((order: any) => {
+                    // Determinar estilos de agrupamento
+                    const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
+                    const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
+                    const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
+                    
+                    let groupClasses = "hover:bg-gray-50";
+                    if (isFirstInGroup) {
+                      groupClasses += " border-t-4 border-purple-500 bg-purple-50";
+                    } else if (isMiddleInGroup) {
+                      groupClasses += " border-l-4 border-purple-300 bg-purple-25";
+                    } else if (isLastInGroup) {
+                      groupClasses += " border-l-4 border-purple-300 bg-purple-25 border-b-2 border-purple-200";
+                    }
+
+                    return (
+                      <tr key={order.uniqueKey} className={groupClasses}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {order.isGrouped && (
+                              <div className="mr-2 text-xs text-purple-600 font-mono bg-purple-100 px-1 rounded">
+                                {order.groupIndex + 1}/{order.groupTotal}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                              <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                              {order.isGrouped && order.groupIndex === 0 && (
+                                <div className="text-xs text-purple-600 font-medium mt-1">
+                                  🏭 Produção Multi-Produtor
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{order.clientName}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-purple-700">
+                            {order.producerName || 'N/A'}
+                          </div>
+                          {order.isGrouped && (
+                            <div className="text-xs text-gray-500">
+                              Grupo de {order.groupTotal} produtores
+                            </div>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(order.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Criar um objeto específico para este produtor
+                                const producerSpecificOrder = {
+                                  ...order,
+                                  // Marcar como visualização específica do produtor
+                                  viewingProducer: order.producerId,
+                                  viewingProducerName: order.producerName
+                                };
+                                setSelectedOrder(producerSpecificOrder);
+                                setShowOrderDetailsModal(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver {order.producerName ? 'Produtor' : 'Pedido'}
+                            </Button>
+                            {order.status === 'ready' && (
+                              <Button
+                                size="sm"
+                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                                onClick={() => handleDispatchOrder(order)}
+                                disabled={dispatchOrderMutation.isPending}
+                                title={`Despachar produção de ${order.producerName} para o cliente`}
+                              >
+                                <Truck className="h-4 w-4 mr-1" />
+                                {dispatchOrderMutation.isPending ? 'Despachando...' : 'Despachar'}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
                 </tbody>
               </table>
             </div>
@@ -656,34 +850,80 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {productionOrders?.filter((o: any) => o.status === 'shipped').map((order: any) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.clientName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.dispatchDate ? new Date(order.dispatchDate).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => {
-                            setSelectedOrder(order);
-                            setShowOrderDetailsModal(true);
-                          }}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            Ver
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    const shippedOrders = expandedProductionOrders?.filter((o: any) => o.status === 'shipped') || [];
+                    return shippedOrders.map((order: any) => {
+                      // Determinar estilos de agrupamento
+                      const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
+                      const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
+                      const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
+                      
+                      let groupClasses = "hover:bg-gray-50";
+                      if (isFirstInGroup) {
+                        groupClasses += " border-t-4 border-cyan-500 bg-cyan-50";
+                      } else if (isMiddleInGroup) {
+                        groupClasses += " border-l-4 border-cyan-300 bg-cyan-25";
+                      } else if (isLastInGroup) {
+                        groupClasses += " border-l-4 border-cyan-300 bg-cyan-25 border-b-2 border-cyan-200";
+                      }
+
+                      return (
+                        <tr key={order.uniqueKey} className={groupClasses}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {order.isGrouped && (
+                                <div className="mr-2 text-xs text-cyan-600 font-mono bg-cyan-100 px-1 rounded">
+                                  {order.groupIndex + 1}/{order.groupTotal}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                                <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                                {order.isGrouped && order.groupIndex === 0 && (
+                                  <div className="text-xs text-cyan-600 font-medium mt-1">
+                                    📦 Despacho Multi-Produtor
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{order.clientName}</div>
+                            {order.producerName && (
+                              <div className="text-xs text-cyan-600 font-medium">
+                                🏭 {order.producerName}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {order.dispatchDate ? new Date(order.dispatchDate).toLocaleDateString('pt-BR') : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm" onClick={() => {
+                                // Criar um objeto específico para este produtor
+                                const producerSpecificOrder = {
+                                  ...order,
+                                  // Marcar como visualização específica do produtor
+                                  viewingProducer: order.producerId,
+                                  viewingProducerName: order.producerName
+                                };
+                                setSelectedOrder(producerSpecificOrder);
+                                setShowOrderDetailsModal(true);
+                              }}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                Ver {order.producerName ? 'Despacho' : 'Pedido'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
                 </tbody>
               </table>
             </div>
@@ -759,13 +999,40 @@ export default function LogisticsDashboard() {
       <Dialog open={showOrderDetailsModal} onOpenChange={setShowOrderDetailsModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogTitle>
+              {selectedOrder?.viewingProducer ? 
+                `Detalhes do Pedido - ${selectedOrder.viewingProducerName}` : 
+                'Detalhes do Pedido'
+              }
+            </DialogTitle>
             <DialogDescription>
-              Informações completas do pedido e itens para produção
+              {selectedOrder?.viewingProducer ? 
+                `Informações específicas para o produtor ${selectedOrder.viewingProducerName}` :
+                'Informações completas do pedido e itens para produção'
+              }
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-6">
+              {/* Indicador de visualização específica do produtor */}
+              {selectedOrder.viewingProducer && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <Package className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-purple-800">
+                        Visualização Específica do Produtor
+                      </h4>
+                      <p className="text-sm text-purple-600">
+                        Mostrando apenas os itens e informações relevantes para <strong>{selectedOrder.viewingProducerName}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Informações do Pedido</h3>
@@ -790,9 +1057,19 @@ export default function LogisticsDashboard() {
                       </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Produto Principal</label>
+                      <label className="text-sm font-medium text-gray-500">
+                        {selectedOrder.viewingProducer ? 'Produtos para este Produtor' : 'Produto Principal'}
+                      </label>
                       <p className="font-medium">{selectedOrder.product || selectedOrder.order?.product}</p>
                     </div>
+                    {selectedOrder.viewingProducer && selectedOrder.producerValue && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Valor deste Produtor</label>
+                        <p className="font-bold text-green-600">
+                          R$ {parseFloat(selectedOrder.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
                     {(selectedOrder.description || selectedOrder.order?.description) && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Descrição</label>
@@ -843,22 +1120,62 @@ export default function LogisticsDashboard() {
               {/* Itens do Pedido */}
               {(() => {
                 // Definir quais itens mostrar baseado na estrutura do pedido
-                const itemsToShow = selectedOrder.items || selectedOrder.order?.items || [];
+                let itemsToShow = selectedOrder.items || selectedOrder.order?.items || [];
+                
+                // Se estamos visualizando um produtor específico, filtrar apenas seus itens
+                if (selectedOrder.viewingProducer) {
+                  itemsToShow = itemsToShow.filter((item: any) => 
+                    item.producerId === selectedOrder.viewingProducer
+                  );
+                }
                 
                 return itemsToShow && itemsToShow.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Itens para Produção ({itemsToShow.length})</h3>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      {selectedOrder.viewingProducer ? (
+                        <>
+                          <Package className="h-5 w-5 text-purple-600" />
+                          Itens para {selectedOrder.viewingProducerName} ({itemsToShow.length})
+                        </>
+                      ) : (
+                        <>
+                          <Package className="h-5 w-5 text-gray-600" />
+                          Itens para Produção ({itemsToShow.length})
+                        </>
+                      )}
+                    </h3>
                     <div className="space-y-3">
                       {itemsToShow.map((item: any, index: number) => {
                         const isExternal = item.producerId && item.producerId !== 'internal';
+                        const isCurrentProducer = selectedOrder.viewingProducer && 
+                          item.producerId === selectedOrder.viewingProducer;
+                        
+                        // Cores diferentes para destacar o produtor atual
+                        let borderColor = 'border-gray-200';
+                        let bgColor = 'bg-gray-50';
+                        
+                        if (isCurrentProducer) {
+                          borderColor = 'border-purple-300';
+                          bgColor = 'bg-purple-50';
+                        } else if (isExternal) {
+                          borderColor = 'border-orange-200';
+                          bgColor = 'bg-orange-50';
+                        }
+                        
                         return (
-                          <div key={`${item.id || index}-${item.productName || 'item'}`} className={`p-4 rounded-lg border ${isExternal ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div key={`${item.id || index}-${item.productName || 'item'}`} 
+                               className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
                                     <Package className="h-4 w-4 text-gray-500" />
                                     <span className="font-medium">{item.productName}</span>
-                                    {isExternal && (
+                                    {isCurrentProducer && (
+                                      <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                                        🎯 Produtor Atual
+                                      </Badge>
+                                    )}
+                                    {isExternal && !isCurrentProducer && (
                                       <Badge variant="outline" className="text-orange-700 border-orange-300">
                                         Produção Externa
                                       </Badge>
@@ -882,8 +1199,12 @@ export default function LogisticsDashboard() {
                                     {/* Produtor do Item */}
                                     <div className="col-span-2">
                                       <span className="text-gray-500">Produtor:</span>
-                                      <p className="font-medium text-orange-700">
+                                      <p className={`font-medium ${
+                                        isCurrentProducer ? 'text-purple-700' : 
+                                        isExternal ? 'text-orange-700' : 'text-gray-700'
+                                      }`}>
                                         {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
+                                        {isCurrentProducer && ' (ATUAL)'}
                                       </p>
                                     </div>
 
@@ -926,6 +1247,23 @@ export default function LogisticsDashboard() {
                         );
                       })}
                     </div>
+                    
+                    {/* Resumo de valor para o produtor específico */}
+                    {selectedOrder.viewingProducer && selectedOrder.producerValue && (
+                      <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-purple-700 font-medium">
+                            Total para {selectedOrder.viewingProducerName}:
+                          </span>
+                          <span className="text-xl font-bold text-purple-800">
+                            R$ {parseFloat(selectedOrder.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-purple-600 mt-1">
+                          Este valor será usado para criar a ordem de produção específica
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
