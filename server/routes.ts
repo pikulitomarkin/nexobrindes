@@ -2960,11 +2960,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paidAt: new Date()
         });
 
-        // Update order paidValue without changing the order's totalValue
-        await storage.updateOrderPaidValue(receivable.orderId);
+        // Get current order to calculate new paid value safely
+        const order = await storage.getOrder(receivable.orderId);
+        if (order) {
+          const totalValue = parseFloat(order.totalValue);
+          const currentPaid = parseFloat(order.paidValue || '0');
+          const thisPayment = parseFloat(amount);
+          const newPaid = currentPaid + thisPayment;
+          const newRemaining = Math.max(totalValue - newPaid, 0);
 
-        // Log the payment for debugging
-        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Added payment of ${amount}. Original order totalValue remains unchanged.`);
+          // >>> CRITICAL: NEVER send totalValue in update! <<<
+          await storage.updateOrder(receivable.orderId, {
+            paidValue: newPaid.toFixed(2),
+            remainingAmount: newRemaining.toFixed(2),
+            __origin: 'receivables' // Safety flag for storage layer
+          });
+
+          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
+        }
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');

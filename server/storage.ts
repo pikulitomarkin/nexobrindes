@@ -1309,34 +1309,28 @@ export class MemStorage implements IStorage {
     const order = this.orders.get(id);
     if (!order) return undefined;
 
-    const oldStatus = order.status;
-    const updateData = {
-      ...order,
-      ...updates,
-      updatedAt: new Date(),
-      trackingCode: updates.trackingCode !== undefined ? updates.trackingCode : order.trackingCode,
-      refundAmount: updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount,
-      refundNotes: updates.refundNotes !== undefined ? updates.refundNotes : order.refundNotes,
-      // Ensure other fields are preserved if not being updated
-      items: updates.items !== undefined ? updates.items : order.items,
-      paymentMethodId: updates.paymentMethodId !== undefined ? updates.paymentMethodId : order.paymentMethodId,
-      shippingMethodId: updates.shippingMethodId !== undefined ? updates.shippingMethodId : order.shippingMethodId,
-      installments: updates.installments !== undefined ? updates.installments : order.installments,
-      downPayment: updates.downPayment !== undefined ? updates.downPayment.toString() : order.downPayment,
-      remainingAmount: updates.remainingAmount !== undefined ? updates.remainingAmount.toString() : order.remainingAmount,
-      shippingCost: updates.shippingCost !== undefined ? updates.shippingCost.toString() : order.shippingCost,
-      hasDiscount: updates.hasDiscount !== undefined ? updates.hasDiscount : order.hasDiscount,
-      discountType: updates.discountType !== undefined ? updates.discountType : order.discountType,
-      discountPercentage: updates.discountPercentage !== undefined ? updates.discountPercentage.toString() : order.discountPercentage,
-      discountValue: updates.discountValue !== undefined ? updates.discountValue.toString() : order.discountValue,
-    };
+    // SEGURANÇA: Nunca permitir que fluxos de pagamento alterem totalValue
+    const sanitized = { ...updates };
 
-    this.orders.set(id, updateData);
+    // Proteção específica contra alteração acidental de totalValue em fluxos de pagamento
+    if ('totalValue' in sanitized && sanitized.totalValue !== undefined) {
+      const origin = (sanitized as any).__origin;
 
-    // Process commission payments if the status has changed
-    if (updates.status && updates.status !== oldStatus) {
-      await this.processCommissionPayments(updateData, updates.status);
+      // Se vier de fluxos de receivables/pagamento, bloquear mudança de totalValue
+      if (origin === 'receivables' || origin === 'payment') {
+        console.warn(`[SECURITY] Blocked totalValue change from ${origin} for order ${id}. Current: ${order.totalValue}, Attempted: ${sanitized.totalValue}`);
+        delete (sanitized as any).totalValue;
+      }
     }
+
+    // Remove o campo __origin da atualização final
+    if ('__origin' in sanitized) {
+      delete (sanitized as any).__origin;
+    }
+
+    // NUNCA alterar o valor total do pedido em operações normais - isso deve ser feito apenas em operações específicas
+    const updatedOrder = { ...order, ...sanitized, updatedAt: new Date() };
+    this.orders.set(id, updatedOrder);
 
     // Update AccountsReceivable if totalValue, refundAmount, or downPayment changes
     if (updates.totalValue !== undefined || updates.refundAmount !== undefined || updates.downPayment !== undefined || updates.shippingCost !== undefined) {
@@ -1367,8 +1361,8 @@ export class MemStorage implements IStorage {
           .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
         // Update minimum payment if new values provided
-        const newDownPayment = parseFloat(updateData.downPayment?.toString() || '0');
-        const newShippingCost = parseFloat(updateData.shippingCost?.toString() || '0');
+        const newDownPayment = parseFloat(updatedOrder.downPayment?.toString() || '0');
+        const newShippingCost = parseFloat(updatedOrder.shippingCost?.toString() || '0');
 
         // Atualizar apenas o pagamento mínimo, NÃO o valor esperado total
         if (newDownPayment > 0 || newShippingCost > 0) {
@@ -1390,7 +1384,7 @@ export class MemStorage implements IStorage {
           }
         }
 
-        const dueDate = updateData.deadline ? new Date(updateData.deadline) : null;
+        const dueDate = updatedOrder.deadline ? new Date(updatedOrder.deadline) : null;
         if (dueDate && new Date() > dueDate && status !== 'paid') {
           status = 'overdue';
         }
@@ -1400,13 +1394,14 @@ export class MemStorage implements IStorage {
           receivedAmount: currentPaid.toFixed(2),
           minimumPayment: minimumPaymentValue,
           status: status,
-          dueDate: updateData.deadline
+          dueDate: updatedOrder.deadline
         });
       }
     }
 
-    return updateData;
+    return updatedOrder;
   }
+
 
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
     const order = this.orders.get(id);
