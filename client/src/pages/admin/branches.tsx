@@ -152,7 +152,10 @@ export default function AdminBranches() {
         </div>
         <Dialog open={isCreateDialogOpen || !!editingBranch} onOpenChange={handleCloseDialog}>
           <DialogTrigger asChild>
-            <Button className="gradient-bg text-white">
+            <Button 
+              className="gradient-bg text-white"
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nova Filial
             </Button>
