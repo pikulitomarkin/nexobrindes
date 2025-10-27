@@ -712,31 +712,39 @@ export default function LogisticsDashboard() {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   
-                                  // Verificar se já não está processando para este produtor específico
+                                  // Verificar se já não está processando
                                   if (sendToProductionMutation.isPending) {
                                     console.log('Mutation já em andamento, ignorando clique');
                                     return;
                                   }
                                   
-                                  if (order.status === 'production') {
-                                    console.log('Pedido já em produção, ignorando clique');
+                                  // Verificar se este produtor específico já tem ordem de produção
+                                  const existingProductionOrder = productionOrders?.find(po => 
+                                    po.orderId === order.id && po.producerId === order.currentProducerId
+                                  );
+                                  
+                                  if (existingProductionOrder) {
+                                    console.log(`Produtor ${order.currentProducerName} já tem ordem de produção para este pedido`);
+                                    toast({
+                                      title: "Já enviado",
+                                      description: `Este produtor já tem uma ordem de produção para este pedido`,
+                                      variant: "destructive",
+                                    });
                                     return;
                                   }
 
-                                  console.log(`Enviando pedido ${order.id} especificamente para produtor ${order.currentProducerId} (${order.currentProducerName})`);
+                                  console.log(`ENVIANDO ESPECÍFICO: pedido ${order.id} APENAS para produtor ${order.currentProducerId} (${order.currentProducerName})`);
                                   
                                   sendToProductionMutation.mutate({
                                     orderId: order.id,
                                     producerId: order.currentProducerId
                                   });
                                 }}
-                                disabled={sendToProductionMutation.isPending || order.status === 'production'}
-                                title={order.status === 'production' ? 'Já enviado para produção' : `Enviar apenas para ${order.currentProducerName}`}
+                                disabled={sendToProductionMutation.isPending}
+                                title={`Enviar APENAS para ${order.currentProducerName}`}
                               >
                                 <Send className="h-4 w-4 mr-1" />
-                                {sendToProductionMutation.isPending ? 'Enviando...' :
-                                 order.status === 'production' ? '✓ Enviado' :
-                                 `📤 Enviar`}
+                                {sendToProductionMutation.isPending ? 'Enviando...' : `📤 ${order.currentProducerName}`}
                               </Button>
                             ) : (
                               <span className="text-xs text-gray-500 italic">

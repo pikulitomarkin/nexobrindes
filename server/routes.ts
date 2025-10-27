@@ -494,25 +494,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Only consider external producers
         if (itemProducerId && itemProducerId !== 'internal') {
-          // Only send to specified producer if producerId is provided
-          if (producerId && itemProducerId !== producerId) {
-            return; // Skip this item
+          // If producerId is specified, ONLY process that specific producer
+          if (producerId) {
+            if (itemProducerId === producerId) {
+              if (!itemsByProducer.has(itemProducerId)) {
+                itemsByProducer.set(itemProducerId, []);
+              }
+              itemsByProducer.get(itemProducerId).push(item);
+            }
+            // Skip all other producers when producerId is specified
+          } else {
+            // No specific producer - process all external producers
+            if (!itemsByProducer.has(itemProducerId)) {
+              itemsByProducer.set(itemProducerId, []);
+            }
+            itemsByProducer.get(itemProducerId).push(item);
           }
-
-          if (!itemsByProducer.has(itemProducerId)) {
-            itemsByProducer.set(itemProducerId, []);
-          }
-          itemsByProducer.get(itemProducerId).push(item);
         }
       });
 
       console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
+      console.log(`Requested specific producer:`, producerId);
+      console.log(`Processing ${itemsByProducer.size} producers`);
 
       if (itemsByProducer.size === 0) {
         const errorMsg = producerId ?
-          `Nenhum item encontrado para o produtor especificado` :
+          `Nenhum item encontrado para o produtor especificado (${producerId})` :
           `Nenhum item de produção externa encontrado`;
         return res.status(400).json({ error: errorMsg });
+      }
+
+      // If a specific producer was requested, make sure ONLY that producer is being processed
+      if (producerId && itemsByProducer.size !== 1) {
+        console.error(`ERRO: Solicitado produtor específico ${producerId}, mas processando ${itemsByProducer.size} produtores`);
+        return res.status(400).json({ error: "Erro interno: processamento incorreto de produtor específico" });
+      }
+
+      if (producerId && !itemsByProducer.has(producerId)) {
+        console.error(`ERRO: Produtor específico ${producerId} não encontrado nos itens agrupados`);
+        return res.status(400).json({ error: `Produtor especificado não possui itens neste pedido` });
       }
 
       // If a specific producer was requested, make sure it exists in the items
