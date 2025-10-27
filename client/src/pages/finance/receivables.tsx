@@ -49,13 +49,13 @@ export default function FinanceReceivables() {
     }
   });
 
-  // Convert API data to expected format
+  // Convert API data to expected format - SEMPRE mostrar valor total original do pedido
   const mockReceivables = receivablesData.map((receivable: any) => ({
     id: receivable.id,
     orderNumber: receivable.orderNumber || `#${receivable.orderId}`,
     clientName: receivable.clientName || 'Cliente não identificado',
     dueDate: receivable.dueDate ? new Date(receivable.dueDate) : new Date(),
-    amount: receivable.amount || "0.00",
+    amount: receivable.amount || "0.00", // SEMPRE o valor total original do pedido
     paidAmount: receivable.receivedAmount || "0.00",
     minimumPayment: receivable.minimumPayment || "0.00", // Pagamento mínimo obrigatório (entrada + frete)
     status: receivable.status || "pending",
@@ -219,7 +219,8 @@ export default function FinanceReceivables() {
     }
   };
 
-  const totalToReceive = mockReceivables.reduce((sum, r) => sum + parseFloat(r.amount) - parseFloat(r.paidAmount), 0);
+  // Calcular totais corretos: Total - Recebido = Saldo restante
+  const totalToReceive = mockReceivables.reduce((sum, r) => sum + Math.max(0, parseFloat(r.amount) - parseFloat(r.paidAmount)), 0);
   const totalReceived = mockReceivables.reduce((sum, r) => sum + parseFloat(r.paidAmount), 0);
   const awaitingEntryCount = mockReceivables.filter(r => r.status === 'pending' || r.status === 'partial').length;
   const partiallyPaidCount = mockReceivables.filter(r => r.status === 'partial').length;
@@ -432,6 +433,9 @@ export default function FinanceReceivables() {
                   </th>
                   <th className="panel-table th">
                     Valor Total
+                    <div className="text-xs font-normal text-gray-500">
+                      (Valor original do pedido)
+                    </div>
                   </th>
                   <th className="panel-table th">
                     Entrada+Frete
@@ -467,8 +471,11 @@ export default function FinanceReceivables() {
                       <td className="panel-table td max-w-[120px] truncate">
                         {receivable.clientName}
                       </td>
-                      <td className="panel-table td font-semibold">
+                      <td className="panel-table td font-semibold text-blue-600">
                         R$ {parseFloat(receivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <div className="text-xs text-gray-500">
+                          Valor total do pedido
+                        </div>
                       </td>
                       <td className="panel-table td font-semibold">
                         <span className={isMinimumMet ? 'text-green-600' : 'text-red-600'}>
