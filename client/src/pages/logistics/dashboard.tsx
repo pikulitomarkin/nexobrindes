@@ -653,7 +653,9 @@ export default function LogisticsDashboard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 // Criar um objeto de pedido específico para este produtor
                                 const producerSpecificOrder = {
                                   ...order,
@@ -676,10 +678,16 @@ export default function LogisticsDashboard() {
                               <Button
                                 size="sm"
                                 className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => sendToProductionMutation.mutate({ 
-                                  orderId: order.id,
-                                  producerId: order.currentProducerId 
-                                })}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!sendToProductionMutation.isPending && order.status !== 'production') {
+                                    sendToProductionMutation.mutate({ 
+                                      orderId: order.id,
+                                      producerId: order.currentProducerId 
+                                    });
+                                  }
+                                }}
                                 disabled={sendToProductionMutation.isPending || order.status === 'production'}
                                 title={order.status === 'production' ? 'Já enviado para produção' : `Enviar apenas para ${order.currentProducerName}`}
                               >
@@ -787,7 +795,9 @@ export default function LogisticsDashboard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 // Criar um objeto específico para este produtor
                                 const producerSpecificOrder = {
                                   ...order,
@@ -806,7 +816,13 @@ export default function LogisticsDashboard() {
                               <Button
                                 size="sm"
                                 className="bg-orange-600 hover:bg-orange-700 text-white"
-                                onClick={() => handleDispatchOrder(order)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!dispatchOrderMutation.isPending) {
+                                    handleDispatchOrder(order);
+                                  }
+                                }}
                                 disabled={dispatchOrderMutation.isPending}
                                 title={`Despachar produção de ${order.producerName} para o cliente`}
                               >
@@ -901,7 +917,9 @@ export default function LogisticsDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" onClick={() => {
+                              <Button variant="outline" size="sm" onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 // Criar um objeto específico para este produtor
                                 const producerSpecificOrder = {
                                   ...order,

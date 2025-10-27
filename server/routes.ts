@@ -435,25 +435,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (order.budgetId) {
         const budgetItems = await storage.getBudgetItems(order.budgetId);
         allItems = budgetItems;
-      } else if (order.items) {
+      } else if (order.items && Array.isArray(order.items)) {
         allItems = order.items;
       }
 
       console.log(`Order ${id} has ${allItems.length} total items`);
 
+      // If no items found, return error
+      if (!allItems || allItems.length === 0) {
+        return res.status(400).json({ error: "Nenhum item encontrado no pedido" });
+      }
+
       // Group items by producer
       const itemsByProducer = new Map();
       allItems.forEach((item: any) => {
-        if (item.producerId && item.producerId !== 'internal') {
+        const itemProducerId = item.producerId || 'internal';
+        
+        // Only consider external producers
+        if (itemProducerId && itemProducerId !== 'internal') {
           // Only send to specified producer if producerId is provided
-          if (producerId && item.producerId !== producerId) {
+          if (producerId && itemProducerId !== producerId) {
             return; // Skip this item
           }
 
-          if (!itemsByProducer.has(item.producerId)) {
-            itemsByProducer.set(item.producerId, []);
+          if (!itemsByProducer.has(itemProducerId)) {
+            itemsByProducer.set(itemProducerId, []);
           }
-          itemsByProducer.get(item.producerId).push(item);
+          itemsByProducer.get(itemProducerId).push(item);
         }
       });
 
