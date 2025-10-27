@@ -705,17 +705,30 @@ export default function LogisticsDashboard() {
                             {/* Botão específico para enviar apenas para este produtor */}
                             {order.currentProducerId ? (
                               <Button
+                                key={`send-btn-${order.uniqueKey}`}
                                 size="sm"
                                 className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  if (!sendToProductionMutation.isPending && order.status !== 'production') {
-                                    sendToProductionMutation.mutate({
-                                      orderId: order.id,
-                                      producerId: order.currentProducerId
-                                    });
+                                  
+                                  // Verificar se já não está processando para este produtor específico
+                                  if (sendToProductionMutation.isPending) {
+                                    console.log('Mutation já em andamento, ignorando clique');
+                                    return;
                                   }
+                                  
+                                  if (order.status === 'production') {
+                                    console.log('Pedido já em produção, ignorando clique');
+                                    return;
+                                  }
+
+                                  console.log(`Enviando pedido ${order.id} especificamente para produtor ${order.currentProducerId} (${order.currentProducerName})`);
+                                  
+                                  sendToProductionMutation.mutate({
+                                    orderId: order.id,
+                                    producerId: order.currentProducerId
+                                  });
                                 }}
                                 disabled={sendToProductionMutation.isPending || order.status === 'production'}
                                 title={order.status === 'production' ? 'Já enviado para produção' : `Enviar apenas para ${order.currentProducerName}`}
@@ -822,6 +835,7 @@ export default function LogisticsDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
                             <Button
+                              key={`view-btn-${order.uniqueKey}`}
                               variant="outline"
                               size="sm"
                               onClick={(e) => {
@@ -843,14 +857,21 @@ export default function LogisticsDashboard() {
                             </Button>
                             {order.status === 'ready' && (
                               <Button
+                                key={`dispatch-btn-${order.uniqueKey}`}
                                 size="sm"
                                 className="bg-orange-600 hover:bg-orange-700 text-white"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  if (!dispatchOrderMutation.isPending) {
-                                    handleDispatchOrder(order);
+                                  
+                                  // Verificar se já não está processando
+                                  if (dispatchOrderMutation.isPending) {
+                                    console.log('Dispatch mutation já em andamento, ignorando clique');
+                                    return;
                                   }
+
+                                  console.log(`Despachando ordem de produção ${order.id} do produtor ${order.producerName}`);
+                                  handleDispatchOrder(order);
                                 }}
                                 disabled={dispatchOrderMutation.isPending}
                                 title={`Despachar produção de ${order.producerName} para o cliente`}
@@ -946,31 +967,43 @@ export default function LogisticsDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // Criar um objeto específico para este produtor
-                                const producerSpecificOrder = {
-                                  ...order,
-                                  // Marcar como visualização específica do produtor
-                                  viewingProducer: order.producerId,
-                                  viewingProducerName: order.producerName
-                                };
-                                setSelectedOrder(producerSpecificOrder);
-                                setShowOrderDetailsModal(true);
-                              }}>
+                              <Button 
+                                key={`view-shipped-btn-${order.uniqueKey}`}
+                                variant="outline" 
+                                size="sm" 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  // Criar um objeto específico para este produtor
+                                  const producerSpecificOrder = {
+                                    ...order,
+                                    // Marcar como visualização específica do produtor
+                                    viewingProducer: order.producerId,
+                                    viewingProducerName: order.producerName
+                                  };
+                                  setSelectedOrder(producerSpecificOrder);
+                                  setShowOrderDetailsModal(true);
+                                }}
+                              >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver {order.producerName ? 'Despacho' : 'Pedido'}
                               </Button>
                               <Button
+                                key={`confirm-delivery-btn-${order.uniqueKey}`}
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  if (!confirmDeliveryMutation.isPending) {
-                                    handleConfirmDelivery(order);
+                                  
+                                  // Verificar se já não está processando
+                                  if (confirmDeliveryMutation.isPending) {
+                                    console.log('Confirm delivery mutation já em andamento, ignorando clique');
+                                    return;
                                   }
+
+                                  console.log(`Confirmando entrega para ordem ${order.id} do produtor ${order.producerName}`);
+                                  handleConfirmDelivery(order);
                                 }}
                                 disabled={confirmDeliveryMutation.isPending}
                                 title="Confirmar que o cliente recebeu o pedido"
@@ -1066,19 +1099,24 @@ export default function LogisticsDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // Criar um objeto específico para este produtor
-                                const producerSpecificOrder = {
-                                  ...order,
-                                  // Marcar como visualização específica do produtor
-                                  viewingProducer: order.producerId,
-                                  viewingProducerName: order.producerName
-                                };
-                                setSelectedOrder(producerSpecificOrder);
-                                setShowOrderDetailsModal(true);
-                              }}>
+                              <Button 
+                                key={`view-delivered-btn-${order.uniqueKey}`}
+                                variant="outline" 
+                                size="sm" 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  // Criar um objeto específico para este produtor
+                                  const producerSpecificOrder = {
+                                    ...order,
+                                    // Marcar como visualização específica do produtor
+                                    viewingProducer: order.producerId,
+                                    viewingProducerName: order.producerName
+                                  };
+                                  setSelectedOrder(producerSpecificOrder);
+                                  setShowOrderDetailsModal(true);
+                                }}
+                              >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver {order.producerName ? 'Entrega' : 'Pedido'}
                               </Button>
