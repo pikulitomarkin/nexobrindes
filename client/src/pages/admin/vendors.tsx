@@ -96,7 +96,7 @@ export default function AdminVendors() {
         password: data.password,
         userCode: userCode,
         commissionRate: data.commissionRate,
-        branchId: data.branchId || null
+        branchId: data.branchId === "default" ? null : data.branchId
       };
       const response = await fetch("/api/vendors", {
         method: "POST",
@@ -286,7 +286,7 @@ export default function AdminVendors() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Matriz (Padrão)</SelectItem>
+                          <SelectItem value="default">Matriz (Padrão)</SelectItem>
                           {branches?.map((branch: any) => (
                             <SelectItem key={branch.id} value={branch.id}>
                               <div className="flex items-center">
