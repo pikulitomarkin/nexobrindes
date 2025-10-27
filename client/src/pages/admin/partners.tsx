@@ -263,14 +263,16 @@ export default function AdminPartners() {
                 />
               </div>
               <div>
-                <Label htmlFor="username">Username *</Label>
+                <Label htmlFor="username">Código de Acesso *</Label>
                 <Input
                   id="username"
                   value={partnerForm.username}
                   onChange={(e) => setPartnerForm({ ...partnerForm, username: e.target.value })}
-                  placeholder="Username para login"
-                  required
+                  placeholder="Será gerado automaticamente se não informado"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Se não informado, será gerado automaticamente (ex: SOC123456)
+                </p>
               </div>
               <div>
                 <Label htmlFor="password">Senha *</Label>
@@ -355,8 +357,13 @@ export default function AdminPartners() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {partner.phone || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {partner.username}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{partner.username}</div>
+                          {partner.userCode && (
+                            <div className="text-xs text-blue-600 font-mono">#{partner.userCode}</div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={partner.isActive ? "default" : "secondary"}>

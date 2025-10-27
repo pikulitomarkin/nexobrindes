@@ -1639,36 +1639,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          // Always use contactName as primary client name - it's required on order creation
-          let clientName = order.contactName;
-
-          // Only if contactName is missing, try to get from client record
-          if (!clientName && order.clientId) {
-            console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
-
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              console.log(`Found client record:`, clientRecord);
-              clientName = clientRecord.name;
-            } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                console.log(`Found client by userId:`, clientByUserId);
-                clientName = clientByUserId.name;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  console.log(`Found user record:`, clientUser);
-                  clientName = clientUser.name;
-                }
-              }
-            }
-          }
-
-          // If still no name, use a descriptive message instead of "Unknown"
-          if (!clientName) {
-            clientName = "Nome não informado";
-          }
+          const client = await storage.getUser(order.clientId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
@@ -1695,11 +1667,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          let productionNotes = null;
+          let productionDeadline = null;
+          let lastNoteAt = null;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            if (productionOrders.length > 0) {
+              const po = productionOrders[0];
+              hasUnreadNotes = po.hasUnreadNotes || false;
+              productionNotes = po.notes;
+              productionDeadline = po.deliveryDeadline;
+              lastNoteAt = po.lastNoteAt;
+            }
+          }
+
           return {
             ...order,
-            clientName: clientName, // Never use fallback 'Unknown'
+            clientName: client?.name || 'Unknown',
+            producerName: producer?.name || null,
+            hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
-            budgetItems: budgetItems
+            budgetItems: budgetItems,
+            productionNotes: productionNotes,
+            productionDeadline: productionDeadline,
+            lastNoteAt: lastNoteAt
           };
         })
       );
@@ -2615,107 +2608,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
-      const users = await storage.getUsers();
-      const partners = users.filter(user => user.role === 'partner');
+      const partners = await storage.getPartners();
 
-      const partnersWithDetails = await Promise.all(partners.map(async (partner) => {
-        const partnerProfile = await storage.getPartner(partner.id);
-        return {
-          id: partner.id,
-          name: partner.name,
-          email: partner.email || "",
-          accessCode: partner.username || "",
-          phone: partner.phone || "",
-          commissionRate: partnerProfile?.commissionRate || '5.00',
-          createdAt: partner.createdAt,
-          isActive: true
-        };
-      }));
+      // Enrich with commission totals
+      const enrichedPartners = await Promise.all(
+        partners.map(async (partner) => {
+          const commissions = await storage.getCommissionsByPartner(partner.id);
+          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
 
-      res.json(partnersWithDetails);
+          return {
+            ...partner,
+            totalCommissions
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedPartners.length} partners`);
+      res.json(enrichedPartners);
     } catch (error) {
       console.error("Error fetching partners:", error);
       res.status(500).json({ error: "Failed to fetch partners" });
     }
   });
 
-  // Create partner (admin-level user)
+  // Create partner (admin only)
   app.post("/api/partners", async (req, res) => {
-    const { name, email, phone, username, password } = req.body;
-
-    if (!name || !email || !username || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // Create user first
-    const userId = generateId("partner");
-    const user = {
-      id: userId,
-      username,
-      password,
-      role: "partner",
-      name,
-      email,
-      phone: phone || "",
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
-    // Create partner profile
-    const partner = {
-      id: userId,
-      userId,
-      name,
-      email,
-      phone: phone || "",
-      username,
-      password, // Note: Storing password directly here is insecure for production.
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
     try {
-      await storage.addUser(user); // Assuming addUser exists and handles user creation
-      await storage.addPartner(partner); // Assuming addPartner exists for partner-specific data
-      res.json(partner);
+      const partnerData = req.body;
+      console.log("Creating partner:", partnerData);
+
+      const newPartner = await storage.createPartner(partnerData);
+
+      console.log("Partner created successfully:", newPartner.id);
+      res.json(newPartner);
     } catch (error) {
       console.error("Error creating partner:", error);
-      res.status(500).json({ error: "Failed to create partner" });
+      res.status(500).json({ error: "Erro ao criar sócio: " + error.message });
     }
   });
 
-  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+  // Update partner commission (admin only)
+  app.put("/api/partners/:id/commission", async (req, res) => {
     try {
-      const { partnerId } = req.params;
+      const { id } = req.params;
       const { commissionRate } = req.body;
 
-      await storage.updatePartnerCommission(partnerId, commissionRate);
-      res.json({ success: true });
+      await storage.updatePartnerCommission(id, commissionRate);
+
+      res.json({ success: true, message: "Comissão do sócio atualizada com sucesso" });
     } catch (error) {
       console.error("Error updating partner commission:", error);
-      res.status(500).json({ error: "Failed to update partner commission" });
-    }
-  });
-
-  // Update partner name
-  app.put("/api/partners/:partnerId/name", async (req, res) => {
-    try {
-      const { partnerId } = req.params;
-      const { name } = req.body;
-
-      if (!name || name.trim().length === 0) {
-        return res.status(400).json({ error: "Nome é obrigatório" });
-      }
-
-      const updatedUser = await storage.updateUser(partnerId, { name: name.trim() });
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Sócio não encontrado" });
-      }
-
-      res.json({ success: true, user: updatedUser });
-    } catch (error) {
-      console.error("Error updating partner name:", error);
-      res.status(500).json({ error: "Failed to update partner name" });
+      res.status(500).json({ error: "Erro ao atualizar comissão do sócio" });
     }
   });
 
@@ -4487,7 +4430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName || item.productId} (${itemKey})`);
+          console.log(`Removing duplicate budget update item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);

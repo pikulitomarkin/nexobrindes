@@ -109,6 +109,7 @@ export interface IStorage {
 
   // Commissions
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
+  getCommissionsByPartner(partnerId: string): Promise<Commission[]>; // Added getCommissionsByPartner
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
@@ -1941,7 +1942,6 @@ export class MemStorage implements IStorage {
     if (receivable) {
       const totalAmount = parseFloat(receivable.amount); // MANTER valor original sempre
       let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-
       if (totalPaid >= totalAmount) {
         status = 'paid';
       } else if (totalPaid > 0) {
@@ -2067,6 +2067,13 @@ export class MemStorage implements IStorage {
   // Commission methods
   async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
     return Array.from(this.commissions.values()).filter(commission => commission.vendorId === vendorId);
+  }
+
+  // Added method to get commissions by partnerId
+  async getCommissionsByPartner(partnerId: string): Promise<Commission[]> {
+    return Array.from(this.commissions.values()).filter(commission =>
+      commission.partnerId === partnerId
+    );
   }
 
   async getAllCommissions(): Promise<Commission[]> {
@@ -2205,53 +2212,47 @@ export class MemStorage implements IStorage {
   }
 
   async createPartner(partnerData: any): Promise<User> {
+    // Generate unique userCode if not provided
+    const userCode = partnerData.userCode || this.generatePartnerCode();
+
     // Create user first
     const newUser: User = {
       id: randomUUID(),
-      username: partnerData.username,
+      username: partnerData.username || userCode,
       password: partnerData.password || "123456",
       role: 'partner',
       name: partnerData.name,
       email: partnerData.email || null,
       phone: partnerData.phone || null,
+      address: partnerData.address || null,
+      specialty: partnerData.specialty || null,
       vendorId: null,
       isActive: true
     };
 
+    // Add userCode to user object for partner access
+    (newUser as any).userCode = userCode;
+
     this.users.set(newUser.id, newUser);
 
-    // Create partner profiles for all 3 partners
-    const partnerProfile1: Partner = {
-      id: "partner-profile-1",
-      userId: "partner-1",
-      commissionRate: "15.00",
+    // Create partner profile
+    const partnerProfile: Partner = {
+      id: randomUUID(),
+      userId: newUser.id,
+      commissionRate: partnerData.commissionRate || "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    const partnerProfile2: Partner = {
-      id: "partner-profile-2",
-      userId: "partner-2",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const partnerProfile3: Partner = {
-      id: "partner-profile-3",
-      userId: "partner-3",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.partners.set(partnerProfile1.id, partnerProfile1);
-    this.partners.set(partnerProfile2.id, partnerProfile2);
-    this.partners.set(partnerProfile3.id, partnerProfile3);
+    this.partners.set(partnerProfile.id, partnerProfile);
     return newUser;
+  }
+
+  private generatePartnerCode(): string {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `SOC${timestamp}${randomStr}`;
   }
 
   async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {

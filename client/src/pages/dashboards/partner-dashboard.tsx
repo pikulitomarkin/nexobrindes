@@ -29,6 +29,29 @@ export default function PartnerDashboard() {
     }
   });
 
+  // Query para dados específicos do sócio
+  const { data: partnerData } = useQuery({
+    queryKey: ["/api/partners"],
+    select: (data) => {
+      return data?.find((partner: any) => partner.userId === user.id);
+    }
+  });
+
+  // Query para todos os pedidos (sócio tem acesso completo)
+  const { data: allOrders } = useQuery({
+    queryKey: ["/api/orders"],
+  });
+
+  // Query para todos os vendedores (sócio pode gerenciar)
+  const { data: allVendors } = useQuery({
+    queryKey: ["/api/vendors"],
+  });
+
+  // Query para todos os clientes (sócio pode gerenciar)
+  const { data: allClients } = useQuery({
+    queryKey: ["/api/clients"],
+  });
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
@@ -36,14 +59,14 @@ export default function PartnerDashboard() {
   };
 
   const quickActions = [
-    { href: "/partner/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
-    { href: "/partner/commission-management", icon: TrendingUp, label: "Comissões", color: "text-green-600" },
-    { href: "/partner/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
-    { href: "/partner/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
-    { href: "/partner/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
-    { href: "/partner/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
-    { href: "/partner/reports", icon: BarChart3, label: "Relatórios", color: "text-rose-600" },
-    { href: "/partner/partners", icon: Users, label: "Sócios", color: "text-teal-600" },
+    { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
+    { href: "/partner/commission-management", icon: TrendingUp, label: "Minhas Comissões", color: "text-green-600" },
+    { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
+    { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
+    { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
+    { href: "/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
+    { href: "/admin/products", icon: Package, label: "Produtos", color: "text-cyan-600" },
+    { href: "/admin/budgets", icon: BarChart3, label: "Orçamentos", color: "text-rose-600" },
   ];
 
   // Cálculos específicos das comissões deste sócio
@@ -90,8 +113,14 @@ export default function PartnerDashboard() {
       <div className="bg-white shadow-sm border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Painel Administrativo</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Painel do Sócio</h1>
             <p className="text-gray-600">Bem-vindo, {user.name}</p>
+            {user.userCode && (
+              <p className="text-sm text-blue-600 font-mono">Código de Acesso: {user.userCode}</p>
+            )}
+            {partnerData && (
+              <p className="text-sm text-green-600">Taxa de Comissão: {partnerData.commissionRate}%</p>
+            )}
           </div>
           <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
             <LogOut className="h-4 w-4" />
@@ -101,14 +130,14 @@ export default function PartnerDashboard() {
       </div>
 
       <div className="p-6">
-        {/* Main Stats Cards - Idênticos ao admin */}
+        {/* Main Stats Cards - Com dados completos do sistema */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card data-testid="card-total-orders">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Pedidos</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats?.totalOrders || 0}</p>
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{allOrders?.length || 0}</p>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
@@ -120,7 +149,9 @@ export default function PartnerDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Em Produção</p>
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats?.inProduction || 0}</p>
+                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                    {allOrders?.filter((o: any) => o.status === 'production').length || 0}
+                  </p>
                 </div>
                 <Factory className="h-8 w-8 text-purple-600 dark:text-purple-400" />
               </div>
@@ -132,7 +163,7 @@ export default function PartnerDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Clientes</p>
-                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats?.totalClients || 0}</p>
+                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{allClients?.length || 0}</p>
                 </div>
                 <Users className="h-8 w-8 text-orange-600 dark:text-orange-400" />
               </div>
@@ -144,7 +175,7 @@ export default function PartnerDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendedores</p>
-                  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats?.totalVendors || 0}</p>
+                  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{allVendors?.length || 0}</p>
                 </div>
                 <Users className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
               </div>
@@ -232,13 +263,13 @@ export default function PartnerDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {!orders || orders.length === 0 ? (
+                {!allOrders || allOrders.length === 0 ? (
                   <div className="text-center py-8">
                     <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-500 dark:text-gray-400">Nenhum pedido encontrado</p>
                   </div>
                 ) : (
-                  orders.slice(0, 5).map((order: any) => (
+                  allOrders.slice(0, 5).map((order: any) => (
                     <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <div className="flex-1">
                         <p className="font-semibold text-sm">#{order.orderNumber}</p>
