@@ -2668,7 +2668,24 @@ export class MemStorage implements IStorage {
     });
 
     console.log(`Storage: Found ${vendorBudgets.length} budgets for vendor ${vendorId}`);
-    return vendorBudgets;
+
+    // Enrich budgets with items and photos
+    const enrichedBudgets = await Promise.all(
+      vendorBudgets.map(async (budget) => {
+        const items = await this.getBudgetItems(budget.id);
+        const photos = await this.getBudgetPhotos(budget.id);
+
+        return {
+          ...budget,
+          items: items,
+          photos: photos.map(p => p.photoUrl || p.imageUrl)
+        };
+      })
+    );
+
+    console.log(`Storage: Returning ${enrichedBudgets.length} enriched budgets for vendor ${vendorId}:`,
+      enrichedBudgets.map(b => ({ id: b.id, budgetNumber: b.budgetNumber, title: b.title })));
+    return enrichedBudgets;
   }
 
   async getBudgetsByClient(clientId: string): Promise<any[]> {

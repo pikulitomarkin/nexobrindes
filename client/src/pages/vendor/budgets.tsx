@@ -108,9 +108,15 @@ export default function VendorBudgets() {
   const { data: budgets, isLoading } = useQuery({
     queryKey: ["/api/budgets/vendor", vendorId],
     queryFn: async () => {
+      console.log(`Fetching budgets for vendor: ${vendorId}`);
       const response = await fetch(`/api/budgets/vendor/${vendorId}`);
-      if (!response.ok) throw new Error('Failed to fetch vendor budgets');
-      return response.json();
+      if (!response.ok) {
+        console.error(`Failed to fetch budgets: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to fetch vendor budgets');
+      }
+      const data = await response.json();
+      console.log(`Received ${data.length} budgets from API:`, data);
+      return data;
     },
   });
 
