@@ -926,7 +926,7 @@ export class MemStorage implements IStorage {
     this.clients.set(client4.id, client4);
     this.clients.set(client5.id, client5);
 
-    // Limpar todos os dados de pedidos, orçamentos, etc.
+    // Limpar dados de pedidos, orçamentos, etc.
     mockOrders = [];
     mockBudgets = [];
 
@@ -1293,29 +1293,25 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
-    const id = randomUUID();
-    const client: Client & { userCode?: string } = {
-      ...clientData,
-      id,
-      vendorId: clientData.vendorId || null,
-      userId: clientData.userId || null,
+  async createClient(clientData: InsertClient): Promise<Client> {
+    const newClient: Client = {
+      id: randomUUID(),
+      userId: clientData.userId,
+      name: clientData.name,
       email: clientData.email || null,
       phone: clientData.phone || null,
       whatsapp: clientData.whatsapp || null,
       cpfCnpj: clientData.cpfCnpj || null,
       address: clientData.address || null,
-      userCode: (clientData as any).userCode || null,
+      vendorId: clientData.vendorId,
+      branchId: clientData.branchId || null, // Include branchId from vendor
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
-    this.clients.set(id, client);
-    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
-    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
-    return client;
+    this.clients.set(newClient.id, newClient);
+    return newClient;
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {

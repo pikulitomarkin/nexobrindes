@@ -28,6 +28,7 @@ export const clients = pgTable("clients", {
   cpfCnpj: text("cpf_cnpj"),
   address: text("address"),
   vendorId: varchar("vendor_id").references(() => users.id), // Vendedor responsável
+  branchId: varchar("branch_id").references(() => branches.id), // Filial do cliente (vem do vendedor)
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
