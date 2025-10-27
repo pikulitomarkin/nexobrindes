@@ -14,6 +14,13 @@ import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "react-router-dom"; // Import useLocation
 import { Badge } from "@/components/ui/badge"; // Import Badge component
 
+// Declare window type extension for processingOrders
+declare global {
+  interface Window {
+    processingOrders?: Set<string>;
+  }
+}
+
 export default function LogisticsDashboard() {
   const location = window.location.pathname; // Get current location
   const [searchTerm, setSearchTerm] = useState("");
@@ -678,9 +685,19 @@ export default function LogisticsDashboard() {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   if (!sendToProductionMutation.isPending && order.status !== 'production') {
+                                    // Prevent multiple clicks by checking the specific order/producer combination
+                                    const key = `${order.id}-${order.currentProducerId}`;
+                                    if (!window.processingOrders) window.processingOrders = new Set();
+                                    if (window.processingOrders.has(key)) return;
+
+                                    window.processingOrders.add(key);
                                     sendToProductionMutation.mutate({ 
                                       orderId: order.id,
                                       producerId: order.currentProducerId 
+                                    }, {
+                                      onSettled: () => {
+                                        window.processingOrders.delete(key);
+                                      }
                                     });
                                   }
                                 }}
@@ -1069,12 +1086,14 @@ export default function LogisticsDashboard() {
                     <span className="text-blue-700">Cliente:</span>
                     <p className="font-medium">{selectedOrder.clientName}</p>
                   </div>
-                  <div>
-                    <span className="text-blue-700">Valor:</span>
-                    <p className="font-medium text-green-600">
-                      R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
+                  {!selectedOrder.viewingProducer && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Valor Total</label>
+                      <p className="font-medium text-gray-900">
+                        R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <span className="text-blue-700">Produto:</span>
                     <p className="font-medium">{selectedOrder.product}</p>
@@ -1291,7 +1310,7 @@ export default function LogisticsDashboard() {
                         }
 
                         return (
-                          <div key={`${item.id || index}-${item.productName || 'item'}`} 
+                          <div key={`${item.id || index}-${item.productId}`} 
                                className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
@@ -1337,7 +1356,7 @@ export default function LogisticsDashboard() {
                                     </div>
 
                                     {/* Personalização do Item */}
-                                    {item.hasItemCustomization && (
+                                    {item.hasItemCustomization && item.itemCustomizationDescription && (
                                       <div className="col-span-2 bg-blue-50 p-2 rounded">
                                         <span className="text-blue-700 font-medium">Personalização do Item:</span>
                                         <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
@@ -1357,7 +1376,7 @@ export default function LogisticsDashboard() {
                                     )}
 
                                     {/* Personalização Geral */}
-                                    {item.hasGeneralCustomization && (
+                                    {item.hasGeneralCustomization && item.generalCustomizationName && (
                                       <div className="col-span-2 bg-green-50 p-2 rounded">
                                         <span className="text-green-700 font-medium">Personalização Geral:</span>
                                         <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>

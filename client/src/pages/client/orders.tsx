@@ -298,6 +298,26 @@ export default function ClientOrders() {
                   </div>
                 </div>
               )}
+
+              {/* Tracking Information */}
+              {order.status === 'shipped' && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      Seu pedido foi despachado!
+                    </span>
+                  </div>
+                  {order.trackingCode && (
+                    <div className="text-xs text-blue-700 mt-2">
+                      <strong>Código de rastreio:</strong> {order.trackingCode}
+                    </div>
+                  )}
+                  <div className="text-xs text-blue-600 mt-1">
+                    A entrega será confirmada automaticamente pelo nosso sistema de logística.
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
