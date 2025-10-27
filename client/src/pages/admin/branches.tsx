@@ -126,10 +126,12 @@ export default function AdminBranches() {
     });
   };
 
-  const handleCloseDialog = () => {
-    setIsCreateDialogOpen(false);
-    setEditingBranch(null);
-    form.reset();
+  const handleCloseDialog = (open: boolean) => {
+    if (!open) {
+      setIsCreateDialogOpen(false);
+      setEditingBranch(null);
+      form.reset();
+    }
   };
 
   if (isLoading) {
@@ -154,7 +156,10 @@ export default function AdminBranches() {
           <DialogTrigger asChild>
             <Button 
               className="gradient-bg text-white"
-              onClick={() => setIsCreateDialogOpen(true)}
+              onClick={() => {
+                setIsCreateDialogOpen(true);
+                setEditingBranch(null);
+              }}
             >
               <Plus className="h-4 w-4 mr-2" />
               Nova Filial
@@ -224,7 +229,7 @@ export default function AdminBranches() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={handleCloseDialog}
+                    onClick={() => handleCloseDialog(false)}
                   >
                     Cancelar
                   </Button>
