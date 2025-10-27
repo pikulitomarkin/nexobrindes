@@ -47,6 +47,40 @@ export default function LogisticsDashboard() {
     },
   });
 
+  // Mutation para confirmar a entrega pelo cliente (agora feita pela logística)
+  const confirmDeliveryMutation = useMutation({
+    mutationFn: async ({ productionOrderId, orderId, notes }: {
+      productionOrderId: string;
+      orderId: string;
+      notes: string;
+    }) => {
+      const response = await fetch("/api/logistics/confirm-delivery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productionOrderId,
+          orderId,
+          notes
+        })
+      });
+      if (!response.ok) throw new Error("Erro ao confirmar entrega");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
+      toast({
+        title: "Sucesso!",
+        description: "Entrega confirmada para o cliente",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao confirmar entrega",
+        variant: "destructive",
+      });
+    },
+  });
 
 
   // Enviar pedido para produtor específico ou todos
@@ -1072,7 +1106,7 @@ export default function LogisticsDashboard() {
                   <div>
                     <span className="text-blue-700">Valor:</span>
                     <p className="font-medium text-green-600">
-                      R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      Confidencial
                     </p>
                   </div>
                   <div>
@@ -1351,8 +1385,8 @@ export default function LogisticsDashboard() {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-lg font-bold text-green-600">
-                                    R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <p className="text-sm text-gray-500">
+                                    Valor: Confidencial
                                   </p>
                                 </div>
                               </div>
@@ -1362,21 +1396,6 @@ export default function LogisticsDashboard() {
                     </div>
 
                     {/* Resumo de valor para o produtor específico */}
-                    {selectedOrder.viewingProducer && selectedOrder.producerValue && (
-                      <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="text-purple-700 font-medium">
-                            Total para {selectedOrder.viewingProducerName}:
-                          </span>
-                          <span className="text-xl font-bold text-purple-800">
-                            R$ {parseFloat(selectedOrder.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <p className="text-xs text-purple-600 mt-1">
-                          Este valor será usado para criar a ordem de produção específica
-                        </p>
-                      </div>
-                    )}
                   </div>
                 );
               })()}

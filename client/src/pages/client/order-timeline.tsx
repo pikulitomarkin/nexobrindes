@@ -185,37 +185,22 @@ export default function ClientOrderTimeline() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Summary */}
         <div className="lg:col-span-2">
-          {/* Delivery Confirmation Button - Only show for shipped orders */}
+          {/* Delivery Status Information */}
           {order.status === 'shipped' && (
-            <Card className="mb-8 border-green-200 bg-green-50">
+            <Card className="mb-8 border-blue-200 bg-blue-50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Truck className="h-6 w-6 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-green-900">Pedido Despachado!</h3>
-                      <p className="text-green-700">Você já recebeu seu pedido? Confirme a entrega abaixo.</p>
+                      <h3 className="text-lg font-semibold text-blue-900">Pedido Enviado!</h3>
+                      <p className="text-blue-700">
+                        Seu pedido foi despachado e está a caminho. A confirmação de entrega será feita automaticamente pela nossa equipe de logística.
+                      </p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => confirmDeliveryMutation.mutate()}
-                    disabled={confirmDeliveryMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {confirmDeliveryMutation.isPending ? (
-                      <>
-                        <Clock className="h-4 w-4 mr-2 animate-spin" />
-                        Confirmando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Recebi meu pedido
-                      </>
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -478,7 +463,7 @@ export default function ClientOrderTimeline() {
             </CardContent>
           </Card>
 
-          
+
 
           {/* Additional Information */}
           {(order.vendorName || order.producerName) && (
