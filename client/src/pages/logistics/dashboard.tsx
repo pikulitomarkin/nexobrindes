@@ -1,18 +1,80 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Package, Send, Eye, Search, Truck, Clock, CheckCircle, AlertTriangle, ShoppingCart, DollarSign, Factory } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "react-router-dom"; // Import useLocation
-import { Badge } from "@/components/ui/badge"; // Import Badge component
+
+// Isolated component for individual producer buttons
+function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
+  orderId: string;
+  producerId: string;
+  label: string;
+  uniqueKey: string;
+}) {
+  const { toast } = useToast();
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      console.log(`Sending order ${orderId} to producer ${producerId} (${label})`);
+
+      const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ producerId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao enviar para produção');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Sucesso!",
+        description: data.message || `Ordem de produção criada para ${label}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
+    },
+    onError: (error: any) => {
+      console.error(`Error sending to producer ${producerId}:`, error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao enviar para produção",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Button
+      key={`send-${uniqueKey}`}
+      size="sm"
+      variant="outline"
+      className="h-6 px-2 text-xs"
+      onClick={() => mutate()}
+      disabled={isPending}
+      title={`Enviar APENAS para ${label}`}
+    >
+      {isPending ? 'Enviando...' : `📤 ${label}`}
+    </Button>
+  );
+}
+
 
 export default function LogisticsDashboard() {
   const location = window.location.pathname; // Get current location
@@ -78,38 +140,38 @@ export default function LogisticsDashboard() {
 
 
   // Enviar pedido para produtor específico ou todos
-  const sendToProductionMutation = useMutation({
-    mutationFn: async ({ orderId, producerId }: { orderId: string; producerId?: string }) => {
-      const body: any = {};
-      if (producerId) {
-        body.producerId = producerId;
-      }
+  const sendAllToProductionMutation = useMutation({
+    mutationFn: async ({ orderId }: { orderId: string }) => {
+      console.log(`Sending order ${orderId} to ALL producers`);
 
       const response = await fetch(`/api/orders/${orderId}/send-to-production`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({}), // No producerId = send to all
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Erro ao enviar para produção");
       }
+
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
-      setShowSendToProductionModal(false);
-      setSelectedOrder(null);
       toast({
         title: "Sucesso!",
-        description: `Pedido enviado para produção. ${data.productionOrdersCreated || 1} ordem(ns) de produção criada(s) para: ${data.producerNames?.join(', ') || 'produtor selecionado'}`,
+        description: data.message || "Pedido enviado para produção",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
     },
     onError: (error: any) => {
+      console.error('Error sending to production:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao enviar pedido para produção",
+        description: error.message || "Erro ao enviar para produção",
         variant: "destructive",
       });
     },
@@ -152,7 +214,7 @@ export default function LogisticsDashboard() {
 
   const confirmSendToProduction = () => {
     if (selectedOrder) {
-      sendToProductionMutation.mutate({ orderId: selectedOrder.id });
+      sendAllToProductionMutation.mutate({ orderId: selectedOrder.id });
     }
   };
 
@@ -630,6 +692,11 @@ export default function LogisticsDashboard() {
                       groupClasses += " border-l-4 border-blue-300 bg-blue-25 border-b-2 border-blue-200";
                     }
 
+                    // Extrair produtores únicos para este pedido
+                    const uniqueProducers = order.producerItems ?
+                      Array.from(new Map(order.producerItems.map((item: any) => [item.producerId, { id: item.producerId, name: item.producerName }])).values()) :
+                      [];
+
                     return (
                       <tr key={order.uniqueKey} className={groupClasses}>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -704,48 +771,13 @@ export default function LogisticsDashboard() {
 
                             {/* Botão específico para enviar apenas para este produtor */}
                             {order.currentProducerId ? (
-                              <Button
-                                key={`send-btn-${order.uniqueKey}`}
-                                size="sm"
-                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  
-                                  // Verificar se já não está processando
-                                  if (sendToProductionMutation.isPending) {
-                                    console.log('Mutation já em andamento, ignorando clique');
-                                    return;
-                                  }
-                                  
-                                  // Verificar se este produtor específico já tem ordem de produção
-                                  const existingProductionOrder = productionOrders?.find(po => 
-                                    po.orderId === order.id && po.producerId === order.currentProducerId
-                                  );
-                                  
-                                  if (existingProductionOrder) {
-                                    console.log(`Produtor ${order.currentProducerName} já tem ordem de produção para este pedido`);
-                                    toast({
-                                      title: "Já enviado",
-                                      description: `Este produtor já tem uma ordem de produção para este pedido`,
-                                      variant: "destructive",
-                                    });
-                                    return;
-                                  }
-
-                                  console.log(`ENVIANDO ESPECÍFICO: pedido ${order.id} APENAS para produtor ${order.currentProducerId} (${order.currentProducerName})`);
-                                  
-                                  sendToProductionMutation.mutate({
-                                    orderId: order.id,
-                                    producerId: order.currentProducerId
-                                  });
-                                }}
-                                disabled={sendToProductionMutation.isPending}
-                                title={`Enviar APENAS para ${order.currentProducerName}`}
-                              >
-                                <Send className="h-4 w-4 mr-1" />
-                                {sendToProductionMutation.isPending ? 'Enviando...' : `📤 ${order.currentProducerName}`}
-                              </Button>
+                              <SendToProducerButton
+                                key={`send-${order.uniqueKey}-${order.currentProducerId}`}
+                                orderId={order.id}
+                                producerId={order.currentProducerId}
+                                label={order.currentProducerName}
+                                uniqueKey={`${order.uniqueKey}-${order.currentProducerId}`}
+                              />
                             ) : (
                               <span className="text-xs text-gray-500 italic">
                                 Sem produtores externos
@@ -871,7 +903,7 @@ export default function LogisticsDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  
+
                                   // Verificar se já não está processando
                                   if (dispatchOrderMutation.isPending) {
                                     console.log('Dispatch mutation já em andamento, ignorando clique');
@@ -975,10 +1007,10 @@ export default function LogisticsDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <Button 
+                              <Button
                                 key={`view-shipped-btn-${order.uniqueKey}`}
-                                variant="outline" 
-                                size="sm" 
+                                variant="outline"
+                                size="sm"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -1003,7 +1035,7 @@ export default function LogisticsDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  
+
                                   // Verificar se já não está processando
                                   if (confirmDeliveryMutation.isPending) {
                                     console.log('Confirm delivery mutation já em andamento, ignorando clique');
@@ -1107,10 +1139,10 @@ export default function LogisticsDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <Button 
+                              <Button
                                 key={`view-delivered-btn-${order.uniqueKey}`}
-                                variant="outline" 
-                                size="sm" 
+                                variant="outline"
+                                size="sm"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -1196,10 +1228,10 @@ export default function LogisticsDashboard() {
             </Button>
             <Button
               onClick={confirmSendToProduction}
-              disabled={sendToProductionMutation.isPending}
+              disabled={sendAllToProductionMutation.isPending}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              {sendToProductionMutation.isPending ? 'Processando...' : 'Confirmar Envio'}
+              {sendAllToProductionMutation.isPending ? 'Processando...' : 'Confirmar Envio'}
             </Button>
           </div>
         </DialogContent>
