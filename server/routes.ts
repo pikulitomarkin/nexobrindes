@@ -1481,15 +1481,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get production orders for shipping details
       const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-      
+
       // Get shipment details for partial/complete shipping
       const shipmentDetails = await Promise.all(
         productionOrders.map(async (po) => {
           const producer = await storage.getUser(po.producerId);
-          
+
           // Filter items for this specific producer
           const producerItems = budgetItems.filter(item => item.producerId === po.producerId);
-          
+
           return {
             producerId: po.producerId,
             producerName: producer?.name || 'Produtor Desconhecido',
@@ -4277,7 +4277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Also check if contactName matches user info (fallback for orders created from budgets)
+        // ContactName check for orders created from budgets
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
@@ -4348,11 +4348,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      // Validar personalizações antes de criar o orçamento - apenas logar alertas
+      // Validate customizations before creating the budget - only log warnings
       let customizationWarnings = [];
 
       if (req.body.items && req.body.items.length > 0) {
-        console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
+        console.log("Validating budget item customizations:", JSON.stringify(req.body.items, null, 2));
 
         for (const item of req.body.items) {
           console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
@@ -4365,13 +4365,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
               const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
 
-              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+              console.log(`Validation: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
 
               if (itemQty < minQty) {
-                console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando orçamento mesmo assim`);
+                console.log(`WARNING: ${itemQty} < ${minQty} - Saving budget anyway`);
                 customizationWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
               } else {
-                console.log(`APROVADO: ${itemQty} >= ${minQty}`);
+                console.log(`APPROVED: ${itemQty} >= ${minQty}`);
               }
             }
           }
@@ -4403,7 +4403,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {          totalPrice += (itemCustomizationValue * quantity);
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
         }
         if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
           totalPrice += (generalCustomizationValue * quantity);
@@ -4474,14 +4475,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       );
 
-      // Incluir alertas na resposta se existirem
+      // Include warnings in the response if any
       const response = {
         ...newBudget,
         warnings: customizationWarnings.length > 0 ? customizationWarnings : undefined
       };
 
       res.json(response);
-    } catch (error) {console.error("Error creating budget:", error);
+    } catch (error) {
+      console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
@@ -4512,7 +4514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
-        const generalCustomizationValue =typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
