@@ -812,6 +812,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get producer payments by producer ID
+  app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      console.log(`Fetching producer payments for producer: ${producerId}`);
+
+      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
+      console.log(`Found ${producerPayments.length} producer payments for producer ${producerId}`);
+
+      // Enrich with production order and order data
+      const enrichedPayments = await Promise.all(
+        producerPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          let order = null;
+
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            // Add clientName, orderNumber, product from order if available
+            clientName: order?.contactName || 'Cliente não encontrado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não informado'
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedPayments.length} enriched producer payments for producer ${producerId}`);
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments for producer:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments for producer" });
+    }
+  });
+
   // Get specific production order by ID
   app.get("/api/production-orders/:id", async (req, res) => {
     try {

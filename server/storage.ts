@@ -260,11 +260,6 @@ export interface IStorage {
   getQuoteRequestsByClient(clientId: string): Promise<any[]>;
   getQuoteRequestById(id: string): Promise<any>; // New method to get a quote request by its ID
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
-
-  // Logistics - Get paid orders that are ready to be sent to production
-  getPaidOrdersReadyForProduction(): Promise<Order[]>;
-  // Reconciliation - Get orders with remaining balance
-  getPendingOrdersForReconciliation(): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -3578,8 +3573,10 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    const payments = Array.from(this.producerPayments.values()).filter(p => p.producerId === producerId);
-    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const allPayments = Array.from(this.producerPayments.values());
+    const producerPayments = allPayments.filter(payment => payment.producerId === producerId);
+    console.log(`Storage: getProducerPaymentsByProducer for ${producerId} returning ${producerPayments.length} payments:`, producerPayments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
+    return producerPayments;
   }
 
   async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
