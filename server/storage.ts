@@ -3094,8 +3094,8 @@ export class MemStorage implements IStorage {
   }
 
   // Update account receivable
-  async updateAccountsReceivable(id: string, updates: any): Promise<any> {
-    console.log(`Updating receivable ${id} with updates:`, updates);
+  async updateAccountsReceivable(id: string, data: any): Promise<any> {
+    console.log(`Updating receivable ${id} with updates:`, data);
 
     // Find in manual receivables
     const receivables = await this.getManualReceivables();
@@ -3106,7 +3106,7 @@ export class MemStorage implements IStorage {
       const receivable = receivables[receivableIndex];
       const updatedReceivable = {
         ...receivable,
-        ...updates,
+        ...data,
         updatedAt: new Date()
       };
 
@@ -3123,7 +3123,7 @@ export class MemStorage implements IStorage {
     if (order) {
       // Update the order's paid value
       const currentPaidValue = parseFloat(order.paidValue || '0');
-      const additionalPayment = parseFloat(updates.receivedAmount || '0');
+      const additionalPayment = parseFloat(data.receivedAmount || '0');
       const newPaidValue = currentPaidValue + additionalPayment;
 
       const updatedOrder = await this.updateOrder(order.id, { paidValue: newPaidValue.toFixed(2) });
