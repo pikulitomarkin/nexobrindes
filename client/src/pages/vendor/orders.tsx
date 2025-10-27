@@ -1090,21 +1090,21 @@ export default function VendorOrders() {
                               </div>
                             </div>
                           </div>
+                        )}
+
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
+                            id={`general-customization-${index}`}
+                            checked={item.hasGeneralCustomization}
+                            onCheckedChange={(checked) => updateOrderItem(index, 'hasGeneralCustomization', checked)}
+                          />
+                          <Label htmlFor={`general-customization-${index}`} className="flex items-center gap-2">
+                            <Percent className="h-4 w-4" />
+                            Personalização Geral
+                          </Label>
                         </div>
 
-                            <div className="flex items-center space-x-2 mb-3">
-                              <Switch
-                                id={`general-customization-${index}`}
-                                checked={item.hasGeneralCustomization}
-                                onCheckedChange={(checked) => updateOrderItem(index, 'hasGeneralCustomization', checked)}
-                              />
-                              <Label htmlFor={`general-customization-${index}`} className="flex items-center gap-2">
-                                <Percent className="h-4 w-4" />
-                                Personalização Geral
-                              </Label>
-                            </div>
-
-                            {item.hasGeneralCustomization && (
+                        {item.hasGeneralCustomization && (
                               <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
@@ -1140,8 +1140,6 @@ export default function VendorOrders() {
                                   </p>
                                 </div>
                               </div>
-                            )}
-                          </div>
                         )}
 
                         <div className="flex items-center space-x-2 mb-3">

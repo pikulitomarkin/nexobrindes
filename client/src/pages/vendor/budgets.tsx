@@ -1119,8 +1119,15 @@ export default function VendorBudgets() {
                             </div>
                           </div>
                         )}
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Subtotal:</span>
+                          <span className="font-medium">
+                            R$ {calculateItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
 
