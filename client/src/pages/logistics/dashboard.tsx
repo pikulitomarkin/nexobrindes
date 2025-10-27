@@ -49,19 +49,13 @@ export default function LogisticsDashboard() {
 
   // Mutation para confirmar a entrega pelo cliente (agora feita pela logística)
   const confirmDeliveryMutation = useMutation({
-    mutationFn: async ({ productionOrderId, orderId, notes }: {
-      productionOrderId: string;
+    mutationFn: async ({ orderId }: {
       orderId: string;
-      notes: string;
     }) => {
-      const response = await fetch("/api/logistics/confirm-delivery", {
+      const response = await fetch(`/api/orders/${orderId}/confirm-delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productionOrderId,
-          orderId,
-          notes
-        })
+        body: JSON.stringify({})
       });
       if (!response.ok) throw new Error("Erro ao confirmar entrega");
       return response.json();
@@ -192,6 +186,11 @@ export default function LogisticsDashboard() {
     setDispatchNotes(`Produto despachado para ${clientName}`);
     setDispatchTrackingCode("");
     setShowDispatchModal(true);
+  };
+
+  const handleConfirmDelivery = (order: any) => {
+    const orderId = order.orderId || order.id;
+    confirmDeliveryMutation.mutate({ orderId });
   };
 
   const confirmDispatch = () => {
@@ -962,6 +961,22 @@ export default function LogisticsDashboard() {
                               }}>
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver {order.producerName ? 'Despacho' : 'Pedido'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!confirmDeliveryMutation.isPending) {
+                                    handleConfirmDelivery(order);
+                                  }
+                                }}
+                                disabled={confirmDeliveryMutation.isPending}
+                                title="Confirmar que o cliente recebeu o pedido"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                {confirmDeliveryMutation.isPending ? 'Confirmando...' : 'Confirmar Entrega'}
                               </Button>
                             </div>
                           </td>

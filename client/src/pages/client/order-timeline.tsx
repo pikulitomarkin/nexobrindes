@@ -197,7 +197,7 @@ export default function ClientOrderTimeline() {
                     <div>
                       <h3 className="text-lg font-semibold text-blue-900">Pedido Enviado!</h3>
                       <p className="text-blue-700">
-                        Seu pedido foi despachado e está a caminho. A confirmação de entrega será feita automaticamente pela nossa equipe de logística.
+                        Seu pedido foi despachado e está a caminho. A confirmação de entrega será feita pela nossa equipe de logística quando você receber o produto.
                       </p>
                     </div>
                   </div>
