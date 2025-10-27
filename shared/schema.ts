@@ -38,6 +38,7 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   clientId: varchar("client_id").references(() => clients.id),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id), // Filial do pedido (vem do vendedor)
   budgetId: varchar("budget_id").references(() => budgets.id),
   product: text("product").notNull(),
   description: text("description"),
@@ -144,9 +145,20 @@ export const commissionSettings = pgTable("commission_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const branches = pgTable("branches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  city: text("city").notNull(),
+  isHeadquarters: boolean("is_headquarters").default(false), // Para identificar a matriz
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id), // Referência à filial
   salesLink: text("sales_link").unique(),
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default('10.00'),
   isActive: boolean("is_active").default(true),
@@ -477,6 +489,7 @@ export const insertCustomizationOptionSchema = createInsertSchema(customizationO
 export const insertProducerPaymentSchema = createInsertSchema(producerPayments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteRequestItemSchema = createInsertSchema(quoteRequestItems).omit({ id: true, createdAt: true });
+export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -533,3 +546,5 @@ export type QuoteRequest = typeof quoteRequests.$inferSelect;
 export type InsertQuoteRequest = z.infer<typeof insertQuoteRequestSchema>;
 export type QuoteRequestItem = typeof quoteRequestItems.$inferSelect;
 export type InsertQuoteRequestItem = z.infer<typeof insertQuoteRequestItemSchema>;
+export type Branch = typeof branches.$inferSelect;
+export type InsertBranch = z.infer<typeof insertBranchSchema>;

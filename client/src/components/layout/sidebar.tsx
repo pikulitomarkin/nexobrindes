@@ -21,6 +21,7 @@ import {
   Store,
   Hammer,
   Palette,
+  Building2,
 } from "lucide-react";
 
 import { useLocation } from "wouter";
@@ -169,6 +170,13 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 path="/admin/vendors"
                 isActive={pathname === '/admin/vendors'}
                 onClick={() => navigate('/admin/vendors')}
+              />
+              <SidebarItem
+                icon={<Building2 className="h-5 w-5" />}
+                label="Filiais"
+                path="/admin/branches"
+                isActive={pathname === '/admin/branches'}
+                onClick={() => navigate('/admin/branches')}
               />
               <SidebarItem
                 icon={<UserCheck className="h-5 w-5" />}

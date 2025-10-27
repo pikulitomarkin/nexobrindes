@@ -16,9 +16,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const vendorFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -27,6 +28,7 @@ const vendorFormSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
+  branchId: z.string().optional(),
 });
 
 type VendorFormValues = z.infer<typeof vendorFormSchema>;
@@ -56,6 +58,10 @@ export default function AdminVendors() {
     queryKey: ["/api/vendors"],
   });
 
+  const { data: branches } = useQuery({
+    queryKey: ["/api/branches"],
+  });
+
   const { data: vendorOrders } = useQuery({
     queryKey: ["/api/vendors", selectedVendorId, "orders"],
     queryFn: async () => {
@@ -76,6 +82,7 @@ export default function AdminVendors() {
       phone: "",
       address: "",
       commissionRate: "10.00",
+      branchId: "",
     },
   });
 
@@ -88,7 +95,8 @@ export default function AdminVendors() {
         address: data.address || null,
         password: data.password,
         userCode: userCode,
-        commissionRate: data.commissionRate
+        commissionRate: data.commissionRate,
+        branchId: data.branchId || null
       };
       const response = await fetch("/api/vendors", {
         method: "POST",
@@ -260,6 +268,44 @@ export default function AdminVendors() {
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="10.00" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="branchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Filial</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a filial" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Matriz (Padrão)</SelectItem>
+                          {branches?.map((branch: any) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              <div className="flex items-center">
+                                {branch.isHeadquarters ? (
+                                  <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                                ) : (
+                                  <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                                )}
+                                {branch.name} - {branch.city}
+                                {branch.isHeadquarters && (
+                                  <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                    Matriz
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

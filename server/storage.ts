@@ -48,8 +48,13 @@ import {
   // Producer Payment types
   type ProducerPayment,
   type InsertProducerPayment,
+  // Branch types
+  type Branch,
+  type InsertBranch,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm"; // Assuming drizzle-orm is used for DB operations
+import { db } from "./db"; // Assuming db connection is set up here
 
 // Helper function to generate IDs (replace with a more robust solution if needed)
 function generateId(prefix: string) {
@@ -260,6 +265,13 @@ export interface IStorage {
   getQuoteRequestsByClient(clientId: string): Promise<any[]>;
   getQuoteRequestById(id: string): Promise<any>; // New method to get a quote request by its ID
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
+
+  // Branches
+  getBranches(): Promise<Branch[]>;
+  getBranch(id: string): Promise<Branch | null>;
+  createBranch(branchData: InsertBranch): Promise<Branch>;
+  updateBranch(id: string, updateData: Partial<Branch>): Promise<Branch | null>;
+  deleteBranch(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -277,6 +289,7 @@ export class MemStorage implements IStorage {
   private budgetPhotos: Map<string, any>; // Changed to Map
   private producerPayments: Map<string, ProducerPayment>; // Added for producer payments
   private quoteRequests: any[] = []; // Added for quote requests
+  private branches: Map<string, Branch>; // Add map for branches
 
   // Financial module storage
   private accountsReceivable: Map<string, AccountsReceivable>;
@@ -405,6 +418,7 @@ export class MemStorage implements IStorage {
     this.budgetItems = new Map(); // Initialize as Map
     this.budgetPhotos = new Map(); // Initialize as Map
     this.producerPayments = new Map(); // Initialize producerPayments Map
+    this.branches = new Map(); // Initialize branches Map
 
     // Initialize financial module Maps
     this.accountsReceivable = new Map();
@@ -1022,6 +1036,49 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).filter(user => user.role === 'vendor');
   }
 
+  async getVendor(userId: string): Promise<Vendor | undefined> {
+    return Array.from(this.vendors.values()).find(vendor => vendor.userId === userId);
+  }
+
+  async createVendor(vendorData: any): Promise<User> {
+    // Create user first
+    const newUser: User = {
+      id: randomUUID(),
+      username: vendorData.username,
+      password: vendorData.password || "123456",
+      role: 'vendor',
+      name: vendorData.name,
+      email: vendorData.email || null,
+      phone: vendorData.phone || null,
+      address: vendorData.address || null,
+      specialty: vendorData.specialty || null,
+      vendorId: null,
+      isActive: true
+    };
+
+    this.users.set(newUser.id, newUser);
+
+    // Create vendor profile
+    const vendorProfile: Vendor = {
+      id: randomUUID(),
+      userId: newUser.id,
+      branchId: vendorData.branchId || null, // Assign branchId
+      salesLink: vendorData.salesLink || null,
+      commissionRate: vendorData.commissionRate || "10.00",
+      isActive: true
+    };
+
+    this.vendors.set(vendorProfile.id, vendorProfile);
+    return newUser;
+  }
+
+  async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
+    const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
+    if (vendor) {
+      const updatedVendor = { ...vendor, commissionRate };
+      this.vendors.set(vendor.id, updatedVendor);
+    }
+  }
 
   // Client methods
   async getClients(): Promise<Client[]> {
@@ -1949,50 +2006,6 @@ export class MemStorage implements IStorage {
           this.commissions.set(commission.id, commission);
         }
       }
-    }
-  }
-
-  // Vendor methods
-  async getVendor(userId: string): Promise<Vendor | undefined> {
-    return Array.from(this.vendors.values()).find(vendor => vendor.userId === userId);
-  }
-
-  async createVendor(vendorData: any): Promise<User> {
-    // Create user first
-    const newUser: User = {
-      id: randomUUID(),
-      username: vendorData.username,
-      password: vendorData.password || "123456",
-      role: 'vendor',
-      name: vendorData.name,
-      email: vendorData.email || null,
-      phone: vendorData.phone || null,
-      address: vendorData.address || null,
-      specialty: vendorData.specialty || null,
-      vendorId: null,
-      isActive: true
-    };
-
-    this.users.set(newUser.id, newUser);
-
-    // Create vendor profile
-    const vendorProfile: Vendor = {
-      id: randomUUID(),
-      userId: newUser.id,
-      salesLink: vendorData.salesLink || null,
-      commissionRate: vendorData.commissionRate || "10.00",
-      isActive: true
-    };
-
-    this.vendors.set(vendorProfile.id, vendorProfile);
-    return newUser;
-  }
-
-  async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
-    const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
-    if (vendor) {
-      const updatedVendor = { ...vendor, commissionRate };
-      this.vendors.set(vendor.id, updatedVendor);
     }
   }
 
@@ -3964,6 +3977,51 @@ export class MemStorage implements IStorage {
 
     console.log(`Storage: Found ${pendingOrders.length} pending orders for reconciliation`);
     return pendingOrders;
+  }
+
+  // Branch CRUD operations
+  async getBranches(): Promise<Branch[]> {
+    return Array.from(this.branches.values());
+  }
+
+  async getBranch(id: string): Promise<Branch | null> {
+    return this.branches.get(id) || null;
+  }
+
+  async createBranch(branchData: InsertBranch): Promise<Branch> {
+    const id = randomUUID();
+    const newBranch: Branch = {
+      id,
+      ...branchData,
+      isHeadquarters: branchData.isHeadquarters || false,
+      isActive: branchData.isActive !== undefined ? branchData.isActive : true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.branches.set(id, newBranch);
+    console.log('Branch created:', newBranch);
+    return newBranch;
+  }
+
+  async updateBranch(id: string, updateData: Partial<Branch>): Promise<Branch | null> {
+    const branch = this.branches.get(id);
+    if (!branch) {
+      console.error('Branch not found for update:', id);
+      return null;
+    }
+
+    const updatedBranch = {
+      ...branch,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    this.branches.set(id, updatedBranch);
+    console.log('Branch updated:', updatedBranch);
+    return updatedBranch;
+  }
+
+  async deleteBranch(id: string): Promise<boolean> {
+    return this.branches.delete(id);
   }
 }
 

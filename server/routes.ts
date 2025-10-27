@@ -1272,11 +1272,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Filtered ${orderData.items.length} items down to ${uniqueItems.length} unique items`);
       }
 
+      // Get vendor's branch info
+      const vendor = await storage.getVendor(orderData.vendorId);
+      const vendorBranchId = vendor?.branchId || null;
+
       // Create order with contact name as primary identifier and proper items handling
       const newOrder = await storage.createOrder({
         orderNumber,
         clientId: finalClientId, // Can be null if no client selected
         vendorId: orderData.vendorId,
+        branchId: vendorBranchId, // Associate order with vendor's branch
         budgetId: orderData.budgetId || null,
         product: orderData.product || orderData.title,
         description: orderData.description || "",
@@ -1982,6 +1987,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating producer:', error);
       res.status(500).json({ error: "Failed to create producer: " + error.message });
+    }
+  });
+
+  // Branches
+  app.get("/api/branches", async (req, res) => {
+    try {
+      const branches = await storage.getBranches();
+      res.json(branches);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+      res.status(500).json({ error: "Failed to fetch branches" });
+    }
+  });
+
+  app.post("/api/branches", async (req, res) => {
+    try {
+      const branchData = req.body;
+      console.log("Creating branch:", branchData);
+
+      // Validate required fields
+      if (!branchData.name || !branchData.city) {
+        return res.status(400).json({ error: "Nome e cidade são obrigatórios" });
+      }
+
+      const newBranch = await storage.createBranch(branchData);
+      res.json(newBranch);
+    } catch (error) {
+      console.error("Error creating branch:", error);
+      res.status(500).json({ error: "Failed to create branch" });
+    }
+  });
+
+  app.put("/api/branches/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      console.log(`Updating branch ${id}:`, updateData);
+
+      const updatedBranch = await storage.updateBranch(id, updateData);
+      if (!updatedBranch) {
+        return res.status(404).json({ error: "Filial não encontrada" });
+      }
+
+      res.json(updatedBranch);
+    } catch (error) {
+      console.error("Error updating branch:", error);
+      res.status(500).json({ error: "Failed to update branch" });
+    }
+  });
+
+  app.get("/api/branches/:id", async (req, res) => {
+    try {
+      const branch = await storage.getBranch(req.params.id);
+      if (!branch) {
+        return res.status(404).json({ error: "Filial não encontrada" });
+      }
+      res.json(branch);
+    } catch (error) {
+      console.error("Error fetching branch:", error);
+      res.status(500).json({ error: "Failed to fetch branch" });
     }
   });
 

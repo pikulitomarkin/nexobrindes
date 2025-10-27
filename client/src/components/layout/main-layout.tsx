@@ -17,7 +17,8 @@ import {
   MessageCircle,
   BarChart3, // Added BarChart3 icon
   Calculator, // Added Calculator icon
-  User // Added User icon
+  User, // Added User icon
+  Building2 // Added Building2 icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -61,8 +62,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/producers", icon: Factory, label: "Produtores" },
           { href: "/admin/clients", icon: Users, label: "Clientes" },
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
-          { href: "/admin/orders", icon: ClipboardList, label: "Pedidos" },
-          { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
+          { href: "/admin/branches", icon: Building2, label: "Filiais" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
           { href: "/admin/reports", icon: FileText, label: "Relatórios" },
           { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },

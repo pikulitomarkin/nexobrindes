@@ -152,13 +152,14 @@ function App() {
                   <Route path="/admin/orders" component={AdminOrders} />
                   <Route path="/admin/budgets" component={AdminBudgets} />
                   <Route path="/admin/clients" component={AdminClients} />
-                  <Route path="/admin/vendors" component={AdminVendors} />
+                  <Route path="/admin/vendors" component={() => import("./pages/admin/vendors")} />
+                  <Route path="/admin/branches" component={() => import("./pages/admin/branches")} />
+                  <Route path="/admin/partners" component={() => import("./pages/admin/partners")} />
                   <Route path="/admin/producers" component={AdminProducers} />
                   <Route path="/admin/products" component={AdminProducts} />
                   <Route path="/admin/settings" component={AdminSettings} />
                   <Route path="/admin/commission-management" component={AdminCommissionManagement} />
                   <Route path="/admin/commission-settings" component={AdminCommissionSettings} />
-                  <Route path="/admin/partners" component={AdminPartners} />
                   <Route path="/admin/users" component={AdminUsers} />
                   <Route path="/admin/reports" component={AdminReports} />
                   <Route path="/admin/producer-payments" component={AdminProducerPayments} />
