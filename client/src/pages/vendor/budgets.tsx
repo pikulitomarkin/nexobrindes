@@ -802,7 +802,22 @@ export default function VendorBudgets() {
                     id="budget-validUntil"
                     type="date"
                     value={vendorBudgetForm.validUntil}
-                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, validUntil: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      const today = new Date().toISOString().split('T')[0];
+                      
+                      if (selectedDate < today) {
+                        toast({
+                          title: "Data Inválida",
+                          description: "A data 'Válido Até' não pode ser anterior à data de hoje.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      setVendorBudgetForm({ ...vendorBudgetForm, validUntil: selectedDate });
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
                     required
                   />
                 </div>
@@ -812,7 +827,22 @@ export default function VendorBudgets() {
                     id="budget-deliveryDeadline"
                     type="date"
                     value={vendorBudgetForm.deliveryDeadline || ""}
-                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      const today = new Date().toISOString().split('T')[0];
+                      
+                      if (selectedDate < today) {
+                        toast({
+                          title: "Data Inválida",
+                          description: "O prazo de entrega não pode ser anterior à data de hoje.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: selectedDate });
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
                     required
                   />
                 </div>

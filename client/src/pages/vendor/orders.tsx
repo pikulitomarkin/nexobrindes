@@ -855,7 +855,21 @@ export default function VendorOrders() {
                     id="order-deadline"
                     type="date"
                     value={vendorOrderForm.deadline}
-                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deadline: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      const today = new Date().toISOString().split('T')[0];
+                      
+                      if (selectedDate < today) {
+                        toast({
+                          title: "Data Inválida",
+                          description: "O prazo de produção não pode ser anterior à data de hoje.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      setVendorOrderForm({ ...vendorOrderForm, deadline: selectedDate });
+                    }}
                     min={new Date().toISOString().split('T')[0]}
                     required
                   />
@@ -866,7 +880,21 @@ export default function VendorOrders() {
                     id="order-deliveryDeadline"
                     type="date"
                     value={vendorOrderForm.deliveryDeadline || ""}
-                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      const today = new Date().toISOString().split('T')[0];
+                      
+                      if (selectedDate < today) {
+                        toast({
+                          title: "Data Inválida",
+                          description: "O prazo de entrega não pode ser anterior à data de hoje.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: selectedDate });
+                    }}
                     min={new Date().toISOString().split('T')[0]}
                     required
                   />
