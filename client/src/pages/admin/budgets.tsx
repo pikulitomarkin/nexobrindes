@@ -708,11 +708,11 @@ export default function AdminBudgets() {
                                 placeholder="Observações extras sobre a personalização..."
                               />
                             </div>
-                          </div>
-                        )}
 
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Switch
+                            <Separator className="my-4" />
+
+                            <div className="flex items-center space-x-2 mb-3">
+                              <Switch
                                 id={`admin-general-customization-${index}`}
                                 checked={item.hasGeneralCustomization}
                                 onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasGeneralCustomization', checked)}
@@ -721,9 +721,9 @@ export default function AdminBudgets() {
                                 <Percent className="h-4 w-4" />
                                 Personalização Geral
                               </Label>
-                        </div>
+                            </div>
 
-                        {item.hasGeneralCustomization && (
+                            {item.hasGeneralCustomization && (
                               <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
@@ -759,6 +759,8 @@ export default function AdminBudgets() {
                                   </p>
                                 </div>
                               </div>
+                            )}
+                          </div>
                         )}
 
                         <div className="flex justify-between items-center text-sm">

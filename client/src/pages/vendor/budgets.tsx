@@ -1067,56 +1067,58 @@ export default function VendorBudgets() {
                                 )}
                               </div>
                             </div>
-                          </div>
-                        )}
 
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Switch
-                            id={`general-customization-${index}`}
-                            checked={item.hasGeneralCustomization}
-                            onCheckedChange={(checked) => updateBudgetItem(index, 'hasGeneralCustomization', checked)}
-                          />
-                          <Label htmlFor={`general-customization-${index}`} className="flex items-center gap-2">
-                            <Percent className="h-4 w-4" />
-                            Personalização Geral
-                          </Label>
-                        </div>
+                            <Separator className="my-4" />
 
-                        {item.hasGeneralCustomization && (
-                          <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label htmlFor={`general-customization-name-${index}`}>Nome da Personalização</Label>
-                                <Input
-                                  id={`general-customization-name-${index}`}
-                                  value={item.generalCustomizationName || ''}
-                                  onChange={(e) => updateBudgetItem(index, 'generalCustomizationName', e.target.value)}
-                                  placeholder="Ex: Bordado, Gravação, etc."
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor={`general-customization-value-${index}`}>Valor Unitário (R$)</Label>
-                                <Input
-                                  id={`general-customization-value-${index}`}
-                                  value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
-                                  onChange={(e) => {
-                                    const value = parseCurrencyValue(e.target.value);
-                                    updateBudgetItem(index, 'generalCustomizationValue', value);
-                                  }}
-                                  placeholder="R$ 0,00"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <Label>Total da Personalização Geral</Label>
-                              <Input
-                                value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                disabled
+                            <div className="flex items-center space-x-2 mb-3">
+                              <Switch
+                                id={`general-customization-${index}`}
+                                checked={item.hasGeneralCustomization}
+                                onCheckedChange={(checked) => updateBudgetItem(index, 'hasGeneralCustomization', checked)}
                               />
-                              <p className="text-xs text-gray-500 mt-1">
-                                {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
+                              <Label htmlFor={`general-customization-${index}`} className="flex items-center gap-2">
+                                <Percent className="h-4 w-4" />
+                                Personalização Geral
+                              </Label>
                             </div>
+
+                            {item.hasGeneralCustomization && (
+                              <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label htmlFor={`general-customization-name-${index}`}>Nome da Personalização</Label>
+                                    <Input
+                                      id={`general-customization-name-${index}`}
+                                      value={item.generalCustomizationName || ''}
+                                      onChange={(e) => updateBudgetItem(index, 'generalCustomizationName', e.target.value)}
+                                      placeholder="Ex: Bordado, Gravação, etc."
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label htmlFor={`general-customization-value-${index}`}>Valor Unitário (R$)</Label>
+                                    <Input
+                                      id={`general-customization-value-${index}`}
+                                      value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
+                                      onChange={(e) => {
+                                        const value = parseCurrencyValue(e.target.value);
+                                        updateBudgetItem(index, 'generalCustomizationValue', value);
+                                      }}
+                                      placeholder="R$ 0,00"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label>Total da Personalização Geral</Label>
+                                  <Input
+                                    value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    disabled
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 

@@ -6,6 +6,11 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 27, 2025**
+- **UI CONSOLIDATION**: "Personalização Geral" foi movida para dentro de "Personalização do Item" criando interface mais limpa com apenas 1 toggle
+- Estrutura consolidada aplicada em admin/budgets.tsx, vendor/orders.tsx e vendor/budgets.tsx
+- Divisão visual com Separator entre personalização do item e personalização geral
+
 **October 22, 2025**
 - **OFX PARSER CORRIGIDO**: Substituído parsing regex por biblioteca node-ofx-parser robusta
 - Corrigido caminho de acesso: ofxData.OFX (não ofxData.body.OFX) - parser retorna estrutura diretamente
