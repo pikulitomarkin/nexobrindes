@@ -1294,28 +1294,56 @@ export class MemStorage implements IStorage {
   }
 
   async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
-    const id = randomUUID();
-    const client: Client & { userCode?: string } = {
-      ...clientData,
-      id,
-      vendorId: clientData.vendorId || null,
-      userId: clientData.userId || null,
-      email: clientData.email || null,
-      phone: clientData.phone || null,
-      whatsapp: clientData.whatsapp || null,
-      cpfCnpj: clientData.cpfCnpj || null,
-      address: clientData.address || null,
-      userCode: (clientData as any).userCode || null,
-      isActive: clientData.isActive !== undefined ? clientData.isActive : true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    try {
+      console.log("Storage: createClient called with data:", clientData);
+      
+      if (!clientData.name) {
+        throw new Error("Nome é obrigatório");
+      }
+      
+      if (!clientData.password) {
+        throw new Error("Senha é obrigatória");
+      }
+      
+      const id = randomUUID();
+      const client: Client & { userCode?: string } = {
+        ...clientData,
+        id,
+        vendorId: clientData.vendorId || null,
+        userId: clientData.userId || null,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        whatsapp: clientData.whatsapp || null,
+        cpfCnpj: clientData.cpfCnpj || null,
+        address: clientData.address || null,
+        userCode: (clientData as any).userCode || null,
+        isActive: clientData.isActive !== undefined ? clientData.isActive : true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
-    this.clients.set(id, client);
-    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
-    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
-    return client;
+      console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, {
+        id: client.id,
+        name: client.name,
+        vendorId: client.vendorId,
+        userCode: client.userCode
+      });
+      
+      this.clients.set(id, client);
+      console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
+      
+      const retrieved = this.clients.get(id);
+      console.log(`Storage: Can retrieve client: ${retrieved !== undefined}`);
+      
+      if (!retrieved) {
+        throw new Error("Falha ao salvar cliente");
+      }
+      
+      return client;
+    } catch (error) {
+      console.error("Storage: Error in createClient:", error);
+      throw error;
+    }
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {

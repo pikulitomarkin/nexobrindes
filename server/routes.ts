@@ -1,3 +1,104 @@
-[
-  {"op": "replace", "path": "/api/receivables/:id/payment", "value": "  app.post(\"/api/receivables/:id/payment\", async (req, res) => {\n    try {\n      const { id } = req.params;\n      const { amount, method, transactionId, notes } = req.body;\n\n      console.log(\"Processing receivables payment:\", { id, amount, method, transactionId });\n\n      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {\n        return res.status(400).json({ error: \"Valor deve ser maior que zero\" });\n      }\n\n      // Check if this is a manual receivable or order-based\n      const receivables = await storage.getAccountsReceivable();\n      const receivable = receivables.find(r => r.id === id);\n\n      if (!receivable) {\n        return res.status(404).json({ error: \"Conta a receber não encontrada\" });\n      }\n\n      let paymentRecord;\n\n      // If orderId exists, it's a payment for an order\n      if (receivable.orderId) {\n        console.log(`Processing receivables payment: ${JSON.stringify({ id: receivableId, amount: paymentAmount, method, transactionId })}`);\n\n        // Create payment record for the order with special flag to prevent automatic order update\n        const payment = await storage.createPayment({\n          orderId: receivable.orderId,\n          amount: paymentAmount,\n          method: method || 'manual',\n          status: 'confirmed',\n          transactionId: transactionId || `MANUAL-${Date.now()}`,\n          paidAt: new Date(),\n          reconciliationStatus: 'manual',\n          bankTransactionId: null,\n          notes: notes || '',\n          __skipOrderUpdate: true // Flag to prevent automatic order update\n        });\n\n        console.log(`Payment processed successfully:`, payment);\n\n        // Get all payments for this order to calculate correct total\n        const allPayments = await storage.getPaymentsByOrder(receivable.orderId);\n        const confirmedPayments = allPayments.filter(p => p.status === 'confirmed');\n        const totalPaid = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);\n\n        // Update order paid value manually with correct total\n        await storage.updateOrder(receivable.orderId, {\n          paidValue: totalPaid.toFixed(2),\n          __origin: 'receivables' // Mark as coming from receivables to prevent totalValue changes\n        });\n\n        // Update the receivable with correct amounts\n        const totalAmount = parseFloat(receivable.amount);\n        let newStatus = 'pending';\n\n        if (totalPaid >= totalAmount) {\n          newStatus = 'paid';\n        } else if (totalPaid > 0) {\n          const minPayment = parseFloat(receivable.minimumPayment || '0');\n          if (minPayment > 0 && totalPaid >= minPayment) {\n            newStatus = 'partial';\n          } else if (minPayment > 0 && totalPaid < minPayment) {\n            newStatus = 'pending';\n          } else {\n            newStatus = 'partial';\n          }\n        }\n\n        await storage.updateAccountsReceivable(receivableId, {\n          receivedAmount: totalPaid.toFixed(2),\n          status: newStatus\n        });\n\n        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${paymentAmount} added. TotalValue=${totalAmount} (unchanged), PaidValue=${totalPaid}, Remaining=${totalAmount - totalPaid}`);\n\n        return payment;\n      } else {\n        // This is a manual receivable - update the receivable directly\n        const currentReceived = parseFloat(receivable.receivedAmount || '0');\n        const newReceivedAmount = currentReceived + parseFloat(amount);\n\n        await storage.updateAccountsReceivable(id, {\n          receivedAmount: newReceivedAmount.toFixed(2),\n          status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'\n        });\n\n        paymentRecord = {\n          id: `payment-${Date.now()}`,\n          amount: parseFloat(amount).toFixed(2),\n          method: method || \"manual\",\n          transactionId: transactionId || `MANUAL-${Date.now()}`,\n          notes: notes || \"\",\n          paidAt: new Date()\n        };\n      }\n\n      console.log(\"Payment processed successfully:\", paymentRecord);\n      res.json({ success: true, payment: paymentRecord });\n    } catch (error) {\n      console.error(\"Error processing receivables payment:\", error);\n      res.status(500).json({ error: \"Erro ao processar pagamento: \" + error.message });\n    }\n  });"}
-]
+app.post("/api/receivables/:id/payment", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, method, transactionId, notes } = req.body;
+
+      console.log("Processing receivables payment:", { id, amount, method, transactionId });
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      // Check if this is a manual receivable or order-based
+      const receivables = await storage.getAccountsReceivable();
+      const receivable = receivables.find(r => r.id === id);
+
+      if (!receivable) {
+        return res.status(404).json({ error: "Conta a receber não encontrada" });
+      }
+
+      let paymentRecord;
+
+      // If orderId exists, it's a payment for an order
+      if (receivable.orderId) {
+        console.log(`Processing receivables payment: ${JSON.stringify({ id: receivableId, amount: paymentAmount, method, transactionId })}`);
+
+        // Create payment record for the order with special flag to prevent automatic order update
+        const payment = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: paymentAmount,
+          method: method || 'manual',
+          status: 'confirmed',
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          paidAt: new Date(),
+          reconciliationStatus: 'manual',
+          bankTransactionId: null,
+          notes: notes || '',
+          __skipOrderUpdate: true // Flag to prevent automatic order update
+        });
+
+        console.log(`Payment processed successfully:`, payment);
+
+        // Get all payments for this order to calculate correct total
+        const allPayments = await storage.getPaymentsByOrder(receivable.orderId);
+        const confirmedPayments = allPayments.filter(p => p.status === 'confirmed');
+        const totalPaid = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        // Update order paid value manually with correct total
+        await storage.updateOrder(receivable.orderId, {
+          paidValue: totalPaid.toFixed(2),
+          __origin: 'receivables' // Mark as coming from receivables to prevent totalValue changes
+        });
+
+        // Update the receivable with correct amounts
+        const totalAmount = parseFloat(receivable.amount);
+        let newStatus = 'pending';
+
+        if (totalPaid >= totalAmount) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
+          const minPayment = parseFloat(receivable.minimumPayment || '0');
+          if (minPayment > 0 && totalPaid >= minPayment) {
+            newStatus = 'partial';
+          } else if (minPayment > 0 && totalPaid < minPayment) {
+            newStatus = 'pending';
+          } else {
+            newStatus = 'partial';
+          }
+        }
+
+        await storage.updateAccountsReceivable(receivableId, {
+          receivedAmount: totalPaid.toFixed(2),
+          status: newStatus
+        });
+
+        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${paymentAmount} added. TotalValue=${totalAmount} (unchanged), PaidValue=${totalPaid}, Remaining=${totalAmount - totalPaid}`);
+
+        return payment;
+      } else {
+        // This is a manual receivable - update the receivable directly
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + parseFloat(amount);
+
+        await storage.updateAccountsReceivable(id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'
+        });
+
+        paymentRecord = {
+          id: `payment-${Date.now()}`,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        };
+      }
+
+      console.log("Payment processed successfully:", paymentRecord);
+      res.json({ success: true, payment: paymentRecord });
+    } catch (error) {
+      console.error("Error processing receivables payment:", error);
+      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+    }
+  });

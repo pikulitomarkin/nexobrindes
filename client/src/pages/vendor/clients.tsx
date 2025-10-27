@@ -90,22 +90,34 @@ export default function VendorClients() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
+      console.log("Creating client with data:", { ...data, userCode, vendorId });
+      
       const clientData = {
         ...data,
         userCode: userCode,
         vendorId: vendorId
       };
+      
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
       });
-      if (!response.ok) throw new Error("Erro ao criar cliente");
-      return response.json();
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Client creation error:", errorData);
+        throw new Error(`Erro ao criar cliente: ${errorData}`);
+      }
+      
+      const result = await response.json();
+      console.log("Client created successfully:", result);
+      return result;
     },
     onSuccess: (newClient) => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
       form.reset();
@@ -122,6 +134,14 @@ export default function VendorClients() {
           duration: 10000,
         });
       }, 1000);
+    },
+    onError: (error) => {
+      console.error("Error creating client:", error);
+      toast({
+        title: "Erro!",
+        description: error.message || "Erro ao criar cliente",
+        variant: "destructive",
+      });
     },
   });
 
