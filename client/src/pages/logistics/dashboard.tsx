@@ -229,7 +229,7 @@ export default function LogisticsDashboard() {
   // Expandir pedidos pagos por produtor - cada produtor vira uma linha separada
   const expandPaidOrdersByProducer = (orders: any[]) => {
     const expandedOrders: any[] = [];
-    
+
     orders?.forEach((order: any) => {
       if (order.items && Array.isArray(order.items)) {
         // Agrupar itens por produtor
@@ -322,7 +322,7 @@ export default function LogisticsDashboard() {
   const expandProductionOrdersByProducer = (orders: any[]) => {
     // Como os pedidos em produção já são separados por produtor, apenas adicionar info de agrupamento
     const expandedOrders: any[] = [];
-    
+
     // Agrupar por orderId para identificar pedidos multi-produtor
     const orderGroups = new Map();
     orders?.forEach((productionOrder: any) => {
@@ -336,7 +336,7 @@ export default function LogisticsDashboard() {
     // Processar cada grupo
     orderGroups.forEach((group: any[], orderId: string) => {
       const isMultiProducer = group.length > 1;
-      
+
       group.forEach((productionOrder: any, index: number) => {
         expandedOrders.push({
           ...productionOrder,
@@ -587,7 +587,7 @@ export default function LogisticsDashboard() {
                     const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
                     const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
                     const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
-                    
+
                     let groupClasses = "hover:bg-gray-50";
                     if (isFirstInGroup) {
                       groupClasses += " border-t-4 border-blue-500 bg-blue-50";
@@ -699,7 +699,6 @@ export default function LogisticsDashboard() {
                     );
                   })}
                 </tbody>
-                </tbody>
               </table>
             </div>
           </CardContent>
@@ -734,7 +733,7 @@ export default function LogisticsDashboard() {
                     const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
                     const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
                     const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
-                    
+
                     let groupClasses = "hover:bg-gray-50";
                     if (isFirstInGroup) {
                       groupClasses += " border-t-4 border-purple-500 bg-purple-50";
@@ -821,7 +820,6 @@ export default function LogisticsDashboard() {
                     );
                   })}
                 </tbody>
-                </tbody>
               </table>
             </div>
           </CardContent>
@@ -857,7 +855,7 @@ export default function LogisticsDashboard() {
                       const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
                       const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
                       const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
-                      
+
                       let groupClasses = "hover:bg-gray-50";
                       if (isFirstInGroup) {
                         groupClasses += " border-t-4 border-cyan-500 bg-cyan-50";
@@ -923,7 +921,6 @@ export default function LogisticsDashboard() {
                       );
                     });
                   })()}
-                </tbody>
                 </tbody>
               </table>
             </div>
@@ -1121,14 +1118,14 @@ export default function LogisticsDashboard() {
               {(() => {
                 // Definir quais itens mostrar baseado na estrutura do pedido
                 let itemsToShow = selectedOrder.items || selectedOrder.order?.items || [];
-                
+
                 // Se estamos visualizando um produtor específico, filtrar apenas seus itens
                 if (selectedOrder.viewingProducer) {
                   itemsToShow = itemsToShow.filter((item: any) => 
                     item.producerId === selectedOrder.viewingProducer
                   );
                 }
-                
+
                 return itemsToShow && itemsToShow.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -1149,11 +1146,11 @@ export default function LogisticsDashboard() {
                         const isExternal = item.producerId && item.producerId !== 'internal';
                         const isCurrentProducer = selectedOrder.viewingProducer && 
                           item.producerId === selectedOrder.viewingProducer;
-                        
+
                         // Cores diferentes para destacar o produtor atual
                         let borderColor = 'border-gray-200';
                         let bgColor = 'bg-gray-50';
-                        
+
                         if (isCurrentProducer) {
                           borderColor = 'border-purple-300';
                           bgColor = 'bg-purple-50';
@@ -1161,7 +1158,7 @@ export default function LogisticsDashboard() {
                           borderColor = 'border-orange-200';
                           bgColor = 'bg-orange-50';
                         }
-                        
+
                         return (
                           <div key={`${item.id || index}-${item.productName || 'item'}`} 
                                className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
@@ -1247,7 +1244,7 @@ export default function LogisticsDashboard() {
                         );
                       })}
                     </div>
-                    
+
                     {/* Resumo de valor para o produtor específico */}
                     {selectedOrder.viewingProducer && selectedOrder.producerValue && (
                       <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
