@@ -139,13 +139,7 @@ export default function VendorQuoteRequests() {
             >
               Pendentes ({quoteRequests?.filter((r: any) => r.status === "pending").length || 0})
             </Button>
-            <Button
-              variant={statusFilter === "reviewing" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter("reviewing")}
-            >
-              Em Análise ({quoteRequests?.filter((r: any) => r.status === "reviewing").length || 0})
-            </Button>
+            
             <Button
               variant={statusFilter === "quoted" ? "default" : "outline"}
               size="sm"
@@ -288,29 +282,6 @@ export default function VendorQuoteRequests() {
                       >
                         <X className="h-4 w-4 mr-1" />
                         Rejeitar
-                      </Button>
-                    </>
-                  )}
-
-                  {request.status === 'reviewing' && (
-                    <>
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
-                        onClick={() => convertToBudgetMutation.mutate(request.id)}
-                        disabled={convertToBudgetMutation.isPending}
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        {convertToBudgetMutation.isPending ? 'Convertendo...' : 'Converter em Orçamento'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'quoted' })}
-                        disabled={updateStatusMutation.isPending}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Finalizar Análise
                       </Button>
                     </>
                   )}
