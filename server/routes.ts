@@ -2959,6 +2959,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: notes || "",
           paidAt: new Date()
         });
+
+        // CRITICAL FIX: Update receivedAmount in accountsReceivable after payment
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + parseFloat(amount);
+        const totalAmount = parseFloat(receivable.amount);
+
+        await storage.updateAccountsReceivable(id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= totalAmount ? 'paid' : 'partial'
+        });
+
+        console.log(`[RECEIVABLE UPDATE] Order ${receivable.orderId}: receivedAmount updated from ${currentReceived} to ${newReceivedAmount} (total: ${totalAmount})`);
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');

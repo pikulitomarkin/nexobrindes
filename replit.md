@@ -6,6 +6,17 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 27, 2025 - RECEIVABLES CARD PAYMENT UPDATE FIX**
+- **FIXED: Contas a Receber Card Not Updating After Payment** - Valor restante permanecia igual ao valor total do pedido após registrar entrada
+- **Root Cause**: Endpoint `/api/receivables/:id/payment` criava o pagamento MAS NÃO atualizava o `receivedAmount` no accountsReceivable para pedidos (apenas para receivables manuais)
+- **Solution**: Adicionada atualização do receivedAmount após criar pagamento de pedidos (linhas 2966-2976):
+  - Calcula newReceivedAmount = currentReceived + payment amount
+  - Atualiza receivedAmount no accountsReceivable
+  - Atualiza status para 'paid' ou 'partial' baseado no valor total
+  - Adicionado log detalhado para debug
+- **Files Modified**: server/routes.ts (added lines 2966-2976)
+- **Impact**: Card "Contas a Receber" no dashboard admin agora mostra valor correto após registrar pagamentos (entrada ou complemento)
+
 **October 27, 2025 - PRODUCTION ORDER ROUTING FIX**
 - **FIXED: Duplicate Route Bug in Logistics** - Clicking "Send to Producer" button for ONE producer was triggering MULTIPLE producers
 - **Root Cause**: Duplicate `/api/orders/:id/send-to-production` route (lines 5853-5917) was overriding the correct implementation (line 462)
