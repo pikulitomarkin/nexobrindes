@@ -744,6 +744,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
+    // Sempre garantir que os clientes pré-cadastrados existam (forçar criação se necessário)
     this.clients.set(preClient1.id, preClient1);
     this.clients.set(preClient2.id, preClient2);
     this.clients.set(preClient3.id, preClient3);
@@ -926,7 +927,7 @@ export class MemStorage implements IStorage {
     this.clients.set(client4.id, client4);
     this.clients.set(client5.id, client5);
 
-    // Limpar todos os dados de pedidos, orçamentos, etc.
+    // Limpar dados de pedidos, orçamentos, etc.
     mockOrders = [];
     mockBudgets = [];
 
@@ -1573,19 +1574,6 @@ export class MemStorage implements IStorage {
         // Calculate expected amount based on payment info - MANTER O VALOR ORIGINAL DO PEDIDO
         let expectedAmount = parseFloat(order.totalValue); // NUNCA alterar o valor total do pedido
         let minimumPaymentValue = "0.00";
-
-        // If order was converted from budget, get budget payment info
-        if (order.budgetId) {
-          const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
-          if (budgetPaymentInfo) {
-            const budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || '0');
-            const budgetShipping = parseFloat(budgetPaymentInfo.shippingCost || '0');
-
-            if (budgetDownPayment > 0 || budgetShipping > 0) {
-              minimumPaymentValue = (budgetDownPayment + budgetShipping).toFixed(2);
-            }
-          }
-        }
 
         // Get current payments for this order
         const payments = await this.getPaymentsByOrder(order.id);
