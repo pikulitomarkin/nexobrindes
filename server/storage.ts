@@ -1201,6 +1201,8 @@ export class MemStorage implements IStorage {
     const downPayment = parseFloat(order.downPayment || "0");
     const shippingCost = parseFloat(order.shippingCost || "0");
 
+    console.log(`[CREATE RECEIVABLE] Order ${order.orderNumber}: totalValue=${order.totalValue}, paidValue=${order.paidValue}, downPayment=${order.downPayment}, shippingCost=${order.shippingCost}`);
+
     // O pagamento mínimo é SEMPRE entrada + frete quando há entrada definida
     // Se não há entrada definida, o pagamento mínimo é 0 (opcional)
     const minimumPaymentValue = downPayment > 0 ? (downPayment + shippingCost).toFixed(2) : "0.00";
@@ -1240,6 +1242,8 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    console.log(`[CREATE RECEIVABLE] Created receivable ar-${order.id}: amount=${receivable.amount}, minimumPayment=${receivable.minimumPayment}, status=${receivable.status}`);
 
     this.accountsReceivable.set(receivable.id, receivable);
   }

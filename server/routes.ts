@@ -4108,6 +4108,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome de contato é obrigatório" });
       }
 
+      console.log(`[CREATE BUDGET] Received ${req.body.items.length} items from frontend`);
+      console.log('[CREATE BUDGET] Items received:', JSON.stringify(req.body.items.map(i => ({
+        productId: i.productId,
+        producerId: i.producerId,
+        quantity: i.quantity,
+        hasGeneralCustomization: i.hasGeneralCustomization,
+        generalCustomizationName: i.generalCustomizationName
+      }))));
+
       const newBudget = await storage.createBudget(req.body);
 
       // Remove duplicate items before processing
@@ -4115,14 +4124,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = req.body.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
         return true;
       });
 
-      console.log(`Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
+      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
 
       // Process budget items with ALL customization data
       for (const item of uniqueItems) {
