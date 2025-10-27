@@ -31,6 +31,9 @@ import AdminReports from "@/pages/admin/reports";
 import AdminProducerPayments from "@/pages/admin/producer-payments";
 import AdminFinance from "@/pages/admin/finance";
 import AdminCustomizations from "@/pages/admin/customizations";
+import AdminBranches from "@/pages/admin/branches";
+import AdminVendors from "@/pages/admin/vendors";
+import AdminPartners from "@/pages/admin/partners";
 
 // Vendor imports
 import VendorOrders from "@/pages/vendor/orders";
@@ -152,9 +155,9 @@ function App() {
                   <Route path="/admin/orders" component={AdminOrders} />
                   <Route path="/admin/budgets" component={AdminBudgets} />
                   <Route path="/admin/clients" component={AdminClients} />
-                  <Route path="/admin/vendors" component={() => import("./pages/admin/vendors")} />
-                  <Route path="/admin/branches" component={() => import("./pages/admin/branches")} />
-                  <Route path="/admin/partners" component={() => import("./pages/admin/partners")} />
+                  <Route path="/admin/vendors" component={AdminVendors} />
+                  <Route path="/admin/branches" component={AdminBranches} />
+                  <Route path="/admin/partners" component={AdminPartners} />
                   <Route path="/admin/producers" component={AdminProducers} />
                   <Route path="/admin/products" component={AdminProducts} />
                   <Route path="/admin/settings" component={AdminSettings} />
