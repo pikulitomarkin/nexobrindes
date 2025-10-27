@@ -330,14 +330,52 @@ export default function ClientOrders() {
                       Envio parcial em andamento!
                     </span>
                   </div>
-                  {order.trackingCode && (
-                    <div className="text-xs text-cyan-700 mt-2">
-                      <strong>Código de rastreio (primeiro envio):</strong> {order.trackingCode}
-                    </div>
-                  )}
-                  <div className="text-xs text-cyan-600 mt-1">
+                  <div className="text-xs text-cyan-600 mt-1 mb-2">
                     Parte do pedido já foi enviada. Os demais itens serão despachados assim que ficarem prontos.
                   </div>
+                  
+                  {/* Detalhes dos envios */}
+                  {order.shipmentDetails && order.shipmentDetails.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs font-medium text-cyan-800">Detalhes dos envios:</div>
+                      {order.shipmentDetails.map((shipment: any, index: number) => (
+                        <div key={index} className="bg-white p-2 rounded border border-cyan-200">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-xs text-cyan-900">
+                                {shipment.producerName}
+                              </div>
+                              <div className="text-xs text-cyan-700">
+                                {shipment.items?.length || 0} item(s)
+                                {shipment.items && shipment.items.length > 0 && (
+                                  <span className="ml-1">
+                                    - {shipment.items.map((item: any) => item.product?.name || item.productName).join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                              {shipment.trackingCode && (
+                                <div className="text-xs text-cyan-600 mt-1">
+                                  Rastreio: {shipment.trackingCode}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs">
+                              {shipment.status === 'shipped' ? (
+                                <span className="text-green-600 font-medium">✓ Enviado</span>
+                              ) : (
+                                <span className="text-orange-600 font-medium">⏳ Pendente</span>
+                              )}
+                            </div>
+                          </div>
+                          {shipment.shippedAt && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Enviado em: {new Date(shipment.shippedAt).toLocaleDateString('pt-BR')}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

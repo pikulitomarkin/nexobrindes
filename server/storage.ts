@@ -1642,6 +1642,23 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async updateOrderShippingStatus(orderId: string): Promise<void> {
+    const productionOrders = await this.getProductionOrdersByOrder(orderId);
+    if (productionOrders.length === 0) return;
+
+    const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+    const totalOrders = productionOrders.length;
+
+    let newStatus = 'production';
+    if (shippedOrders.length === totalOrders) {
+      newStatus = 'shipped'; // Todos despachados
+    } else if (shippedOrders.length > 0) {
+      newStatus = 'partial_shipped'; // Alguns despachados
+    }
+
+    await this.updateOrderStatus(orderId, newStatus);
+  }
+
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
     // Get orders and enrich with budget items
     const ordersWithItems = await Promise.all(Array.from(this.orders.values())

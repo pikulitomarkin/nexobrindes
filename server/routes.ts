@@ -421,13 +421,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      // Update main order status to shipped if this was the last pending production order
-      const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
-      const allShipped = allProductionOrders.every(po => po.status === 'shipped' || po.status === 'delivered');
-
-      if (allShipped) {
-        await storage.updateOrderStatus(orderId, 'shipped');
-      }
+      // Update main order shipping status (handles partial and complete shipping)
+      await storage.updateOrderShippingStatus(orderId);
 
       console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
 
@@ -1484,12 +1479,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      // Get production order for tracking info
-      let productionOrder = null;
-      if (order.producerId) {
-        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-        productionOrder = productionOrders[0] || null;
-      }
+      // Get production orders for shipping details
+      const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+      
+      // Get shipment details for partial/complete shipping
+      const shipmentDetails = await Promise.all(
+        productionOrders.map(async (po) => {
+          const producer = await storage.getUser(po.producerId);
+          return {
+            producerId: po.producerId,
+            producerName: producer?.name || 'Produtor Desconhecido',
+            status: po.status,
+            trackingCode: po.trackingCode,
+            shippedAt: po.status === 'shipped' || po.status === 'delivered' ? po.updatedAt : null,
+            items: budgetItems.filter(item => item.producerId === po.producerId)
+          };
+        })
+      );
 
       // Get payments for this order to calculate correct paid value
       const payments = await storage.getPaymentsByOrder(order.id);
@@ -1530,8 +1536,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         producerName: producer?.name || null,
         budgetPhotos: budgetPhotos,
         budgetItems: budgetItems,
-        trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-        estimatedDelivery: productionOrder?.deliveryDeadline || null,
+        shipmentDetails: shipmentDetails,
+        trackingCode: order.trackingCode || productionOrders[0]?.trackingCode || null,
+        estimatedDelivery: productionOrders[0]?.deliveryDeadline || null,
         payments: payments.filter(p => p.status === 'confirmed'),
         budgetInfo: originalBudgetInfo,
         paidValue: actualPaidValue.toFixed(2),
