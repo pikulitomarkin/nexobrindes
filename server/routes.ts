@@ -2165,10 +2165,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching clients for vendor: ${vendorId}`);
-      
+
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}`);
-      
+
       res.json(clients);
     } catch (error) {
       console.error("Error fetching clients by vendor:", error);
@@ -4396,7 +4396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         generalCustomizationName: i.generalCustomizationName
       }))));
 
-      const newBudget = await storage.createBudget(budgetData);
+      const newBudget = await storage.createBudget(req.body);
 
       // Remove duplicate items before processing
       const seenItems = new Set();
@@ -4477,8 +4477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log budget creation
       await storage.logUserAction(
-        budgetData.vendorId,
-        vendor?.name || 'Vendedor',
+        req.body.vendorId,
+        req.body.vendorName || 'Vendedor',
         'vendor',
         'CREATE',
         'budgets',
@@ -4489,7 +4489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           budgetNumber: newBudget.budgetNumber,
           clientName: newBudget.contactName,
           totalValue: newBudget.totalValue,
-          itemCount: budgetData.items?.length || 0
+          itemCount: req.body.items?.length || 0
         }
       );
 
@@ -4500,8 +4500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json(response);
-    } catch (error) {
-      console.error("Error creating budget:", error);
+    } catch (error) {console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
