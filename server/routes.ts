@@ -102,3 +102,45 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
       res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
     }
   });
+app.post("/api/clients", async (req, res) => {
+    try {
+      console.log("POST /api/clients - Request body:", req.body);
+
+      const { name, email, phone, whatsapp, cpfCnpj, address, vendorId, userCode, password } = req.body;
+
+      // Validation
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!password || typeof password !== 'string' || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const clientData = {
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        whatsapp: whatsapp?.trim() || null,
+        cpfCnpj: cpfCnpj?.trim() || null,
+        address: address?.trim() || null,
+        vendorId: vendorId || null,
+        userCode: userCode || null,
+        password: password.trim(),
+        isActive: true
+      };
+
+      console.log("Creating client with data:", clientData);
+
+      const client = await storage.createClient(clientData);
+      console.log("Client created successfully:", client);
+
+      res.status(201).json(client);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ 
+        error: "Erro ao criar cliente", 
+        details: error instanceof Error ? error.message : "Erro desconhecido" 
+      });
+    }
+  });

@@ -1293,20 +1293,20 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
+  async createClient(clientData: InsertClient & { userCode?: string; password?: string }): Promise<Client & { userCode?: string }> {
     try {
       console.log("Storage: createClient called with data:", clientData);
       
-      if (!clientData.name) {
+      if (!clientData.name || typeof clientData.name !== 'string' || !clientData.name.trim()) {
         throw new Error("Nome é obrigatório");
       }
       
-      if (!clientData.password) {
-        throw new Error("Senha é obrigatória");
+      if (!clientData.password || typeof clientData.password !== 'string' || clientData.password.length < 6) {
+        throw new Error("Senha deve ter pelo menos 6 caracteres");
       }
       
       const id = randomUUID();
-      const client: Client & { userCode?: string } = {
+      const client: Client & { userCode?: string; password?: string } = {
         ...clientData,
         id,
         vendorId: clientData.vendorId || null,
@@ -1317,6 +1317,7 @@ export class MemStorage implements IStorage {
         cpfCnpj: clientData.cpfCnpj || null,
         address: clientData.address || null,
         userCode: (clientData as any).userCode || null,
+        password: clientData.password, // Store password for client login
         isActive: clientData.isActive !== undefined ? clientData.isActive : true,
         createdAt: new Date(),
         updatedAt: new Date()
