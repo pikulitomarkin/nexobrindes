@@ -946,6 +946,111 @@ export default function LogisticsDashboard() {
         </Card>
       )}
 
+      {/* Pedidos Entregues */}
+      {(currentSection === 'dashboard' || currentSection === 'shipments') && (
+        <Card>
+          <CardHeader className="bg-green-50">
+            <CardTitle className="text-green-800 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" />
+              Pedidos Entregues ({productionOrders?.filter(o => o.status === 'delivered').length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código Rastreio</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Entrega</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {(() => {
+                    const deliveredOrders = expandedProductionOrders?.filter((o: any) => o.status === 'delivered') || [];
+                    return deliveredOrders.map((order: any) => {
+                      // Determinar estilos de agrupamento
+                      const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
+                      const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
+                      const isMiddleInGroup = order.isGrouped && order.groupIndex > 0 && order.groupIndex < order.groupTotal - 1;
+
+                      let groupClasses = "hover:bg-gray-50";
+                      if (isFirstInGroup) {
+                        groupClasses += " border-t-4 border-green-500 bg-green-50";
+                      } else if (isMiddleInGroup) {
+                        groupClasses += " border-l-4 border-green-300 bg-green-25";
+                      } else if (isLastInGroup) {
+                        groupClasses += " border-l-4 border-green-300 bg-green-25 border-b-2 border-green-200";
+                      }
+
+                      return (
+                        <tr key={order.uniqueKey} className={groupClasses}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {order.isGrouped && (
+                                <div className="mr-2 text-xs text-green-600 font-mono bg-green-100 px-1 rounded">
+                                  {order.groupIndex + 1}/{order.groupTotal}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                                <div className="text-sm text-gray-500">#{order.id.slice(-6)}</div>
+                                {order.isGrouped && order.groupIndex === 0 && (
+                                  <div className="text-xs text-green-600 font-medium mt-1">
+                                    ✅ Entrega Multi-Produtor
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{order.clientName}</div>
+                            {order.producerName && (
+                              <div className="text-xs text-green-600 font-medium">
+                                🏭 {order.producerName}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {order.completedAt ? new Date(order.completedAt).toLocaleDateString('pt-BR') : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm" onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // Criar um objeto específico para este produtor
+                                const producerSpecificOrder = {
+                                  ...order,
+                                  // Marcar como visualização específica do produtor
+                                  viewingProducer: order.producerId,
+                                  viewingProducerName: order.producerName
+                                };
+                                setSelectedOrder(producerSpecificOrder);
+                                setShowOrderDetailsModal(true);
+                              }}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                Ver {order.producerName ? 'Entrega' : 'Pedido'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+        </>
+      )}
+
 
       {/* Modal - Enviar para Produção */}
       <Dialog open={showSendToProductionModal} onOpenChange={setShowSendToProductionModal}>
