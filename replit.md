@@ -6,6 +6,18 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 27, 2025 - PRODUCTION ORDER ROUTING FIX**
+- **FIXED: Duplicate Route Bug in Logistics** - Clicking "Send to Producer" button for ONE producer was triggering MULTIPLE producers
+- **Root Cause**: Duplicate `/api/orders/:id/send-to-production` route (lines 5853-5917) was overriding the correct implementation (line 462)
+- **Solution**: Removed duplicate route completely, keeping only the robust implementation with:
+  - Proper producerId filtering when specific producer is sent
+  - Item grouping by producer with deduplication
+  - Validation that only requested producer is processed
+  - Detailed logging for debugging
+- **Files Modified**: server/routes.ts (removed lines 5853-5917)
+- **Impact**: Each "Send to Producer" button now correctly sends ONLY to that specific producer, not all producers
+- Frontend already had correct event handling with stopPropagation() and isPending checks
+
 **October 27, 2025 - CRITICAL BUG FIX**
 - **FIXED: Order Total Calculation Error** - Pedidos de R$ 15.000,00 apareciam como R$ 4.672,00 no painel financeiro
 - **Root Cause**: convertBudgetToOrder copiava budget.totalValue sem recalcular; valores em formato brasileiro ("15.000,00") eram mal interpretados
