@@ -109,6 +109,117 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Auth verification endpoint
+  app.get("/api/auth/verify", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Token não fornecido" });
+      }
+
+      const token = authHeader.substring(7);
+      
+      if (!token) {
+        return res.status(401).json({ error: "Token inválido" });
+      }
+
+      // Decode simple token (userId:username:timestamp)
+      try {
+        const decoded = Buffer.from(token, 'base64').toString('utf-8');
+        const [userId, username, timestamp] = decoded.split(':');
+        
+        if (!userId || !username || !timestamp) {
+          return res.status(401).json({ error: "Token malformado" });
+        }
+
+        // Get user data from storage
+        const users = await storage.getUsers();
+        const user = users.find(u => u.id === userId && u.username === username);
+        
+        if (!user) {
+          return res.status(401).json({ error: "Usuário não encontrado" });
+        }
+
+        console.log(`Auth verification successful for: ${username} (${user.role})`);
+        
+        res.json({ 
+          success: true, 
+          user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role
+          }
+        });
+      } catch (decodeError) {
+        console.error("Token decode error:", decodeError);
+        return res.status(401).json({ error: "Token inválido" });
+      }
+    } catch (error) {
+      console.error("Auth verification error:", error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // Auth login endpoint
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { username, password, preferredRole } = req.body;
+      
+      console.log(`Login attempt: ${username} with preferred role: ${preferredRole}`);
+
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username e password são obrigatórios" });
+      }
+
+      // Get all users
+      const users = await storage.getUsers();
+      let user = users.find(u => u.username === username && u.password === password);
+
+      if (!user) {
+        // Check if it's a client code
+        const clients = await storage.getClients();
+        const client = clients.find(c => c.userCode === username && c.password === password);
+        
+        if (client) {
+          user = {
+            id: client.id,
+            username: client.userCode,
+            name: client.name,
+            role: 'client',
+            password: client.password
+          };
+        }
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      // Use preferred role if specified and user is admin, otherwise use user's role
+      const effectiveRole = (user.role === 'admin' && preferredRole) ? preferredRole : user.role;
+
+      const token = Buffer.from(`${user.id}:${user.username}:${Date.now()}`).toString('base64');
+
+      console.log(`Login successful: ${user.username} as ${effectiveRole}`);
+
+      res.json({ 
+        success: true, 
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: effectiveRole
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
   app.post("/api/clients", async (req: Request, res: Response) => {
     try {
       console.log("POST /api/clients - Request body:", req.body);

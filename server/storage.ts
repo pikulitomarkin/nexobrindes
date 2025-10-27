@@ -1296,15 +1296,15 @@ export class MemStorage implements IStorage {
   async createClient(clientData: InsertClient & { userCode?: string; password?: string }): Promise<Client & { userCode?: string }> {
     try {
       console.log("Storage: createClient called with data:", clientData);
-      
+
       if (!clientData.name || typeof clientData.name !== 'string' || !clientData.name.trim()) {
         throw new Error("Nome é obrigatório");
       }
-      
+
       if (!clientData.password || typeof clientData.password !== 'string' || clientData.password.length < 6) {
         throw new Error("Senha deve ter pelo menos 6 caracteres");
       }
-      
+
       const id = randomUUID();
       const client: Client & { userCode?: string; password?: string } = {
         ...clientData,
@@ -1329,17 +1329,17 @@ export class MemStorage implements IStorage {
         vendorId: client.vendorId,
         userCode: client.userCode
       });
-      
+
       this.clients.set(id, client);
       console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
-      
+
       const retrieved = this.clients.get(id);
       console.log(`Storage: Can retrieve client: ${retrieved !== undefined}`);
-      
+
       if (!retrieved) {
         throw new Error("Falha ao salvar cliente");
       }
-      
+
       return client;
     } catch (error) {
       console.error("Storage: Error in createClient:", error);
@@ -2297,7 +2297,11 @@ export class MemStorage implements IStorage {
 
   // Commission Settings methods
   async getCommissionSettings(): Promise<CommissionSettings | undefined> {
-    return this.commissionSettings;
+    // This method was intended to query a database, but in MemStorage it returns a static value.
+    // Ensure it's returning the correct type.
+    // The original code had a database query. In MemStorage, we return the hardcoded value.
+    // return this.db.select().from(commissionSettings); // This line is from a DB context
+    return this.commissionSettings; // Returning the in-memory setting
   }
 
   async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
@@ -3696,7 +3700,7 @@ export class MemStorage implements IStorage {
         status = 'overdue';
       }
 
-      await this.updateAccountsReceivable(receivableId, {
+      await this.updateAccountsReceivable(receivable.id, {
         receivedAmount: newReceived.toFixed(2),
         status
       });
