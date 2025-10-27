@@ -79,33 +79,33 @@ interface ParsedOFXResult {
 
 async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
   const ofxContent = buffer.toString('utf-8');
-  const stats = { 
+  const stats = {
     totalLines: ofxContent.split('\n').length,
     accountId: undefined as string | undefined,
     bankId: undefined as string | undefined,
     accountType: undefined as string | undefined
   };
-  
+
   // Parse OFX using node-ofx-parser (synchronous, no await needed but doesn't hurt)
   const ofxData = Ofx.parse(ofxContent);
-  
+
   const transactions: ParsedOFXTransaction[] = [];
-  
+
   // Normalize STMTTRNRS to array (node-ofx-parser may return single object or array)
   const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS;
   if (!stmtTrnRsList) {
     console.warn('No STMTTRNRS found in OFX file');
     return { transactions, stats };
   }
-  
+
   // Ensure STMTTRNRS is an array
   const stmtTrnRsArray = Array.isArray(stmtTrnRsList) ? stmtTrnRsList : [stmtTrnRsList];
-  
+
   // Iterate over each STMTTRNRS entry
   for (const stmtTrnRs of stmtTrnRsArray) {
     const stmtRs = stmtTrnRs?.STMTRS;
     if (!stmtRs) continue;
-    
+
     // Extract account information for better reconciliation (only once)
     if (!stats.accountId) {
       const bankAccount = stmtRs.BANKACCTFROM;
@@ -115,18 +115,18 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
         stats.accountType = bankAccount.ACCTTYPE;
       }
     }
-    
+
     // Extract transactions from the current statement
     const statementTransactions = stmtRs.BANKTRANLIST?.STMTTRN;
-    
+
     if (!statementTransactions) {
       console.log('No transactions in this STMTRS entry, skipping');
       continue;
     }
-    
+
     // Ensure it's an array
     const txnArray = Array.isArray(statementTransactions) ? statementTransactions : [statementTransactions];
-  
+
   txnArray.forEach((txn, index) => {
     // Extract transaction data safely
     const trnType = txn.TRNTYPE || 'OTHER';
@@ -134,7 +134,7 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
     const trnAmt = txn.TRNAMT || '0';
     const memo = txn.MEMO || txn.NAME || 'Transação bancária';
     const refNum = txn.REFNUM || txn.CHECKNUM || null;
-    
+
     // Generate deterministic FITID when missing
     let fitId = txn.FITID;
     if (!fitId) {
@@ -144,22 +144,22 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
       fitId = `HASH_${hash}`;
       console.log(`Generated deterministic FITID for transaction: ${fitId} from ${hashInput}`);
     }
-    
+
     // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
     let transactionDate: Date | null = null;
     let hasValidDate = false;
-    
+
     if (dtPostedRaw && dtPostedRaw.length >= 8) {
       try {
         const dateStr = String(dtPostedRaw);
         const year = parseInt(dateStr.substring(0, 4));
         const month = parseInt(dateStr.substring(4, 6)) - 1; // Month is 0-based
         const day = parseInt(dateStr.substring(6, 8));
-        
+
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           const parsedDate = new Date(year, month, day);
-          if (parsedDate.getFullYear() === year && 
-              parsedDate.getMonth() === month && 
+          if (parsedDate.getFullYear() === year &&
+              parsedDate.getMonth() === month &&
               parsedDate.getDate() === day) {
             transactionDate = parsedDate;
             hasValidDate = true;
@@ -169,15 +169,15 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
         console.error("Error parsing date from DTPOSTED:", dtPostedRaw, e);
       }
     }
-    
+
     // Classify transaction type
     let standardType: 'credit' | 'debit' | 'other' = 'other';
     const amount = parseFloat(trnAmt);
-    
+
     // Check for debit indicators (payments/withdrawals)
-    const isDebit = amount < 0 || 
-                   trnType === 'PAYMENT' || 
-                   trnType === 'DEBIT' || 
+    const isDebit = amount < 0 ||
+                   trnType === 'PAYMENT' ||
+                   trnType === 'DEBIT' ||
                    trnType === 'CHECK' ||
                    trnType === 'XFER' ||
                    trnType === 'WITHDRAWAL' ||
@@ -186,13 +186,13 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
                    memo.toLowerCase().includes('transf') ||
                    memo.toLowerCase().includes('saque') ||
                    memo.toLowerCase().includes('débito');
-    
+
     if (isDebit) {
       standardType = 'debit';
     } else if (trnType === 'CREDIT' || trnType === 'DEP' || amount > 0) {
       standardType = 'credit';
     }
-    
+
       transactions.push({
         fitId: fitId,
         rawFitId: fitId, // Store original/generated FITID for deduplication
@@ -206,7 +206,7 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
       });
     });
   }
-  
+
   console.log(`Parsed OFX successfully: ${transactions.length} transactions found`);
   return { transactions, stats };
 }
@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update budget status
-      const updatedBudget = await storage.updateBudget(id, { 
+      const updatedBudget = await storage.updateBudget(id, {
         status,
         clientObservations: observations || null,
         reviewedAt: new Date().toISOString()
@@ -450,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsByProducer = new Map();
       allItems.forEach((item: any) => {
         const itemProducerId = item.producerId || 'internal';
-        
+
         // Only consider external producers
         if (itemProducerId && itemProducerId !== 'internal') {
           // Only send to specified producer if producerId is provided
@@ -468,8 +468,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
 
       if (itemsByProducer.size === 0) {
-        const errorMsg = producerId ? 
-          `Nenhum item encontrado para o produtor especificado` : 
+        const errorMsg = producerId ?
+          `Nenhum item encontrado para o produtor especificado` :
           `Nenhum item de produção externa encontrado`;
         return res.status(400).json({ error: errorMsg });
       }
@@ -498,7 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Calculate total value for this producer's items
-        const producerTotalValue = items.reduce((sum: number, item: any) => 
+        const producerTotalValue = items.reduce((sum: number, item: any) =>
           sum + parseFloat(item.totalPrice || '0'), 0
         );
 
@@ -506,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const producerItems = items.filter(item => item.producerId === currentProducerId);
         const uniqueProducerItems = [];
         const seenItems = new Set();
-        
+
         for (const item of producerItems) {
           const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice}`;
           if (!seenItems.has(itemKey)) {
@@ -532,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: order.contactPhone,
             email: order.contactEmail
           },
-          shippingAddress: order.deliveryType === 'pickup' 
+          shippingAddress: order.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
             : (order.shippingAddress || 'Endereço não informado'),
           items: uniqueProducerItems, // Use unique items only
@@ -547,14 +547,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingForProducer) {
           console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
-          
+
           // If sending to specific producer and order already exists, return error
           if (producerId) {
-            return res.status(400).json({ 
-              error: `Ordem de produção para ${producer.name} já foi criada anteriormente` 
+            return res.status(400).json({
+              error: `Ordem de produção para ${producer.name} já foi criada anteriormente`
             });
           }
-          
+
           // Otherwise, just add to the list and continue
           createdOrders.push(existingForProducer);
           producerNames.push(producer.name);
@@ -585,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateOrder(id, { status: 'production' });
       }
 
-      const message = producerId 
+      const message = producerId
         ? `Ordem de produção criada para ${producerNames[0]}`
         : `Pedido enviado para produção - ${createdOrders.length} ordem(ns) criada(s) para: ${producerNames.join(', ')}`;
 
@@ -962,14 +962,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parsedDetails = JSON.parse(productionOrder.orderDetails);
           // Filter items to show only those for this producer
           if (parsedDetails.items && parsedDetails.producerId) {
-            const filteredItems = parsedDetails.items.filter((item: any) => 
+            const filteredItems = parsedDetails.items.filter((item: any) =>
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
 
             // Remove duplicatas baseado em productId, producerId, quantity e unitPrice
-            const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
-              self.findIndex(i => 
-                i.productId === item.productId && 
+            const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) =>
+              self.findIndex(i =>
+                i.productId === item.productId &&
                 i.producerId === item.producerId &&
                 i.quantity === item.quantity &&
                 i.unitPrice === item.unitPrice
@@ -1015,9 +1015,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientPhone: clientPhone,
           clientEmail: clientEmail,
           clientAddress: clientAddress,
-          shippingAddress: order.deliveryType === 'pickup' 
-            ? 'Sede Principal - Retirada no Local' 
-            : (clientAddress || order.contactName ? `${clientName}` : 'Endereço não informado')
+          shippingAddress: order.deliveryType === 'pickup'
+            ? 'Sede Principal - Retirada no Local'
+            : (clientAddress || 'Endereço não informado')
         },
         photos: photos,
         orderDetails: orderDetails
@@ -2336,9 +2336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Filter out invalid commissions (without names or order numbers)
-      const validCommissions = enrichedCommissions.filter(commission => 
-        commission.amount && 
-        (commission.vendorName || commission.partnerName) && 
+      const validCommissions = enrichedCommissions.filter(commission =>
+        commission.amount &&
+        (commission.vendorName || commission.partnerName) &&
         commission.orderNumber
       );
 
@@ -2531,8 +2531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // 1. Are not cancelled
         // 2. Have remaining balance > 0.01 (to avoid floating point issues)
         // 3. Are confirmed (not just drafts)
-        const shouldInclude = order.status !== 'cancelled' && 
-                             remainingValue > 0.01 && 
+        const shouldInclude = order.status !== 'cancelled' &&
+                             remainingValue > 0.01 &&
                              (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
 
         if (shouldInclude) {
@@ -2650,10 +2650,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { transactions, orderId, totalAmount } = req.body;
 
-      console.log("Processing multiple payment association:", { 
-        transactionCount: transactions?.length, 
-        orderId, 
-        totalAmount 
+      console.log("Processing multiple payment association:", {
+        transactionCount: transactions?.length,
+        orderId,
+        totalAmount
       });
 
       if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
@@ -3056,9 +3056,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("OFX import error:", error);
-      res.status(500).json({ 
-        error: "Erro ao importar arquivo OFX", 
-        details: error.message 
+      res.status(500).json({
+        error: "Erro ao importar arquivo OFX",
+        details: error.message
       });
     }
   });
@@ -3085,28 +3085,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter debit transactions (payments to producers - money going out)
-    // Accept both parsed 'debit' type AND original OFX types like 'PAYMENT', 'DEBIT'
-    const debitTransactions = transactions.filter(t => 
-      t.type === 'debit' || 
-      t.originalType === 'PAYMENT' || 
-      t.originalType === 'DEBIT' || 
-      t.originalType === 'XFER' ||
-      parseFloat(t.amount) < 0 // Also accept negative amounts as debits
-    );
+      // Accept both parsed 'debit' type AND original OFX types like 'PAYMENT', 'DEBIT'
+      const debitTransactions = transactions.filter(t =>
+        t.type === 'debit' ||
+        t.originalType === 'PAYMENT' ||
+        t.originalType === 'DEBIT' ||
+        t.originalType === 'XFER' ||
+        parseFloat(t.amount) < 0 // Also accept negative amounts as debits
+      );
 
-    console.log(`Processing producer payment OFX file: Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
-    console.log(`Sample transactions:`, transactions.slice(0, 3).map(t => ({ 
-      type: t.type, 
-      originalType: t.originalType, 
-      amount: t.amount, 
-      description: t.description 
-    })));
+      console.log(`Processing producer payment OFX file: Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
+      console.log(`Sample transactions:`, transactions.slice(0, 3).map(t => ({
+        type: t.type,
+        originalType: t.originalType,
+        amount: t.amount,
+        description: t.description
+      })));
 
-    if (debitTransactions.length === 0) {
-      return res.status(400).json({ 
-        error: "Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX" 
-      });
-    }
+      if (debitTransactions.length === 0) {
+        return res.status(400).json({
+          error: "Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX"
+        });
+      }
 
       // Create bank import record for producer payments
       const importRecord = await storage.createBankImport({
@@ -3179,9 +3179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Producer payment OFX import error:", error);
-      res.status(500).json({ 
-        error: "Erro ao importar arquivo OFX de pagamentos", 
-        details: error.message 
+      res.status(500).json({
+        error: "Erro ao importar arquivo OFX de pagamentos",
+        details: error.message
       });
     }
   });
@@ -4216,7 +4216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove existing items and re-add them to ensure consistency
       await storage.deleteBudgetItems(req.params.id);
-      
+
       // Remove duplicate items before processing
       const seenItems = new Set();
       const uniqueItems = budgetData.items.filter(item => {
@@ -4230,7 +4230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
-      
+
       for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
@@ -4315,7 +4315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!updatedBudget) {
-        return res.status(404).json({ error: "Orçamento não encontrado" });
+        return res.status(404).json({ error: "Budget not found" });
       }
 
       console.log(`Budget ${id} approved by client with observations: ${observations}`);
@@ -4964,7 +4964,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Filter only pending payments that haven't been reconciled yet
       // Mutual exclusivity: only show payments with reconciliationStatus='pending'
-      const pendingPayments = allPayments.filter(payment => 
+      const pendingPayments = allPayments.filter(payment =>
         (payment.status === 'pending' || payment.status === 'approved') &&
         (payment.reconciliationStatus === 'pending' || !payment.reconciliationStatus)
       );
@@ -5051,7 +5051,7 @@ Para mais detalhes, entre em contato conosco!`;
         const isPaid = parseFloat(order.paidValue || '0') > 0;
         const isConfirmed = order.status === 'confirmed';
         const notInProduction = order.status !== 'production';
-        const hasExternalItems = order.items && Array.isArray(order.items) && 
+        const hasExternalItems = order.items && Array.isArray(order.items) &&
           order.items.some((item: any) => item.producerId && item.producerId !== 'internal');
 
         return isPaid && isConfirmed && notInProduction && hasExternalItems;
@@ -5104,7 +5104,7 @@ Para mais detalhes, entre em contato conosco!`;
           return {
             ...order,
             clientName: clientName,
-            clientAddress: clientAddress,
+            clientAddress: clientAddress || 'Endereço não informado',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
@@ -5778,8 +5778,8 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Order ${id} sent to production. Created ${productionOrdersCreated} production orders for producers: ${producerNames.join(', ')}`);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         productionOrdersCreated,
         producerNames
       });

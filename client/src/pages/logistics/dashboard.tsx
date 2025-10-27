@@ -639,11 +639,7 @@ export default function LogisticsDashboard() {
                           <div className="text-sm text-gray-900">
                             {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
                           </div>
-                          {order.producerValue && parseFloat(order.producerValue) > 0 && (
-                            <div className="text-xs text-green-600 font-medium">
-                              R$ {parseFloat(order.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </div>
-                          )}
+                          
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
@@ -1048,7 +1044,6 @@ export default function LogisticsDashboard() {
             </div>
           </CardContent>
         </Card>
-        </>
       )}
 
 
