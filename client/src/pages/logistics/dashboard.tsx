@@ -24,6 +24,7 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
   const { toast } = useToast();
 
   const { mutate, isPending } = useMutation({
+    mutationKey: [`send-to-producer-${uniqueKey}`], // Unique mutation key for each button
     mutationFn: async () => {
       console.log(`Sending order ${orderId} to producer ${producerId} (${label})`);
 
@@ -66,7 +67,11 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
       size="sm"
       variant="outline"
       className="h-6 px-2 text-xs"
-      onClick={() => mutate()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        mutate();
+      }}
       disabled={isPending}
       title={`Enviar APENAS para ${label}`}
     >
