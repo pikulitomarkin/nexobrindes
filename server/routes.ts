@@ -5,8 +5,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { storage } from "./storage";
-import { db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
+import { storage, db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
 // Configure multer for file uploads
 const upload = multer({
@@ -305,10 +304,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching budgets for vendor: ${vendorId}`);
-      
+
       const budgets = await storage.getBudgetsByVendor(vendorId);
       console.log(`Found ${budgets.length} budgets for vendor ${vendorId}`);
-      
+
       res.json(budgets);
     } catch (error) {
       console.error("Error fetching budgets by vendor:", error);
@@ -629,17 +628,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if there are still producers without production orders
         const allProductionOrders = await storage.getProductionOrdersByOrder(id);
         const uniqueProducers = new Set();
-        
+
         // Count unique producers in the order items
         allItems.forEach((item: any) => {
           if (item.producerId && item.producerId !== 'internal') {
             uniqueProducers.add(item.producerId);
           }
         });
-        
+
         // Count unique producers with production orders
         const producersWithOrders = new Set(allProductionOrders.map(po => po.producerId));
-        
+
         // Only mark as production if all producers have been sent
         if (uniqueProducers.size === producersWithOrders.size) {
           await storage.updateOrder(id, { status: 'production' });
@@ -1635,6 +1634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const orders = await storage.getOrdersByVendor(vendorId);
+      console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
@@ -4381,22 +4381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newBudget = await storage.createBudget(req.body);
 
-      // Remove duplicate items before processing
-      const seenItems = new Set();
-      const uniqueItems = req.body.items.filter(item => {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-        if (seenItems.has(itemKey)) {
-          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
-          return false;
-        }
-        seenItems.add(itemKey);
-        return true;
-      });
-
-      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
-
       // Process budget items with ALL customization data
-      for (const item of uniqueItems) {
+      for (const item of req.body.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
@@ -4404,8 +4390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {
-          totalPrice += (itemCustomizationValue * quantity);
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {          totalPrice += (itemCustomizationValue * quantity);
         }
         if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
           totalPrice += (generalCustomizationValue * quantity);
@@ -5384,7 +5369,7 @@ Para mais detalhes, entre em contato conosco!`;
                   const producer = await storage.getUser(item.producerId);
                   producerCache.set(item.producerId, producer?.name || null);
                 }
-                
+
                 return {
                   ...item,
                   producerName: producerCache.get(item.producerId) || `Produtor ${item.producerId.slice(-6)}`
