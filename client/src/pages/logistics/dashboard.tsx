@@ -14,13 +14,6 @@ import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "react-router-dom"; // Import useLocation
 import { Badge } from "@/components/ui/badge"; // Import Badge component
 
-// Declare window type extension for processingOrders
-declare global {
-  interface Window {
-    processingOrders?: Set<string>;
-  }
-}
-
 export default function LogisticsDashboard() {
   const location = window.location.pathname; // Get current location
   const [searchTerm, setSearchTerm] = useState("");
@@ -257,7 +250,7 @@ export default function LogisticsDashboard() {
         // Se há produtores externos, criar uma entrada para cada um
         if (itemsByProducer.size > 0) {
           Array.from(itemsByProducer.values()).forEach((producerGroup: any, index: number) => {
-            const producerValue = producerGroup.items.reduce((sum: number, item: any) => 
+            const producerValue = producerGroup.items.reduce((sum: number, item: any) =>
               sum + parseFloat(item.totalPrice || '0'), 0
             );
 
@@ -274,7 +267,7 @@ export default function LogisticsDashboard() {
               producerItems: producerGroup.items,
               producerValue: producerValue.toFixed(2),
               // Produto principal deste produtor
-              product: producerGroup.items.length > 1 
+              product: producerGroup.items.length > 1
                 ? `${producerGroup.items[0].productName} +${producerGroup.items.length - 1} mais`
                 : producerGroup.items[0].productName
             });
@@ -685,19 +678,9 @@ export default function LogisticsDashboard() {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   if (!sendToProductionMutation.isPending && order.status !== 'production') {
-                                    // Prevent multiple clicks by checking the specific order/producer combination
-                                    const key = `${order.id}-${order.currentProducerId}`;
-                                    if (!window.processingOrders) window.processingOrders = new Set();
-                                    if (window.processingOrders.has(key)) return;
-
-                                    window.processingOrders.add(key);
-                                    sendToProductionMutation.mutate({ 
+                                    sendToProductionMutation.mutate({
                                       orderId: order.id,
-                                      producerId: order.currentProducerId 
-                                    }, {
-                                      onSettled: () => {
-                                        window.processingOrders.delete(key);
-                                      }
+                                      producerId: order.currentProducerId
                                     });
                                   }
                                 }}
@@ -705,8 +688,8 @@ export default function LogisticsDashboard() {
                                 title={order.status === 'production' ? 'Já enviado para produção' : `Enviar apenas para ${order.currentProducerName}`}
                               >
                                 <Send className="h-4 w-4 mr-1" />
-                                {sendToProductionMutation.isPending ? 'Enviando...' : 
-                                 order.status === 'production' ? '✓ Enviado' : 
+                                {sendToProductionMutation.isPending ? 'Enviando...' :
+                                 order.status === 'production' ? '✓ Enviado' :
                                  `📤 Enviar`}
                               </Button>
                             ) : (
@@ -1086,14 +1069,12 @@ export default function LogisticsDashboard() {
                     <span className="text-blue-700">Cliente:</span>
                     <p className="font-medium">{selectedOrder.clientName}</p>
                   </div>
-                  {!selectedOrder.viewingProducer && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Valor Total</label>
-                      <p className="font-medium text-gray-900">
-                        R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  )}
+                  <div>
+                    <span className="text-blue-700">Valor:</span>
+                    <p className="font-medium text-green-600">
+                      R$ {parseFloat(selectedOrder.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                   <div>
                     <span className="text-blue-700">Produto:</span>
                     <p className="font-medium">{selectedOrder.product}</p>
@@ -1134,13 +1115,13 @@ export default function LogisticsDashboard() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedOrder?.viewingProducer ? 
-                `Detalhes do Pedido - ${selectedOrder.viewingProducerName}` : 
+              {selectedOrder?.viewingProducer ?
+                `Detalhes do Pedido - ${selectedOrder.viewingProducerName}` :
                 'Detalhes do Pedido'
               }
             </DialogTitle>
             <DialogDescription>
-              {selectedOrder?.viewingProducer ? 
+              {selectedOrder?.viewingProducer ?
                 `Informações específicas para o produtor ${selectedOrder.viewingProducerName}` :
                 'Informações completas do pedido e itens para produção'
               }
@@ -1196,18 +1177,12 @@ export default function LogisticsDashboard() {
                       </label>
                       <p className="font-medium">{selectedOrder.product || selectedOrder.order?.product}</p>
                     </div>
-                    {selectedOrder.viewingProducer && selectedOrder.producerValue && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Valor deste Produtor</label>
-                        <p className="font-bold text-green-600">
-                          R$ {parseFloat(selectedOrder.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'delivery' && (
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
+                        <p className="text-gray-700 bg-gray-50 p-2 rounded">
+                          {selectedOrder.shippingAddress || selectedOrder.order?.shippingAddress || 'Endereço não informado'}
                         </p>
-                      </div>
-                    )}
-                    {(selectedOrder.description || selectedOrder.order?.description) && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Descrição</label>
-                        <p className="text-gray-700 bg-gray-50 p-2 rounded">{selectedOrder.description || selectedOrder.order?.description}</p>
                       </div>
                     )}
                     {(selectedOrder.deadline || selectedOrder.order?.deadline) && (
@@ -1239,14 +1214,6 @@ export default function LogisticsDashboard() {
                       <label className="text-sm font-medium text-gray-500">Data de Criação</label>
                       <p>{new Date(selectedOrder.createdAt || selectedOrder.order?.createdAt).toLocaleDateString('pt-BR')}</p>
                     </div>
-                    {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'delivery' && (
-                      <div className="col-span-2">
-                        <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
-                        <p className="text-gray-700 bg-gray-50 p-2 rounded">
-                          {selectedOrder.shippingAddress || selectedOrder.order?.shippingAddress || 'Endereço não informado'}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1258,7 +1225,7 @@ export default function LogisticsDashboard() {
 
                 // Se estamos visualizando um produtor específico, filtrar apenas seus itens
                 if (selectedOrder.viewingProducer) {
-                  itemsToShow = itemsToShow.filter((item: any) => 
+                  itemsToShow = itemsToShow.filter((item: any) =>
                     item.producerId === selectedOrder.viewingProducer
                   );
                 }
@@ -1267,14 +1234,13 @@ export default function LogisticsDashboard() {
                 const uniqueItems: any[] = [];
                 const seenItems = new Set();
                 itemsToShow.forEach((item: any) => {
-                  const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice || item.totalPrice}-${item.hasItemCustomization}-${item.selectedCustomizationId}-${item.hasGeneralCustomization}-${item.generalCustomizationName}`;
+                  const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.totalPrice}-${item.hasItemCustomization}-${item.selectedCustomizationId}-${item.hasGeneralCustomization}-${item.generalCustomizationName}`;
                   if (!seenItems.has(itemKey)) {
                     seenItems.add(itemKey);
                     uniqueItems.push(item);
                   }
                 });
                 itemsToShow = uniqueItems;
-
 
                 return itemsToShow && itemsToShow.length > 0 && (
                   <div>
@@ -1294,7 +1260,7 @@ export default function LogisticsDashboard() {
                     <div className="space-y-3">
                       {itemsToShow.map((item: any, index: number) => {
                         const isExternal = item.producerId && item.producerId !== 'internal';
-                        const isCurrentProducer = selectedOrder.viewingProducer && 
+                        const isCurrentProducer = selectedOrder.viewingProducer &&
                           item.producerId === selectedOrder.viewingProducer;
 
                         // Cores diferentes para destacar o produtor atual
@@ -1310,7 +1276,7 @@ export default function LogisticsDashboard() {
                         }
 
                         return (
-                          <div key={`${item.id || index}-${item.productId}`} 
+                          <div key={`${item.id || index}-${item.productName || 'item'}`}
                                className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
@@ -1347,7 +1313,7 @@ export default function LogisticsDashboard() {
                                     <div className="col-span-2">
                                       <span className="text-gray-500">Produtor:</span>
                                       <p className={`font-medium ${
-                                        isCurrentProducer ? 'text-purple-700' : 
+                                        isCurrentProducer ? 'text-purple-700' :
                                         isExternal ? 'text-orange-700' : 'text-gray-700'
                                       }`}>
                                         {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
@@ -1356,7 +1322,7 @@ export default function LogisticsDashboard() {
                                     </div>
 
                                     {/* Personalização do Item */}
-                                    {item.hasItemCustomization && item.itemCustomizationDescription && (
+                                    {item.hasItemCustomization && (
                                       <div className="col-span-2 bg-blue-50 p-2 rounded">
                                         <span className="text-blue-700 font-medium">Personalização do Item:</span>
                                         <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
@@ -1376,7 +1342,7 @@ export default function LogisticsDashboard() {
                                     )}
 
                                     {/* Personalização Geral */}
-                                    {item.hasGeneralCustomization && item.generalCustomizationName && (
+                                    {item.hasGeneralCustomization && (
                                       <div className="col-span-2 bg-green-50 p-2 rounded">
                                         <span className="text-green-700 font-medium">Personalização Geral:</span>
                                         <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>

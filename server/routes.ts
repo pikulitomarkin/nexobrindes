@@ -417,6 +417,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics dispatch order
+  app.post("/api/logistics/dispatch-order", async (req, res) => {
+    try {
+      const { productionOrderId, orderId, notes, trackingCode } = req.body;
+
+      console.log(`Dispatching order - productionOrderId: ${productionOrderId}, orderId: ${orderId}`);
+
+      // Update production order status to shipped
+      const updatedPO = await storage.updateProductionOrderStatus(
+        productionOrderId,
+        'shipped',
+        notes,
+        undefined, // deliveryDate
+        trackingCode
+      );
+
+      if (!updatedPO) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Update main order status to shipped if this was the last pending production order
+      const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
+      const allShipped = allProductionOrders.every(po => po.status === 'shipped' || po.status === 'delivered');
+
+      if (allShipped) {
+        await storage.updateOrderStatus(orderId, 'shipped');
+      }
+
+      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
+
+      res.json({
+        success: true,
+        message: "Pedido despachado com sucesso",
+        productionOrder: updatedPO
+      });
+    } catch (error) {
+      console.error("Error dispatching order:", error);
+      res.status(500).json({ error: "Erro ao despachar pedido: " + error.message });
+    }
+  });
+
   // Send order to production - creates separate production orders for each producer
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
