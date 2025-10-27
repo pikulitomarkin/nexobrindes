@@ -577,10 +577,82 @@ export default function VendorOrders() {
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar produtos obrigatórios
     if (vendorOrderForm.items.length === 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao pedido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar datas obrigatórias
+    if (!vendorOrderForm.deadline) {
+      toast({
+        title: "Erro",
+        description: "O prazo de produção é obrigatório",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!vendorOrderForm.deliveryDeadline) {
+      toast({
+        title: "Erro",
+        description: "O prazo de entrega é obrigatório",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar entrada obrigatória
+    if (vendorOrderForm.downPayment <= 0) {
+      toast({
+        title: "Erro",
+        description: "O valor de entrada é obrigatório e deve ser maior que zero",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar frete quando delivery
+    if (vendorOrderForm.deliveryType === "delivery") {
+      if (!vendorOrderForm.shippingMethodId) {
+        toast({
+          title: "Erro",
+          description: "Selecione um método de entrega",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (vendorOrderForm.shippingCost <= 0) {
+        toast({
+          title: "Erro",
+          description: "O valor do frete é obrigatório quando há entrega",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Validar datas não podem ser no passado
+    const today = new Date().toISOString().split('T')[0];
+    if (vendorOrderForm.deadline < today) {
+      toast({
+        title: "Erro",
+        description: "O prazo de produção não pode ser anterior a hoje",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (vendorOrderForm.deliveryDeadline < today) {
+      toast({
+        title: "Erro",
+        description: "O prazo de entrega não pode ser anterior a hoje",
         variant: "destructive"
       });
       return;
@@ -769,7 +841,7 @@ export default function VendorOrders() {
             <form onSubmit={handleOrderSubmit} className="space-y-6">
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="order-title">Título do Pedido</Label>
+                  <Label htmlFor="order-title">Título do Pedido *</Label>
                   <Input
                     id="order-title"
                     value={vendorOrderForm.title}
@@ -778,28 +850,33 @@ export default function VendorOrders() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="order-deadline">Prazo de Entrega</Label>
+                  <Label htmlFor="order-deadline">Prazo de Produção *</Label>
                   <Input
                     id="order-deadline"
                     type="date"
                     value={vendorOrderForm.deadline}
                     onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deadline: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="order-deliveryDeadline">Prazo de Entrega</Label>
+                  <Label htmlFor="order-deliveryDeadline">Prazo de Entrega *</Label>
                   <Input
                     id="order-deliveryDeadline"
                     type="date"
                     value={vendorOrderForm.deliveryDeadline || ""}
                     onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="order-delivery-type">Tipo de Entrega</Label>
+                  <Label htmlFor="order-delivery-type">Tipo de Entrega *</Label>
                   <Select
                     value={vendorOrderForm.deliveryType}
                     onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, deliveryType: value })}
+                    required
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo" />

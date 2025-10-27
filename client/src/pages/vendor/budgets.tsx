@@ -632,6 +632,56 @@ export default function VendorBudgets() {
       return;
     }
 
+    // Date validation: validUntil and deliveryDeadline cannot be in the past
+    const today = new Date().toISOString().split('T')[0];
+    if (vendorBudgetForm.validUntil && vendorBudgetForm.validUntil < today) {
+      toast({
+        title: "Erro de Validação",
+        description: "A data de 'Válido Até' não pode ser anterior a hoje.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (vendorBudgetForm.deliveryDeadline && vendorBudgetForm.deliveryDeadline < today) {
+      toast({
+        title: "Erro de Validação",
+        description: "A data de 'Prazo de Entrega' não pode ser anterior a hoje.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Mandatory fields validation
+    if (!vendorBudgetForm.title) {
+      toast({ title: "Erro", description: "O título do orçamento é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!vendorBudgetForm.contactName) {
+      toast({ title: "Erro", description: "O nome de contato é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!vendorBudgetForm.paymentMethodId) {
+      toast({ title: "Erro", description: "A forma de pagamento é obrigatória.", variant: "destructive" });
+      return;
+    }
+    if (vendorBudgetForm.installments < 1) {
+      toast({ title: "Erro", description: "O número de parcelas deve ser pelo menos 1.", variant: "destructive" });
+      return;
+    }
+    if (vendorBudgetForm.downPayment <= 0) {
+      toast({ title: "Erro", description: "O valor de entrada é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (vendorBudgetForm.deliveryType !== 'pickup' && !vendorBudgetForm.shippingMethodId) {
+      toast({ title: "Erro", description: "O método de frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
+      return;
+    }
+    if (vendorBudgetForm.deliveryType !== 'pickup' && vendorBudgetForm.shippingCost <= 0) {
+      toast({ title: "Erro", description: "O custo do frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
+      return;
+    }
+
+
     if (isEditMode) {
       updateBudgetMutation.mutate(vendorBudgetForm);
     } else {
@@ -738,7 +788,7 @@ export default function VendorBudgets() {
             <form onSubmit={handleBudgetSubmit} className="space-y-6">
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="budget-title">Título do Orçamento</Label>
+                  <Label htmlFor="budget-title">Título do Orçamento *</Label>
                   <Input
                     id="budget-title"
                     value={vendorBudgetForm.title}
@@ -747,28 +797,31 @@ export default function VendorBudgets() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="budget-validUntil">Válido Até</Label>
+                  <Label htmlFor="budget-validUntil">Válido Até *</Label>
                   <Input
                     id="budget-validUntil"
                     type="date"
                     value={vendorBudgetForm.validUntil}
                     onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, validUntil: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="budget-deliveryDeadline">Prazo de Entrega</Label>
+                  <Label htmlFor="budget-deliveryDeadline">Prazo de Entrega *</Label>
                   <Input
                     id="budget-deliveryDeadline"
                     type="date"
                     value={vendorBudgetForm.deliveryDeadline || ""}
                     onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="budget-delivery-type">Tipo de Entrega</Label>
+                  <Label htmlFor="budget-delivery-type">Tipo de Entrega *</Label>
                   <Select
                     value={vendorBudgetForm.deliveryType}
                     onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryType: value })}
+                    required
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo" />
@@ -844,11 +897,11 @@ export default function VendorBudgets() {
 
               <Separator />
 
-              {/* Product Selection */}      
+              {/* Product Selection */}              
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
+                <h3 className="text-lg font-medium">Produtos do Orçamento *</h3>
 
-                {/* Selected Products */}        
+                {/* Selected Products */}                
                 {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
                     {vendorBudgetForm.items.map((item, index) => (
@@ -878,13 +931,14 @@ export default function VendorBudgets() {
 
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
-                            <Label htmlFor={`quantity-${index}`}>Quantidade</Label>
+                            <Label htmlFor={`quantity-${index}`}>Quantidade *</Label>
                             <Input
                               id={`quantity-${index}`}
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateBudgetItem(index, 'quantity', e.target.value)}
+                              required
                             />
                           </div>
                           <div>
@@ -1128,7 +1182,7 @@ export default function VendorBudgets() {
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Package className="h-5 w-5" />
-                    Adicionar Produtos ao Orçamento
+                    Adicionar Produtos ao Orçamento *
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1147,7 +1201,7 @@ export default function VendorBudgets() {
                   ) : selectedProducerId === "select" ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <Label>Selecionar Produtor</Label>
+                        <Label>Selecionar Produtor *</Label>
                         <Button
                           type="button"
                           variant="outline"
@@ -1277,8 +1331,8 @@ export default function VendorBudgets() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="payment-method">Forma de Pagamento</Label>
-                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value }) }>
+                    <Label htmlFor="payment-method">Forma de Pagamento *</Label>
+                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value }) } required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a forma de pagamento" />
                       </SelectTrigger>
@@ -1290,8 +1344,8 @@ export default function VendorBudgets() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="shipping-method">Método de Frete</Label>
-                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value }) }>
+                    <Label htmlFor="shipping-method">Método de Frete *</Label>
+                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value }) } required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o método de frete" />
                       </SelectTrigger>
@@ -1312,8 +1366,8 @@ export default function VendorBudgets() {
                     {selectedPaymentMethod.type === "credit_card" && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label htmlFor="installments">Número de Parcelas</Label>
-                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) }) }>
+                          <Label htmlFor="installments">Número de Parcelas *</Label>
+                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) }) } required>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -1331,7 +1385,7 @@ export default function VendorBudgets() {
 
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$) *</Label>
                         <Input
                           id="down-payment"
                           value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
@@ -1345,6 +1399,7 @@ export default function VendorBudgets() {
                             });
                           }}
                           placeholder="R$ 0,00"
+                          required
                         />
                         <div className="text-xs text-gray-600 mt-2 space-y-1">
                           <div className="flex justify-between">
@@ -1396,7 +1451,7 @@ export default function VendorBudgets() {
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="shipping-cost">Valor do Frete</Label>
+                        <Label htmlFor="shipping-cost">Valor do Frete (R$) *</Label>
                         <Input
                           id="shipping-cost"
                           value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
@@ -1410,11 +1465,12 @@ export default function VendorBudgets() {
                             });
                           }}
                           placeholder="R$ 0,00"
+                          required
                         />
                         <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do orçamento</p>
                       </div>
                       <div>
-                        <Label>Prazo de Entrega</Label>
+                        <Label>Prazo Estimado</Label>
                         <p className="text-sm text-gray-600 mt-2">
                           {selectedShippingMethod.estimatedDays} dias úteis
                         </p>

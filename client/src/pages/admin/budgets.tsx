@@ -355,6 +355,8 @@ export default function AdminBudgets() {
 
   const handleAdminBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar produtos obrigatórios
     if (adminBudgetForm.items.length === 0) {
       toast({
         title: "Erro",
@@ -363,6 +365,56 @@ export default function AdminBudgets() {
       });
       return;
     }
+
+    // Validar datas obrigatórias
+    if (!adminBudgetForm.validUntil) {
+      toast({
+        title: "Erro",
+        description: "A data 'Válido Até' é obrigatória",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!adminBudgetForm.deliveryDeadline) {
+      toast({
+        title: "Erro",
+        description: "O prazo de entrega é obrigatório",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar frete quando delivery
+    if (adminBudgetForm.deliveryType === "delivery" && adminBudgetForm.shippingCost <= 0) {
+      toast({
+        title: "Erro",
+        description: "O valor do frete é obrigatório quando há entrega",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar datas não podem ser no passado
+    const today = new Date().toISOString().split('T')[0];
+    if (adminBudgetForm.validUntil < today) {
+      toast({
+        title: "Erro",
+        description: "A data 'Válido Até' não pode ser anterior a hoje",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (adminBudgetForm.deliveryDeadline < today) {
+      toast({
+        title: "Erro",
+        description: "O prazo de entrega não pode ser anterior a hoje",
+        variant: "destructive"
+      });
+      return;
+    }
+
     createAdminBudgetMutation.mutate(adminBudgetForm);
   };
 
@@ -465,7 +517,7 @@ export default function AdminBudgets() {
             <form onSubmit={handleAdminBudgetSubmit} className="space-y-6">
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="admin-budget-title">Título do Orçamento</Label>
+                  <Label htmlFor="admin-budget-title">Título do Orçamento *</Label>
                   <Input
                     id="admin-budget-title"
                     value={adminBudgetForm.title}
@@ -474,28 +526,33 @@ export default function AdminBudgets() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="admin-budget-validUntil">Válido Até</Label>
+                  <Label htmlFor="admin-budget-validUntil">Válido Até *</Label>
                   <Input
                     id="admin-budget-validUntil"
                     type="date"
                     value={adminBudgetForm.validUntil}
                     onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, validUntil: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="admin-budget-deliveryDeadline">Prazo de Entrega</Label>
+                  <Label htmlFor="admin-budget-deliveryDeadline">Prazo de Entrega *</Label>
                   <Input
                     id="admin-budget-deliveryDeadline"
                     type="date"
                     value={adminBudgetForm.deliveryDeadline || ""}
                     onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega</Label>
+                  <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega *</Label>
                   <Select
                     value={adminBudgetForm.deliveryType}
                     onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value })}
+                    required
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo" />
