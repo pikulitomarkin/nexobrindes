@@ -227,6 +227,41 @@ export default function ClientOrders() {
                 </div>
               </div>
 
+              {/* Items Summary - Show unique items count */}
+              {(() => {
+                const items = order.budgetItems || order.items || [];
+                const uniqueItems = items.filter((item: any, index: number, self: any[]) => 
+                  self.findIndex(i => 
+                    i.productId === item.productId && 
+                    i.producerId === item.producerId &&
+                    i.quantity === item.quantity &&
+                    (i.unitPrice === item.unitPrice || i.totalPrice === item.totalPrice) &&
+                    i.hasItemCustomization === item.hasItemCustomization &&
+                    i.selectedCustomizationId === item.selectedCustomizationId &&
+                    i.hasGeneralCustomization === item.hasGeneralCustomization &&
+                    i.generalCustomizationName === item.generalCustomizationName
+                  ) === index
+                );
+
+                return uniqueItems.length > 0 && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm font-medium text-blue-800 mb-2">Itens do Pedido ({uniqueItems.length}):</p>
+                    <div className="space-y-1">
+                      {uniqueItems.map((item: any, index: number) => (
+                        <div key={`${item.id || index}-${item.productId}`} className="flex justify-between text-sm">
+                          <span className="text-blue-700">
+                            {item.productName || item.product?.name || 'Produto'} - Qtd: {item.quantity}
+                          </span>
+                          <span className="font-medium text-blue-800">
+                            R$ {parseFloat(item.totalPrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Payment Information */}
               {parseFloat(order.paidValue || '0') > 0 && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">

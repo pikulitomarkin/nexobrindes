@@ -260,11 +260,6 @@ export interface IStorage {
   getQuoteRequestsByClient(clientId: string): Promise<any[]>;
   getQuoteRequestById(id: string): Promise<any>; // New method to get a quote request by its ID
   updateQuoteRequestStatus(id: string, status: string): Promise<any>;
-
-  // Logistics - Get paid orders that are ready to be sent to production
-  getPaidOrdersReadyForProduction(): Promise<Order[]>;
-  // Reconciliation - Get orders with remaining balance
-  getPendingOrdersForReconciliation(): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -2500,9 +2495,50 @@ export class MemStorage implements IStorage {
     return enrichedBudgets;
   }
 
+  // Helper function to parse monetary values in either BRL format or standard format
+  // BRL: "15.000,00" (dot=thousands, comma=decimal) -> 15000.00
+  // Standard: "15000.00" (dot=decimal, no thousands) -> 15000.00
+  private parseBRLCurrency(value: any): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    
+    // Convert to string and remove BRL currency symbol and spaces
+    const strValue = String(value).replace(/[R$\s]/g, '').trim();
+    
+    // Check if this is Brazilian format (has comma) or standard format (no comma)
+    if (strValue.includes(',')) {
+      // Brazilian format: remove thousand separators (dot) and replace decimal comma with dot
+      const normalized = strValue.replace(/\./g, '').replace(',', '.');
+      return parseFloat(normalized) || 0;
+    } else {
+      // Standard format or already normalized: use as-is (dot is decimal separator)
+      return parseFloat(strValue) || 0;
+    }
+  }
+
+  // Helper function to parse percentage values (not currency - can have fractional percentages like 10.5)
+  private parsePercentage(value: any): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    
+    const strValue = String(value).replace(/[%\s]/g, '').trim();
+    
+    // Check if Brazilian format (comma for decimal)
+    if (strValue.includes(',') && !strValue.includes('.')) {
+      // Replace comma with dot for decimal
+      return parseFloat(strValue.replace(',', '.')) || 0;
+    } else {
+      // Standard format
+      return parseFloat(strValue) || 0;
+    }
+  }
+
   async createBudget(budgetData: any): Promise<any> {
     const id = generateId('budget');
     const now = new Date();
+
+    // Normalize monetary fields to ensure consistency
+    const normalizedTotalValue = this.parseBRLCurrency(budgetData.totalValue);
 
     const budget = {
       id,
@@ -2517,18 +2553,18 @@ export class MemStorage implements IStorage {
       validUntil: budgetData.validUntil || null,
       deliveryDeadline: budgetData.deliveryDeadline || null,
       deliveryType: budgetData.deliveryType || 'delivery',
-      totalValue: budgetData.totalValue || '0.00',
+      totalValue: normalizedTotalValue.toFixed(2),
       status: budgetData.status || 'draft',
       paymentMethodId: budgetData.paymentMethodId || '',
       shippingMethodId: budgetData.shippingMethodId || '',
-      installments: budgetData.installments || 1,
-      downPayment: parseFloat(budgetData.downPayment || 0),
-      remainingAmount: parseFloat(budgetData.remainingAmount || 0),
-      shippingCost: parseFloat(budgetData.shippingCost || 0),
+      installments: parseInt(budgetData.installments) || 1,
+      downPayment: this.parseBRLCurrency(budgetData.downPayment),
+      remainingAmount: this.parseBRLCurrency(budgetData.remainingAmount),
+      shippingCost: this.parseBRLCurrency(budgetData.shippingCost),
       hasDiscount: budgetData.hasDiscount || false,
       discountType: budgetData.discountType || 'percentage',
-      discountPercentage: parseFloat(budgetData.discountPercentage || 0),
-      discountValue: parseFloat(budgetData.discountValue || 0),
+      discountPercentage: this.parsePercentage(budgetData.discountPercentage),
+      discountValue: this.parseBRLCurrency(budgetData.discountValue),
       createdAt: now,
       updatedAt: now
     };
@@ -2556,9 +2592,33 @@ export class MemStorage implements IStorage {
     const budget = this.budgets.get(id);
     if (!budget) return null;
 
+    // Normalize monetary fields if present using BRL currency parser
+    const normalizedData = { ...budgetData };
+    if (budgetData.totalValue !== undefined) {
+      normalizedData.totalValue = this.parseBRLCurrency(budgetData.totalValue).toFixed(2);
+    }
+    if (budgetData.downPayment !== undefined) {
+      normalizedData.downPayment = this.parseBRLCurrency(budgetData.downPayment);
+    }
+    if (budgetData.remainingAmount !== undefined) {
+      normalizedData.remainingAmount = this.parseBRLCurrency(budgetData.remainingAmount);
+    }
+    if (budgetData.shippingCost !== undefined) {
+      normalizedData.shippingCost = this.parseBRLCurrency(budgetData.shippingCost);
+    }
+    if (budgetData.discountPercentage !== undefined) {
+      normalizedData.discountPercentage = this.parsePercentage(budgetData.discountPercentage);
+    }
+    if (budgetData.discountValue !== undefined) {
+      normalizedData.discountValue = this.parseBRLCurrency(budgetData.discountValue);
+    }
+    if (budgetData.installments !== undefined) {
+      normalizedData.installments = parseInt(budgetData.installments) || 1;
+    }
+
     const updatedBudget = {
       ...budget,
-      ...budgetData,
+      ...normalizedData,
       updatedAt: new Date().toISOString()
     };
 
@@ -2573,98 +2633,168 @@ export class MemStorage implements IStorage {
     return this.budgets.delete(id);
   }
 
-  async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
+  async convertBudgetToOrder(budgetId: string, clientId?: string): Promise<Order> {
     const budget = this.budgets.get(budgetId);
     if (!budget) {
-      throw new Error('Orçamento não encontrado');
+      throw new Error("Orçamento não encontrado");
+    }
+
+    if (budget.status === 'converted') {
+      throw new Error("Este orçamento já foi convertido em pedido");
     }
 
     // Get budget items
-    const budgetItems = await Promise.all(
-      Array.from(this.budgetItems.values())
-      .filter(item => item.budgetId === budgetId)
-      .map(async (item) => {
-        const product = await this.getProduct(item.productId);
-        let producerName = null;
-        if (item.producerId && item.producerId !== 'internal') {
-          const producer = await this.getUser(item.producerId);
-          producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
-        }
-        return {
-          ...item,
-          producerName: producerName,
-          product: {
-            name: product?.name || 'Produto não encontrado',
-            description: product?.description || '',
-            category: product?.category || '',
-            imageLink: product?.imageLink || ''
-          }
-        };
-      })
-    );
+    const budgetItems = await this.getBudgetItems(budgetId);
+    console.log(`Budget items for conversion:`, budgetItems.length);
 
-    // Create order data based on budget
-    const orderData = {
+    // Get budget payment info
+    const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
+
+    // Get budget photos
+    const budgetPhotos = await this.getBudgetPhotos(budgetId);
+
+    // Generate order number
+    const orderNumber = `PED-${Date.now()}`;
+
+    // Filter and deduplicate budget items - remove items with duplicate productId + producerId + quantity + unitPrice
+    const uniqueBudgetItems = budgetItems.filter((item: any, index: number, self: any[]) => {
+      const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+      const firstIndex = self.findIndex((i: any) => 
+        `${i.productId}-${i.producerId || 'internal'}-${i.quantity}-${i.unitPrice}` === itemKey
+      );
+
+      if (firstIndex !== index) {
+        console.log(`Removing duplicate budget item: ${item.productName} (${itemKey})`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`Filtered ${budgetItems.length} items down to ${uniqueBudgetItems.length} unique items`);
+
+    // Convert budget items to order format
+    const orderItems = uniqueBudgetItems.map((item: any) => ({
+      productId: item.productId,
+      productName: item.productName || 'Produto',
+      producerId: item.producerId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+
+      // Personalização do item
+      hasItemCustomization: item.hasItemCustomization || false,
+      selectedCustomizationId: item.selectedCustomizationId || null,
+      itemCustomizationValue: item.itemCustomizationValue || 0,
+      itemCustomizationDescription: item.itemCustomizationDescription || '',
+      additionalCustomizationNotes: item.additionalCustomizationNotes || '',
+      customizationPhoto: item.customizationPhoto || '',
+
+      // Personalização geral
+      hasGeneralCustomization: item.hasGeneralCustomization || false,
+      generalCustomizationName: item.generalCustomizationName || '',
+      generalCustomizationValue: item.generalCustomizationValue || 0,
+
+      // Desconto do item
+      hasItemDiscount: item.hasItemDiscount || false,
+      itemDiscountType: item.itemDiscountType || 'percentage',
+      itemDiscountPercentage: item.itemDiscountPercentage || 0,
+      itemDiscountValue: item.itemDiscountValue || 0,
+
+      // Dimensões do produto
+      productWidth: item.productWidth,
+      productHeight: item.productHeight,
+      productDepth: item.productDepth,
+    }));
+
+    // Recalculate total value from items to ensure accuracy (using BRL currency parser)
+    let calculatedTotal = orderItems.reduce((sum, item) => {
+      // Calculate item total with all components - parse BRL format values
+      const basePrice = this.parseBRLCurrency(item.unitPrice) * item.quantity;
+      
+      // Item customization (valor por unidade personalizada)
+      const itemCustomization = item.hasItemCustomization ? 
+        item.quantity * this.parseBRLCurrency(item.itemCustomizationValue) : 0;
+      
+      // General customization (valor por unidade aplicado à quantidade total)
+      const generalCustomization = item.hasGeneralCustomization ? 
+        item.quantity * this.parseBRLCurrency(item.generalCustomizationValue) : 0;
+      
+      let itemSubtotal = basePrice + itemCustomization + generalCustomization;
+      
+      // Apply item discount (sobre o preço base apenas)
+      if (item.hasItemDiscount) {
+        if (item.itemDiscountType === 'percentage') {
+          const discountAmount = (basePrice * this.parsePercentage(item.itemDiscountPercentage)) / 100;
+          itemSubtotal -= discountAmount;
+        } else if (item.itemDiscountType === 'value') {
+          itemSubtotal -= this.parseBRLCurrency(item.itemDiscountValue);
+        }
+      }
+      
+      return sum + Math.max(0, itemSubtotal);
+    }, 0);
+
+    // Apply general discount to the subtotal
+    if (budget.hasDiscount) {
+      if (budget.discountType === 'percentage') {
+        const discountAmount = (calculatedTotal * this.parsePercentage(budget.discountPercentage)) / 100;
+        calculatedTotal -= discountAmount;
+      } else if (budget.discountType === 'value') {
+        calculatedTotal -= this.parseBRLCurrency(budget.discountValue);
+      }
+    }
+
+    // Add shipping cost if delivery (not pickup)
+    const shippingCost = budget.deliveryType === 'pickup' ? 0 : 
+      this.parseBRLCurrency(budgetPaymentInfo?.shippingCost);
+    
+    calculatedTotal += shippingCost;
+
+    // Ensure total is never negative
+    const finalTotalValue = Math.max(0, calculatedTotal).toFixed(2);
+
+    console.log(`Budget ${budgetId} conversion - Recalculated total: R$ ${finalTotalValue} (original: R$ ${budget.totalValue})`);
+
+    // Create order
+    const orderData: InsertOrder = {
+      orderNumber,
       budgetId: budgetId,
-      clientId: budget.clientId,
+      clientId: clientId || budget.clientId || null,
       vendorId: budget.vendorId,
       product: budget.title,
-      description: budget.description,
-      totalValue: budget.totalValue,
+      description: budget.description || '',
+      totalValue: finalTotalValue,
       status: 'confirmed',
+      deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+
+      // Contact info from budget
       contactName: budget.contactName,
-      contactPhone: budget.contactPhone,
-      contactEmail: budget.contactEmail,
-      deliveryType: budget.deliveryType,
-      deliveryDeadline: budget.deliveryDeadline,
-      paymentMethodId: budget.paymentMethodId,
-      shippingMethodId: budget.shippingMethodId,
-      installments: budget.installments,
-      downPayment: budget.downPayment,
-      remainingAmount: budget.remainingAmount,
-      shippingCost: budget.shippingCost,
-      hasDiscount: budget.hasDiscount,
-      discountType: budget.discountType,
-      discountPercentage: budget.discountPercentage,
-      discountValue: budget.discountValue,
-      items: budgetItems.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        producerId: item.producerId,
-        producerName: item.producerName, // Include producer name
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        hasItemCustomization: item.hasItemCustomization,
-        selectedCustomizationId: item.selectedCustomizationId,
-        itemCustomizationValue: item.itemCustomizationValue,
-        itemCustomizationDescription: item.itemCustomizationDescription,
-        additionalCustomizationNotes: item.additionalCustomizationNotes,
-        customizationPhoto: item.customizationPhoto, // Include customization photo
-        hasGeneralCustomization: item.hasGeneralCustomization,
-        generalCustomizationName: item.generalCustomizationName,
-        generalCustomizationValue: item.generalCustomizationValue,
-        productWidth: item.productWidth,
-        productHeight: item.productHeight,
-        productDepth: item.productDepth,
-        hasItemDiscount: item.hasItemDiscount,
-        itemDiscountType: item.itemDiscountType,
-        itemDiscountPercentage: item.itemDiscountPercentage,
-        itemDiscountValue: item.itemDiscountValue
-      }))
+      contactPhone: budget.contactPhone || '',
+      contactEmail: budget.contactEmail || '',
+      deliveryType: budget.deliveryType || 'delivery',
+
+      // Payment info from budget
+      paymentMethodId: budgetPaymentInfo?.paymentMethodId || '',
+      shippingMethodId: budgetPaymentInfo?.shippingMethodId || '',
+      installments: budgetPaymentInfo?.installments || 1,
+      downPayment: budgetPaymentInfo?.downPayment || 0,
+      remainingAmount: budgetPaymentInfo?.remainingAmount || 0,
+      shippingCost: budgetPaymentInfo?.shippingCost || 0,
+
+      // Discount from budget
+      hasDiscount: budget.hasDiscount || false,
+      discountType: budget.discountType || 'percentage',
+      discountPercentage: budget.discountPercentage || 0,
+      discountValue: budget.discountValue || 0,
+
+      // Order items
+      items: orderItems
     };
 
-    // Create the order
     const order = await this.createOrder(orderData);
 
-    // Update budget status to converted
-    const updatedBudget = {
-      ...budget,
-      status: 'converted',
-      convertedAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.budgets.set(budgetId, updatedBudget);
+    // Mark budget as converted
+    await this.updateBudget(budgetId, { status: 'converted' });
 
     console.log(`Budget ${budgetId} converted to order ${order.id}`);
     return order;
@@ -2686,19 +2816,19 @@ export class MemStorage implements IStorage {
       productName: itemData.productName || '',
       producerId: itemData.producerId || null,
       quantity: parseInt(itemData.quantity) || 1,
-      unitPrice: parseFloat(itemData.unitPrice) || 0,
-      totalPrice: parseFloat(itemData.totalPrice) || 0,
+      unitPrice: this.parseBRLCurrency(itemData.unitPrice),
+      totalPrice: this.parseBRLCurrency(itemData.totalPrice),
       // Item customization fields
       hasItemCustomization: itemData.hasItemCustomization || false,
       selectedCustomizationId: itemData.selectedCustomizationId || null,
-      itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || 0),
+      itemCustomizationValue: this.parseBRLCurrency(itemData.itemCustomizationValue),
       itemCustomizationDescription: itemData.itemCustomizationDescription || '',
       additionalCustomizationNotes: itemData.additionalCustomizationNotes || '',
       customizationPhoto: itemData.customizationPhoto || '', // Add customization photo field
       // General customization fields
       hasGeneralCustomization: itemData.hasGeneralCustomization || false,
       generalCustomizationName: itemData.generalCustomizationName || '',
-      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || 0),
+      generalCustomizationValue: this.parseBRLCurrency(itemData.generalCustomizationValue),
       // Product dimensions
       productWidth: itemData.productWidth || null,
       productHeight: itemData.productHeight || null,
@@ -2706,8 +2836,8 @@ export class MemStorage implements IStorage {
       // Item discount
       hasItemDiscount: itemData.hasItemDiscount || false,
       itemDiscountType: itemData.itemDiscountType || 'percentage',
-      itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || 0),
-      itemDiscountValue: parseFloat(itemData.itemDiscountValue || 0),
+      itemDiscountPercentage: this.parsePercentage(itemData.itemDiscountPercentage),
+      itemDiscountValue: this.parseBRLCurrency(itemData.itemDiscountValue),
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -3578,8 +3708,10 @@ export class MemStorage implements IStorage {
   }
 
   async getProducerPaymentsByProducer(producerId: string): Promise<ProducerPayment[]> {
-    const payments = Array.from(this.producerPayments.values()).filter(p => p.producerId === producerId);
-    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const allPayments = Array.from(this.producerPayments.values());
+    const producerPayments = allPayments.filter(payment => payment.producerId === producerId);
+    console.log(`Storage: getProducerPaymentsByProducer for ${producerId} returning ${producerPayments.length} payments:`, producerPayments.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
+    return producerPayments;
   }
 
   async getProducerPaymentByProductionOrderId(productionOrderId: string): Promise<ProducerPayment | undefined> {
