@@ -744,7 +744,6 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    // Sempre garantir que os clientes pré-cadastrados existam (forçar criação se necessário)
     this.clients.set(preClient1.id, preClient1);
     this.clients.set(preClient2.id, preClient2);
     this.clients.set(preClient3.id, preClient3);
@@ -927,7 +926,7 @@ export class MemStorage implements IStorage {
     this.clients.set(client4.id, client4);
     this.clients.set(client5.id, client5);
 
-    // Limpar dados de pedidos, orçamentos, etc.
+    // Limpar todos os dados de pedidos, orçamentos, etc.
     mockOrders = [];
     mockBudgets = [];
 
@@ -1294,58 +1293,29 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient & { userCode?: string; password?: string }): Promise<Client & { userCode?: string }> {
-    try {
-      console.log("Storage: createClient called with data:", clientData);
+  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
+    const id = randomUUID();
+    const client: Client & { userCode?: string } = {
+      ...clientData,
+      id,
+      vendorId: clientData.vendorId || null,
+      userId: clientData.userId || null,
+      email: clientData.email || null,
+      phone: clientData.phone || null,
+      whatsapp: clientData.whatsapp || null,
+      cpfCnpj: clientData.cpfCnpj || null,
+      address: clientData.address || null,
+      userCode: (clientData as any).userCode || null,
+      isActive: clientData.isActive !== undefined ? clientData.isActive : true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-      if (!clientData.name || typeof clientData.name !== 'string' || !clientData.name.trim()) {
-        throw new Error("Nome é obrigatório");
-      }
-
-      if (!clientData.password || typeof clientData.password !== 'string' || clientData.password.length < 6) {
-        throw new Error("Senha deve ter pelo menos 6 caracteres");
-      }
-
-      const id = randomUUID();
-      const client: Client & { userCode?: string; password?: string } = {
-        ...clientData,
-        id,
-        vendorId: clientData.vendorId || null,
-        userId: clientData.userId || null,
-        email: clientData.email || null,
-        phone: clientData.phone || null,
-        whatsapp: clientData.whatsapp || null,
-        cpfCnpj: clientData.cpfCnpj || null,
-        address: clientData.address || null,
-        userCode: (clientData as any).userCode || null,
-        password: clientData.password, // Store password for client login
-        isActive: clientData.isActive !== undefined ? clientData.isActive : true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, {
-        id: client.id,
-        name: client.name,
-        vendorId: client.vendorId,
-        userCode: client.userCode
-      });
-
-      this.clients.set(id, client);
-      console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
-
-      const retrieved = this.clients.get(id);
-      console.log(`Storage: Can retrieve client: ${retrieved !== undefined}`);
-
-      if (!retrieved) {
-        throw new Error("Falha ao salvar cliente");
-      }
-
-      return client;
-    } catch (error) {
-      console.error("Storage: Error in createClient:", error);
-      throw error;
-    }
+    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
+    this.clients.set(id, client);
+    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
+    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
+    return client;
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
@@ -1574,6 +1544,19 @@ export class MemStorage implements IStorage {
         // Calculate expected amount based on payment info - MANTER O VALOR ORIGINAL DO PEDIDO
         let expectedAmount = parseFloat(order.totalValue); // NUNCA alterar o valor total do pedido
         let minimumPaymentValue = "0.00";
+
+        // If order was converted from budget, get budget payment info
+        if (order.budgetId) {
+          const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
+          if (budgetPaymentInfo) {
+            const budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || '0');
+            const budgetShipping = parseFloat(budgetPaymentInfo.shippingCost || '0');
+
+            if (budgetDownPayment > 0 || budgetShipping > 0) {
+              minimumPaymentValue = (budgetDownPayment + budgetShipping).toFixed(2);
+            }
+          }
+        }
 
         // Get current payments for this order
         const payments = await this.getPaymentsByOrder(order.id);
@@ -1916,7 +1899,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values());
   }
 
-  async createPayment(insertPayment: InsertPayment & { __skipOrderUpdate?: boolean }): Promise<Payment> {
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
     const payment: Payment = {
       ...insertPayment,
@@ -1931,8 +1914,8 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(id, payment);
 
-    // If the payment is confirmed and not flagged to skip order update, update the order's paid value
-    if (payment.status === 'confirmed' && !(insertPayment as any).__skipOrderUpdate) {
+    // If the payment is confirmed, update the order's paid value
+    if (payment.status === 'confirmed') {
       await this.updateOrderPaidValue(payment.orderId);
     }
 
@@ -2285,11 +2268,7 @@ export class MemStorage implements IStorage {
 
   // Commission Settings methods
   async getCommissionSettings(): Promise<CommissionSettings | undefined> {
-    // This method was intended to query a database, but in MemStorage it returns a static value.
-    // Ensure it's returning the correct type.
-    // The original code had a database query. In MemStorage, we return the hardcoded value.
-    // return this.db.select().from(commissionSettings); // This line is from a DB context
-    return this.commissionSettings; // Returning the in-memory setting
+    return this.commissionSettings;
   }
 
   async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
@@ -3688,7 +3667,7 @@ export class MemStorage implements IStorage {
         status = 'overdue';
       }
 
-      await this.updateAccountsReceivable(receivable.id, {
+      await this.updateAccountsReceivable(receivableId, {
         receivedAmount: newReceived.toFixed(2),
         status
       });

@@ -56,18 +56,11 @@ export default function VendorClients() {
   }, [isCreateDialogOpen]);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ["/api/vendors", vendorId, "clients"],
+    queryKey: ["/api/vendor/clients", vendorId],
     queryFn: async () => {
-      console.log(`Fetching clients for vendor: ${vendorId}`);
       const response = await fetch(`/api/vendors/${vendorId}/clients`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Failed to fetch clients: ${response.status} - ${errorText}`);
-        throw new Error(`Failed to fetch clients: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log(`Received ${data.length} clients:`, data);
-      return data;
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
     },
   });
 
@@ -97,33 +90,22 @@ export default function VendorClients() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
-      console.log("Creating client with data:", { ...data, userCode, vendorId });
-      
       const clientData = {
         ...data,
         userCode: userCode,
         vendorId: vendorId
       };
-      
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
       });
-      
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Client creation error:", errorData);
-        throw new Error(`Erro ao criar cliente: ${errorData}`);
-      }
-      
-      const result = await response.json();
-      console.log("Client created successfully:", result);
-      return result;
+      if (!response.ok) throw new Error("Erro ao criar cliente");
+      return response.json();
     },
     onSuccess: (newClient) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/clients", vendorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsCreateDialogOpen(false);
       form.reset();
@@ -140,14 +122,6 @@ export default function VendorClients() {
           duration: 10000,
         });
       }, 1000);
-    },
-    onError: (error) => {
-      console.error("Error creating client:", error);
-      toast({
-        title: "Erro!",
-        description: error.message || "Erro ao criar cliente",
-        variant: "destructive",
-      });
     },
   });
 

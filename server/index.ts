@@ -39,34 +39,13 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  // Error handling middleware
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Error:', err);
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
 
-    // Ensure we always send JSON response
-    if (!res.headersSent) {
-      res.setHeader('Content-Type', 'application/json');
-      res.status(500).json({
-        error: 'Internal server error',
-        message: err.message || 'Erro desconhecido',
-        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-      });
-    }
+    res.status(status).json({ message });
+    throw err;
   });
-
-  // Catch-all for unmatched routes that should return JSON
-  app.use('*', (req: express.Request, res: express.Response) => {
-    if (req.path.startsWith('/api')) {
-      res.setHeader('Content-Type', 'application/json');
-      res.status(404).json({
-        error: 'Not found',
-        message: `Endpoint ${req.method} ${req.path} not found`
-      });
-    } else {
-      next();
-    }
-  });
-
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
