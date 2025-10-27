@@ -711,8 +711,8 @@ export default function AdminBudgets() {
                           </div>
                         </div>
 
-                            <div className="flex items-center space-x-2 mb-3">
-                              <Switch
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Switch
                                 id={`admin-general-customization-${index}`}
                                 checked={item.hasGeneralCustomization}
                                 onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasGeneralCustomization', checked)}
