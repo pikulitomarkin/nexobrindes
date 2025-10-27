@@ -209,83 +209,143 @@ export default function ClientOrderTimeline() {
           )}
 
           {order.status === 'partial_shipped' && (
-            <Card className="mb-8 border-cyan-200 bg-cyan-50">
+            <Card className="mb-8 border-cyan-200 bg-gradient-to-r from-cyan-50 to-blue-50 shadow-lg">
               <CardContent className="p-6">
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center">
-                      <Truck className="h-6 w-6 text-cyan-600" />
+                  <div className="flex items-center gap-3 pb-3 border-b border-cyan-200">
+                    <div className="w-16 h-16 bg-gradient-to-br from-cyan-100 to-blue-100 rounded-full flex items-center justify-center shadow-inner">
+                      <Truck className="h-8 w-8 text-cyan-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-cyan-900">Envio Parcial!</h3>
-                      <p className="text-cyan-700">
+                      <h3 className="text-xl font-bold text-cyan-900">📦 Envio Parcial em Andamento</h3>
+                      <p className="text-cyan-700 text-sm mt-1">
                         Parte do seu pedido já foi despachada e está a caminho. Os demais itens serão enviados assim que ficarem prontos.
                       </p>
                     </div>
                   </div>
 
                   {/* Detalhes dos envios */}
-                  {order.shipmentDetails && order.shipmentDetails.length > 0 && (
-                    <div className="mt-4 space-y-3">
-                      <h4 className="text-md font-semibold text-cyan-900">Status dos Envios:</h4>
+                  {order.shipmentDetails && order.shipmentDetails.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-bold text-cyan-900">📋 Status Detalhado dos Envios</h4>
+                        <span className="bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium">
+                          {order.shipmentDetails.filter((s: any) => s.status === 'shipped').length} de {order.shipmentDetails.length} enviados
+                        </span>
+                      </div>
+                      
                       {order.shipmentDetails.map((shipment: any, index: number) => (
-                        <div key={index} className="bg-white p-4 rounded-lg border border-cyan-200">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="font-semibold text-cyan-900">
-                                🏭 {shipment.producerName}
+                        <div key={index} className="bg-white p-5 rounded-xl border border-cyan-200 shadow-sm hover:shadow-md transition-shadow">
+                          {/* Header do envio */}
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                shipment.status === 'shipped' 
+                                  ? 'bg-green-100 text-green-600' 
+                                  : 'bg-orange-100 text-orange-600'
+                              }`}>
+                                {shipment.status === 'shipped' ? '✅' : '⏳'}
                               </div>
-                              <div className="text-sm text-cyan-700 mt-1">
-                                {shipment.items?.length || 0} item(s) neste envio
+                              <div>
+                                <div className="font-bold text-gray-900 text-lg">
+                                  🏭 {shipment.producerName || 'Produtor'}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {shipment.items?.length || 0} item(s) neste envio
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
                               {shipment.status === 'shipped' ? (
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                                  ✓ Enviado
+                                <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">
+                                  ✅ Despachado
                                 </span>
                               ) : (
-                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
-                                  ⏳ Preparando
+                                <span className="bg-orange-100 text-orange-800 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">
+                                  ⏳ Preparando Envio
                                 </span>
                               )}
                             </div>
                           </div>
                           
-                          {/* Lista de itens */}
+                          {/* Lista detalhada de itens */}
                           {shipment.items && shipment.items.length > 0 && (
-                            <div className="mt-3">
-                              <div className="text-xs font-medium text-cyan-800 mb-2">Itens:</div>
-                              <div className="space-y-1">
+                            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="text-sm font-semibold text-gray-800 mb-2">📦 Itens neste envio:</div>
+                              <div className="space-y-2">
                                 {shipment.items.map((item: any, itemIndex: number) => (
-                                  <div key={itemIndex} className="flex justify-between text-xs text-cyan-700 bg-cyan-50 px-2 py-1 rounded">
-                                    <span>{item.product?.name || item.productName}</span>
-                                    <span>Qtd: {item.quantity}</span>
+                                  <div key={itemIndex} className="flex justify-between items-center bg-white px-3 py-2 rounded border border-gray-200">
+                                    <div className="flex-1">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {item.product?.name || item.productName}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm font-bold text-blue-600">
+                                      Qtd: {item.quantity}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
                           
+                          {/* Código de rastreamento */}
                           {shipment.trackingCode && (
-                            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                              <div className="text-xs font-medium text-blue-800">Código de Rastreamento:</div>
-                              <div className="text-xs text-blue-700 font-mono">{shipment.trackingCode}</div>
+                            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="text-sm font-semibold text-blue-900 mb-2">📍 Rastreamento:</div>
+                              <div className="flex items-center justify-between bg-white p-3 rounded border border-blue-200">
+                                <div className="font-mono text-sm text-blue-800">{shipment.trackingCode}</div>
+                                <a 
+                                  href={`https://rastreamento.correios.com.br/${shipment.trackingCode}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                                >
+                                  🔗 Rastrear
+                                </a>
+                              </div>
                             </div>
                           )}
                           
+                          {/* Data de envio */}
                           {shipment.shippedAt && (
-                            <div className="text-xs text-gray-600 mt-2">
-                              Despachado em: {new Date(shipment.shippedAt).toLocaleDateString('pt-BR', {
+                            <div className="text-sm text-gray-600 pt-3 border-t border-gray-200">
+                              📅 <strong>Despachado em:</strong> {new Date(shipment.shippedAt).toLocaleDateString('pt-BR', {
                                 weekday: 'long',
                                 year: 'numeric',
                                 month: 'long',
-                                day: 'numeric'
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
                               })}
                             </div>
                           )}
                         </div>
                       ))}
+                      
+                      {/* Resumo final */}
+                      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <div className="text-blue-600 mt-1">💡</div>
+                          <div className="text-sm text-blue-800">
+                            <strong>Sobre o envio parcial:</strong>
+                            <ul className="mt-1 ml-3 space-y-1 text-xs">
+                              <li>• Cada produtor envia seus itens separadamente</li>
+                              <li>• Você pode acompanhar cada envio individualmente</li>
+                              <li>• O pedido será marcado como "Enviado" quando todos os itens forem despachados</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                      <div className="flex items-center gap-3">
+                        <div className="text-yellow-600 text-xl">ℹ️</div>
+                        <div className="text-sm text-yellow-800">
+                          <strong>Aguardando detalhes:</strong> As informações específicas dos envios serão atualizadas em breve.
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -323,57 +323,101 @@ export default function ClientOrders() {
               )}
 
               {order.status === 'partial_shipped' && (
-                <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-cyan-600" />
-                    <span className="text-sm font-medium text-cyan-800">
-                      Envio parcial em andamento!
+                <div className="mt-4 p-4 bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-lg shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1 bg-cyan-100 rounded-full">
+                      <Truck className="h-4 w-4 text-cyan-600" />
+                    </div>
+                    <span className="text-sm font-semibold text-cyan-800">
+                      📦 Envio Parcial em Andamento!
                     </span>
                   </div>
-                  <div className="text-xs text-cyan-600 mt-1 mb-2">
-                    Parte do pedido já foi enviada. Os demais itens serão despachados assim que ficarem prontos.
+                  <div className="text-sm text-cyan-700 mb-3">
+                    Parte do seu pedido já foi despachada e está a caminho. Os demais itens serão enviados assim que ficarem prontos.
                   </div>
                   
-                  {/* Detalhes dos envios */}
-                  {order.shipmentDetails && order.shipmentDetails.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <div className="text-xs font-medium text-cyan-800">Detalhes dos envios:</div>
+                  {/* Status dos Envios */}
+                  {order.shipmentDetails && order.shipmentDetails.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="text-sm font-semibold text-cyan-800 border-b border-cyan-200 pb-1">
+                        Status detalhado dos envios:
+                      </div>
                       {order.shipmentDetails.map((shipment: any, index: number) => (
-                        <div key={index} className="bg-white p-2 rounded border border-cyan-200">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-xs text-cyan-900">
-                                {shipment.producerName}
-                              </div>
-                              <div className="text-xs text-cyan-700">
-                                {shipment.items?.length || 0} item(s)
-                                {shipment.items && shipment.items.length > 0 && (
-                                  <span className="ml-1">
-                                    - {shipment.items.map((item: any) => item.product?.name || item.productName).join(', ')}
+                        <div key={index} className="bg-white p-3 rounded-lg border border-cyan-200 shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-semibold text-cyan-900">
+                                  🏭 {shipment.producerName || 'Produtor'}
+                                </span>
+                                {shipment.status === 'shipped' ? (
+                                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                                    ✅ Enviado
+                                  </span>
+                                ) : (
+                                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-medium">
+                                    ⏳ Preparando Envio
                                   </span>
                                 )}
                               </div>
+                              
+                              {shipment.items && shipment.items.length > 0 ? (
+                                <div className="text-xs text-gray-600 mb-2">
+                                  <strong>Itens neste envio ({shipment.items.length}):</strong>
+                                  <ul className="mt-1 ml-3 space-y-1">
+                                    {shipment.items.map((item: any, itemIndex: number) => (
+                                      <li key={itemIndex} className="flex justify-between">
+                                        <span>• {item.product?.name || item.productName}</span>
+                                        <span className="font-medium">Qtd: {item.quantity}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-600 mb-2">
+                                  {shipment.items?.length || 0} item(s) neste envio
+                                </div>
+                              )}
+                              
                               {shipment.trackingCode && (
-                                <div className="text-xs text-cyan-600 mt-1">
-                                  Rastreio: {shipment.trackingCode}
+                                <div className="bg-blue-50 p-2 rounded border border-blue-200 mt-2">
+                                  <div className="text-xs font-medium text-blue-800">Código de Rastreamento:</div>
+                                  <div className="text-xs text-blue-700 font-mono mt-1">{shipment.trackingCode}</div>
+                                  <a 
+                                    href={`https://rastreamento.correios.com.br/${shipment.trackingCode}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
+                                  >
+                                    🔗 Rastrear pelos Correios
+                                  </a>
                                 </div>
                               )}
                             </div>
-                            <div className="text-xs">
-                              {shipment.status === 'shipped' ? (
-                                <span className="text-green-600 font-medium">✓ Enviado</span>
-                              ) : (
-                                <span className="text-orange-600 font-medium">⏳ Pendente</span>
-                              )}
-                            </div>
                           </div>
+                          
                           {shipment.shippedAt && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Enviado em: {new Date(shipment.shippedAt).toLocaleDateString('pt-BR')}
+                            <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-100">
+                              📅 Despachado em: {new Date(shipment.shippedAt).toLocaleDateString('pt-BR', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
                             </div>
                           )}
                         </div>
                       ))}
+                      
+                      <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        💡 <strong>Dica:</strong> Assim que todos os itens forem despachados, o status do pedido mudará para "Enviado" e você receberá uma notificação.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                      <div className="text-sm text-yellow-800">
+                        ℹ️ Aguardando informações detalhadas dos envios...
+                      </div>
                     </div>
                   )}
                 </div>

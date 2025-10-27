@@ -1486,13 +1486,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shipmentDetails = await Promise.all(
         productionOrders.map(async (po) => {
           const producer = await storage.getUser(po.producerId);
+          
+          // Filter items for this specific producer
+          const producerItems = budgetItems.filter(item => item.producerId === po.producerId);
+          
           return {
             producerId: po.producerId,
             producerName: producer?.name || 'Produtor Desconhecido',
-            status: po.status,
-            trackingCode: po.trackingCode,
-            shippedAt: po.status === 'shipped' || po.status === 'delivered' ? po.updatedAt : null,
-            items: budgetItems.filter(item => item.producerId === po.producerId)
+            status: po.status === 'delivered' ? 'shipped' : po.status, // Normalize delivered to shipped for client view
+            trackingCode: po.trackingCode || null,
+            shippedAt: ['shipped', 'delivered'].includes(po.status) ? (po.completedAt || po.updatedAt) : null,
+            items: producerItems.map(item => ({
+              ...item,
+              product: item.product || { name: item.productName },
+              productName: item.productName || item.product?.name
+            }))
           };
         })
       );
