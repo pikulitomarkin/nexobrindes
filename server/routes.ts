@@ -3441,7 +3441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const monthlyRevenue = orders
         .filter(order => {
-          if (!order.createdAt || order.status === 'cancelled') return false;
+          if (!order.createdAt) return false;
           const orderDate = new Date(order.createdAt);
           return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
         })
@@ -3809,35 +3809,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orders/:id/confirm-delivery", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log(`Client confirming delivery for order: ${id}`);
 
-      let order = await storage.getOrder(id);
-      if (!order) {
-        return res.status(404).json({ error: "Pedido não encontrado" });
-      }
+      console.log(`Confirming delivery for order: ${id}`);
 
-      if (order.status !== 'shipped') {
-        return res.status(400).json({ error: "Pedido deve estar despachado para confirmar a entrega" });
-      }
-
-      // Update order status to delivered
-      const updatedOrder = await storage.updateOrder(id, {
-        status: 'delivered',
-        updatedAt: new Date()
-      });
-
-      // Update related production orders to delivered
+      // Check all production orders for this order
       const productionOrders = await storage.getProductionOrdersByOrder(id);
-      for (const po of productionOrders) {
-        await storage.updateProductionOrderStatus(po.id, 'delivered', 'Cliente confirmou o recebimento');
+      const allDelivered = productionOrders.every(po => po.status === 'delivered');
+
+      if (allDelivered) {
+        // All production orders are delivered, mark main order as delivered
+        const updatedOrder = await storage.updateOrderStatus(id, 'delivered');
+        if (!updatedOrder) {
+          return res.status(404).json({ error: "Pedido não encontrado" });
+        }
+
+        console.log(`Order ${id} fully delivered - all producers completed`);
+
+        res.json({
+          success: true,
+          message: "Entrega completa confirmada com sucesso",
+          order: updatedOrder
+        });
+      } else {
+        // Some production orders are still pending, keep as partially shipped
+        const updatedOrder = await storage.updateOrderStatus(id, 'partial_shipped');
+        if (!updatedOrder) {
+          return res.status(404).json({ error: "Pedido não encontrado" });
+        }
+
+        console.log(`Order ${id} partially delivered - some producers still pending`);
+
+        res.json({
+          success: true,
+          message: "Entrega parcial confirmada com sucesso",
+          order: updatedOrder
+        });
       }
 
-      console.log(`Order ${id} confirmed as delivered by client`);
-      res.json({
-        success: true,
-        order: updatedOrder,
-        message: "Entrega confirmada com sucesso!"
-      });
     } catch (error) {
       console.error("Error confirming delivery:", error);
       res.status(500).json({ error: "Erro ao confirmar entrega: " + error.message });
@@ -4450,25 +4458,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Budget approval endpoint (for clients)
   app.post("/api/budgets/:id/approve", async (req, res) => {
     try {
-      const { id } = req.params;
-      const { observations } = req.body;
+      const budgetId = req.params.id;
+      const budget = await storage.getBudget(budgetId);
 
-      const updatedBudget = await storage.updateBudget(id, {
-        status: "approved",
-        approvedAt: new Date(),
-        clientObservations: observations || null,
-        hasVendorNotification: true // Nova notificação para o vendedor
-      });
-
-      if (!updatedBudget) {
+      if (!budget) {
         return res.status(404).json({ error: "Budget not found" });
       }
 
-      console.log(`Budget ${id} approved by client with observations: ${observations}`);
-      res.json(updatedBudget);
+      budget.status = 'approved';
+      budget.updatedAt = new Date().toISOString();
+
+      await storage.updateBudget(budgetId, budget);
+
+      res.json({ success: true, budget });
     } catch (error) {
-      console.error("Error approving budget:", error);
-      res.status(500).json({ error: "Erro ao aprovar orçamento" });
+      console.error('Error approving budget:', error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -5092,7 +5097,7 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({
         success: true,
         payment: updatedPayment,
-        message: "Pagamento registrado com sucesso"
+        message: "Pagamento do produtor registrado com sucesso"
       });
     } catch (error) {
       console.error("Error registering producer payment:", error);

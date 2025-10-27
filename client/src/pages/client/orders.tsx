@@ -42,6 +42,7 @@ export default function ClientOrders() {
       production: "bg-purple-100 text-purple-800",
       ready: "bg-orange-100 text-orange-800",
       shipped: "bg-indigo-100 text-indigo-800",
+      partial_shipped: "bg-cyan-100 text-cyan-800",
       delivered: "bg-green-100 text-green-800",
       completed: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
@@ -53,6 +54,7 @@ export default function ClientOrders() {
       production: "Em Produção",
       ready: "Pronto para Envio",
       shipped: "Enviado",
+      partial_shipped: "Enviado Parcialmente",
       delivered: "Entregue",
       completed: "Finalizado",
       cancelled: "Cancelado",
@@ -204,6 +206,7 @@ export default function ClientOrders() {
                              order.status === "production" ? "40%" :
                              order.status === "ready" ? "60%" :
                              order.status === "shipped" ? "80%" :
+                             order.status === "partial_shipped" ? "65%" :
                              ["delivered", "completed"].includes(order.status) ? "100%" : "0%"
                     }}
                   ></div>
@@ -315,6 +318,25 @@ export default function ClientOrders() {
                   )}
                   <div className="text-xs text-blue-600 mt-1">
                     A entrega será confirmada automaticamente pelo nosso sistema de logística.
+                  </div>
+                </div>
+              )}
+
+              {order.status === 'partial_shipped' && (
+                <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-cyan-600" />
+                    <span className="text-sm font-medium text-cyan-800">
+                      Envio parcial em andamento!
+                    </span>
+                  </div>
+                  {order.trackingCode && (
+                    <div className="text-xs text-cyan-700 mt-2">
+                      <strong>Código de rastreio (primeiro envio):</strong> {order.trackingCode}
+                    </div>
+                  )}
+                  <div className="text-xs text-cyan-600 mt-1">
+                    Parte do pedido já foi enviada. Os demais itens serão despachados assim que ficarem prontos.
                   </div>
                 </div>
               )}

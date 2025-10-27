@@ -44,6 +44,7 @@ export default function ClientOrderTimeline() {
       ready: "bg-orange-100 text-orange-800",
       preparing_shipment: "bg-yellow-200 text-yellow-800",
       shipped: "bg-indigo-100 text-indigo-800",
+      partial_shipped: "bg-cyan-100 text-cyan-800",
       delivered: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
       completed: "bg-gray-100 text-gray-800",
@@ -56,6 +57,7 @@ export default function ClientOrderTimeline() {
       ready: "Pronto",
       preparing_shipment: "Preparando Envio",
       shipped: "Enviado",
+      partial_shipped: "Enviado Parcialmente",
       delivered: "Entregue",
       cancelled: "Cancelado",
       completed: "Finalizado",
@@ -111,8 +113,8 @@ export default function ClientOrderTimeline() {
         status: 'shipped',
         title: 'Enviado',
         description: order.trackingCode ? `Código de rastreamento: ${order.trackingCode}` : (order.productionOrder?.trackingCode ? `Código de rastreamento: ${order.productionOrder.trackingCode}` : 'Produto foi enviado para o cliente'),
-        date: ['shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
-        completed: ['shipped', 'delivered', 'completed'].includes(order.status),
+        date: ['shipped', 'partial_shipped', 'delivered', 'completed'].includes(order.status) ? order.updatedAt : null,
+        completed: ['shipped', 'partial_shipped', 'delivered', 'completed'].includes(order.status),
         icon: 'truck'
       },
       {
@@ -198,6 +200,26 @@ export default function ClientOrderTimeline() {
                       <h3 className="text-lg font-semibold text-blue-900">Pedido Enviado!</h3>
                       <p className="text-blue-700">
                         Seu pedido foi despachado e está a caminho. A confirmação de entrega será feita pela nossa equipe de logística quando você receber o produto.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {order.status === 'partial_shipped' && (
+            <Card className="mb-8 border-cyan-200 bg-cyan-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center">
+                      <Truck className="h-6 w-6 text-cyan-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-cyan-900">Envio Parcial!</h3>
+                      <p className="text-cyan-700">
+                        Parte do seu pedido já foi despachada e está a caminho. Os demais itens serão enviados assim que ficarem prontos. Você será notificado sobre cada envio.
                       </p>
                     </div>
                   </div>

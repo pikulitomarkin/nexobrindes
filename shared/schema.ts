@@ -45,7 +45,7 @@ export const orders = pgTable("orders", {
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
   paidValue: decimal("paid_value", { precision: 10, scale: 2 }).default('0'),
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).default('0'), // Valor a ser restituído em caso de cancelamento
-  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'delivered', 'cancelled'
+  status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'partial_shipped', 'delivered', 'cancelled'
   deadline: timestamp("deadline"),
   // Contact information fields
   contactName: text("contact_name").notNull(), // Nome de contato obrigatório
