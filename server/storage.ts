@@ -294,7 +294,9 @@ export interface IStorage {
     entityId: string,
     description: string,
     level?: string,
-    details?: any
+    details?: any,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<void>;
 }
 
@@ -4137,52 +4139,66 @@ export class MemStorage implements IStorage {
     }
     let logs = [...this.mockData.systemLogs];
 
-    // Apply filters
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      logs = logs.filter(log =>
-        log.action.toLowerCase().includes(searchLower) ||
-        log.description.toLowerCase().includes(searchLower) ||
-        log.userName.toLowerCase().includes(searchLower) ||
-        (log.entity && log.entity.toLowerCase().includes(searchLower))
+    // Ensure we have some initial logs if empty
+    if (logs.length === 0) {
+      // Create a sample log to show the system is working
+      await this.logUserAction(
+        'system',
+        'Sistema',
+        'system',
+        'SYSTEM_START',
+        'system',
+        'startup',
+        'Sistema de logs iniciado',
+        'info'
       );
+      logs = [...this.mockData.systemLogs];
     }
 
-    if (filters.action && filters.action !== 'all') {
-      logs = logs.filter(log => log.action === filters.action);
-    }
+    if (filters) {
+      if (filters.search && filters.search.trim()) {
+        const searchLower = filters.search.toLowerCase();
+        logs = logs.filter(log =>
+          log.description.toLowerCase().includes(searchLower) ||
+          log.userName.toLowerCase().includes(searchLower) ||
+          log.action.toLowerCase().includes(searchLower) ||
+          (log.entity && log.entity.toLowerCase().includes(searchLower))
+        );
+      }
 
-    if (filters.userId && filters.userId !== 'all') {
-      logs = logs.filter(log => log.userId === filters.userId);
-    }
+      if (filters.action && filters.action !== 'all') {
+        logs = logs.filter(log => log.action === filters.action);
+      }
 
-    if (filters.level && filters.level !== 'all') {
-      logs = logs.filter(log => log.level === filters.level);
-    }
+      if (filters.userId && filters.userId !== 'all') {
+        logs = logs.filter(log => log.userId === filters.userId);
+      }
 
-    if (filters.dateFilter && filters.dateFilter !== 'all') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (filters.level && filters.level !== 'all') {
+        logs = logs.filter(log => log.level === filters.level);
+      }
 
-      logs = logs.filter(log => {
-        const logDate = new Date(log.createdAt);
+      if (filters.dateFilter && filters.dateFilter !== 'all') {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         switch (filters.dateFilter) {
           case 'today':
-            return logDate >= today;
+            logs = logs.filter(log => new Date(log.createdAt) >= today);
+            break;
           case 'week':
-            return logDate >= thisWeek;
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            logs = logs.filter(log => new Date(log.createdAt) >= weekAgo);
+            break;
           case 'month':
-            return logDate >= thisMonth;
-          default:
-            return true;
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            logs = logs.filter(log => new Date(log.createdAt) >= monthAgo);
+            break;
         }
-      });
+      }
     }
 
-    // Sort by creation date (most recent first)
+    // Sort by creation date descending (newest first)
     logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return logs;
@@ -4216,20 +4232,29 @@ export class MemStorage implements IStorage {
     entity: string,
     entityId: string,
     description: string,
-    level: string = 'info',
-    details?: any
+    level?: string,
+    details?: any,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<void> {
-    await this.createSystemLog({
+    const log: SystemLog = {
+      id: randomUUID(),
       userId,
       userName,
       userRole,
       action,
-      entity,
-      entityId,
+      entity: entity || null,
+      entityId: entityId || null,
       description,
-      level,
       details: details ? JSON.stringify(details) : null,
-    });
+      level: level || 'info',
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+      createdAt: new Date()
+    };
+
+    this.mockData.systemLogs.push(log);
+    console.log(`[LOG] ${userName} (${userRole}) - ${action} - ${description}`);
   }
 }
 

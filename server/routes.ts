@@ -353,6 +353,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return user data without password
       const { password: _, ...userWithoutPassword } = user;
 
+      // Log successful login
+      await storage.logUserAction(
+        user.id,
+        user.name,
+        user.role,
+        'LOGIN',
+        'auth',
+        user.id,
+        `Login realizado com sucesso - Role: ${user.role}`,
+        'info',
+        {
+          username: user.username,
+          role: user.role
+        },
+        req.ip,
+        req.get('User-Agent')
+      );
+
       console.log("Login successful for:", userWithoutPassword.username, "role:", userWithoutPassword.role);
 
       res.json({
@@ -535,7 +553,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `Produtor especificado não possui itens neste pedido` });
       }
 
-      // If a specific producer was requested, make sure it exists in the items
       if (producerId && !itemsByProducer.has(producerId)) {
         return res.status(400).json({ error: "Produtor especificado não possui itens neste pedido" });
       }
@@ -718,6 +735,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const product = await storage.createProduct(newProduct);
+
+      // Log product creation
+      await storage.logUserAction(
+        req.user?.id || 'system',
+        req.user?.name || 'Sistema',
+        req.user?.role || 'system',
+        'CREATE',
+        'products',
+        product.id,
+        `Produto criado: ${product.name} - Preço: R$ ${product.basePrice}`,
+        'success',
+        {
+          productName: product.name,
+          category: product.category,
+          basePrice: product.basePrice,
+          producerId: product.producerId
+        }
+      );
+
       console.log("Logistics product created successfully:", product.id);
 
       res.json(product);
@@ -1329,6 +1365,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Created order with contact name:", newOrder.contactName);
 
+      // Log order creation
+      await storage.logUserAction(
+        orderData.vendorId,
+        vendor?.name || 'Vendedor',
+        'vendor',
+        'CREATE',
+        'orders',
+        newOrder.id,
+        `Pedido criado: ${newOrder.orderNumber} - Cliente: ${newOrder.contactName} - Valor: R$ ${newOrder.totalValue}`,
+        'success',
+        {
+          orderNumber: newOrder.orderNumber,
+          clientName: newOrder.contactName,
+          totalValue: newOrder.totalValue,
+          itemCount: uniqueItems.length
+        }
+      );
+
       // Incluir alertas na resposta se existirem
       const response = {
         ...newOrder,
@@ -1359,6 +1413,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Order ${id} cancelled - updating related commissions and payments`);
         await storage.updateCommissionsByOrderStatus(id, 'cancelled');
       }
+
+      // Log order update
+      await storage.logUserAction(
+        req.user?.id || 'system',
+        req.user?.name || 'Sistema',
+        req.user?.role || 'system',
+        'UPDATE',
+        'orders',
+        id,
+        `Pedido atualizado: ${updatedOrder.orderNumber} - Status: ${updatedOrder.status}`,
+        'info',
+        {
+          orderNumber: updatedOrder.orderNumber,
+          changes: updateData,
+          newStatus: updatedOrder.status
+        }
+      );
 
       console.log(`Order ${id} updated successfully`);
       res.json(updatedOrder);
@@ -1994,6 +2065,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: address || null,
         isActive: true
       });
+
+      // Log user creation
+      await storage.logUserAction(
+        req.user?.id || 'admin-1',
+        req.user?.name || 'Administrador',
+        req.user?.role || 'admin',
+        'CREATE',
+        'users',
+        user.id,
+        `Produtor criado: ${user.name} - Usuário: ${user.username}`,
+        'success',
+        {
+          userName: user.name,
+          username: user.username,
+          role: user.role,
+          specialty: user.specialty
+        }
+      );
 
       console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
 
@@ -2912,6 +3001,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update order paid value
       await storage.updateOrderPaidValue(orderId);
+
+      // Log payment creation
+      const order = await storage.getOrder(orderId);
+      await storage.logUserAction(
+        req.user?.id || 'system',
+        req.user?.name || 'Sistema',
+        req.user?.role || 'system',
+        'CREATE',
+        'payments',
+        payment.id,
+        `Pagamento processado via OFX: R$ ${paymentAmount.toFixed(2)} - Pedido: ${order?.orderNumber}`,
+        'success',
+        {
+          amount: paymentAmount.toFixed(2),
+          method: 'bank_transfer',
+          orderId: orderId,
+          orderNumber: order?.orderNumber,
+          transactionId: payment.transactionId
+        }
+      );
 
       console.log(`Created payment ${payment.id} for R$ ${paymentAmount}`);
 
@@ -4271,7 +4380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         generalCustomizationName: i.generalCustomizationName
       }))));
 
-      const newBudget = await storage.createBudget(req.body);
+      const newBudget = await storage.createBudget(budgetData);
 
       // Remove duplicate items before processing
       const seenItems = new Set();
@@ -4349,6 +4458,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Log budget creation
+      await storage.logUserAction(
+        budgetData.vendorId,
+        vendor?.name || 'Vendedor',
+        'vendor',
+        'CREATE',
+        'budgets',
+        newBudget.id,
+        `Orçamento criado: ${newBudget.budgetNumber} - Cliente: ${newBudget.contactName} - Valor: R$ ${newBudget.totalValue}`,
+        'success',
+        {
+          budgetNumber: newBudget.budgetNumber,
+          clientName: newBudget.contactName,
+          totalValue: newBudget.totalValue,
+          itemCount: budgetData.items?.length || 0
+        }
+      );
 
       // Incluir alertas na resposta se existirem
       const response = {
@@ -5358,247 +5485,6 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
-    }
-  });
-
-  // Dispatch order (mark as shipped)
-  app.post("/api/logistics/dispatch-order", async (req, res) => {
-    try {
-      const { productionOrderId, orderId, notes, trackingCode } = req.body;
-
-      // Update production order to shipped status
-      if (productionOrderId) {
-        await storage.updateProductionOrderStatus(
-          productionOrderId,
-          'shipped',
-          notes || 'Produto despachado para o cliente',
-          null,
-          trackingCode
-        );
-      }
-
-      // Update main order to shipped status
-      if (orderId) {
-        await storage.updateOrder(orderId, {
-          status: 'shipped',
-          trackingCode: trackingCode || null
-        });
-      }
-
-      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
-
-      res.json({
-        success: true,
-        message: "Pedido despachado com sucesso"
-      });
-    } catch (error) {
-      console.error("Error dispatching order:", error);
-      res.status(500).json({ error: "Failed to dispatch order" });
-    }
-  });
-
-  // Get budgets by vendor
-  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      const budgets = await storage.getBudgetsByVendor(vendorId);
-      res.json(budgets);
-    } catch (error) {
-      console.error("Error fetching vendor budgets:", error);
-      res.status(500).json({ error: "Failed to fetch vendor budgets" });
-    }
-  });
-
-  // Get all clients
-  app.get("/api/clients", async (req, res) => {
-    try {
-      const clients = await storage.getClients();
-      console.log(`Found ${clients.length} clients`);
-
-      // Enrich with additional information
-      const enrichedClients = await Promise.all(
-        clients.map(async (client) => {
-          // Get vendor information
-          const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
-
-          // Get orders count and total spent
-          const orders = await storage.getOrdersByClient(client.id);
-          const ordersCount = orders.length;
-          const totalSpent = orders.reduce((sum, order) => {
-            return sum + parseFloat(order.totalValue || '0');
-          }, 0);
-
-          return {
-            ...client,
-            vendorName: vendor?.name || null,
-            ordersCount,
-            totalSpent
-          };
-        })
-      );
-
-      res.json(enrichedClients);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-      res.status(500).json({ error: "Failed to fetch clients" });
-    }
-  });
-
-  // Get clients by vendor
-  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      console.log(`Fetching clients for vendor: ${vendorId}`);
-
-      const clients = await storage.getClientsByVendor(vendorId);
-      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
-
-      // Enrich with user data if available
-      const enrichedClients = await Promise.all(
-        clients.map(async (client) => {
-          // Get user information if userId is available
-          let userData = null;
-          if (client.userId) {
-            userData = await storage.getUser(client.userId);
-          }
-
-          // Get orders count and total spent
-          const orders = await storage.getOrdersByClient(client.id);
-          const ordersCount = orders.length;
-          const totalSpent = orders.reduce((sum, order) => {
-            return sum + parseFloat(order.totalValue || '0');
-          }, 0);
-
-          return {
-            ...client,
-            username: userData?.username || client.userCode || 'N/A',
-            userCode: client.userCode || userData?.username || client.username || 'N/A',
-            ordersCount,
-            totalSpent
-          };
-        })
-      );
-
-      console.log(`Returning ${enrichedClients.length} enriched clients`);
-      res.json(enrichedClients);
-    } catch (error) {
-      console.error("Error fetching vendor clients:", error);
-      res.status(500).json({ error: "Failed to fetch vendor clients" });
-    }
-  });
-
-  // Create client
-  app.post("/api/clients", async (req, res) => {
-    try {
-      const clientData = req.body;
-      console.log(`Creating client with data:`, clientData);
-
-      const newClient = await storage.createClient(clientData);
-      console.log(`Client created successfully:`, newClient);
-
-      res.json(newClient);
-    } catch (error) {
-      console.error("Error creating client:", error);
-      res.status(500).json({ error: "Failed to create client" });
-    }
-  });
-
-  // Get client orders
-  app.get("/api/clients/:clientId/orders", async (req, res) => {
-    try {
-      const { clientId } = req.params;
-      console.log(`Fetching orders for client: ${clientId}`);
-
-      const orders = await storage.getOrdersByClient(clientId);
-      console.log(`Found ${orders.length} orders for client ${clientId}`);
-
-      const enrichedOrders = await Promise.all(
-        orders.map(async (order) => {
-          const vendor = await storage.getUser(order.vendorId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
-          return {
-            ...order,
-            vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null
-          };
-        })
-      );
-
-      res.json(enrichedOrders);
-    } catch (error) {
-      console.error("Error fetching client orders:", error);
-      res.status(500).json({ error: "Failed to fetch client orders" });
-    }
-  });
-
-  // Logistics routes
-  app.get("/api/logistics/orders", async (req, res) => {
-    try {
-      // Get orders that are ready for logistics (shipped, ready)
-      const orders = await storage.getOrders();
-      const logisticsOrders = orders.filter(order =>
-        ['ready', 'shipped', 'delivered'].includes(order.status)
-      );
-
-      const enrichedOrders = await Promise.all(
-        logisticsOrders.map(async (order) => {
-          let clientName = order.contactName || 'Cliente não identificado';
-          let clientAddress = null;
-          let clientPhone = order.contactPhone;
-          let clientEmail = order.contactEmail;
-
-          // Get client details if available
-          if (order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              clientName = clientRecord.name;
-              clientAddress = clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
-            } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
-                  clientAddress = clientUser.address;
-                }
-              }
-            }
-          }
-
-          const vendor = await storage.getUser(order.vendorId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
-          return {
-            ...order,
-            clientName,
-            clientAddress: clientAddress || 'Endereço não informado',
-            clientPhone,
-            clientEmail,
-            vendorName: vendor?.name || 'Vendedor',
-            producerName: producer?.name || null,
-            shippingAddress: order.deliveryType === 'pickup'
-              ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado'),
-            deliveryType: order.deliveryType || 'delivery'
-          };
-        })
-      );
-
-      console.log(`Returning ${enrichedOrders.length} logistics orders`);
-      res.json(enrichedOrders);
-    } catch (error) {
-      console.error("Error fetching logistics orders:", error);
-      res.status(500).json({ error: "Failed to fetch logistics orders" });
     }
   });
 
