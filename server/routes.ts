@@ -4381,7 +4381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
-        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+        const generalCustomizationValue =typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
@@ -5865,6 +5865,73 @@ Para mais detalhes, entre em contato conosco!`;
     } catch (error) {
       console.error("Error fetching client budgets:", error);
       res.status(500).json({ error: "Failed to fetch client budgets" });
+    }
+  });
+
+  // System Logs routes
+  app.get("/api/admin/logs", async (req, res) => {
+    try {
+      const { search, action, user, level, date } = req.query;
+
+      const logs = await storage.getSystemLogs({
+        search: search as string,
+        action: action as string,
+        userId: user as string,
+        level: level as string,
+        dateFilter: date as string,
+      });
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching system logs:", error);
+      res.status(500).json({ error: "Failed to fetch system logs" });
+    }
+  });
+
+  app.get("/api/admin/logs/export", async (req, res) => {
+    try {
+      const { search, action, user, level, date } = req.query;
+
+      const logs = await storage.getSystemLogs({
+        search: search as string,
+        action: action as string,
+        userId: user as string,
+        level: level as string,
+        dateFilter: date as string,
+      });
+
+      // Convert logs to CSV
+      const csvHeaders = 'Data,Usuário,Ação,Entidade,Descrição,Nível,IP\n';
+      const csvData = logs.map((log: any) => {
+        const date = new Date(log.createdAt).toLocaleString('pt-BR');
+        return `"${date}","${log.userName}","${log.action}","${log.entity || ''}","${log.description}","${log.level}","${log.ipAddress || ''}"`;
+      }).join('\n');
+
+      const csv = csvHeaders + csvData;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="system-logs.csv"');
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting system logs:", error);
+      res.status(500).json({ error: "Failed to export system logs" });
+    }
+  });
+
+  app.post("/api/admin/logs", async (req, res) => {
+    try {
+      const logData = req.body;
+
+      const log = await storage.createSystemLog({
+        ...logData,
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+      });
+
+      res.json(log);
+    } catch (error) {
+      console.error("Error creating system log:", error);
+      res.status(500).json({ error: "Failed to create system log" });
     }
   });
 

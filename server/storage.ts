@@ -51,6 +51,9 @@ import {
   // Branch types
   type Branch,
   type InsertBranch,
+  // System Log types
+  type SystemLog,
+  type InsertSystemLog,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm"; // Assuming drizzle-orm is used for DB operations
@@ -272,6 +275,27 @@ export interface IStorage {
   createBranch(branchData: InsertBranch): Promise<Branch>;
   updateBranch(id: string, updateData: Partial<Branch>): Promise<Branch | null>;
   deleteBranch(id: string): Promise<boolean>;
+
+  // System Logs
+  getSystemLogs(filters?: {
+    search?: string;
+    action?: string;
+    userId?: string;
+    level?: string;
+    dateFilter?: string;
+  }): Promise<SystemLog[]>;
+  createSystemLog(logData: InsertSystemLog): Promise<SystemLog>;
+  logUserAction(
+    userId: string,
+    userName: string,
+    userRole: string,
+    action: string,
+    entity: string,
+    entityId: string,
+    description: string,
+    level?: string,
+    details?: any
+  ): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -299,7 +323,7 @@ export class MemStorage implements IStorage {
   private expenseNotes: Map<string, ExpenseNote>;
   private commissionPayouts: Map<string, CommissionPayout>;
 
-  // Mock data, including manual receivables
+  // Mock data, including manual receivables, payables, and system logs
   private mockData = {
     users: [] as User[],
     clients: [] as Client[],
@@ -327,7 +351,9 @@ export class MemStorage implements IStorage {
     customizationCategories: [] as string[], // Added for storing customization categories
     financialNotes: [] as any[], // Added for financial notes
     manualReceivables: [] as any[], // Added for manual receivables
-    manualPayables: [] as any[] // Added for manual payables
+    manualPayables: [] as any[], // Added for manual payables
+    systemLogs: [] as SystemLog[], // Added for system logs
+    branches: [] as Branch[], // Added for branches
   };
 
   // Payment Methods
@@ -445,6 +471,37 @@ export class MemStorage implements IStorage {
 
   // Helper to load all mock data
   private async loadData(): Promise<any> {
+    // Ensure all necessary arrays/maps are initialized before returning
+    if (!this.mockData.users) this.mockData.users = [];
+    if (!this.mockData.clients) this.mockData.clients = [];
+    if (!this.mockData.orders) this.mockData.orders = [];
+    if (!this.mockData.productionOrders) this.mockData.productionOrders = [];
+    if (!this.mockData.payments) this.mockData.payments = [];
+    if (!this.mockData.commissions) this.mockData.commissions = [];
+    if (!this.mockData.partners) this.mockData.partners = [];
+    if (!this.mockData.commissionSettings) this.mockData.commissionSettings = [];
+    if (!this.mockData.vendors) this.mockData.vendors = [];
+    if (!this.mockData.products) this.mockData.products = [];
+    if (!this.mockData.budgets) this.mockData.budgets = [];
+    if (!this.mockData.budgetItems) this.mockData.budgetItems = [];
+    if (!this.mockData.budgetPhotos) this.mockData.budgetPhotos = [];
+    if (!this.mockData.paymentMethods) this.mockData.paymentMethods = [];
+    if (!this.mockData.shippingMethods) this.mockData.shippingMethods = [];
+    if (!this.mockData.budgetPaymentInfo) this.mockData.budgetPaymentInfo = [];
+    if (!this.mockData.accountsReceivable) this.mockData.accountsReceivable = [];
+    if (!this.mockData.paymentAllocations) this.mockData.paymentAllocations = [];
+    if (!this.mockData.bankImports) this.mockData.bankImports = [];
+    if (!this.mockData.bankTransactions) this.mockData.bankTransactions = [];
+    if (!this.mockData.expenseNotes) this.mockData.expenseNotes = [];
+    if (!this.mockData.commissionPayouts) this.mockData.commissionPayouts = [];
+    if (!this.mockData.customizationOptions) this.mockData.customizationOptions = [];
+    if (!this.mockData.customizationCategories) this.mockData.customizationCategories = [];
+    if (!this.mockData.financialNotes) this.mockData.financialNotes = [];
+    if (!this.mockData.manualReceivables) this.mockData.manualReceivables = [];
+    if (!this.mockData.manualPayables) this.mockData.manualPayables = [];
+    if (!this.mockData.systemLogs) this.mockData.systemLogs = [];
+    if (!this.mockData.branches) this.mockData.branches = [];
+
     return Promise.resolve(this.mockData);
   }
 
@@ -981,6 +1038,8 @@ export class MemStorage implements IStorage {
     this.mockData.manualReceivables = [];
     this.mockData.manualPayables = [];
     this.mockData.bankTransactions = [];
+    this.mockData.systemLogs = []; // Initialize system logs
+    this.mockData.branches = []; // Initialize branches
   }
 
   // User methods
@@ -1309,7 +1368,7 @@ export class MemStorage implements IStorage {
     const order = this.orders.get(id);
     if (!order) return undefined;
 
-    // SEGURANÇA: Nunca permitir que fluxos de pagamento alterem totalValue
+    //SEGURANÇA: Nunca permitir que fluxos de pagamento alterem totalValue
     const sanitized = { ...updates };
 
     // Proteção específica contra alteração acidental de totalValue em fluxos de pagamento
@@ -3996,11 +4055,19 @@ export class MemStorage implements IStorage {
 
   // Branch CRUD operations
   async getBranches(): Promise<Branch[]> {
-    return Array.from(this.branches.values());
+    // Ensure mockData.branches is initialized
+    if (!this.mockData.branches) {
+      this.mockData.branches = [];
+    }
+    return this.mockData.branches;
   }
 
   async getBranch(id: string): Promise<Branch | null> {
-    return this.branches.get(id) || null;
+    // Ensure mockData.branches is initialized
+    if (!this.mockData.branches) {
+      this.mockData.branches = [];
+    }
+    return this.mockData.branches.find(branch => branch.id === id) || null;
   }
 
   async createBranch(branchData: InsertBranch): Promise<Branch> {
@@ -4013,30 +4080,156 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    this.branches.set(id, newBranch);
+    // Ensure mockData.branches is initialized
+    if (!this.mockData.branches) {
+      this.mockData.branches = [];
+    }
+    this.mockData.branches.push(newBranch);
     console.log('Branch created:', newBranch);
     return newBranch;
   }
 
   async updateBranch(id: string, updateData: Partial<Branch>): Promise<Branch | null> {
-    const branch = this.branches.get(id);
-    if (!branch) {
+    // Ensure mockData.branches is initialized
+    if (!this.mockData.branches) {
+      this.mockData.branches = [];
+    }
+    const index = this.mockData.branches.findIndex(branch => branch.id === id);
+    if (index === -1) {
       console.error('Branch not found for update:', id);
       return null;
     }
 
     const updatedBranch = {
-      ...branch,
+      ...this.mockData.branches[index],
       ...updateData,
       updatedAt: new Date(),
     };
-    this.branches.set(id, updatedBranch);
+    this.mockData.branches[index] = updatedBranch;
     console.log('Branch updated:', updatedBranch);
     return updatedBranch;
   }
 
   async deleteBranch(id: string): Promise<boolean> {
-    return this.branches.delete(id);
+    // Ensure mockData.branches is initialized
+    if (!this.mockData.branches) {
+      this.mockData.branches = [];
+    }
+    const index = this.mockData.branches.findIndex(branch => branch.id === id);
+    if (index === -1) return false;
+
+    this.mockData.branches.splice(index, 1);
+    await this.saveData(this.mockData);
+    return true;
+  }
+
+  // System Logs methods
+  async getSystemLogs(filters: {
+    search?: string;
+    action?: string;
+    userId?: string;
+    level?: string;
+    dateFilter?: string;
+  } = {}): Promise<SystemLog[]> {
+    // Ensure mockData.systemLogs is initialized
+    if (!this.mockData.systemLogs) {
+      this.mockData.systemLogs = [];
+    }
+    let logs = [...this.mockData.systemLogs];
+
+    // Apply filters
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      logs = logs.filter(log =>
+        log.action.toLowerCase().includes(searchLower) ||
+        log.description.toLowerCase().includes(searchLower) ||
+        log.userName.toLowerCase().includes(searchLower) ||
+        (log.entity && log.entity.toLowerCase().includes(searchLower))
+      );
+    }
+
+    if (filters.action && filters.action !== 'all') {
+      logs = logs.filter(log => log.action === filters.action);
+    }
+
+    if (filters.userId && filters.userId !== 'all') {
+      logs = logs.filter(log => log.userId === filters.userId);
+    }
+
+    if (filters.level && filters.level !== 'all') {
+      logs = logs.filter(log => log.level === filters.level);
+    }
+
+    if (filters.dateFilter && filters.dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      logs = logs.filter(log => {
+        const logDate = new Date(log.createdAt);
+
+        switch (filters.dateFilter) {
+          case 'today':
+            return logDate >= today;
+          case 'week':
+            return logDate >= thisWeek;
+          case 'month':
+            return logDate >= thisMonth;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Sort by creation date (most recent first)
+    logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return logs;
+  }
+
+  async createSystemLog(logData: InsertSystemLog): Promise<SystemLog> {
+    const id = randomUUID();
+    const log: SystemLog = {
+      ...logData,
+      id,
+      createdAt: new Date(),
+    };
+
+    // Ensure mockData.systemLogs is initialized
+    if (!this.mockData.systemLogs) {
+      this.mockData.systemLogs = [];
+    }
+    this.mockData.systemLogs.push(log);
+    await this.saveData(this.mockData);
+
+    console.log(`[SYSTEM LOG] ${log.userName} (${log.userRole}) - ${log.action} ${log.entity || ''}: ${log.description}`);
+
+    return log;
+  }
+
+  async logUserAction(
+    userId: string,
+    userName: string,
+    userRole: string,
+    action: string,
+    entity: string,
+    entityId: string,
+    description: string,
+    level: string = 'info',
+    details?: any
+  ): Promise<void> {
+    await this.createSystemLog({
+      userId,
+      userName,
+      userRole,
+      action,
+      entity,
+      entityId,
+      description,
+      level,
+      details: details ? JSON.stringify(details) : null,
+    });
   }
 }
 

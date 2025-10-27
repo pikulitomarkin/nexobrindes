@@ -460,6 +460,22 @@ export const quoteRequestItems = pgTable("quote_request_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const systemLogs = pgTable("system_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  userName: text("user_name").notNull(), // Nome do usuário para facilitar consultas
+  userRole: text("user_role").notNull(), // Role do usuário
+  action: text("action").notNull(), // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
+  entity: text("entity"), // orders, users, products, etc.
+  entityId: varchar("entity_id"), // ID da entidade afetada
+  description: text("description").notNull(), // Descrição da ação
+  details: text("details"), // Detalhes adicionais em JSON
+  level: text("level").notNull().default('info'), // info, warning, error, success
+  ipAddress: text("ip_address"), // IP do usuário
+  userAgent: text("user_agent"), // User Agent do navegador
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -490,6 +506,7 @@ export const insertProducerPaymentSchema = createInsertSchema(producerPayments).
 export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteRequestItemSchema = createInsertSchema(quoteRequestItems).omit({ id: true, createdAt: true });
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -548,3 +565,5 @@ export type QuoteRequestItem = typeof quoteRequestItems.$inferSelect;
 export type InsertQuoteRequestItem = z.infer<typeof insertQuoteRequestItemSchema>;
 export type Branch = typeof branches.$inferSelect;
 export type InsertBranch = z.infer<typeof insertBranchSchema>;
+export type SystemLog = typeof systemLogs.$inferSelect;
+export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;

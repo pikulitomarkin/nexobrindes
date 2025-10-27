@@ -32,6 +32,7 @@ import AdminProducerPayments from "@/pages/admin/producer-payments";
 import AdminFinance from "@/pages/admin/finance";
 import AdminCustomizations from "@/pages/admin/customizations";
 import AdminBranches from "@/pages/admin/branches";
+import AdminLogs from "@/pages/admin/logs";
 
 // Vendor imports
 import VendorOrders from "@/pages/vendor/orders";
@@ -166,6 +167,7 @@ function App() {
                   <Route path="/admin/producer-payments" component={AdminProducerPayments} />
                   <Route path="/admin/finance" component={AdminFinance} />
                   <Route path="/admin/customizations" component={AdminCustomizations} />
+                  <Route path="/admin/logs" component={AdminLogs} />
 
                   {/* Vendor Routes */}
                   <Route path="/vendor/dashboard" component={VendorDashboard} />
