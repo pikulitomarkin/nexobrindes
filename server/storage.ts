@@ -2657,43 +2657,18 @@ export class MemStorage implements IStorage {
   }
 
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
+    console.log(`Storage: getBudgetsByVendor for vendorId: ${vendorId}`);
     const allBudgets = Array.from(this.budgets.values());
-    console.log(`Storage: Getting budgets for vendor ${vendorId}. Total budgets: ${allBudgets.length}`);
-
-    // Log some budget samples for debugging
-    console.log(`Storage: Sample budgets:`, allBudgets.slice(0, 3).map(b => ({
-      id: b.id,
-      budgetNumber: b.budgetNumber,
-      vendorId: b.vendorId,
-      title: b.title,
-      status: b.status
-    })));
+    console.log(`Storage: Total budgets in storage: ${allBudgets.length}`);
 
     const vendorBudgets = allBudgets.filter(budget => {
       const isMatch = budget.vendorId === vendorId;
-      console.log(`Storage: Budget ${budget.budgetNumber || budget.id} - vendorId: ${budget.vendorId}, matches ${vendorId}: ${isMatch}`);
+      console.log(`Storage: Budget ${budget.budgetNumber} - vendorId: ${budget.vendorId}, matches ${vendorId}: ${isMatch}`);
       return isMatch;
     });
 
     console.log(`Storage: Found ${vendorBudgets.length} budgets for vendor ${vendorId}`);
-
-    // Enrich with items and photos
-    const enrichedBudgets = await Promise.all(
-      vendorBudgets.map(async (budget) => {
-        const items = await this.getBudgetItems(budget.id);
-        const photos = await this.getBudgetPhotos(budget.id);
-
-        return {
-          ...budget,
-          items: items,
-          photos: photos.map(p => p.photoUrl || p.imageUrl)
-        };
-      })
-    );
-
-    console.log(`Storage: Returning ${enrichedBudgets.length} enriched budgets for vendor ${vendorId}:`,
-      enrichedBudgets.map(b => ({ id: b.id, budgetNumber: b.budgetNumber, title: b.title })));
-    return enrichedBudgets;
+    return vendorBudgets;
   }
 
   async getBudgetsByClient(clientId: string): Promise<any[]> {

@@ -300,6 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get budgets by vendor
+  app.get("/api/budgets/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching budgets for vendor: ${vendorId}`);
+      
+      const budgets = await storage.getBudgetsByVendor(vendorId);
+      console.log(`Found ${budgets.length} budgets for vendor ${vendorId}`);
+      
+      res.json(budgets);
+    } catch (error) {
+      console.error("Error fetching budgets by vendor:", error);
+      res.status(500).json({ error: "Failed to fetch budgets" });
+    }
+  });
+
   // Get budget PDF data with all images
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
