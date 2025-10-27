@@ -1899,7 +1899,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values());
   }
 
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+  async createPayment(insertPayment: InsertPayment & { __skipOrderUpdate?: boolean }): Promise<Payment> {
     const id = randomUUID();
     const payment: Payment = {
       ...insertPayment,
@@ -1914,8 +1914,8 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(id, payment);
 
-    // If the payment is confirmed, update the order's paid value
-    if (payment.status === 'confirmed') {
+    // If the payment is confirmed and not flagged to skip order update, update the order's paid value
+    if (payment.status === 'confirmed' && !(insertPayment as any).__skipOrderUpdate) {
       await this.updateOrderPaidValue(payment.orderId);
     }
 
