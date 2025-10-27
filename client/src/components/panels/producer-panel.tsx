@@ -24,11 +24,6 @@ export default function ProducerPanel() {
     enabled: !!producerId,
   });
 
-  const { data: paymentStats, isLoading: paymentsLoading } = useQuery({
-    queryKey: ["/api/finance/producer-payments/producer", producerId],
-    enabled: !!producerId,
-  });
-
   
 
   const getStatusBadge = (status: string) => {
@@ -55,7 +50,7 @@ export default function ProducerPanel() {
     );
   };
 
-  if (statsLoading || ordersLoading || paymentsLoading) {
+  if (statsLoading || ordersLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -74,17 +69,6 @@ export default function ProducerPanel() {
   console.log('ProducerPanel - Production Orders Data:', productionOrders);
   console.log('ProducerPanel - Payment Stats Data:', paymentStats);
   console.log('ProducerPanel - Raw data structure:', JSON.stringify(productionOrders, null, 2));
-
-  // Calculate payment statistics from producer payments
-  const totalPendingPayments = paymentStats?.filter((payment: any) => 
-    ['pending', 'approved'].includes(payment.status)
-  ).reduce((sum: number, payment: any) => sum + parseFloat(payment.amount || '0'), 0) || 0;
-
-  const totalReceivedPayments = paymentStats?.filter((payment: any) => 
-    payment.status === 'paid'
-  ).reduce((sum: number, payment: any) => sum + parseFloat(payment.amount || '0'), 0) || 0;
-
-  const totalServicesValue = totalPendingPayments + totalReceivedPayments;
 
   const activeOrders = productionOrders?.filter((order: any) => 
     !['completed', 'rejected'].includes(order.status)
@@ -113,16 +97,10 @@ export default function ProducerPanel() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Painel de Produção</h2>
-        <div className="flex gap-2">
-          <Button onClick={() => navigate('/producer/receivables')}>
-            <DollarSign className="h-4 w-4 mr-2" />
-            Ver Contas a Receber
-          </Button>
-          <Button onClick={() => navigate('/producer/dashboard')}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Ver Painel Completo
-          </Button>
-        </div>
+        <Button onClick={() => navigate('/producer/dashboard')}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Ver Painel Completo
+        </Button>
       </div>
 
       {/* Quick Stats */}
@@ -169,7 +147,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">A Receber</p>
                 <p className="text-2xl font-bold text-green-600">
-                  R$ {totalPendingPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalPendingPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
@@ -185,7 +163,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Recebido</p>
                 <p className="text-2xl font-bold text-emerald-600">
-                  R$ {totalReceivedPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalReceivedPayments || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <CheckCircle className="h-6 w-6 text-emerald-600" />
@@ -199,7 +177,7 @@ export default function ProducerPanel() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Serviços</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  R$ {totalServicesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {((stats?.totalServicesValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <Package className="h-6 w-6 text-blue-600" />

@@ -435,48 +435,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (order.budgetId) {
         const budgetItems = await storage.getBudgetItems(order.budgetId);
         allItems = budgetItems;
-      } else if (order.items && Array.isArray(order.items)) {
+      } else if (order.items) {
         allItems = order.items;
       }
 
       console.log(`Order ${id} has ${allItems.length} total items`);
 
-      // If no items found, return error
-      if (!allItems || allItems.length === 0) {
-        return res.status(400).json({ error: "Nenhum item encontrado no pedido" });
-      }
-
       // Group items by producer
       const itemsByProducer = new Map();
       allItems.forEach((item: any) => {
-        const itemProducerId = item.producerId || 'internal';
-        
-        // Only consider external producers
-        if (itemProducerId && itemProducerId !== 'internal') {
+        if (item.producerId && item.producerId !== 'internal') {
           // Only send to specified producer if producerId is provided
-          if (producerId && itemProducerId !== producerId) {
+          if (producerId && item.producerId !== producerId) {
             return; // Skip this item
           }
 
-          if (!itemsByProducer.has(itemProducerId)) {
-            itemsByProducer.set(itemProducerId, []);
+          if (!itemsByProducer.has(item.producerId)) {
+            itemsByProducer.set(item.producerId, []);
           }
-          itemsByProducer.get(itemProducerId).push(item);
+          itemsByProducer.get(item.producerId).push(item);
         }
       });
 
       console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
 
       if (itemsByProducer.size === 0) {
-        const errorMsg = producerId ? 
-          `Nenhum item encontrado para o produtor especificado` : 
-          `Nenhum item de produção externa encontrado`;
-        return res.status(400).json({ error: errorMsg });
-      }
-
-      // If a specific producer was requested, make sure it exists in the items
-      if (producerId && !itemsByProducer.has(producerId)) {
-        return res.status(400).json({ error: "Produtor especificado não possui itens neste pedido" });
+        return res.status(400).json({ error: "Nenhum item de produção externa encontrado" });
       }
 
       const createdOrders = [];
@@ -502,23 +486,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sum + parseFloat(item.totalPrice || '0'), 0
         );
 
-        // Filter and deduplicate items for this producer
-        const producerItems = items.filter(item => item.producerId === currentProducerId);
-        const uniqueProducerItems = [];
-        const seenItems = new Set();
-        
-        for (const item of producerItems) {
-          const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice}`;
-          if (!seenItems.has(itemKey)) {
-            seenItems.add(itemKey);
-            uniqueProducerItems.push(item);
-          } else {
-            console.log(`Removing duplicate production item: ${item.productName || item.productId} for producer ${currentProducerId}`);
-          }
-        }
-
-        console.log(`Producer ${currentProducerId} has ${uniqueProducerItems.length} unique items (filtered from ${producerItems.length})`);
-
         // Create detailed order information specific to this producer
         const orderDetails = {
           orderNumber: order.orderNumber,
@@ -535,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shippingAddress: order.deliveryType === 'pickup' 
             ? 'Sede Principal - Retirada no Local'
             : (order.shippingAddress || 'Endereço não informado'),
-          items: uniqueProducerItems, // Use unique items only
+          items: items.filter(item => item.producerId === currentProducerId), // Filter items for this producer only
           photos: photos,
           producerId: currentProducerId, // Add producer ID to identify items
           producerName: producer.name
@@ -547,15 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingForProducer) {
           console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
-          
-          // If sending to specific producer and order already exists, return error
-          if (producerId) {
-            return res.status(400).json({ 
-              error: `Ordem de produção para ${producer.name} já foi criada anteriormente` 
-            });
-          }
-          
-          // Otherwise, just add to the list and continue
+          // Still add to created orders list so response shows success
           createdOrders.push(existingForProducer);
           producerNames.push(producer.name);
           continue;
@@ -580,13 +539,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
       }
 
-      // Update order status to production only if we created orders and it's not already in production
-      if (createdOrders.length > 0 && order.status !== 'production') {
+      // Update order status to production only if we created orders
+      if (createdOrders.length > 0) {
         await storage.updateOrder(id, { status: 'production' });
       }
 
       const message = producerId 
-        ? `Ordem de produção criada para ${producerNames[0]}`
+        ? `Pedido enviado para produção - ${producerNames[0]}`
         : `Pedido enviado para produção - ${createdOrders.length} ordem(ns) criada(s) para: ${producerNames.join(', ')}`;
 
       res.json({
@@ -594,8 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productionOrders: createdOrders,
         productionOrdersCreated: createdOrders.length,
         producerNames: producerNames,
-        message: message,
-        isSpecificProducer: !!producerId
+        message: message
       });
     } catch (error) {
       console.error("Error sending order to production:", error);
@@ -854,45 +812,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get producer payments by producer ID
-  app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
-    try {
-      const { producerId } = req.params;
-      console.log(`Fetching producer payments for producer: ${producerId}`);
-
-      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
-      console.log(`Found ${producerPayments.length} producer payments for producer ${producerId}`);
-
-      // Enrich with production order and order data
-      const enrichedPayments = await Promise.all(
-        producerPayments.map(async (payment) => {
-          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
-          let order = null;
-
-          if (productionOrder) {
-            order = await storage.getOrder(productionOrder.orderId);
-          }
-
-          return {
-            ...payment,
-            productionOrder,
-            order,
-            // Add clientName, orderNumber, product from order if available
-            clientName: order?.contactName || 'Cliente não encontrado',
-            orderNumber: order?.orderNumber || 'N/A',
-            product: order?.product || 'Produto não informado'
-          };
-        })
-      );
-
-      console.log(`Returning ${enrichedPayments.length} enriched producer payments for producer ${producerId}`);
-      res.json(enrichedPayments);
-    } catch (error) {
-      console.error("Error fetching producer payments for producer:", error);
-      res.status(500).json({ error: "Failed to fetch producer payments for producer" });
-    }
-  });
-
   // Get specific production order by ID
   app.get("/api/production-orders/:id", async (req, res) => {
     try {
@@ -966,17 +885,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
 
-            // Remove duplicatas baseado em productId, producerId, quantity e unitPrice
+            // Remove duplicatas baseado em productId e producerId
             const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
-              self.findIndex(i => 
-                i.productId === item.productId && 
-                i.producerId === item.producerId &&
-                i.quantity === item.quantity &&
-                i.unitPrice === item.unitPrice
-              ) === index
+              self.findIndex(i => i.productId === item.productId && i.producerId === item.producerId) === index
             );
-
-            console.log(`Producer ${parsedDetails.producerId}: Filtered ${filteredItems.length} items down to ${uniqueItems.length} unique items`);
 
             // Remove valores financeiros dos itens
             parsedDetails.items = uniqueItems.map((item: any) => ({
@@ -1215,22 +1127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
-      // Remove duplicate items by productId and producerId before creating order
-      let uniqueItems = [];
-      if (orderData.items && orderData.items.length > 0) {
-        const seenItems = new Set();
-        uniqueItems = orderData.items.filter(item => {
-          const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-          if (seenItems.has(itemKey)) {
-            console.log(`Removing duplicate item: ${item.productName} (${itemKey})`);
-            return false;
-          }
-          seenItems.add(itemKey);
-          return true;
-        });
-        console.log(`Filtered ${orderData.items.length} items down to ${uniqueItems.length} unique items`);
-      }
-
       // Create order with contact name as primary identifier and proper items handling
       const newOrder = await storage.createOrder({
         orderNumber,
@@ -1258,7 +1154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountType: orderData.discountType || "percentage",
         discountPercentage: orderData.discountPercentage || 0,
         discountValue: orderData.discountValue || 0,
-        items: uniqueItems
+        items: orderData.items || []
       });
 
       console.log("Created order with contact name:", newOrder.contactName);
@@ -4109,22 +4005,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newBudget = await storage.createBudget(req.body);
 
-      // Remove duplicate items before processing
-      const seenItems = new Set();
-      const uniqueItems = req.body.items.filter(item => {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-        if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
-          return false;
-        }
-        seenItems.add(itemKey);
-        return true;
-      });
-
-      console.log(`Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
-
       // Process budget items with ALL customization data
-      for (const item of uniqueItems) {
+      for (const item of req.body.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
@@ -4206,22 +4088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove existing items and re-add them to ensure consistency
       await storage.deleteBudgetItems(req.params.id);
-      
-      // Remove duplicate items before processing
-      const seenItems = new Set();
-      const uniqueItems = budgetData.items.filter(item => {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-        if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName || item.productId} (${itemKey})`);
-          return false;
-        }
-        seenItems.add(itemKey);
-        return true;
-      });
-
-      console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
-      
-      for (const item of uniqueItems) {
+      for (const item of budgetData.items) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
