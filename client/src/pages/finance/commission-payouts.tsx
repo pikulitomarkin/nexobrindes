@@ -400,7 +400,7 @@ function CommissionsTable({
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data Criação
+                  DataCriação
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ações
@@ -432,6 +432,16 @@ function CommissionsTable({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(commission.status)}
+                    {commission.type === 'vendor' && commission.status !== 'paid' && (
+                      <span className="text-sm text-gray-500">
+                        Aguardando entrega do pedido
+                      </span>
+                    )}
+                    {commission.type !== 'vendor' && commission.status !== 'paid' && (
+                      <span className="text-sm text-gray-500">
+                        Aguardando confirmação do pedido
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : '-'}
@@ -442,8 +452,19 @@ function CommissionsTable({
                         <Eye className="h-4 w-4 mr-1" />
                         Ver
                       </Button>
-                      {['pending', 'confirmed'].includes(commission.status) && (
-                        <Button
+                      {['pending', 'confirmed'].includes(commission.status) && commission.type === 'vendor' && (
+                         <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onMarkAsPaid(commission)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Pagar
+                        </Button>
+                      )}
+                       {['pending', 'confirmed'].includes(commission.status) && commission.type !== 'vendor' && (
+                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onMarkAsPaid(commission)}

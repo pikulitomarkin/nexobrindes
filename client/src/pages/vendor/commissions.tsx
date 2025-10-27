@@ -32,6 +32,11 @@ export default function VendorCommissions() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Minhas Comissões</h1>
         <p className="text-gray-600">Acompanhe suas comissões de vendas</p>
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            <strong>📦 Importante:</strong> As comissões são confirmadas para pagamento apenas quando o pedido for <strong>entregue</strong> ao cliente.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -141,7 +146,7 @@ export default function VendorCommissions() {
                       }`}>
                         {commission.status === 'confirmed' ? 'Confirmada (A Receber)' : 
                          commission.status === 'paid' ? 'Paga' :
-                         commission.status === 'pending' ? 'Aguardando Pedido Pronto' : 
+                         commission.status === 'pending' ? 'Aguardando Entrega do Pedido' : 
                          commission.status === 'cancelled' ? 'Pedido Cancelado' :
                          commission.status}
                       </span>

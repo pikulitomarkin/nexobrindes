@@ -1834,15 +1834,15 @@ export class MemStorage implements IStorage {
   // Process commission payments based on order status
   async processCommissionPayments(order: Order, status: string): Promise<void> {
     try {
-      if (status === 'completed' || status === 'delivered') {
-        // Update vendor commissions to paid when order is completed
+      if (status === 'delivered') {
+        // Update vendor commissions to confirmed when order is delivered (not paid automatically)
         const vendorCommissions = Array.from(this.commissions.values())
           .filter(c => c.orderId === order.id && c.vendorId && c.status === 'pending');
 
         for (const commission of vendorCommissions) {
-          commission.status = 'paid';
-          commission.paidAt = new Date();
+          commission.status = 'confirmed'; // Ready to be paid, but not paid automatically
           this.commissions.set(commission.id, commission);
+          console.log(`Vendor commission ${commission.id} confirmed for payment - order delivered`);
         }
       } else if (status === 'cancelled') {
         // When order is cancelled, partners keep their commissions but they will be deducted from next orders
@@ -1856,15 +1856,6 @@ export class MemStorage implements IStorage {
         for (const commission of partnerCommissions) {
           commission.status = 'deducted'; // This marks them for future deduction
           commission.deductedAt = new Date();
-          this.commissions.set(commission.id, commission);
-        }
-
-        // Mark vendor commission as cancelled
-        const vendorCommissions = Array.from(this.commissions.values())
-          .filter(c => c.orderId === order.id && c.vendorId);
-
-        for (const commission of vendorCommissions) {
-          commission.status = 'cancelled';
           this.commissions.set(commission.id, commission);
         }
       }

@@ -629,7 +629,7 @@ export default function CommissionManagement() {
                           )}
                           {commission.status === 'pending' && (
                             <span className="text-sm text-gray-500">
-                              {commission.type === 'vendor' ? 'Aguardando pedido ficar pronto' : 'Aguardando confirmação do pedido'}
+                              {commission.type === 'vendor' ? 'Aguardando entrega do pedido' : 'Aguardando confirmação do pedido'}
                             </span>
                           )}
                         </td>
