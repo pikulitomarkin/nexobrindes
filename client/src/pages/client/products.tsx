@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,10 +37,7 @@ export default function ClientProducts() {
 
   // Estado do formulário de solicitação
   const [quoteForm, setQuoteForm] = useState({
-    observations: "",
-    whatsapp: "",
-    email: "",
-    contactName: ""
+    observations: ""
   });
 
   const { data: productsData, isLoading } = useQuery({
@@ -93,17 +89,14 @@ export default function ClientProducts() {
 
   const resetForm = () => {
     setQuoteForm({
-      observations: "",
-      whatsapp: "",
-      email: "",
-      contactName: ""
+      observations: ""
     });
   };
 
   // Funções do carrinho
   const addToCart = (product: any) => {
     const existingItem = cart.find(item => item.productId === product.id);
-    
+
     if (existingItem) {
       setCart(cart.map(item => 
         item.productId === product.id 
@@ -132,7 +125,7 @@ export default function ClientProducts() {
   const updateCartItemQuantity = (productId: string, newQuantity: number) => {
     // Limitar quantidade entre 1 e 999999
     const validQuantity = Math.max(1, Math.min(999999, Math.floor(newQuantity)));
-    
+
     if (validQuantity <= 0) {
       removeFromCart(productId);
       return;
@@ -186,30 +179,18 @@ export default function ClientProducts() {
     }
 
     setQuoteForm({
-      observations: "",
-      whatsapp: clientProfile?.phone || "",
-      email: clientProfile?.email || "",
-      contactName: clientProfile?.name || currentUser.name || ""
+      observations: ""
     });
     setIsQuoteDialogOpen(true);
   };
 
   const handleSubmitQuote = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (cart.length === 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao carrinho",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!quoteForm.contactName.trim()) {
-      toast({
-        title: "Erro",
-        description: "O nome de contato é obrigatório",
         variant: "destructive"
       });
       return;
@@ -239,11 +220,7 @@ export default function ClientProducts() {
     const consolidatedQuote = {
       clientId: currentUser.id,
       vendorId: clientProfile?.vendorId,
-      contactName: quoteForm.contactName.trim(),
-      whatsapp: quoteForm.whatsapp.trim(),
-      email: quoteForm.email.trim(),
       observations: quoteForm.observations.trim(),
-      status: "pending",
       products: cart.map(item => ({
         productId: item.productId,
         productName: item.productName,
@@ -306,7 +283,7 @@ export default function ClientProducts() {
               Total: {filteredProducts.length} produtos encontrados
             </p>
           </div>
-          
+
           {/* Carrinho */}
           <div className="relative">
             <Button
@@ -322,7 +299,7 @@ export default function ClientProducts() {
                 </Badge>
               )}
             </Button>
-            
+
             {showCart && (
               <Card className="absolute right-0 top-12 w-[500px] z-50 shadow-lg max-h-[600px] overflow-hidden">
                 <CardHeader>
@@ -390,7 +367,7 @@ export default function ClientProducts() {
                               </Button>
                             </div>
                           </div>
-                          
+
                           {/* Campo de observações para cada produto */}
                           <div className="mt-2">
                             <Label className="text-xs text-gray-600">Observações do produto:</Label>
@@ -403,7 +380,7 @@ export default function ClientProducts() {
                           </div>
                         </div>
                       ))}
-                      
+
                       <div className="border-t pt-3">
                         <div className="flex justify-between items-center mb-3">
                           <span className="font-medium">Total estimado:</span>
@@ -586,7 +563,7 @@ export default function ClientProducts() {
                   {product.description && (
                     <p className="text-sm text-gray-600 line-clamp-3">{product.description}</p>
                   )}
-                  
+
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="text-sm text-gray-500">Categoria:</span>
@@ -607,7 +584,7 @@ export default function ClientProducts() {
                     <Plus className="h-4 w-4 mr-2" />
                     Adicionar ao Carrinho
                   </Button>
-                  
+
                   {!clientProfile?.vendorId && (
                     <p className="text-xs text-amber-600 text-center">
                       Você pode adicionar produtos, mas precisará ter um vendedor atribuído para solicitar orçamentos
@@ -671,10 +648,10 @@ export default function ClientProducts() {
             <DialogTitle>Solicitar Orçamento</DialogTitle>
             <DialogDescription>
               Você está solicitando orçamento para {cart.length} produto(s). 
-              Preencha os dados de contato abaixo.
+              Preencha os dados do pedido abaixo.
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Resumo dos produtos */}
           <div className="max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
             <h4 className="font-medium mb-2">Produtos selecionados:</h4>
@@ -701,47 +678,13 @@ export default function ClientProducts() {
 
           <form onSubmit={handleSubmitQuote} className="space-y-4">
             <div>
-              <Label htmlFor="contactName">Nome de Contato *</Label>
-              <Input
-                id="contactName"
-                value={quoteForm.contactName}
-                onChange={(e) => setQuoteForm({ ...quoteForm, contactName: e.target.value })}
-                placeholder="Seu nome completo"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="whatsapp">WhatsApp</Label>
-                <Input
-                  id="whatsapp"
-                  value={quoteForm.whatsapp}
-                  onChange={(e) => setQuoteForm({ ...quoteForm, whatsapp: phoneMask(e.target.value) })}
-                  placeholder="(11) 99999-9999"
-                  maxLength={15}
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={quoteForm.email}
-                  onChange={(e) => setQuoteForm({ ...quoteForm, email: e.target.value })}
-                  placeholder="seu@email.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="observations">Observações Gerais</Label>
+              <Label htmlFor="observations">Observações do Pedido</Label>
               <Textarea
                 id="observations"
-                rows={4}
                 value={quoteForm.observations}
                 onChange={(e) => setQuoteForm({ ...quoteForm, observations: e.target.value })}
-                placeholder="Observações que se aplicam a todos os produtos da solicitação..."
+                placeholder="Descreva detalhes específicos, personalizações desejadas, prazo de entrega, etc."
+                rows={4}
               />
             </div>
 
