@@ -71,7 +71,6 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
 
   return (
     <Button
-      key={`send-${uniqueKey}`}
       size="sm"
       variant="outline"
       className="h-6 px-2 text-xs"
@@ -82,6 +81,7 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
       }}
       disabled={pending}
       title={`Enviar APENAS para ${label}`}
+      data-testid={`button-send-producer-${uniqueKey}`}
     >
       {pending ? 'Enviando...' : `📤 ${label}`}
     </Button>
