@@ -335,8 +335,15 @@ export default function LogisticsDashboard() {
   };
 
   // Expandir pedidos pagos por produtor - cada produtor vira uma linha separada
-  const expandPaidOrdersByProducer = (orders: any[]) => {
+  // FILTRA produtores que já têm production order
+  const expandPaidOrdersByProducer = (orders: any[], existingProductionOrders: any[]) => {
     const expandedOrders: any[] = [];
+
+    // Criar mapa de produtores que já receberam production orders
+    const producersWithOrders = new Set();
+    existingProductionOrders?.forEach((po: any) => {
+      producersWithOrders.add(`${po.orderId}-${po.producerId}`);
+    });
 
     orders?.forEach((order: any) => {
       if (order.items && Array.isArray(order.items)) {
@@ -355,9 +362,15 @@ export default function LogisticsDashboard() {
           }
         });
 
-        // Se há produtores externos, criar uma entrada para cada um
-        if (itemsByProducer.size > 0) {
-          Array.from(itemsByProducer.values()).forEach((producerGroup: any, index: number) => {
+        // Filtrar produtores que ainda NÃO receberam production order
+        const pendingProducers = Array.from(itemsByProducer.values()).filter((producerGroup: any) => {
+          const key = `${order.id}-${producerGroup.producerId}`;
+          return !producersWithOrders.has(key);
+        });
+
+        // Se há produtores pendentes, criar uma entrada para cada um
+        if (pendingProducers.length > 0) {
+          pendingProducers.forEach((producerGroup: any, index: number) => {
             const producerValue = producerGroup.items.reduce((sum: number, item: any) =>
               sum + parseFloat(item.totalPrice || '0'), 0
             );
@@ -366,9 +379,9 @@ export default function LogisticsDashboard() {
               ...order,
               // Identificadores únicos para este produtor
               uniqueKey: `${order.id}-${producerGroup.producerId}`,
-              isGrouped: itemsByProducer.size > 1, // Indica se faz parte de um grupo
+              isGrouped: pendingProducers.length > 1, // Indica se faz parte de um grupo
               groupIndex: index, // Posição no grupo (0, 1, 2...)
-              groupTotal: itemsByProducer.size, // Total de produtores no pedido
+              groupTotal: pendingProducers.length, // Total de produtores PENDENTES no pedido
               // Dados específicos do produtor
               currentProducerId: producerGroup.producerId,
               currentProducerName: producerGroup.producerName,
@@ -380,33 +393,8 @@ export default function LogisticsDashboard() {
                 : producerGroup.items[0].productName
             });
           });
-        } else {
-          // Sem produtores externos, manter como está
-          expandedOrders.push({
-            ...order,
-            uniqueKey: order.id,
-            isGrouped: false,
-            groupIndex: 0,
-            groupTotal: 1,
-            currentProducerId: null,
-            currentProducerName: null,
-            producerItems: [],
-            producerValue: '0.00'
-          });
         }
-      } else {
-        // Sem itens, manter como está
-        expandedOrders.push({
-          ...order,
-          uniqueKey: order.id,
-          isGrouped: false,
-          groupIndex: 0,
-          groupTotal: 1,
-          currentProducerId: null,
-          currentProducerName: null,
-          producerItems: [],
-          producerValue: '0.00'
-        });
+        // Se todos os produtores já receberam, não adiciona nada (pedido não aparece)
       }
     });
 
@@ -414,7 +402,8 @@ export default function LogisticsDashboard() {
   };
 
   // Aplicar a expansão por produtor nos pedidos pagos
-  const expandedPaidOrders = expandPaidOrdersByProducer(paidOrders || []);
+  // Passa productionOrders para filtrar produtores que já receberam
+  const expandedPaidOrders = expandPaidOrdersByProducer(paidOrders || [], productionOrders || []);
 
   // Filtrar pedidos pagos expandidos
   const filteredPaidOrders = expandedPaidOrders?.filter((order: any) => {

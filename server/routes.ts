@@ -624,9 +624,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
       }
 
-      // Update order status to production only if we created orders and it's not already in production
+      // Only update order status to production if ALL producers have received their orders
       if (createdOrders.length > 0 && order.status !== 'production') {
-        await storage.updateOrder(id, { status: 'production' });
+        // Check if there are still producers without production orders
+        const allProductionOrders = await storage.getProductionOrdersByOrder(id);
+        const uniqueProducers = new Set();
+        
+        // Count unique producers in the order items
+        allItems.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            uniqueProducers.add(item.producerId);
+          }
+        });
+        
+        // Count unique producers with production orders
+        const producersWithOrders = new Set(allProductionOrders.map(po => po.producerId));
+        
+        // Only mark as production if all producers have been sent
+        if (uniqueProducers.size === producersWithOrders.size) {
+          await storage.updateOrder(id, { status: 'production' });
+        }
       }
 
       const message = producerId
