@@ -1,0 +1,74 @@
+Débora, achei o problema.
+
+Onde está o erro
+
+Está no front, em client/src/pages/logistics/dashboard.tsx.
+Você usa uma única useMutation (sendToProductionMutation) para todos os botões “Enviar para produção”. O estado global isPending dessa mutation é lido por todos os botões; quando você clica em um, todos entram em “Enviando…”, parecendo que todos foram clicados. Isso explica o “clica tudo junto”.
+
+O back-end (em server/routes.ts, rota POST /api/orders/:id/send-to-production) está OK: ele respeita producerId quando enviado e cria uma OP por produtor. Em server/storage.ts a criação da OP (createProductionOrder) também está correta.
+
+Correção mínima (2 linhas + 1 condição)
+
+Ainda usando a mesma mutation, restrinja o “pending” ao botão da dupla (orderId, producerId) que você clicou:
+
+// perto do botão "Enviar APENAS para ..."
+const isSendingThis =
+  sendToProductionMutation.isPending &&
+  sendToProductionMutation.variables?.orderId === order.id &&
+  sendToProductionMutation.variables?.producerId === order.currentProducerId;
+
+<Button
+  onClick={() =>
+    sendToProductionMutation.mutate({
+      orderId: order.id,
+      producerId: order.currentProducerId!,
+    })
+  }
+  disabled={isSendingThis}
+  title={`Enviar APENAS para ${order.currentProducerName}`}
+>
+  {isSendingThis ? 'Enviando...' : `📤 ${order.currentProducerName}`}
+</Button>
+
+
+E para o botão “Enviar (todos os produtores)” use outra flag:
+
+const isSendingAll =
+  sendToProductionMutation.isPending &&
+  sendToProductionMutation.variables?.orderId === selectedOrder?.id &&
+  !sendToProductionMutation.variables?.producerId;
+
+Correção robusta (recomendada)
+
+Extraia o botão para um componente de linha com sua própria useMutation (cada linha tem seu pending isolado):
+
+function SendToProducerButton({ orderId, producerId, label }: { orderId: string; producerId: string; label: string }) {
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/orders/${orderId}/send-to-production`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ producerId }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Erro ao enviar');
+      return r.json();
+    },
+  });
+
+  return (
+    <Button onClick={() => mutate()} disabled={isPending}>
+      {isPending ? 'Enviando...' : `📤 ${label}`}
+    </Button>
+  );
+}
+
+
+Use esse componente dentro do map de produtores. Assim cada botão tem “instância” própria e não contamina os demais.
+
+Dois checks rápidos (para o “não distribui certo”)
+
+Payload: ao clicar em um produtor, o Network do navegador deve mostrar POST /api/orders/:id/send-to-production com {"producerId":"<id_do_produtor>"}.
+
+Itens sem produtor: a rota ignora itens com producerId ausente ou 'internal'. Se algum item ficar assim, ele não gera OP (isso é esperado).
+
+Se quiser, eu já te devolvo o trecho de dashboard.tsx revisado com o componente isolado.
