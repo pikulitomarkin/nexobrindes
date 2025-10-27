@@ -250,6 +250,300 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Producers endpoints
+  app.get("/api/producers", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const producers = await storage.getUsersByRole('producer');
+      res.json(producers);
+    } catch (error) {
+      console.error("Error getting producers:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar produtores", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.post("/api/producers", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const { name, email, phone, specialty, address, password, username } = req.body;
+
+      if (!name || !password) {
+        return res.status(400).json({ error: "Nome e senha são obrigatórios" });
+      }
+
+      const producerData = {
+        username: username || `producer-${Date.now()}`,
+        password,
+        role: 'producer',
+        name,
+        email: email || null,
+        phone: phone || null,
+        specialty: specialty || null,
+        address: address || null,
+        vendorId: null,
+        isActive: true
+      };
+
+      const producer = await storage.createUser(producerData as any);
+      console.log('Producer created successfully:', producer);
+
+      res.status(201).json(producer);
+    } catch (error) {
+      console.error("Error creating producer:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao criar produtor", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  // Products endpoints
+  app.get("/api/products", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const { page, limit, search, category, producer } = req.query;
+      
+      const options = {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+        search: search as string,
+        category: category as string,
+        producer: producer as string
+      };
+
+      const result = await storage.getProducts(options);
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting products:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar produtos", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.post("/api/products", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const productData = req.body;
+      const product = await storage.createProduct(productData);
+      
+      res.status(201).json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao criar produto", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.put("/api/products/:id", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const { id } = req.params;
+      const productData = req.body;
+      
+      const product = await storage.updateProduct(id, productData);
+      
+      if (!product) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao atualizar produto", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.delete("/api/products/:id", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const { id } = req.params;
+      const success = await storage.deleteProduct(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao deletar produto", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  // Logistics endpoints
+  app.get("/api/logistics/products", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const { page, limit, search, category, producer } = req.query;
+      
+      const options = {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+        search: search as string,
+        category: category as string,
+        producer: producer as string
+      };
+
+      const result = await storage.getProducts(options);
+      
+      // Enrich products with producer names
+      const enrichedProducts = await Promise.all(
+        result.products.map(async (product: any) => {
+          if (product.producerId && product.producerId !== 'internal') {
+            const producer = await storage.getUser(product.producerId);
+            return {
+              ...product,
+              producerName: producer?.name || `Produtor ${product.producerId.slice(-6)}`
+            };
+          }
+          return product;
+        })
+      );
+
+      res.json({
+        ...result,
+        products: enrichedProducts
+      });
+    } catch (error) {
+      console.error("Error getting logistics products:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar produtos da logística", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.get("/api/logistics/producer-stats", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const products = await storage.getProducts();
+      const producers = await storage.getUsersByRole('producer');
+      
+      const stats = producers.map((producer: any) => {
+        const producerProducts = products.products.filter((p: any) => p.producerId === producer.id);
+        const activeProducts = producerProducts.filter((p: any) => p.isActive);
+        
+        return {
+          producerId: producer.id,
+          producerName: producer.name,
+          totalProducts: producerProducts.length,
+          activeProducts: activeProducts.length
+        };
+      });
+      
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting producer stats:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar estatísticas de produtores", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.get("/api/logistics/paid-orders", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const orders = await storage.getOrders();
+      const paidOrders = orders.filter((order: any) => {
+        const paidValue = parseFloat(order.paidValue || '0');
+        return paidValue > 0 && order.status !== 'production' && order.status !== 'shipped' && order.status !== 'delivered';
+      });
+      
+      res.json(paidOrders);
+    } catch (error) {
+      console.error("Error getting paid orders:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar pedidos pagos", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
+  app.get("/api/production-orders", async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      
+      const productionOrders = await storage.getProductionOrders();
+      
+      // Enrich with producer and order information
+      const enrichedOrders = await Promise.all(
+        productionOrders.map(async (po: any) => {
+          const producer = await storage.getUser(po.producerId);
+          const order = await storage.getOrder(po.orderId);
+          
+          return {
+            ...po,
+            producerName: producer?.name || `Produtor ${po.producerId.slice(-6)}`,
+            orderNumber: order?.orderNumber || `PED-${po.orderId.slice(-6)}`,
+            clientName: order?.clientName || 'Cliente não informado',
+            product: order?.product || 'Produto não informado'
+          };
+        })
+      );
+      
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error getting production orders:", error);
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro ao buscar ordens de produção", 
+          message: error instanceof Error ? error.message : "Erro desconhecido" 
+        });
+      }
+    }
+  });
+
   app.post("/api/clients", async (req: Request, res: Response) => {
     try {
       console.log("POST /api/clients - Request body:", req.body);
