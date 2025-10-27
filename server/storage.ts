@@ -2505,10 +2505,10 @@ export class MemStorage implements IStorage {
   private parseBRLCurrency(value: any): number {
     if (typeof value === 'number') return value;
     if (!value) return 0;
-    
+
     // Convert to string and remove BRL currency symbol and spaces
     const strValue = String(value).replace(/[R$\s]/g, '').trim();
-    
+
     // Check if this is Brazilian format (has comma) or standard format (no comma)
     if (strValue.includes(',')) {
       // Brazilian format: remove thousand separators (dot) and replace decimal comma with dot
@@ -2524,9 +2524,9 @@ export class MemStorage implements IStorage {
   private parsePercentage(value: any): number {
     if (typeof value === 'number') return value;
     if (!value) return 0;
-    
+
     const strValue = String(value).replace(/[%\s]/g, '').trim();
-    
+
     // Check if Brazilian format (comma for decimal)
     if (strValue.includes(',') && !strValue.includes('.')) {
       // Replace comma with dot for decimal
@@ -2663,7 +2663,7 @@ export class MemStorage implements IStorage {
     // Filter and deduplicate budget items - remove items with duplicate productId + producerId + quantity + unitPrice
     const uniqueBudgetItems = budgetItems.filter((item: any, index: number, self: any[]) => {
       const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-      const firstIndex = self.findIndex((i: any) => 
+      const firstIndex = self.findIndex((i: any) =>
         `${i.productId}-${i.producerId || 'internal'}-${i.quantity}-${i.unitPrice}` === itemKey
       );
 
@@ -2714,17 +2714,17 @@ export class MemStorage implements IStorage {
     let calculatedTotal = orderItems.reduce((sum, item) => {
       // Calculate item total with all components - parse BRL format values
       const basePrice = this.parseBRLCurrency(item.unitPrice) * item.quantity;
-      
+
       // Item customization (valor por unidade personalizada)
-      const itemCustomization = item.hasItemCustomization ? 
+      const itemCustomization = item.hasItemCustomization ?
         item.quantity * this.parseBRLCurrency(item.itemCustomizationValue) : 0;
-      
+
       // General customization (valor por unidade aplicado à quantidade total)
-      const generalCustomization = item.hasGeneralCustomization ? 
+      const generalCustomization = item.hasGeneralCustomization ?
         item.quantity * this.parseBRLCurrency(item.generalCustomizationValue) : 0;
-      
+
       let itemSubtotal = basePrice + itemCustomization + generalCustomization;
-      
+
       // Apply item discount (sobre o preço base apenas)
       if (item.hasItemDiscount) {
         if (item.itemDiscountType === 'percentage') {
@@ -2734,7 +2734,7 @@ export class MemStorage implements IStorage {
           itemSubtotal -= this.parseBRLCurrency(item.itemDiscountValue);
         }
       }
-      
+
       return sum + Math.max(0, itemSubtotal);
     }, 0);
 
@@ -2749,9 +2749,9 @@ export class MemStorage implements IStorage {
     }
 
     // Add shipping cost if delivery (not pickup)
-    const shippingCost = budget.deliveryType === 'pickup' ? 0 : 
+    const shippingCost = budget.deliveryType === 'pickup' ? 0 :
       this.parseBRLCurrency(budgetPaymentInfo?.shippingCost);
-    
+
     calculatedTotal += shippingCost;
 
     // Ensure total is never negative

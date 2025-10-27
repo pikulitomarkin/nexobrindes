@@ -480,11 +480,11 @@ export default function FinanceReceivables() {
                           </div>
                         )}
                       </td>
-                      <td className="panel-table td font-semibold">
+                      <td className="panel-table td font-semibold text-green-600">
                         R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="panel-table td font-semibold">
-                        R$ {(parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <td className="panel-table td font-semibold text-blue-600">
+                        R$ {Math.max(0, parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="panel-table td">
                         {getStatusBadge(receivable.status)}

@@ -1398,9 +1398,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Use budget down payment if available, otherwise use calculated payments
-      const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
+      // Use the actual paid value from payments table, not budget down payment
       const totalValue = parseFloat(order.totalValue);
+      const actualPaidValue = Math.max(totalPaid, parseFloat(order.paidValue || '0'));
       const remainingBalance = Math.max(0, totalValue - actualPaidValue);
 
       const enrichedOrder = {
