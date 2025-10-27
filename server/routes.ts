@@ -3206,13 +3206,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         producerPayments: producerPayments.length
       });
 
-      // Contas a Receber - soma dos valores pendentes dos pedidos + contas manuais
-      const orderReceivables = orders
-        .filter(order => order.status !== 'cancelled')
-        .reduce((total, order) => {
-          const totalValue = parseFloat(order.totalValue);
-          const paidValue = parseFloat(order.paidValue || '0');
-          const remaining = totalValue - paidValue;
+      // Contas a Receber - usar accountsReceivable (que já tem o valor correto)
+      const accountsReceivable = await storage.getAccountsReceivable();
+      const orderReceivables = accountsReceivable
+        .filter(ar => ar.status !== 'paid')
+        .reduce((total, ar) => {
+          const amount = parseFloat(ar.amount || '0');
+          const received = parseFloat(ar.receivedAmount || '0');
+          const remaining = amount - received;
           return total + Math.max(0, remaining);
         }, 0);
 
