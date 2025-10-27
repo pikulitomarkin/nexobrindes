@@ -32,7 +32,6 @@ import AdminProducerPayments from "@/pages/admin/producer-payments";
 import AdminFinance from "@/pages/admin/finance";
 import AdminCustomizations from "@/pages/admin/customizations";
 import AdminBranches from "@/pages/admin/branches";
-import AdminVendors from "@/pages/admin/vendors";
 import AdminPartners from "@/pages/admin/partners";
 
 // Vendor imports
