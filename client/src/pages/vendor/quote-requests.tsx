@@ -281,15 +281,6 @@ export default function VendorQuoteRequests() {
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white"
-                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'reviewing' })}
-                        disabled={updateStatusMutation.isPending}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Aceitar Análise
-                      </Button>
-                      <Button
-                        size="sm"
                         variant="outline"
                         className="text-red-600 border-red-300 hover:bg-red-50"
                         onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
