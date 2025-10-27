@@ -2495,9 +2495,50 @@ export class MemStorage implements IStorage {
     return enrichedBudgets;
   }
 
+  // Helper function to parse monetary values in either BRL format or standard format
+  // BRL: "15.000,00" (dot=thousands, comma=decimal) -> 15000.00
+  // Standard: "15000.00" (dot=decimal, no thousands) -> 15000.00
+  private parseBRLCurrency(value: any): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    
+    // Convert to string and remove BRL currency symbol and spaces
+    const strValue = String(value).replace(/[R$\s]/g, '').trim();
+    
+    // Check if this is Brazilian format (has comma) or standard format (no comma)
+    if (strValue.includes(',')) {
+      // Brazilian format: remove thousand separators (dot) and replace decimal comma with dot
+      const normalized = strValue.replace(/\./g, '').replace(',', '.');
+      return parseFloat(normalized) || 0;
+    } else {
+      // Standard format or already normalized: use as-is (dot is decimal separator)
+      return parseFloat(strValue) || 0;
+    }
+  }
+
+  // Helper function to parse percentage values (not currency - can have fractional percentages like 10.5)
+  private parsePercentage(value: any): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    
+    const strValue = String(value).replace(/[%\s]/g, '').trim();
+    
+    // Check if Brazilian format (comma for decimal)
+    if (strValue.includes(',') && !strValue.includes('.')) {
+      // Replace comma with dot for decimal
+      return parseFloat(strValue.replace(',', '.')) || 0;
+    } else {
+      // Standard format
+      return parseFloat(strValue) || 0;
+    }
+  }
+
   async createBudget(budgetData: any): Promise<any> {
     const id = generateId('budget');
     const now = new Date();
+
+    // Normalize monetary fields to ensure consistency
+    const normalizedTotalValue = this.parseBRLCurrency(budgetData.totalValue);
 
     const budget = {
       id,
@@ -2512,18 +2553,18 @@ export class MemStorage implements IStorage {
       validUntil: budgetData.validUntil || null,
       deliveryDeadline: budgetData.deliveryDeadline || null,
       deliveryType: budgetData.deliveryType || 'delivery',
-      totalValue: budgetData.totalValue || '0.00',
+      totalValue: normalizedTotalValue.toFixed(2),
       status: budgetData.status || 'draft',
       paymentMethodId: budgetData.paymentMethodId || '',
       shippingMethodId: budgetData.shippingMethodId || '',
-      installments: budgetData.installments || 1,
-      downPayment: parseFloat(budgetData.downPayment || 0),
-      remainingAmount: parseFloat(budgetData.remainingAmount || 0),
-      shippingCost: parseFloat(budgetData.shippingCost || 0),
+      installments: parseInt(budgetData.installments) || 1,
+      downPayment: this.parseBRLCurrency(budgetData.downPayment),
+      remainingAmount: this.parseBRLCurrency(budgetData.remainingAmount),
+      shippingCost: this.parseBRLCurrency(budgetData.shippingCost),
       hasDiscount: budgetData.hasDiscount || false,
       discountType: budgetData.discountType || 'percentage',
-      discountPercentage: parseFloat(budgetData.discountPercentage || 0),
-      discountValue: parseFloat(budgetData.discountValue || 0),
+      discountPercentage: this.parsePercentage(budgetData.discountPercentage),
+      discountValue: this.parseBRLCurrency(budgetData.discountValue),
       createdAt: now,
       updatedAt: now
     };
@@ -2551,9 +2592,33 @@ export class MemStorage implements IStorage {
     const budget = this.budgets.get(id);
     if (!budget) return null;
 
+    // Normalize monetary fields if present using BRL currency parser
+    const normalizedData = { ...budgetData };
+    if (budgetData.totalValue !== undefined) {
+      normalizedData.totalValue = this.parseBRLCurrency(budgetData.totalValue).toFixed(2);
+    }
+    if (budgetData.downPayment !== undefined) {
+      normalizedData.downPayment = this.parseBRLCurrency(budgetData.downPayment);
+    }
+    if (budgetData.remainingAmount !== undefined) {
+      normalizedData.remainingAmount = this.parseBRLCurrency(budgetData.remainingAmount);
+    }
+    if (budgetData.shippingCost !== undefined) {
+      normalizedData.shippingCost = this.parseBRLCurrency(budgetData.shippingCost);
+    }
+    if (budgetData.discountPercentage !== undefined) {
+      normalizedData.discountPercentage = this.parsePercentage(budgetData.discountPercentage);
+    }
+    if (budgetData.discountValue !== undefined) {
+      normalizedData.discountValue = this.parseBRLCurrency(budgetData.discountValue);
+    }
+    if (budgetData.installments !== undefined) {
+      normalizedData.installments = parseInt(budgetData.installments) || 1;
+    }
+
     const updatedBudget = {
       ...budget,
-      ...budgetData,
+      ...normalizedData,
       updatedAt: new Date().toISOString()
     };
 
@@ -2641,6 +2706,55 @@ export class MemStorage implements IStorage {
       productDepth: item.productDepth,
     }));
 
+    // Recalculate total value from items to ensure accuracy (using BRL currency parser)
+    let calculatedTotal = orderItems.reduce((sum, item) => {
+      // Calculate item total with all components - parse BRL format values
+      const basePrice = this.parseBRLCurrency(item.unitPrice) * item.quantity;
+      
+      // Item customization (valor por unidade personalizada)
+      const itemCustomization = item.hasItemCustomization ? 
+        item.quantity * this.parseBRLCurrency(item.itemCustomizationValue) : 0;
+      
+      // General customization (valor por unidade aplicado à quantidade total)
+      const generalCustomization = item.hasGeneralCustomization ? 
+        item.quantity * this.parseBRLCurrency(item.generalCustomizationValue) : 0;
+      
+      let itemSubtotal = basePrice + itemCustomization + generalCustomization;
+      
+      // Apply item discount (sobre o preço base apenas)
+      if (item.hasItemDiscount) {
+        if (item.itemDiscountType === 'percentage') {
+          const discountAmount = (basePrice * this.parsePercentage(item.itemDiscountPercentage)) / 100;
+          itemSubtotal -= discountAmount;
+        } else if (item.itemDiscountType === 'value') {
+          itemSubtotal -= this.parseBRLCurrency(item.itemDiscountValue);
+        }
+      }
+      
+      return sum + Math.max(0, itemSubtotal);
+    }, 0);
+
+    // Apply general discount to the subtotal
+    if (budget.hasDiscount) {
+      if (budget.discountType === 'percentage') {
+        const discountAmount = (calculatedTotal * this.parsePercentage(budget.discountPercentage)) / 100;
+        calculatedTotal -= discountAmount;
+      } else if (budget.discountType === 'value') {
+        calculatedTotal -= this.parseBRLCurrency(budget.discountValue);
+      }
+    }
+
+    // Add shipping cost if delivery (not pickup)
+    const shippingCost = budget.deliveryType === 'pickup' ? 0 : 
+      this.parseBRLCurrency(budgetPaymentInfo?.shippingCost);
+    
+    calculatedTotal += shippingCost;
+
+    // Ensure total is never negative
+    const finalTotalValue = Math.max(0, calculatedTotal).toFixed(2);
+
+    console.log(`Budget ${budgetId} conversion - Recalculated total: R$ ${finalTotalValue} (original: R$ ${budget.totalValue})`);
+
     // Create order
     const orderData: InsertOrder = {
       orderNumber,
@@ -2649,7 +2763,7 @@ export class MemStorage implements IStorage {
       vendorId: budget.vendorId,
       product: budget.title,
       description: budget.description || '',
-      totalValue: budget.totalValue,
+      totalValue: finalTotalValue,
       status: 'confirmed',
       deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
 
@@ -2702,19 +2816,19 @@ export class MemStorage implements IStorage {
       productName: itemData.productName || '',
       producerId: itemData.producerId || null,
       quantity: parseInt(itemData.quantity) || 1,
-      unitPrice: parseFloat(itemData.unitPrice) || 0,
-      totalPrice: parseFloat(itemData.totalPrice) || 0,
+      unitPrice: this.parseBRLCurrency(itemData.unitPrice),
+      totalPrice: this.parseBRLCurrency(itemData.totalPrice),
       // Item customization fields
       hasItemCustomization: itemData.hasItemCustomization || false,
       selectedCustomizationId: itemData.selectedCustomizationId || null,
-      itemCustomizationValue: parseFloat(itemData.itemCustomizationValue || 0),
+      itemCustomizationValue: this.parseBRLCurrency(itemData.itemCustomizationValue),
       itemCustomizationDescription: itemData.itemCustomizationDescription || '',
       additionalCustomizationNotes: itemData.additionalCustomizationNotes || '',
       customizationPhoto: itemData.customizationPhoto || '', // Add customization photo field
       // General customization fields
       hasGeneralCustomization: itemData.hasGeneralCustomization || false,
       generalCustomizationName: itemData.generalCustomizationName || '',
-      generalCustomizationValue: parseFloat(itemData.generalCustomizationValue || 0),
+      generalCustomizationValue: this.parseBRLCurrency(itemData.generalCustomizationValue),
       // Product dimensions
       productWidth: itemData.productWidth || null,
       productHeight: itemData.productHeight || null,
@@ -2722,8 +2836,8 @@ export class MemStorage implements IStorage {
       // Item discount
       hasItemDiscount: itemData.hasItemDiscount || false,
       itemDiscountType: itemData.itemDiscountType || 'percentage',
-      itemDiscountPercentage: parseFloat(itemData.itemDiscountPercentage || 0),
-      itemDiscountValue: parseFloat(itemData.itemDiscountValue || 0),
+      itemDiscountPercentage: this.parsePercentage(itemData.itemDiscountPercentage),
+      itemDiscountValue: this.parseBRLCurrency(itemData.itemDiscountValue),
       createdAt: new Date(),
       updatedAt: new Date()
     };
