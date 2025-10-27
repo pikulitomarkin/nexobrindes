@@ -2755,8 +2755,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/receivables", async (req, res) => {
     try {
       const receivables = await storage.getAccountsReceivable();
-      console.log(`Returning ${receivables.length} total receivables to frontend`);
-      res.json(receivables);
+      
+      // Fix calculation for each receivable
+      const correctedReceivables = receivables.map(receivable => {
+        if (receivable.orderId) {
+          // For order-based receivables, ensure correct calculation
+          const originalAmount = parseFloat(receivable.amount || '0');
+          const receivedAmount = parseFloat(receivable.receivedAmount || '0');
+          const remainingAmount = Math.max(0, originalAmount - receivedAmount);
+          
+          // Update status based on payment
+          let status = 'pending';
+          if (receivedAmount >= originalAmount) {
+            status = 'paid';
+          } else if (receivedAmount > 0) {
+            status = 'partial';
+          }
+          
+          console.log(`Order ${receivable.orderId}: Original=${originalAmount}, Received=${receivedAmount}, Remaining=${remainingAmount}, Status=${status}`);
+          
+          return {
+            ...receivable,
+            amount: originalAmount.toFixed(2),
+            receivedAmount: receivedAmount.toFixed(2),
+            remainingAmount: remainingAmount.toFixed(2),
+            status: status
+          };
+        }
+        return receivable;
+      });
+      
+      console.log(`Returning ${correctedReceivables.length} total receivables to frontend`);
+      res.json(correctedReceivables);
     } catch (error) {
       console.error("Error fetching accounts receivable:", error);
       res.status(500).json({ error: "Failed to fetch accounts receivable" });
@@ -3117,7 +3147,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             __origin: 'receivables' // Safety flag for storage layer
           });
 
+          // ALSO update the accountsReceivable record to reflect the payment
+          const currentReceivableReceived = parseFloat(receivable.receivedAmount || '0');
+          const newReceivableReceived = currentReceivableReceived + thisPayment;
+          const originalReceivableAmount = parseFloat(receivable.amount || '0');
+          
+          let newStatus = 'partial';
+          if (newReceivableReceived >= originalReceivableAmount) {
+            newStatus = 'paid';
+          } else if (newReceivableReceived <= 0) {
+            newStatus = 'pending';
+          }
+          
+          await storage.updateAccountsReceivable(receivable.id, {
+            receivedAmount: newReceivableReceived.toFixed(2),
+            status: newStatus
+          });
+
           console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
+          console.log(`[RECEIVABLE UPDATE] Receivable ${receivable.id}: ReceivedAmount updated from ${currentReceivableReceived} to ${newReceivableReceived}, Status: ${newStatus}`);
         }
       } else {
         // This is a manual receivable - update the receivable directly
@@ -3496,12 +3544,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Contas a Receber - usar accountsReceivable (que já tem o valor correto)
       const accountsReceivable = await storage.getAccountsReceivable();
       const orderReceivables = accountsReceivable
-        .filter(ar => ar.status !== 'paid')
+        .filter(ar => ar.status !== 'paid' && ar.orderId) // Only order-based receivables
         .reduce((total, ar) => {
           const amount = parseFloat(ar.amount || '0');
           const received = parseFloat(ar.receivedAmount || '0');
-          const remaining = amount - received;
-          return total + Math.max(0, remaining);
+          const remaining = Math.max(0, amount - received);
+          console.log(`Receivable ${ar.id}: Amount=${amount}, Received=${received}, Remaining=${remaining}`);
+          return total + remaining;
         }, 0);
 
       // Add manual receivables
