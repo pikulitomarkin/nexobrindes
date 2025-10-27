@@ -2160,6 +2160,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get clients by vendor
+  app.get("/api/vendors/:vendorId/clients", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching clients for vendor: ${vendorId}`);
+      
+      const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}`);
+      
+      res.json(clients);
+    } catch (error) {
+      console.error("Error fetching clients by vendor:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
   // Vendors
   app.get("/api/vendors", async (req, res) => {
     try {

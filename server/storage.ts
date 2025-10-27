@@ -517,6 +517,7 @@ export class MemStorage implements IStorage {
   private createTestUsers() {
     // Override existing users with test users
     this.users.clear();
+    this.clients.clear(); // Limpar clientes existentes também
 
     // Admin user
     const adminUser = {
@@ -660,47 +661,84 @@ export class MemStorage implements IStorage {
     };
     this.users.set(financeUser.id, financeUser);
 
-    // Recriar clientes pré-cadastrados
-    const preClient1: Client = {
+    console.log("Criando clientes pré-cadastrados...");
+
+    // Recriar clientes pré-cadastrados com userCode
+    const preClient1: Client & { userCode?: string } = {
       id: "client-1",
-      userId: "client-1",
+      userId: "client-1", // Vinculado ao user client-1
       name: "João Silva",
       email: "joao@gmail.com",
       phone: "(11) 98765-4321",
       whatsapp: null,
-      cpfCnpj: null,
-      address: "Rua das Flores, 123 - São Paulo",
+      cpfCnpj: "123.456.789-00",
+      address: "Rua das Flores, 123 - São Paulo, SP",
       vendorId: "vendor-1",
+      userCode: "CLI001",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    const preClient2: Client = {
+    const preClient2: Client & { userCode?: string } = {
       id: "client-2",
-      userId: null,
+      userId: null, // Cliente sem conta de usuário
       name: "Maria Santos",
       email: "maria@email.com",
       phone: "(11) 99999-8888",
-      whatsapp: null,
-      cpfCnpj: null,
-      address: "Av. Principal, 456 - São Paulo",
+      whatsapp: "(11) 99999-8888",
+      cpfCnpj: "987.654.321-00",
+      address: "Av. Principal, 456 - São Paulo, SP",
       vendorId: "vendor-1",
+      userCode: "CLI002",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    const preClient3: Client = {
+    const preClient3: Client & { userCode?: string } = {
       id: "client-3",
-      userId: null,
+      userId: null, // Cliente sem conta de usuário
       name: "Ana Costa",
       email: "ana@email.com",
       phone: "(11) 97777-6666",
       whatsapp: "(11) 97777-6666",
-      cpfCnpj: "987.654.321-00",
+      cpfCnpj: "111.222.333-44",
       address: "Rua dos Bobos, 0 - Centro, São Paulo, SP",
       vendorId: "vendor-1",
+      userCode: "CLI003",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const preClient4: Client & { userCode?: string } = {
+      id: "client-4",
+      userId: null,
+      name: "Pedro Oliveira", 
+      email: "pedro@empresa.com",
+      phone: "(11) 96666-5555",
+      whatsapp: null,
+      cpfCnpj: "12.345.678/0001-90",
+      address: "Av. Paulista, 1000 - Bela Vista, São Paulo, SP",
+      vendorId: "vendor-1",
+      userCode: "CLI004",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const preClient5: Client & { userCode?: string } = {
+      id: "client-5",
+      userId: null,
+      name: "Empresa ABC Ltda",
+      email: "contato@abc.com.br", 
+      phone: "(11) 95555-4444",
+      whatsapp: "(11) 95555-4444",
+      cpfCnpj: "23.456.789/0001-12",
+      address: "Rua do Comércio, 500 - Vila Madalena, São Paulo, SP",
+      vendorId: "vendor-1",
+      userCode: "CLI005", 
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -709,6 +747,11 @@ export class MemStorage implements IStorage {
     this.clients.set(preClient1.id, preClient1);
     this.clients.set(preClient2.id, preClient2);
     this.clients.set(preClient3.id, preClient3);
+    this.clients.set(preClient4.id, preClient4);
+    this.clients.set(preClient5.id, preClient5);
+
+    console.log(`Clientes pré-cadastrados criados: ${this.clients.size} clientes`);
+    console.log("Clientes:", Array.from(this.clients.values()).map(c => ({ id: c.id, name: c.name, userCode: c.userCode, vendorId: c.vendorId })));
   }
 
   private initializeData() {
