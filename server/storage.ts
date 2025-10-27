@@ -3292,31 +3292,60 @@ export class MemStorage implements IStorage {
     const manualReceivables = this.mockData.manualReceivables || [];
 
     const orderReceivables = orders
-      .filter(order => order.status !== 'cancelled')
+      .filter(order => order.status !== 'cancelled') // Não incluir pedidos cancelados
       .map(order => {
-        let clientName = order.contactName || 'Cliente não identificado';
-        const minimumPayment = (parseFloat(order.downPayment || "0") + parseFloat(order.shippingCost || "0")).toFixed(2);
-
-        // Calculate remaining amount to receive (total - already paid)
-        const totalValue = parseFloat(order.totalValue);
+        const totalValue = parseFloat(order.totalValue || "0");
         const paidValue = parseFloat(order.paidValue || "0");
-        const remainingAmount = Math.max(0, totalValue - paidValue);
+        const remainingValue = Math.max(0, totalValue - paidValue);
+
+        // Get minimum payment (entrada + frete) from budget if available
+        let minimumPaymentValue = "0.00";
+        if (order.budgetId) {
+          // Try to get budget payment info for minimum payment calculation
+          const downPayment = parseFloat(order.downPayment || "0");
+          const shippingCost = parseFloat(order.shippingCost || "0");
+          minimumPaymentValue = downPayment > 0 || shippingCost > 0 ?
+            (downPayment + shippingCost).toFixed(2) : "0.00";
+        }
+
+        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+        if (paidValue >= totalValue) {
+          status = 'paid';
+        } else if (paidValue > 0) {
+          // Check if minimum payment requirement is met
+          if (parseFloat(minimumPaymentValue) > 0 && paidValue >= parseFloat(minimumPaymentValue)) {
+            status = 'partial';
+          } else if (parseFloat(minimumPaymentValue) > 0 && paidValue < parseFloat(minimumPaymentValue)) {
+            status = 'pending'; // Minimum not met
+          } else {
+            status = 'partial'; // No minimum requirement
+          }
+        }
+
+        // Check if overdue
+        const dueDate = order.deadline ? new Date(order.deadline) : null;
+        if (dueDate && new Date() > dueDate && status !== 'paid') {
+          status = 'overdue';
+        }
 
         return {
           id: `ar-${order.id}`,
           orderId: order.id,
-          orderNumber: order.orderNumber || `#${order.id}`,
-          clientName: clientName,
-          amount: remainingAmount.toFixed(2), // Show remaining amount instead of total
+          orderNumber: order.orderNumber,
+          clientName: order.contactName || 'Cliente não identificado',
+          amount: order.totalValue || "0.00", // ✅ CORRIGIDO: Sempre usar valor original do pedido
           receivedAmount: order.paidValue || "0.00",
-          minimumPayment: minimumPayment, // Add minimumPayment
-          status: this.calculateReceivableStatus(order),
+          minimumPayment: minimumPaymentValue,
+          status: status,
           dueDate: order.deadline ? new Date(order.deadline) : null,
           createdAt: new Date(order.createdAt),
           lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
           isManual: false,
-          type: 'sale',
-          originalAmount: order.totalValue || "0.00" // Keep original amount for reference
+          type: 'order',
+          description: `Venda: ${order.product}`,
+          notes: order.notes || '',
+          // Store remaining value for calculations if needed
+          remainingValue: remainingValue.toFixed(2)
         };
       });
 

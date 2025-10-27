@@ -239,9 +239,14 @@ export default function FinanceReceivables() {
     }
   };
 
-  // Calcular totais corretos: Total - Recebido = Saldo restante
-  const totalToReceive = mockReceivables.reduce((sum, r) => sum + Math.max(0, parseFloat(r.amount) - parseFloat(r.paidAmount)), 0);
-  const totalReceived = mockReceivables.reduce((sum, r) => sum + parseFloat(r.paidAmount), 0);
+  // Calcular totais corretos: Valor Original - Valor Recebido = Saldo restante
+  const totalToReceive = mockReceivables.reduce((sum, r) => {
+    const originalAmount = parseFloat(r.amount); // Valor original do pedido
+    const receivedAmount = parseFloat(r.paidAmount || r.receivedAmount || "0");
+    return sum + Math.max(0, originalAmount - receivedAmount);
+  }, 0);
+  
+  const totalReceived = mockReceivables.reduce((sum, r) => sum + parseFloat(r.paidAmount || r.receivedAmount || "0"), 0);
   const awaitingEntryCount = mockReceivables.filter(r => r.status === 'pending' || r.status === 'partial').length;
   const partiallyPaidCount = mockReceivables.filter(r => r.status === 'partial').length;
   const overdueCount = mockReceivables.filter(r => r.status === 'overdue').length;
@@ -534,7 +539,7 @@ export default function FinanceReceivables() {
                         R$ {parseFloat(receivable.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="panel-table td font-semibold text-blue-600">
-                        R$ {Math.max(0, parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {Math.max(0, parseFloat(receivable.amount) - parseFloat(receivable.receivedAmount || receivable.paidAmount || "0")).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="panel-table td">
                         {getStatusBadge(receivable.status)}
@@ -553,9 +558,11 @@ export default function FinanceReceivables() {
                               onClick={() => {
                                 setSelectedReceivable(receivable);
                                 // Suggest minimum payment if not met, otherwise remaining amount
+                                const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
+                                const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
                                 const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
                                   minimumPayment.toString() : 
-                                  (parseFloat(receivable.amount) - parseFloat(receivable.paidAmount)).toString();
+                                  remainingAmount.toString();
                                 setPaymentData({
                                   ...paymentData,
                                   amount: suggestedAmount
