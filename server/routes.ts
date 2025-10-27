@@ -220,6 +220,26 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get clients by vendor
+  app.get("/api/vendors/:vendorId/clients", async (req: Request, res: Response) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Getting clients for vendor: ${vendorId}`);
+
+      const clients = await storage.getClientsByVendor(vendorId);
+      console.log(`Found ${clients.length} clients for vendor ${vendorId}:`, 
+        clients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
+
+      res.json(clients);
+    } catch (error) {
+      console.error("Error getting clients by vendor:", error);
+      res.status(500).json({ 
+        error: "Erro ao buscar clientes", 
+        details: error instanceof Error ? error.message : "Erro desconhecido" 
+      });
+    }
+  });
+
   app.post("/api/clients", async (req: Request, res: Response) => {
     try {
       console.log("POST /api/clients - Request body:", req.body);

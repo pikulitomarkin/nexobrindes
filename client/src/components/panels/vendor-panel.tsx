@@ -19,6 +19,15 @@ export default function VendorPanel() {
     queryKey: ["/api/orders/vendor", vendorId],
   });
 
+  const { data: clients, isLoading: clientsLoading } = useQuery({
+    queryKey: ["/api/vendors", vendorId, "clients"],
+    queryFn: async () => {
+      const response = await fetch(`/api/vendors/${vendorId}/clients`);
+      if (!response.ok) throw new Error('Failed to fetch vendor clients');
+      return response.json();
+    },
+  });
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -59,7 +68,7 @@ export default function VendorPanel() {
     );
   };
 
-  if (vendorLoading || ordersLoading) {
+  if (vendorLoading || ordersLoading || clientsLoading) {
     return (
       <div className="p-8">
         <div className="animate-pulse">
@@ -174,7 +183,7 @@ export default function VendorPanel() {
             <Link href="/vendor/clients">
               <Button variant="outline" className="w-full justify-start">
                 <Users className="h-4 w-4 mr-2" />
-                Ver Meus Clientes
+                Ver Meus Clientes ({clients?.length || 0})
               </Button>
             </Link>
             <Link href="/vendor/commissions">
