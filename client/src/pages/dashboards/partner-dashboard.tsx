@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight, Percent } from "lucide-react";
 import { Link } from "wouter";
 
 export default function PartnerDashboard() {
@@ -16,6 +16,17 @@ export default function PartnerDashboard() {
 
   const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
+  });
+
+  // Query específica para as comissões deste sócio
+  const { data: partnerCommissions } = useQuery({
+    queryKey: ["/api/commissions"],
+    select: (data) => {
+      // Filtrar apenas comissões deste sócio específico
+      return data?.filter((commission: any) => 
+        commission.partnerId === user.id && commission.type === 'partner'
+      ) || [];
+    }
   });
 
   const handleLogout = () => {
@@ -34,6 +45,18 @@ export default function PartnerDashboard() {
     { href: "/partner/reports", icon: BarChart3, label: "Relatórios", color: "text-rose-600" },
     { href: "/partner/partners", icon: Users, label: "Sócios", color: "text-teal-600" },
   ];
+
+  // Cálculos específicos das comissões deste sócio
+  const totalPartnerCommissions = partnerCommissions?.reduce((sum: number, commission: any) => 
+    sum + parseFloat(commission.amount || '0'), 0) || 0;
+  
+  const pendingPartnerCommissions = partnerCommissions?.filter((c: any) => 
+    ['pending', 'confirmed'].includes(c.status)).reduce((sum: number, c: any) => 
+    sum + parseFloat(c.amount || '0'), 0) || 0;
+  
+  const paidPartnerCommissions = partnerCommissions?.filter((c: any) => 
+    c.status === 'paid').reduce((sum: number, c: any) => 
+    sum + parseFloat(c.amount || '0'), 0) || 0;
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
@@ -141,50 +164,61 @@ export default function PartnerDashboard() {
           </Card>
         </div>
 
-        {/* Financial Summary Cards - Idênticos ao admin */}
+        {/* Partner Commission Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card data-testid="card-orders-today">
+          <Card data-testid="card-total-commissions">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pedidos Hoje</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats?.ordersToday || 0}</p>
-                </div>
-                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-monthly-revenue">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Receita Mensal</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Comissões</p>
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    R$ {totalPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    {partnerCommissions?.length || 0} pedidos
                   </p>
                 </div>
-                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-pending-payments">
+          <Card data-testid="card-pending-commissions">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pagamentos Pendentes</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Pendentes</p>
                   <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    R$ {stats?.pendingPayments?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    R$ {pendingPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    A receber
                   </p>
                 </div>
-                <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                <Percent className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-paid-commissions">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Pagas</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    R$ {paidPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    Já recebidas
+                  </p>
+                </div>
+                <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Orders & Quick Actions - Idênticos ao admin */}
+        {/* Recent Orders & Recent Commissions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-recent-orders">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -222,28 +256,81 @@ export default function PartnerDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-quick-actions">
-            <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
+          <Card data-testid="card-recent-commissions">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Minhas Comissões Recentes</CardTitle>
+              <Link href="/partner/commission-management">
+                <Button variant="outline" size="sm" data-testid="button-view-all-commissions">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver Todas
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                {quickActions.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <Link key={action.href} href={action.href}>
-                      <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" data-testid={`link-${action.label.toLowerCase().replace(/\s+/g, '-')}`}>
-                        <Icon className={`h-5 w-5 ${action.color} mr-3`} />
-                        <span className="font-medium text-sm">{action.label}</span>
-                        <ArrowUpRight className="h-4 w-4 ml-auto text-gray-400" />
+              <div className="space-y-4">
+                {!partnerCommissions || partnerCommissions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Percent className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">Nenhuma comissão encontrada</p>
+                  </div>
+                ) : (
+                  partnerCommissions.slice(0, 5).map((commission: any) => (
+                    <div key={commission.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm">#{commission.orderNumber || 'N/A'}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : 'Data não disponível'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                          {commission.percentage}% sobre R$ {parseFloat(commission.orderValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
-                    </Link>
-                  );
-                })}
+                      <div className="text-right">
+                        <p className="font-semibold text-sm text-emerald-600">
+                          R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <Badge className={`${
+                          commission.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          commission.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                          commission.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {commission.status === 'paid' ? 'Pago' :
+                           commission.status === 'confirmed' ? 'Confirmado' :
+                           commission.status === 'pending' ? 'Pendente' :
+                           commission.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Quick Actions */}
+        <Card data-testid="card-quick-actions">
+          <CardHeader>
+            <CardTitle>Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link key={action.href} href={action.href}>
+                    <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" data-testid={`link-${action.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <Icon className={`h-5 w-5 ${action.color} mr-3`} />
+                      <span className="font-medium text-sm">{action.label}</span>
+                      <ArrowUpRight className="h-4 w-4 ml-auto text-gray-400" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
