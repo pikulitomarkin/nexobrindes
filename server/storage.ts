@@ -334,7 +334,7 @@ export class MemStorage implements IStorage {
       name: "Cartão de Crédito",
       type: "credit_card",
       maxInstallments: 12,
-      installmentInterest: "2.99",
+      installmentInterest: "0.00",
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -1286,42 +1286,62 @@ export class MemStorage implements IStorage {
       const receivableId = `ar-${id}`;
       const receivable = this.accountsReceivable.get(receivableId);
       if (receivable) {
-        const newTotalValue = parseFloat(updates.totalValue !== undefined ? updates.totalValue : order.totalValue);
-        const newRefundAmount = parseFloat(updates.refundAmount !== undefined ? updates.refundAmount : order.refundAmount);
-        const newDownPayment = parseFloat(updates.downPayment !== undefined ? updates.downPayment.toString() : order.downPayment);
-        const newShippingCost = parseFloat(updates.shippingCost !== undefined ? updates.shippingCost.toString() : order.shippingCost);
-        const currentPaid = parseFloat(receivable.receivedAmount);
+        // Calculate expected amount based on payment info - MANTER O VALOR ORIGINAL DO PEDIDO
+        let expectedAmount = parseFloat(order.totalValue); // NUNCA alterar o valor total do pedido
+        let minimumPaymentValue = "0.00";
 
-        // O valor esperado é sempre o valor total menos reembolso
-        const expectedAmount = newTotalValue - newRefundAmount;
-        // O pagamento mínimo é SEMPRE entrada + frete quando há entrada definida
-        const minimumPaymentValue = newDownPayment > 0 ? (newDownPayment + newShippingCost).toFixed(2) : "0.00";
+        // If order was converted from budget, get budget payment info
+        if (order.budgetId) {
+          const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
+          if (budgetPaymentInfo) {
+            const budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || '0');
+            const budgetShipping = parseFloat(budgetPaymentInfo.shippingCost || '0');
 
+            if (budgetDownPayment > 0 || budgetShipping > 0) {
+              minimumPaymentValue = (budgetDownPayment + budgetShipping).toFixed(2);
+            }
+          }
+        }
+
+        // Get current payments for this order
+        const payments = await this.getPaymentsByOrder(order.id);
+        const currentPaid = payments
+          .filter(p => p.status === 'confirmed')
+          .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        // Update minimum payment if new values provided
+        const newDownPayment = parseFloat(updateData.downPayment?.toString() || '0');
+        const newShippingCost = parseFloat(updateData.shippingCost?.toString() || '0');
+
+        // Atualizar apenas o pagamento mínimo, NÃO o valor esperado total
+        if (newDownPayment > 0 || newShippingCost > 0) {
+          minimumPaymentValue = (newDownPayment + newShippingCost).toFixed(2);
+        }
+
+        // Status calculation logic based on currentPaid, expectedAmount, and minimumPaymentValue
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
         if (currentPaid >= expectedAmount) {
           status = 'paid';
         } else if (currentPaid > 0) {
-          // Check if minimum payment requirement is met
           const minPayment = parseFloat(minimumPaymentValue);
           if (minPayment > 0 && currentPaid >= minPayment) {
-            status = 'partial'; // Entrada + frete pagos, restante pendente
+            status = 'partial';
           } else if (minPayment > 0 && currentPaid < minPayment) {
-            status = 'pending'; // Entrada + frete ainda não pagos completamente
+            status = 'pending';
           } else {
-            status = 'partial'; // Sem exigência de entrada, qualquer valor é parcial
+            status = 'partial';
           }
         }
 
-        // Check if overdue
         const dueDate = updateData.deadline ? new Date(updateData.deadline) : null;
         if (dueDate && new Date() > dueDate && status !== 'paid') {
           status = 'overdue';
         }
 
         await this.updateAccountsReceivable(receivableId, {
-          amount: expectedAmount.toFixed(2),
-          receivedAmount: currentPaid.toFixed(2), // Keep current received amount as is
-          minimumPayment: minimumPaymentValue, // Update minimum payment
+          amount: expectedAmount.toFixed(2), // Keep original total amount
+          receivedAmount: currentPaid.toFixed(2),
+          minimumPayment: minimumPaymentValue,
           status: status,
           dueDate: updateData.deadline
         });
@@ -1651,55 +1671,51 @@ export class MemStorage implements IStorage {
   }
 
   // Update order paid value based on confirmed payments
-  async updateOrderPaidValue(orderId: string, receivedAmount?: string): Promise<void> {
+  async updateOrderPaidValue(orderId: string): Promise<void> {
     const payments = await this.getPaymentsByOrder(orderId);
     const totalPaid = payments
-      .filter(payment => payment.status === 'confirmed')
-      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+      .filter(p => p.status === 'confirmed')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
-    const order = await this.getOrder(orderId);
-    if (!order) return;
+    // Update order paid value
+    await this.updateOrder(orderId, {
+      paidValue: totalPaid.toFixed(2)
+    });
 
-    const newPaidValue = receivedAmount !== undefined ? receivedAmount : totalPaid.toFixed(2);
+    // Update accounts receivable - CORRIGIDO: não alterar o valor original
+    const receivables = await this.getAccountsReceivable();
+    const receivable = receivables.find(r => r.orderId === orderId);
 
-    if (newPaidValue !== order.paidValue) {
-      await this.updateOrder(orderId, { paidValue: newPaidValue });
+    if (receivable) {
+      const totalAmount = parseFloat(receivable.amount); // MANTER valor original sempre
+      let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
 
-      // Update corresponding AccountsReceivable entry
-      const receivableId = `ar-${orderId}`;
-      const receivable = this.accountsReceivable.get(receivableId);
-
-      if (receivable) {
-        const totalValue = parseFloat(receivable.amount);
-        const minimumPayment = parseFloat(receivable.minimumPayment || 0);
-        let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-
-        if (parseFloat(newPaidValue) >= totalValue) {
-          status = 'paid';
-        } else if (parseFloat(newPaidValue) > 0) {
-          // Check if minimum payment requirement is met
-          if (minimumPayment > 0 && parseFloat(newPaidValue) >= minimumPayment) {
-            status = 'partial';
-          } else if (minimumPayment > 0 && parseFloat(newPaidValue) < minimumPayment) {
-            status = 'pending';
-          } else {
-            status = 'partial';
-          }
+      if (totalPaid >= totalAmount) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        // Check if minimum payment requirement is met
+        const minPayment = parseFloat(receivable.minimumPayment || '0');
+        if (minPayment > 0 && totalPaid >= minPayment) {
+          status = 'partial'; // Entrada + frete pagos, restante pendente
+        } else if (minPayment > 0 && totalPaid < minPayment) {
+          status = 'pending'; // Entrada + frete ainda não pagos completamente
         } else {
-          status = minimumPayment > 0 ? 'pending' : 'open';
+          status = 'partial'; // Sem exigência de entrada, qualquer valor é parcial
         }
-
-        // Check if overdue
-        const dueDate = order.deadline ? new Date(order.deadline) : null;
-        if (dueDate && new Date() > dueDate && status !== 'paid') {
-          status = 'overdue';
-        }
-
-        await this.updateAccountsReceivable(receivableId, {
-          receivedAmount: parseFloat(newPaidValue).toFixed(2),
-          status: status
-        });
       }
+
+      // Check if overdue
+      const dueDate = receivable.dueDate ? new Date(receivable.dueDate) : null;
+      if (dueDate && new Date() > dueDate && status !== 'paid') {
+        status = 'overdue';
+      }
+
+      // IMPORTANTE: Atualizar apenas receivedAmount e status, NÃO o valor total
+      await this.updateAccountsReceivable(receivable.id, {
+        receivedAmount: totalPaid.toFixed(2), // Apenas valor recebido
+        status: status // Apenas status
+        // NÃO atualizar 'amount' - deve sempre permanecer o valor original do pedido
+      });
     }
   }
 
@@ -2810,7 +2826,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any) {
+  async createBudgetItem(budgetId: string, itemData: any>) {
     const id = generateId('budget-item');
 
     const item = {
