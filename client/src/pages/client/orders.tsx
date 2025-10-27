@@ -235,7 +235,11 @@ export default function ClientOrders() {
                     i.productId === item.productId && 
                     i.producerId === item.producerId &&
                     i.quantity === item.quantity &&
-                    (i.unitPrice === item.unitPrice || i.totalPrice === item.totalPrice)
+                    (i.unitPrice === item.unitPrice || i.totalPrice === item.totalPrice) &&
+                    i.hasItemCustomization === item.hasItemCustomization &&
+                    i.selectedCustomizationId === item.selectedCustomizationId &&
+                    i.hasGeneralCustomization === item.hasGeneralCustomization &&
+                    i.generalCustomizationName === item.generalCustomizationName
                   ) === index
                 );
 

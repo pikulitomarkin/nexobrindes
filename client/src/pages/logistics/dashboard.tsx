@@ -1,3 +1,4 @@
+replit_final_file>
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1126,17 +1127,18 @@ export default function LogisticsDashboard() {
                   );
                 }
 
-                // Remove duplicate items based on productId, producerId, quantity and unitPrice
+                // Remove duplicatas baseado em productId, producerId, quantity, unitPrice e personalizações
                 const uniqueItems: any[] = [];
                 const seenItems = new Set();
                 itemsToShow.forEach((item: any) => {
-                  const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice || item.totalPrice}`;
+                  const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice || item.totalPrice}-${item.hasItemCustomization}-${item.selectedCustomizationId}-${item.hasGeneralCustomization}-${item.generalCustomizationName}`;
                   if (!seenItems.has(itemKey)) {
                     seenItems.add(itemKey);
                     uniqueItems.push(item);
                   }
                 });
                 itemsToShow = uniqueItems;
+
 
                 return itemsToShow && itemsToShow.length > 0 && (
                   <div>
@@ -1357,3 +1359,4 @@ export default function LogisticsDashboard() {
     </div>
   );
 }
+</replit_final_file>

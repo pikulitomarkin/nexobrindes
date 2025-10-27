@@ -2568,98 +2568,119 @@ export class MemStorage implements IStorage {
     return this.budgets.delete(id);
   }
 
-  async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any> {
+  async convertBudgetToOrder(budgetId: string, clientId?: string): Promise<Order> {
     const budget = this.budgets.get(budgetId);
     if (!budget) {
-      throw new Error('Orçamento não encontrado');
+      throw new Error("Orçamento não encontrado");
+    }
+
+    if (budget.status === 'converted') {
+      throw new Error("Este orçamento já foi convertido em pedido");
     }
 
     // Get budget items
-    const budgetItems = await Promise.all(
-      Array.from(this.budgetItems.values())
-      .filter(item => item.budgetId === budgetId)
-      .map(async (item) => {
-        const product = await this.getProduct(item.productId);
-        let producerName = null;
-        if (item.producerId && item.producerId !== 'internal') {
-          const producer = await this.getUser(item.producerId);
-          producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
-        }
-        return {
-          ...item,
-          producerName: producerName,
-          product: {
-            name: product?.name || 'Produto não encontrado',
-            description: product?.description || '',
-            category: product?.category || '',
-            imageLink: product?.imageLink || ''
-          }
-        };
-      })
-    );
+    const budgetItems = await this.getBudgetItems(budgetId);
+    console.log(`Budget items for conversion:`, budgetItems.length);
 
-    // Create order data based on budget
-    const orderData = {
+    // Get budget payment info
+    const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
+
+    // Get budget photos
+    const budgetPhotos = await this.getBudgetPhotos(budgetId);
+
+    // Generate order number
+    const orderNumber = `PED-${Date.now()}`;
+
+    // Filter and deduplicate budget items - remove items with duplicate productId + producerId + quantity + unitPrice
+    const uniqueBudgetItems = budgetItems.filter((item: any, index: number, self: any[]) => {
+      const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+      const firstIndex = self.findIndex((i: any) => 
+        `${i.productId}-${i.producerId || 'internal'}-${i.quantity}-${i.unitPrice}` === itemKey
+      );
+
+      if (firstIndex !== index) {
+        console.log(`Removing duplicate budget item: ${item.productName} (${itemKey})`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`Filtered ${budgetItems.length} items down to ${uniqueBudgetItems.length} unique items`);
+
+    // Convert budget items to order format
+    const orderItems = uniqueBudgetItems.map((item: any) => ({
+      productId: item.productId,
+      productName: item.productName || 'Produto',
+      producerId: item.producerId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+
+      // Personalização do item
+      hasItemCustomization: item.hasItemCustomization || false,
+      selectedCustomizationId: item.selectedCustomizationId || null,
+      itemCustomizationValue: item.itemCustomizationValue || 0,
+      itemCustomizationDescription: item.itemCustomizationDescription || '',
+      additionalCustomizationNotes: item.additionalCustomizationNotes || '',
+      customizationPhoto: item.customizationPhoto || '',
+
+      // Personalização geral
+      hasGeneralCustomization: item.hasGeneralCustomization || false,
+      generalCustomizationName: item.generalCustomizationName || '',
+      generalCustomizationValue: item.generalCustomizationValue || 0,
+
+      // Desconto do item
+      hasItemDiscount: item.hasItemDiscount || false,
+      itemDiscountType: item.itemDiscountType || 'percentage',
+      itemDiscountPercentage: item.itemDiscountPercentage || 0,
+      itemDiscountValue: item.itemDiscountValue || 0,
+
+      // Dimensões do produto
+      productWidth: item.productWidth,
+      productHeight: item.productHeight,
+      productDepth: item.productDepth,
+    }));
+
+    // Create order
+    const orderData: InsertOrder = {
+      orderNumber,
       budgetId: budgetId,
-      clientId: budget.clientId,
+      clientId: clientId || budget.clientId || null,
       vendorId: budget.vendorId,
       product: budget.title,
-      description: budget.description,
+      description: budget.description || '',
       totalValue: budget.totalValue,
       status: 'confirmed',
+      deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+
+      // Contact info from budget
       contactName: budget.contactName,
-      contactPhone: budget.contactPhone,
-      contactEmail: budget.contactEmail,
-      deliveryType: budget.deliveryType,
-      deliveryDeadline: budget.deliveryDeadline,
-      paymentMethodId: budget.paymentMethodId,
-      shippingMethodId: budget.shippingMethodId,
-      installments: budget.installments,
-      downPayment: budget.downPayment,
-      remainingAmount: budget.remainingAmount,
-      shippingCost: budget.shippingCost,
-      hasDiscount: budget.hasDiscount,
-      discountType: budget.discountType,
-      discountPercentage: budget.discountPercentage,
-      discountValue: budget.discountValue,
-      items: budgetItems.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        producerId: item.producerId,
-        producerName: item.producerName, // Include producer name
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        hasItemCustomization: item.hasItemCustomization,
-        selectedCustomizationId: item.selectedCustomizationId,
-        itemCustomizationValue: item.itemCustomizationValue,
-        itemCustomizationDescription: item.itemCustomizationDescription,
-        additionalCustomizationNotes: item.additionalCustomizationNotes,
-        customizationPhoto: item.customizationPhoto, // Include customization photo
-        hasGeneralCustomization: item.hasGeneralCustomization,
-        generalCustomizationName: item.generalCustomizationName,
-        generalCustomizationValue: item.generalCustomizationValue,
-        productWidth: item.productWidth,
-        productHeight: item.productHeight,
-        productDepth: item.productDepth,
-        hasItemDiscount: item.hasItemDiscount,
-        itemDiscountType: item.itemDiscountType,
-        itemDiscountPercentage: item.itemDiscountPercentage,
-        itemDiscountValue: item.itemDiscountValue
-      }))
+      contactPhone: budget.contactPhone || '',
+      contactEmail: budget.contactEmail || '',
+      deliveryType: budget.deliveryType || 'delivery',
+
+      // Payment info from budget
+      paymentMethodId: budgetPaymentInfo?.paymentMethodId || '',
+      shippingMethodId: budgetPaymentInfo?.shippingMethodId || '',
+      installments: budgetPaymentInfo?.installments || 1,
+      downPayment: budgetPaymentInfo?.downPayment || 0,
+      remainingAmount: budgetPaymentInfo?.remainingAmount || 0,
+      shippingCost: budgetPaymentInfo?.shippingCost || 0,
+
+      // Discount from budget
+      hasDiscount: budget.hasDiscount || false,
+      discountType: budget.discountType || 'percentage',
+      discountPercentage: budget.discountPercentage || 0,
+      discountValue: budget.discountValue || 0,
+
+      // Order items
+      items: orderItems
     };
 
-    // Create the order
     const order = await this.createOrder(orderData);
 
-    // Update budget status to converted
-    const updatedBudget = {
-      ...budget,
-      status: 'converted',
-      convertedAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.budgets.set(budgetId, updatedBudget);
+    // Mark budget as converted
+    await this.updateBudget(budgetId, { status: 'converted' });
 
     console.log(`Budget ${budgetId} converted to order ${order.id}`);
     return order;
