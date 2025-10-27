@@ -112,6 +112,9 @@ export function registerRoutes(app: Express): Server {
   // Auth verification endpoint
   app.get("/api/auth/verify", async (req: Request, res: Response) => {
     try {
+      // Set JSON header explicitly
+      res.setHeader('Content-Type', 'application/json');
+      
       const authHeader = req.headers.authorization;
       
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -158,7 +161,14 @@ export function registerRoutes(app: Express): Server {
       }
     } catch (error) {
       console.error("Auth verification error:", error);
-      res.status(500).json({ error: "Erro interno do servidor" });
+      // Ensure JSON response even in error cases
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ 
+          error: "Erro interno do servidor",
+          message: error instanceof Error ? error.message : "Erro desconhecido"
+        });
+      }
     }
   });
 

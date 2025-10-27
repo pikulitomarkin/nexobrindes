@@ -45,11 +45,25 @@ app.use((req, res, next) => {
 
     // Ensure we always send JSON response
     if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({
         error: 'Internal server error',
         message: err.message || 'Erro desconhecido',
         details: process.env.NODE_ENV === 'development' ? err.stack : undefined
       });
+    }
+  });
+
+  // Catch-all for unmatched routes that should return JSON
+  app.use('*', (req: express.Request, res: express.Response) => {
+    if (req.path.startsWith('/api')) {
+      res.setHeader('Content-Type', 'application/json');
+      res.status(404).json({
+        error: 'Not found',
+        message: `Endpoint ${req.method} ${req.path} not found`
+      });
+    } else {
+      next();
     }
   });
 
