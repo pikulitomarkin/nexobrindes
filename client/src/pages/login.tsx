@@ -66,9 +66,6 @@ export default function Login() {
             case "partner":
               window.location.href = "/partner/clients";
               break;
-            case "finance":
-              window.location.href = "/finance";
-              break;
             default:
               window.location.href = "/dashboard";
           }
