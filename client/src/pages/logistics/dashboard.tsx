@@ -54,7 +54,7 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
         title: "Sucesso!",
         description: data.message || `Ordem de produção criada para ${label}`,
       });
-      // Atualiza os dois painéis relevantes
+      // Invalida ambas as listas para evitar confusão visual
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
     },
@@ -78,7 +78,9 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!pending) mutate();
+        if (!pending) {
+          mutate();
+        }
       }}
       disabled={pending}
       title={`Enviar APENAS para ${label}`}
