@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -16,6 +16,7 @@ export default function FinancePayables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [branchFilter, setBranchFilter] = useState("all");
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isCreatePayableDialogOpen, setIsCreatePayableDialogOpen] = useState(false); // State for the new payable dialog
   const [selectedPayable, setSelectedPayable] = useState<any>(null);
@@ -240,6 +241,11 @@ export default function FinancePayables() {
     queryKey: ["/api/finance/payables/manual"],
   });
 
+  // Fetch branches data
+  const { data: branches = [] } = useQuery({
+    queryKey: ['/api/branches'],
+  });
+
   // Combine all payables
   const allPayables = [
     // Producer payments - apenas pagamentos aprovados e não pagos
@@ -357,7 +363,10 @@ export default function FinancePayables() {
       payable.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payable.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payable.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesType && matchesSearch;
+    const matchesBranch = branchFilter === "all" || 
+      payable.branchId === branchFilter ||
+      (branchFilter === 'matriz' && (!payable.branchId || payable.branchId === 'matriz'));
+    return matchesStatus && matchesType && matchesSearch && matchesBranch;
   });
 
   const handlePayProducer = (producerPayment: any) => {
@@ -617,6 +626,29 @@ export default function FinancePayables() {
                   <SelectItem value="commission">Comissões</SelectItem>
                   <SelectItem value="refund">Estornos</SelectItem>
                   <SelectItem value="manual">Manuais</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Filial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Filiais</SelectItem>
+                  <SelectItem value="matriz">
+                    <div className="flex items-center">
+                      <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                      Matriz
+                    </div>
+                  </SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      <div className="flex items-center">
+                        <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                        {branch.name} - {branch.city}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 

@@ -15,6 +15,7 @@ export default function FinanceCommissionPayouts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [branchFilter, setBranchFilter] = useState("all");
   const [selectedCommission, setSelectedCommission] = useState<any>(null);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -27,6 +28,10 @@ export default function FinanceCommissionPayouts() {
   // Buscar dados de vendedores e sócios
   const { data: vendors } = useQuery({
     queryKey: ["/api/vendors"],
+  });
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ["/api/branches"],
   });
 
   const { data: partners } = useQuery({
@@ -103,7 +108,10 @@ export default function FinanceCommissionPayouts() {
     const matchesSearch = searchTerm === "" ||
       userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       commission.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesType && matchesSearch;
+    const matchesBranch = branchFilter === "all" || 
+      commission.branchId === branchFilter ||
+      (branchFilter === 'matriz' && (!commission.branchId || commission.branchId === 'matriz'));
+    return matchesStatus && matchesType && matchesSearch && matchesBranch;
   });
 
   const handleMarkAsPaid = (commission: any) => {
@@ -254,6 +262,21 @@ export default function FinanceCommissionPayouts() {
                   <SelectItem value="all">Todos Tipos</SelectItem>
                   <SelectItem value="vendor">Vendedor</SelectItem>
                   <SelectItem value="partner">Sócio</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Filiais</SelectItem>
+                  <SelectItem value="matriz">Matriz</SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name} - {branch.city}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

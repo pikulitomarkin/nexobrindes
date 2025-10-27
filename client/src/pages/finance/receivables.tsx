@@ -8,13 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Eye, DollarSign, TrendingUp, Clock, CheckCircle, Plus, CreditCard } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingUp, Clock, CheckCircle, Plus, CreditCard, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function FinanceReceivables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [branchFilter, setBranchFilter] = useState("all");
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedReceivable, setSelectedReceivable] = useState<any>(null);
@@ -44,6 +45,22 @@ export default function FinanceReceivables() {
       });
       if (!response.ok) {
         throw new Error('Erro ao carregar contas a receber');
+      }
+      return response.json();
+    }
+  });
+
+  // Fetch branches data
+  const { data: branches = [] } = useQuery({
+    queryKey: ['/api/branches'],
+    queryFn: async () => {
+      const response = await fetch('/api/branches', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Erro ao carregar filiais');
       }
       return response.json();
     }
@@ -198,7 +215,10 @@ export default function FinanceReceivables() {
     const matchesSearch = searchTerm === "" || 
       receivable.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       receivable.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    const matchesBranch = branchFilter === "all" || 
+      receivable.branchId === branchFilter ||
+      (branchFilter === 'matriz' && (!receivable.branchId || receivable.branchId === 'matriz'));
+    return matchesStatus && matchesSearch && matchesBranch;
   });
 
   const handleReceivePayment = () => {
@@ -316,6 +336,29 @@ export default function FinanceReceivables() {
                   <SelectItem value="partial">Parcial</SelectItem>
                   <SelectItem value="paid">Pago</SelectItem>
                   <SelectItem value="overdue">Vencido</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Filiais</SelectItem>
+                  <SelectItem value="matriz">
+                    <div className="flex items-center">
+                      <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                      Matriz
+                    </div>
+                  </SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      <div className="flex items-center">
+                        <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                        {branch.name} - {branch.city}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

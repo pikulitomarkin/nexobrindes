@@ -38,6 +38,7 @@ export default function AdminReports() {
   const [vendorFilter, setVendorFilter] = useState('all');
   const [producerFilter, setProducerFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [searchFilter, setSearchFilter] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [refreshing, setRefreshing] = useState(false);
@@ -117,6 +118,15 @@ export default function AdminReports() {
     },
   });
 
+  const { data: branches = [] } = useQuery({
+    queryKey: ["/api/branches"],
+    queryFn: async () => {
+      const response = await fetch("/api/branches");
+      if (!response.ok) throw new Error("Failed to fetch branches");
+      return response.json();
+    },
+  });
+
   // Função de filtro avançado
   const filterData = (data: any[], dateField = 'createdAt') => {
     return data.filter((item) => {
@@ -173,6 +183,12 @@ export default function AdminReports() {
       // Filtro de produtor
       const producerMatch = producerFilter === 'all' || item.producerId === producerFilter;
       
+      // Filtro de filial
+      const branchMatch = branchFilter === 'all' || 
+        item.branchId === branchFilter ||
+        (branchFilter === 'matriz' && (!item.branchId || item.branchId === 'matriz')) ||
+        (item.vendorBranchId && item.vendorBranchId === branchFilter);
+      
       // Filtro de categoria (para despesas e outros)
       const categoryMatch = categoryFilter === 'all' || 
         item.category === categoryFilter ||
@@ -192,7 +208,7 @@ export default function AdminReports() {
         item.client?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         item.vendor?.toLowerCase().includes(searchFilter.toLowerCase());
 
-      return dateMatch && statusMatch && vendorMatch && producerMatch && categoryMatch && searchMatch;
+      return dateMatch && statusMatch && vendorMatch && producerMatch && branchMatch && categoryMatch && searchMatch;
     });
   };
 
@@ -613,6 +629,7 @@ export default function AdminReports() {
     setVendorFilter('all');
     setProducerFilter('all');
     setCategoryFilter('all');
+    setBranchFilter('all');
     setSearchFilter('');
     setDateRange(undefined);
     
@@ -761,6 +778,24 @@ export default function AdminReports() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Filial</label>
+                  <Select value={branchFilter} onValueChange={setBranchFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Filiais</SelectItem>
+                      <SelectItem value="matriz">Matriz</SelectItem>
+                      {branches.map((branch: any) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </>
             )}
 
@@ -803,7 +838,7 @@ export default function AdminReports() {
           </div>
 
           {/* Indicadores dos Filtros Aplicados */}
-          {(dateFilter !== '30' || statusFilter !== 'all' || vendorFilter !== 'all' || producerFilter !== 'all' || categoryFilter !== 'all' || searchFilter !== '' || dateRange) && (
+          {(dateFilter !== '30' || statusFilter !== 'all' || vendorFilter !== 'all' || producerFilter !== 'all' || categoryFilter !== 'all' || branchFilter !== 'all' || searchFilter !== '' || dateRange) && (
             <div className="mt-4 pt-4 border-t">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Filtros aplicados:</span>
@@ -852,6 +887,12 @@ export default function AdminReports() {
                 {categoryFilter !== 'all' && (
                   <Badge variant="outline">
                     Categoria: {categoryFilter}
+                  </Badge>
+                )}
+
+                {branchFilter !== 'all' && (
+                  <Badge variant="outline">
+                    Filial: {branchFilter === 'matriz' ? 'Matriz' : branches.find((b: any) => b.id === branchFilter)?.name || branchFilter}
                   </Badge>
                 )}
 
