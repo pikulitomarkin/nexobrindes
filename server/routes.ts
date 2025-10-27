@@ -1824,7 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Use budget down payment if available, otherwise use calculated payments
+          // Budget down payment if available, otherwise use calculated payments
           const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
           const totalValue = parseFloat(order.totalValue);
           const remainingBalance = Math.max(0, totalValue - actualPaidValue);
@@ -2632,34 +2632,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update partner (admin only)
+  app.put("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const partnerData = req.body;
+      console.log("Updating partner:", id, partnerData);
+
+      // Update user information
+      const updatedUser = await storage.updateUser(id, {
+        name: partnerData.name,
+        email: partnerData.email,
+        phone: partnerData.phone,
+        isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      console.log("Partner updated successfully:", updatedUser.id);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating partner:", error);
+      res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
+    }
+  });
+
+  // Delete partner (admin only)
+  app.delete("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log("Deleting partner:", id);
+
+      // Update user to inactive instead of deleting
+      const updatedUser = await storage.updateUser(id, { isActive: false });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      console.log("Partner deleted successfully:", id);
+      res.json({ success: true, message: "Sócio removido com sucesso" });
+    } catch (error) {
+      console.error("Error deleting partner:", error);
+      res.status(500).json({ error: "Erro ao remover sócio: " + error.message });
+    }
+  });
+
   // Create partner (admin only)
   app.post("/api/partners", async (req, res) => {
     try {
       const partnerData = req.body;
       console.log("Creating partner:", partnerData);
 
-      const newPartner = await storage.createPartner(partnerData);
+      // Validate required fields
+      if (!partnerData.name || !partnerData.username || !partnerData.password) {
+        return res.status(400).json({ error: "Nome, usuário e senha são obrigatórios" });
+      }
 
-      console.log("Partner created successfully:", newPartner.id);
-      res.json(newPartner);
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(partnerData.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Nome de usuário já existe" });
+      }
+
+      // Create user with partner role
+      const newUser = await storage.createUser({
+        username: partnerData.username,
+        password: partnerData.password,
+        name: partnerData.name,
+        email: partnerData.email || null,
+        phone: partnerData.phone || null,
+        role: "partner",
+        isActive: true
+      });
+
+      console.log("Partner created successfully:", newUser.id);
+      res.json(newUser);
     } catch (error) {
       console.error("Error creating partner:", error);
       res.status(500).json({ error: "Erro ao criar sócio: " + error.message });
-    }
-  });
-
-  // Update partner commission (admin only)
-  app.put("/api/partners/:id/commission", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { commissionRate } = req.body;
-
-      await storage.updatePartnerCommission(id, commissionRate);
-
-      res.json({ success: true, message: "Comissão do sócio atualizada com sucesso" });
-    } catch (error) {
-      console.error("Error updating partner commission:", error);
-      res.status(500).json({ error: "Erro ao atualizar comissão do sócio" });
     }
   });
 
