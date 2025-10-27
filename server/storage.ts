@@ -1297,12 +1297,15 @@ export class MemStorage implements IStorage {
   async createClient(clientData: InsertClient): Promise<Client> {
     const id = randomUUID();
     
-    console.log(`Storage: Creating client with data:`, {
+    console.log(`Storage: === CREATING CLIENT ===`);
+    console.log(`Storage: Input data:`, {
       name: clientData.name,
       vendorId: clientData.vendorId,
       branchId: clientData.branchId,
       userId: clientData.userId,
-      email: clientData.email
+      email: clientData.email,
+      phone: clientData.phone,
+      isActive: clientData.isActive
     });
 
     const newClient: Client = {
@@ -1321,10 +1324,14 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
+    console.log(`Storage: About to save client with ID: ${id}`);
+    console.log(`Storage: Client object:`, newClient);
+    
     this.clients.set(id, newClient);
     
-    console.log(`Storage: Client created successfully with ID: ${id}. Total clients: ${this.clients.size}`);
-    console.log(`Storage: Client details:`, { id: newClient.id, name: newClient.name, vendorId: newClient.vendorId });
+    console.log(`Storage: Client saved to map. Map size before: ${this.clients.size - 1}, after: ${this.clients.size}`);
+    console.log(`Storage: Verification - can retrieve client: ${this.clients.has(id)}`);
+    console.log(`Storage: Retrieved client:`, this.clients.get(id));
 
     return newClient;
   }

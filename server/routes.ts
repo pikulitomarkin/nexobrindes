@@ -5508,7 +5508,7 @@ Para mais detalhes, entre em contato conosco!`;
       const methods = await storage.getAllPaymentMethods();
       res.json(methods);
     } catch (error) {
-      console.error("Error fetching payment methods:", error);
+      console.error("Error fetching paymentmethods:", error);
       res.status(500).json({ error: "Failed to fetch payment methods" });
     }
   });
