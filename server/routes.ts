@@ -494,6 +494,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sum + parseFloat(item.totalPrice || '0'), 0
         );
 
+        // Filter and deduplicate items for this producer
+        const producerItems = items.filter(item => item.producerId === currentProducerId);
+        const uniqueProducerItems = [];
+        const seenItems = new Set();
+        
+        for (const item of producerItems) {
+          const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice}`;
+          if (!seenItems.has(itemKey)) {
+            seenItems.add(itemKey);
+            uniqueProducerItems.push(item);
+          } else {
+            console.log(`Removing duplicate production item: ${item.productName || item.productId} for producer ${currentProducerId}`);
+          }
+        }
+
+        console.log(`Producer ${currentProducerId} has ${uniqueProducerItems.length} unique items (filtered from ${producerItems.length})`);
+
         // Create detailed order information specific to this producer
         const orderDetails = {
           orderNumber: order.orderNumber,
@@ -510,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shippingAddress: order.deliveryType === 'pickup' 
             ? 'Sede Principal - Retirada no Local'
             : (order.shippingAddress || 'Endereço não informado'),
-          items: items.filter(item => item.producerId === currentProducerId), // Filter items for this producer only
+          items: uniqueProducerItems, // Use unique items only
           photos: photos,
           producerId: currentProducerId, // Add producer ID to identify items
           producerName: producer.name
@@ -941,10 +958,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               item.producerId === parsedDetails.producerId || item.producerId === productionOrder.producerId
             );
 
-            // Remove duplicatas baseado em productId e producerId
+            // Remove duplicatas baseado em productId, producerId, quantity e unitPrice
             const uniqueItems = filteredItems.filter((item: any, index: number, self: any[]) => 
-              self.findIndex(i => i.productId === item.productId && i.producerId === item.producerId) === index
+              self.findIndex(i => 
+                i.productId === item.productId && 
+                i.producerId === item.producerId &&
+                i.quantity === item.quantity &&
+                i.unitPrice === item.unitPrice
+              ) === index
             );
+
+            console.log(`Producer ${parsedDetails.producerId}: Filtered ${filteredItems.length} items down to ${uniqueItems.length} unique items`);
 
             // Remove valores financeiros dos itens
             parsedDetails.items = uniqueItems.map((item: any) => ({
@@ -1183,6 +1207,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order number
       const orderNumber = `PED-${Date.now()}`;
 
+      // Remove duplicate items by productId and producerId before creating order
+      let uniqueItems = [];
+      if (orderData.items && orderData.items.length > 0) {
+        const seenItems = new Set();
+        uniqueItems = orderData.items.filter(item => {
+          const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+          if (seenItems.has(itemKey)) {
+            console.log(`Removing duplicate item: ${item.productName} (${itemKey})`);
+            return false;
+          }
+          seenItems.add(itemKey);
+          return true;
+        });
+        console.log(`Filtered ${orderData.items.length} items down to ${uniqueItems.length} unique items`);
+      }
+
       // Create order with contact name as primary identifier and proper items handling
       const newOrder = await storage.createOrder({
         orderNumber,
@@ -1210,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountType: orderData.discountType || "percentage",
         discountPercentage: orderData.discountPercentage || 0,
         discountValue: orderData.discountValue || 0,
-        items: orderData.items || []
+        items: uniqueItems
       });
 
       console.log("Created order with contact name:", newOrder.contactName);
@@ -4061,8 +4101,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newBudget = await storage.createBudget(req.body);
 
+      // Remove duplicate items before processing
+      const seenItems = new Set();
+      const uniqueItems = req.body.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
+
       // Process budget items with ALL customization data
-      for (const item of req.body.items) {
+      for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
@@ -4144,7 +4198,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Remove existing items and re-add them to ensure consistency
       await storage.deleteBudgetItems(req.params.id);
-      for (const item of budgetData.items) {
+      
+      // Remove duplicate items before processing
+      const seenItems = new Set();
+      const uniqueItems = budgetData.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`Removing duplicate budget update item: ${item.productName || item.productId} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
+      
+      for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;

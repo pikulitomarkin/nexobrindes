@@ -1126,6 +1126,18 @@ export default function LogisticsDashboard() {
                   );
                 }
 
+                // Remove duplicate items based on productId, producerId, quantity and unitPrice
+                const uniqueItems: any[] = [];
+                const seenItems = new Set();
+                itemsToShow.forEach((item: any) => {
+                  const itemKey = `${item.productId}-${item.producerId}-${item.quantity}-${item.unitPrice || item.totalPrice}`;
+                  if (!seenItems.has(itemKey)) {
+                    seenItems.add(itemKey);
+                    uniqueItems.push(item);
+                  }
+                });
+                itemsToShow = uniqueItems;
+
                 return itemsToShow && itemsToShow.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
