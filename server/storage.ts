@@ -659,6 +659,56 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.users.set(financeUser.id, financeUser);
+
+    // Recriar clientes pré-cadastrados
+    const preClient1: Client = {
+      id: "client-1",
+      userId: "client-1",
+      name: "João Silva",
+      email: "joao@gmail.com",
+      phone: "(11) 98765-4321",
+      whatsapp: null,
+      cpfCnpj: null,
+      address: "Rua das Flores, 123 - São Paulo",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const preClient2: Client = {
+      id: "client-2",
+      userId: null,
+      name: "Maria Santos",
+      email: "maria@email.com",
+      phone: "(11) 99999-8888",
+      whatsapp: null,
+      cpfCnpj: null,
+      address: "Av. Principal, 456 - São Paulo",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const preClient3: Client = {
+      id: "client-3",
+      userId: null,
+      name: "Ana Costa",
+      email: "ana@email.com",
+      phone: "(11) 97777-6666",
+      whatsapp: "(11) 97777-6666",
+      cpfCnpj: "987.654.321-00",
+      address: "Rua dos Bobos, 0 - Centro, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    this.clients.set(preClient1.id, preClient1);
+    this.clients.set(preClient2.id, preClient2);
+    this.clients.set(preClient3.id, preClient3);
   }
 
   private initializeData() {
@@ -782,6 +832,56 @@ export class MemStorage implements IStorage {
 
     this.clients.set(client1.id, client1);
     this.clients.set(client2.id, client2);
+
+    // Adicionar mais alguns clientes de exemplo
+    const client3: Client = {
+      id: "client-3",
+      userId: null,
+      name: "Ana Costa",
+      email: "ana@email.com",
+      phone: "(11) 97777-6666",
+      whatsapp: "(11) 97777-6666",
+      cpfCnpj: "987.654.321-00",
+      address: "Rua dos Bobos, 0 - Centro, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const client4: Client = {
+      id: "client-4",
+      userId: null,
+      name: "Pedro Oliveira",
+      email: "pedro@empresa.com",
+      phone: "(11) 96666-5555",
+      whatsapp: null,
+      cpfCnpj: "12.345.678/0001-90",
+      address: "Av. Paulista, 1000 - Bela Vista, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const client5: Client = {
+      id: "client-5",
+      userId: null,
+      name: "Empresa ABC Ltda",
+      email: "contato@abc.com.br",
+      phone: "(11) 95555-4444",
+      whatsapp: "(11) 95555-4444",
+      cpfCnpj: "23.456.789/0001-12",
+      address: "Rua do Comércio, 500 - Vila Madalena, São Paulo, SP",
+      vendorId: "vendor-1",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    this.clients.set(client3.id, client3);
+    this.clients.set(client4.id, client4);
+    this.clients.set(client5.id, client5);
 
     // Limpar todos os dados de pedidos, orçamentos, etc.
     mockOrders = [];
