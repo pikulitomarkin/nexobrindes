@@ -1295,23 +1295,37 @@ export class MemStorage implements IStorage {
   }
 
   async createClient(clientData: InsertClient): Promise<Client> {
-    const newClient: Client = {
-      id: randomUUID(),
+    const id = randomUUID();
+    
+    console.log(`Storage: Creating client with data:`, {
+      name: clientData.name,
+      vendorId: clientData.vendorId,
+      branchId: clientData.branchId,
       userId: clientData.userId,
+      email: clientData.email
+    });
+
+    const newClient: Client = {
+      id,
+      userId: clientData.userId || null,
       name: clientData.name,
       email: clientData.email || null,
       phone: clientData.phone || null,
       whatsapp: clientData.whatsapp || null,
       cpfCnpj: clientData.cpfCnpj || null,
       address: clientData.address || null,
-      vendorId: clientData.vendorId,
-      branchId: clientData.branchId || null, // Include branchId from vendor
+      vendorId: clientData.vendorId || null,
+      branchId: clientData.branchId || null,
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    this.clients.set(newClient.id, newClient);
+    this.clients.set(id, newClient);
+    
+    console.log(`Storage: Client created successfully with ID: ${id}. Total clients: ${this.clients.size}`);
+    console.log(`Storage: Client details:`, { id: newClient.id, name: newClient.name, vendorId: newClient.vendorId });
+
     return newClient;
   }
 

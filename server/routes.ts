@@ -1312,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get vendor's branch info
-      const vendor = await storage.getVendor(orderData.vendorId);
+      const vendor = await storage.getVendor(orderData.vendorId); // Changed from getUser to getVendor
       const vendorBranchId = vendor?.branchId || null;
 
       // Create order with contact name as primary identifier and proper items handling
@@ -2466,7 +2466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendor/:userId/info", async (req, res) => {
     try {
       const { userId } = req.params;
-      const vendor = await storage.getVendor(userId);
+      const vendor = await storage.getVendor(userId); // Use getVendor to fetch vendor specific info
       const orders = await storage.getOrdersByVendor(userId);
       const commissions = await storage.getCommissionsByVendor(userId);
 
@@ -2483,12 +2483,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .reduce((total, commission) => total + parseFloat(commission.amount), 0);
 
       res.json({
-        vendor,
+        vendor: vendor ? { ...vendor, name: vendor.user?.name, email: vendor.user?.email, phone: vendor.user?.phone, address: vendor.user?.address, username: vendor.user?.username } : null,
         monthlySales,
         totalCommissions,
         confirmedOrders: orders.filter(o => o.status !== 'pending').length
       });
     } catch (error) {
+      console.error("Error fetching vendor info:", error);
       res.status(500).json({ error: "Failed to fetch vendor info" });
     }
   });
@@ -5297,11 +5298,8 @@ Para mais detalhes, entre em contato conosco!`;
             }
           }
 
-          // Get payment information
-          const payments = await storage.getPaymentsByOrder(order.id);
-          const lastPayment = payments
-            .filter(p => p.status === 'confirmed')
-            .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
           // Enrich items with producer names (cache producers to avoid duplicate queries)
           const producerCache = new Map();
@@ -5330,7 +5328,8 @@ Para mais detalhes, entre em contato conosco!`;
             clientAddress: clientAddress || 'Endereço não informado',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
-            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
+            vendorName: vendor?.name || 'Vendedor',
+            producerName: producer?.name || null,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
               : (clientAddress || 'Endereço não informado')
