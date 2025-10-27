@@ -22,9 +22,10 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
   uniqueKey: string;
 }) {
   const { toast } = useToast();
+  const [pending, setPending] = useState(false);
 
-  const { mutate, isPending } = useMutation({
-    mutationKey: [`send-to-producer-${uniqueKey}`], // Unique mutation key for each button
+  const { mutate } = useMutation({
+    // REMOVIDO: mutationKey - cada botão tem sua própria instância independente
     mutationFn: async () => {
       console.log(`Sending order ${orderId} to producer ${producerId} (${label})`);
 
@@ -44,14 +45,21 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
 
       return response.json();
     },
+    onMutate: () => {
+      setPending(true);
+    },
     onSuccess: (data) => {
+      setPending(false);
       toast({
         title: "Sucesso!",
         description: data.message || `Ordem de produção criada para ${label}`,
       });
+      // Atualiza os dois painéis relevantes
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
     },
     onError: (error: any) => {
+      setPending(false);
       console.error(`Error sending to producer ${producerId}:`, error);
       toast({
         title: "Erro",
@@ -70,12 +78,12 @@ function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        mutate();
+        if (!pending) mutate();
       }}
-      disabled={isPending}
+      disabled={pending}
       title={`Enviar APENAS para ${label}`}
     >
-      {isPending ? 'Enviando...' : `📤 ${label}`}
+      {pending ? 'Enviando...' : `📤 ${label}`}
     </Button>
   );
 }
