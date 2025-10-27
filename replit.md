@@ -6,10 +6,22 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
-**October 27, 2025**
+**October 27, 2025 - CRITICAL BUG FIX**
+- **FIXED: Order Total Calculation Error** - Pedidos de R$ 15.000,00 apareciam como R$ 4.672,00 no painel financeiro
+- **Root Cause**: convertBudgetToOrder copiava budget.totalValue sem recalcular; valores em formato brasileiro ("15.000,00") eram mal interpretados
+- **Solution Implemented**:
+  1. Created `parseBRLCurrency()` helper function that auto-detects format:
+     - Brazilian format ("15.000,00") → 15000.00
+     - Standard format ("15000.00") → 15000.00  
+     - Never corrupts already-normalized values
+  2. Created `parsePercentage()` for discount percentages (supports "10,5" and "10.5")
+  3. convertBudgetToOrder now recalculates totalValue from items + customizations + discounts + shipping
+  4. All monetary fields normalized on budget/item creation and updates
+- **Files Modified**: server/storage.ts (lines 2501-2752)
 - **UI CONSOLIDATION**: "Personalização Geral" foi movida para dentro de "Personalização do Item" criando interface mais limpa com apenas 1 toggle
 - Estrutura consolidada aplicada em admin/budgets.tsx, vendor/orders.tsx e vendor/budgets.tsx
 - Divisão visual com Separator entre personalização do item e personalização geral
+- Removido toggle duplicado de "Personalização Geral" que estava causando confusão de UI
 
 **October 22, 2025**
 - **OFX PARSER CORRIGIDO**: Substituído parsing regex por biblioteca node-ofx-parser robusta
