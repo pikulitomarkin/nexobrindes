@@ -715,7 +715,7 @@ export class MemStorage implements IStorage {
     const preClient4: Client & { userCode?: string } = {
       id: "client-4",
       userId: null,
-      name: "Pedro Oliveira", 
+      name: "Pedro Oliveira",
       email: "pedro@empresa.com",
       phone: "(11) 96666-5555",
       whatsapp: null,
@@ -732,13 +732,13 @@ export class MemStorage implements IStorage {
       id: "client-5",
       userId: null,
       name: "Empresa ABC Ltda",
-      email: "contato@abc.com.br", 
+      email: "contato@abc.com.br",
       phone: "(11) 95555-4444",
       whatsapp: "(11) 95555-4444",
       cpfCnpj: "23.456.789/0001-12",
       address: "Rua do Comércio, 500 - Vila Madalena, São Paulo, SP",
       vendorId: "vendor-1",
-      userCode: "CLI005", 
+      userCode: "CLI005",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -2657,33 +2657,42 @@ export class MemStorage implements IStorage {
   }
 
   async getBudgetsByVendor(vendorId: string): Promise<any[]> {
-    const budgets = Array.from(this.budgets.values()).filter(budget => budget.vendorId === vendorId);
-    // Enrich with items and producer names
-    const enrichedBudgets = await Promise.all(budgets.map(async (budget) => {
-      const items = await Promise.all(
-        Array.from(this.budgetItems.values())
-        .filter(item => item.budgetId === budget.id)
-        .map(async (item) => {
-          const product = await this.getProduct(item.productId);
-          let producerName = null;
-          if (item.producerId && item.producerId !== 'internal') {
-            const producer = await this.getUser(item.producerId);
-            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
-          }
-          return {
-            ...item,
-            producerName: producerName,
-            product: {
-              name: product?.name || 'Produto não encontrado',
-              description: product?.description || '',
-              category: product?.category || '',
-              imageLink: product?.imageLink || ''
-            }
-          };
-        })
-      );
-      return { ...budget, items };
-    }));
+    const allBudgets = Array.from(this.budgets.values());
+    console.log(`Storage: Getting budgets for vendor ${vendorId}. Total budgets: ${allBudgets.length}`);
+
+    // Log some budget samples for debugging
+    console.log(`Storage: Sample budgets:`, allBudgets.slice(0, 3).map(b => ({
+      id: b.id,
+      budgetNumber: b.budgetNumber,
+      vendorId: b.vendorId,
+      title: b.title,
+      status: b.status
+    })));
+
+    const vendorBudgets = allBudgets.filter(budget => {
+      const isMatch = budget.vendorId === vendorId;
+      console.log(`Storage: Budget ${budget.budgetNumber || budget.id} - vendorId: ${budget.vendorId}, matches ${vendorId}: ${isMatch}`);
+      return isMatch;
+    });
+
+    console.log(`Storage: Found ${vendorBudgets.length} budgets for vendor ${vendorId}`);
+
+    // Enrich with items and photos
+    const enrichedBudgets = await Promise.all(
+      vendorBudgets.map(async (budget) => {
+        const items = await this.getBudgetItems(budget.id);
+        const photos = await this.getBudgetPhotos(budget.id);
+
+        return {
+          ...budget,
+          items: items,
+          photos: photos.map(p => p.photoUrl || p.imageUrl)
+        };
+      })
+    );
+
+    console.log(`Storage: Returning ${enrichedBudgets.length} enriched budgets for vendor ${vendorId}:`,
+      enrichedBudgets.map(b => ({ id: b.id, budgetNumber: b.budgetNumber, title: b.title })));
     return enrichedBudgets;
   }
 
@@ -2763,7 +2772,7 @@ export class MemStorage implements IStorage {
     // Normalize monetary fields to ensure consistency
     const normalizedTotalValue = this.parseBRLCurrency(budgetData.totalValue);
 
-    const budget = {
+    const newBudget = {
       id,
       budgetNumber: `ORC-${Date.now()}`,
       title: budgetData.title || 'Orçamento sem título',
@@ -2792,23 +2801,34 @@ export class MemStorage implements IStorage {
       updatedAt: now
     };
 
-    this.budgets.set(id, budget);
+    // Add budget to storage
+    this.budgets.set(newBudget.id, newBudget);
+    console.log(`[CREATE BUDGET] Budget stored with ID: ${newBudget.id}. Total budgets in storage: ${this.budgets.size}`);
+    console.log(`[CREATE BUDGET] Budget details:`, {
+      id: newBudget.id,
+      budgetNumber: newBudget.budgetNumber,
+      vendorId: newBudget.vendorId,
+      title: newBudget.title,
+      contactName: newBudget.contactName
+    });
 
-    // Create budget items if provided
-    if (budgetData.items && Array.isArray(budgetData.items)) {
+    // Process items
+    console.log(`[CREATE BUDGET] Processing ${budgetData.items.length} items from request`);
+    if (budgetData.items && budgetData.items.length > 0) {
       for (const itemData of budgetData.items) {
-        await this.createBudgetItem(id, itemData);
+        await this.createBudgetItem(newBudget.id, itemData);
       }
     }
 
     // Create budget photos if provided
+    console.log(`[CREATE BUDGET] Processing ${budgetData.photos?.length || 0} photos from request`);
     if (budgetData.photos && Array.isArray(budgetData.photos)) {
       for (const photoUrl of budgetData.photos) {
-        await this.createBudgetPhoto(id, { photoUrl });
+        await this.createBudgetPhoto(newBudget.id, { photoUrl });
       }
     }
 
-    return budget;
+    return newBudget;
   }
 
   async updateBudget(id: string, budgetData: any): Promise<any> {
