@@ -1,4 +1,9 @@
-app.post("/api/receivables/:id/payment", async (req, res) => {
+import type { Express, Request, Response } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+
+export function registerRoutes(app: Express): Server {
+  app.post("/api/receivables/:id/payment", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { amount, method, transactionId, notes } = req.body;
@@ -21,12 +26,12 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
 
       // If orderId exists, it's a payment for an order
       if (receivable.orderId) {
-        console.log(`Processing receivables payment: ${JSON.stringify({ id: receivableId, amount: paymentAmount, method, transactionId })}`);
+        console.log(`Processing receivables payment: ${JSON.stringify({ id, amount, method, transactionId })}`);
 
         // Create payment record for the order with special flag to prevent automatic order update
         const payment = await storage.createPayment({
           orderId: receivable.orderId,
-          amount: paymentAmount,
+          amount: amount,
           method: method || 'manual',
           status: 'confirmed',
           transactionId: transactionId || `MANUAL-${Date.now()}`,
@@ -35,7 +40,7 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
           bankTransactionId: null,
           notes: notes || '',
           __skipOrderUpdate: true // Flag to prevent automatic order update
-        });
+        } as any);
 
         console.log(`Payment processed successfully:`, payment);
 
@@ -48,7 +53,7 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
         await storage.updateOrder(receivable.orderId, {
           paidValue: totalPaid.toFixed(2),
           __origin: 'receivables' // Mark as coming from receivables to prevent totalValue changes
-        });
+        } as any);
 
         // Update the receivable with correct amounts
         const totalAmount = parseFloat(receivable.amount);
@@ -67,14 +72,14 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
           }
         }
 
-        await storage.updateAccountsReceivable(receivableId, {
+        await storage.updateAccountsReceivable(id, {
           receivedAmount: totalPaid.toFixed(2),
           status: newStatus
-        });
+        } as any);
 
-        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${paymentAmount} added. TotalValue=${totalAmount} (unchanged), PaidValue=${totalPaid}, Remaining=${totalAmount - totalPaid}`);
+        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalAmount} (unchanged), PaidValue=${totalPaid}, Remaining=${totalAmount - totalPaid}`);
 
-        return payment;
+        paymentRecord = payment;
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -83,7 +88,7 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
         await storage.updateAccountsReceivable(id, {
           receivedAmount: newReceivedAmount.toFixed(2),
           status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'
-        });
+        } as any);
 
         paymentRecord = {
           id: `payment-${Date.now()}`,
@@ -99,10 +104,12 @@ app.post("/api/receivables/:id/payment", async (req, res) => {
       res.json({ success: true, payment: paymentRecord });
     } catch (error) {
       console.error("Error processing receivables payment:", error);
-      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      res.status(500).json({ error: "Erro ao processar pagamento: " + errorMessage });
     }
   });
-app.post("/api/clients", async (req, res) => {
+
+  app.post("/api/clients", async (req: Request, res: Response) => {
     try {
       console.log("POST /api/clients - Request body:", req.body);
 
@@ -132,7 +139,7 @@ app.post("/api/clients", async (req, res) => {
 
       console.log("Creating client with data:", clientData);
 
-      const client = await storage.createClient(clientData);
+      const client = await storage.createClient(clientData as any);
       console.log("Client created successfully:", client);
 
       res.status(201).json(client);
@@ -144,3 +151,7 @@ app.post("/api/clients", async (req, res) => {
       });
     }
   });
+
+  const server = createServer(app);
+  return server;
+}
