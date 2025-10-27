@@ -639,7 +639,7 @@ export default function LogisticsDashboard() {
                           <div className="text-sm text-gray-900">
                             {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
                           </div>
-                          
+
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
