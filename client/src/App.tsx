@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Router, Route, Switch } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -81,13 +80,18 @@ const queryClient = new QueryClient({
   },
 });
 
+// Lazy load pages that are not critical for initial load
+const LazyAdminLogs = lazy(() => import("@/pages/admin/logs"));
+const LazyPartnerLogs = lazy(() => import("@/pages/partner/logs"));
+
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
         <Switch>
           <Route path="/login" component={Login} />
-          
+
           {/* Admin routes */}
           <ProtectedRoute path="/" allowedRoles={["admin", "partner"]}>
             <MainLayout>
@@ -157,7 +161,7 @@ function App() {
 
           <ProtectedRoute path="/admin/logs" allowedRoles={["admin"]}>
             <MainLayout>
-              <AdminLogs />
+              <LazyAdminLogs />
             </MainLayout>
           </ProtectedRoute>
 
@@ -186,15 +190,22 @@ function App() {
           </ProtectedRoute>
 
           {/* Partner specific routes */}
+          <ProtectedRoute path="/partner/dashboard" allowedRoles={["partner"]}>
+            <MainLayout>
+              <PartnerDashboard />
+            </MainLayout>
+          </ProtectedRoute>
+
           <ProtectedRoute path="/partner/my-commissions" allowedRoles={["partner"]}>
             <MainLayout>
               <MyCommissions />
             </MainLayout>
           </ProtectedRoute>
 
-          {/* Partner dashboard for standalone access */}
-          <ProtectedRoute path="/partner/dashboard" allowedRoles={["partner"]}>
-            <PartnerDashboard />
+          <ProtectedRoute path="/partner/logs" allowedRoles={["partner"]}>
+            <MainLayout>
+              <LazyPartnerLogs />
+            </MainLayout>
           </ProtectedRoute>
 
           {/* Vendor routes */}

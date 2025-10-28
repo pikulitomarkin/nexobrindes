@@ -88,6 +88,7 @@ export default function PartnerDashboard() {
     { href: "/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
     { href: "/admin/products", icon: Package, label: "Produtos", color: "text-cyan-600" },
     { href: "/admin/budgets", icon: BarChart3, label: "Orçamentos", color: "text-rose-600" },
+    { href: "/partner/logs", icon: BarChart3, label: "Logs do Sistema", color: "text-gray-600" },
   ];
 
   // Cálculos específicos das comissões deste sócio
