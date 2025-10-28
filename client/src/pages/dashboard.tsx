@@ -17,7 +17,7 @@ export default function Dashboard() {
 
   // Redirecionar vendedores para seu dashboard específico
   if (user.role === 'vendor') {
-    window.location.href = '/vendor-dashboard';
+    window.location.href = '/vendor/dashboard';
     return null;
   }
 

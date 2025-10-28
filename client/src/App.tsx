@@ -198,7 +198,7 @@ function App() {
           </ProtectedRoute>
 
           {/* Vendor routes */}
-          <ProtectedRoute path="/vendor-dashboard" allowedRoles={["vendor"]}>
+          <ProtectedRoute path="/vendor/dashboard" allowedRoles={["vendor"]}>
             <MainLayout>
               <VendorDashboard />
             </MainLayout>
