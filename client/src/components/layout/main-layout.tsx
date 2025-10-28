@@ -18,8 +18,7 @@ import {
   BarChart3, // Added BarChart3 icon
   Calculator, // Added Calculator icon
   User, // Added User icon
-  Building2, // Added Building2 icon
-  TrendingUp // Added TrendingUp icon
+  Building2 // Added Building2 icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -73,14 +72,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "partner":
         return [
           { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/partner/commission-management", icon: TrendingUp, label: "Minhas Comissões" },
-          { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos" },
-          { href: "/admin/products", icon: Package, label: "Produtos" },
-          { href: "/admin/producers", icon: Factory, label: "Produtores" },
-          { href: "/admin/clients", icon: Users, label: "Clientes" },
-          { href: "/admin/vendors", icon: Users, label: "Vendedores" },
-          { href: "/admin/budgets", icon: BarChart3, label: "Orçamentos" },
-          { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+          { href: "/partner/products", icon: Package, label: "Produtos" },
+          { href: "/partner/producers", icon: Factory, label: "Produtores" },
+          { href: "/partner/clients", icon: Users, label: "Clientes" },
+          { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
+          { href: "/partner/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
         ];
       case "vendor":
         return [
