@@ -90,9 +90,10 @@ export default function AdminClients() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
+      const finalCode = userCode || generateUserCode();
       const clientData = {
         ...data,
-        userCode: userCode
+        userCode: finalCode
       };
       console.log("Sending client data with userCode:", clientData);
       const response = await fetch("/api/clients", {
@@ -348,7 +349,14 @@ export default function AdminClients() {
                       <div className="flex items-center mt-1">
                         <User className="h-3 w-3 text-blue-600 mr-1" />
                         <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                          {(client as any).userCode || 'N/A'}
+                          {(() => {
+                            const code = (client as any).userCode ?? 
+                                        (client as any).code ?? 
+                                        (client as any).loginCode ?? 
+                                        (client as any).accessCode ?? 
+                                        null;
+                            return code ?? 'N/A';
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -542,7 +550,14 @@ export default function AdminClients() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
                       <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {client.userCode || 'N/A'}
+                        {(() => {
+                          const code = client.userCode ?? 
+                                      client.code ?? 
+                                      client.loginCode ?? 
+                                      client.accessCode ?? 
+                                      null;
+                          return code ?? 'N/A';
+                        })()}
                       </p>
                     </div>
 
@@ -605,7 +620,18 @@ export default function AdminClients() {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
-                    <p className="font-mono font-bold text-blue-800">{clients?.find((c: any) => c.id === selectedClientId)?.userCode || 'N/A'}</p>
+                    <p className="font-mono font-bold text-blue-800">
+                      {(() => {
+                        const client = clients?.find((c: any) => c.id === selectedClientId);
+                        if (!client) return 'N/A';
+                        const code = client.userCode ?? 
+                                    client.code ?? 
+                                    client.loginCode ?? 
+                                    client.accessCode ?? 
+                                    null;
+                        return code ?? 'N/A';
+                      })()}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Vendedor</p>
