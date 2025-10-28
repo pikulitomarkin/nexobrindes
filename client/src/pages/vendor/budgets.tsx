@@ -440,12 +440,12 @@ export default function VendorBudgets() {
     onSuccess: async (data) => {
       try {
         console.log('Processing PDF generation...');
-        
+
         // Validate essential data only
         if (!data) {
           throw new Error('Nenhum dado retornado da API');
         }
-        
+
         if (!data.budget) {
           throw new Error('Dados do orçamento não encontrados na resposta da API');
         }
@@ -855,7 +855,7 @@ export default function VendorBudgets() {
                     onChange={(e) => {
                       const selectedDate = e.target.value;
                       const today = new Date().toISOString().split('T')[0];
-                      
+
                       if (selectedDate < today) {
                         toast({
                           title: "Data Inválida",
@@ -864,7 +864,7 @@ export default function VendorBudgets() {
                         });
                         return;
                       }
-                      
+
                       setVendorBudgetForm({ ...vendorBudgetForm, validUntil: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -880,7 +880,7 @@ export default function VendorBudgets() {
                     onChange={(e) => {
                       const selectedDate = e.target.value;
                       const today = new Date().toISOString().split('T')[0];
-                      
+
                       if (selectedDate < today) {
                         toast({
                           title: "Data Inválida",
@@ -889,7 +889,7 @@ export default function VendorBudgets() {
                         });
                         return;
                       }
-                      
+
                       setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -1336,92 +1336,154 @@ export default function VendorBudgets() {
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-gray-800">
-                          {selectedProducerId === 'internal' ? 'Produtos Internos' : 
-                            producers?.find((p: any) => p.id === selectedProducerId)?.name}
-                        </h4>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedProducerId("select")}
-                          >
-                            Trocar Produtor
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedProducerId("")}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                        <Label className="flex items-center gap-2">
+                          <Factory className="h-4 w-4" />
+                          Selecionado: {selectedProducerId === 'internal' ? 'Produtos Internos' : 
+                            producers?.find((p: any) => p.id === selectedProducerId)?.name || 'Produtor não encontrado'}
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedProducerId("select")}
+                        >
+                          Trocar Produtor
+                        </Button>
+                      </div>
+
+                      {/* Product Search and Filter */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Buscar produtos..."
+                            value={budgetProductSearch}
+                            onChange={(e) => setBudgetProductSearch(e.target.value)}
+                            className="pl-9"
+                          />
                         </div>
+                        <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category === "all" ? "Todas as Categorias" : category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          placeholder="Buscar produtos..."
-                          value={budgetProductSearch}
-                          onChange={(e) => setBudgetProductSearch(e.target.value)}
-                          className="pl-9"
-                        />
-                      </div>
+                      {/* Product List */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                        {(() => {
+                          const producerProducts = productsByProducer[selectedProducerId] || [];
+                          const filteredProducts = producerProducts.filter((product: any) => {
+                            const matchesSearch = !budgetProductSearch ||
+                              product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                              product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                              product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
 
-                      <div className="border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {(() => {
-                            const producerProducts = productsByProducer[selectedProducerId] || [];
-                            const filteredProducts = producerProducts.filter((product: any) => 
-                              !budgetProductSearch || 
-                              product.name.toLowerCase().includes(budgetProductSearch.toLowerCase())
+                            const matchesCategory = budgetCategoryFilter === "all" ||
+                              product.category === budgetCategoryFilter;
+
+                            return matchesSearch && matchesCategory;
+                          });
+
+                          if (filteredProducts.length === 0) {
+                            return (
+                              <div className="col-span-full text-center py-8">
+                                <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <p className="text-gray-500">
+                                  {budgetProductSearch || budgetCategoryFilter !== "all" ?
+                                    "Nenhum produto encontrado com os filtros aplicados" :
+                                    `Nenhum produto disponível para ${selectedProducerId === 'internal' ? 'Produtos Internos' : 'este produtor'}`
+                                  }
+                                </p>
+                                {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setBudgetProductSearch("");
+                                      setBudgetCategoryFilter("all");
+                                    }}
+                                    className="mt-2"
+                                  >
+                                    Limpar filtros
+                                  </Button>
+                                )}
+                              </div>
                             );
+                          }
 
-                            if (filteredProducts.length === 0) {
-                              return (
-                                <div className="col-span-full text-center py-8">
-                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                  <p className="text-gray-500">
-                                    {budgetProductSearch ? 'Nenhum produto encontrado' : 'Nenhum produto disponível'}
-                                  </p>
-                                </div>
-                              );
-                            }
-
-                            return filteredProducts.map((product: any) => (
-                              <div 
-                                key={product.id} 
-                                className="p-3 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 cursor-pointer transition-colors" 
-                                onClick={() => {
-                                  addProductToBudget(product, selectedProducerId);
-                                  setSelectedProducerId(""); // Reset after adding
-                                  setBudgetProductSearch(""); // Clear search
-                                }}
-                              >
-                                <div className="flex items-center gap-3">
-                                  {product.imageLink ? (
-                                    <img src={product.imageLink} alt={product.name} className="w-10 h-10 object-cover rounded" />
-                                  ) : (
-                                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-                                      <Package className="h-5 w-5 text-gray-400" />
-                                    </div>
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{product.name}</p>
-                                    <p className="text-xs text-gray-500">
-                                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </p>
-                                    {product.category && (
-                                      <p className="text-xs text-blue-600">{product.category}</p>
-                                    )}
+                          return filteredProducts.map((product: any) => (
+                            <div 
+                              key={product.id} 
+                              className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => addProductToBudget(product, selectedProducerId)}
+                            >
+                              <div className="flex items-center gap-2">
+                                {product.imageLink ? (
+                                  <img 
+                                    src={product.imageLink} 
+                                    alt={product.name} 
+                                    className="w-8 h-8 object-cover rounded" 
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                    <Package className="h-4 w-4 text-gray-400" />
                                   </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  {product.category && (
+                                    <p className="text-xs text-blue-600">{product.category}</p>
+                                  )}
                                 </div>
                               </div>
-                            ));
+                            </div>
+                          ));
+                        })()}
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                        <span>
+                          {(() => {
+                            const producerProducts = productsByProducer[selectedProducerId] || [];
+                            const filteredProducts = producerProducts.filter((product: any) => {
+                              const matchesSearch = !budgetProductSearch ||
+                                product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
+
+                              const matchesCategory = budgetCategoryFilter === "all" ||
+                                product.category === budgetCategoryFilter;
+
+                              return matchesSearch && matchesCategory;
+                            });
+                            return `${filteredProducts.length} produtos encontrados`;
                           })()}
-                        </div>
+                        </span>
+                        {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setBudgetProductSearch("");
+                              setBudgetCategoryFilter("all");
+                            }}
+                          >
+                            Limpar filtros
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
