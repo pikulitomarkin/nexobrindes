@@ -405,7 +405,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Get client information
-      const client = await storage.getClient(budget.clientId);
       let clientName = budget.contactName || 'Cliente não informado';
       let clientEmail = budget.contactEmail || '';
       let clientPhone = budget.contactPhone || '';
@@ -1263,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const orderDetails = JSON.parse(po.orderDetails);
               if (orderDetails.items) {
-                producerItems = orderDetails.items.filter(item => 
+                producerItems = orderDetails.items.filter(item =>
                   item.producerId === po.producerId
                 );
               }
@@ -2355,7 +2354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // If still no name, use a descriptive message instead of "Unknown"
+          // If still no name, use a descriptive message
           if (!clientName) {
             clientName = "Nome não informado";
           }
@@ -2384,8 +2383,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      console.log(`Returning ${enrichedOrders.length} enriched production orders`);
-      res.json(enrichedOrders);
+      // Filter out null entries
+      const validOrders = enrichedOrders.filter(order => order !== null);
+
+      console.log(`Returning ${validOrders.length} enriched production orders`);
+      res.json(validOrders);
     } catch (error) {
       console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
@@ -2466,7 +2468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Creating producer with request data:', { name, email, phone, specialty, address, username: username || userCode, hasPassword: !!password });
 
       // Use userCode as username if username is not provided
-      const finalUsername = username || userCode || email;
+      const finalUsername = userCode || username || email;
 
       if (!finalUsername) {
         return res.status(400).json({ error: "Username ou código de usuário é obrigatório" });
@@ -2496,7 +2498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log user creation
+      // Log producer creation
       await storage.logUserAction(
         req.user?.id || 'admin-1',
         req.user?.name || 'Administrador',
@@ -2599,10 +2601,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}`);
 
-      res.json(clients);
+      // Enrich with order stats
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const ownerUser = client.userId ? await storage.getUser(client.userId) : null;
+          const clientOrders = await storage.getOrdersByClient(client.id);
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue || '0'), 0
+          );
+
+          return {
+            ...client,
+            userCode: ownerUser?.username || null,
+            ordersCount: clientOrders.length,
+            totalSpent,
+          };
+        })
+      );
+
+      res.json(enrichedClients);
     } catch (error) {
-      console.error("Error fetching clients by vendor:", error);
-      res.status(500).json({ error: "Failed to fetch clients" });
+      console.error("Error fetching vendor clients:", error);
+      res.status(500).json({ error: "Failed to fetch vendor clients" });
     }
   });
 
@@ -2945,7 +2965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vendor,
         monthlySales,
         totalCommissions,
-        confirmedOrders: orders.filter(o => o.status !== 'pending').length
+        confirmedOrders: orders.filter(o => o.status !== 'cancelled').length
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor info" });
@@ -3076,11 +3096,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: partner.id,
           name: partner.name,
           email: partner.email || "",
-          accessCode: partner.username || "",
+          username: partner.username || "",
+          userCode: partner.username || "",
           phone: partner.phone || "",
-          commissionRate: partnerProfile?.commissionRate || '5.00',
+          commissionRate: partnerProfile?.commissionRate || '15.00',
           createdAt: partner.createdAt,
-          isActive: true
+          isActive: partner.isActive || true
         };
       }));
 
@@ -3093,46 +3114,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create partner (admin-level user)
   app.post("/api/partners", async (req, res) => {
-    const { name, email, phone, username, password } = req.body;
-
-    if (!name || !email || !username || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // Create user first
-    const userId = generateId("partner");
-    const user = {
-      id: userId,
-      username,
-      password,
-      role: "partner",
-      name,
-      email,
-      phone: phone || "",
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
-    // Create partner profile
-    const partner = {
-      id: userId,
-      userId,
-      name,
-      email,
-      phone: phone || "",
-      username,
-      password, // Note: Storing password directly here is insecure for production.
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
     try {
-      await storage.addUser(user); // Assuming addUser exists and handles user creation
-      await storage.addPartner(partner); // Assuming addPartner exists for partner-specific data
-      res.json(partner);
+      const { name, email, phone, username, password } = req.body;
+
+      console.log('Creating partner with request data:', { name, email, phone, username: username, hasPassword: !!password });
+
+      // Validate required fields
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Nome de usuário é obrigatório" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser) {
+        console.log('Username already exists:', username);
+        return res.status(400).json({ error: "Nome de usuário já existe" });
+      }
+
+      // Create partner using storage method
+      const newPartner = await storage.createPartner({
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        username: username.trim(),
+        password: password,
+        commissionRate: '15.00' // Default commission rate for partners
+      });
+
+      // Log partner creation
+      await storage.logUserAction(
+        req.user?.id || 'admin-1',
+        req.user?.name || 'Administrador',
+        req.user?.role || 'admin',
+        'CREATE',
+        'users',
+        newPartner.id,
+        `Sócio criado: ${newPartner.name} - Usuário: ${newPartner.username}`,
+        'success',
+        {
+          userName: newPartner.name,
+          username: newPartner.username,
+          role: newPartner.role,
+          email: newPartner.email
+        }
+      );
+
+      console.log('Partner created successfully:', { id: newPartner.id, username: newPartner.username, name: newPartner.name });
+
+      // Return partner without password
+      const { password: _, ...partnerWithoutPassword } = newPartner;
+
+      res.json({
+        success: true,
+        partner: {
+          ...partnerWithoutPassword,
+          userCode: newPartner.username,
+          commissionRate: '15.00'
+        }
+      });
     } catch (error) {
-      console.error("Error creating partner:", error);
-      res.status(500).json({ error: "Failed to create partner" });
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: "Failed to create partner: " + error.message });
     }
   });
 
@@ -3651,10 +3701,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
 
-        // Note: No need to manually update order.paidValue here as createPayment() with 
+        // Note: No need to manually update order.paidValue here as createPayment() with
         // status='confirmed' already calls updateOrderPaidValue() which:
         // 1. Sums all confirmed payments for the order
-        // 2. Updates order.paidValue 
+        // 2. Updates order.paidValue
         // 3. Updates the corresponding accountsReceivable status/receivedAmount
       } else {
         // This is a manual receivable - update the receivable directly
@@ -3964,7 +4014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createBankTransaction({
             importId: importRecord.id,
             fitId: transaction.fitId,
-            date: new Date(transaction.date),
+            date: new Date(transaction.date), // Ensure date is a Date object
             amount: transaction.amount, // Keep original negative value
             description: transaction.description,
             type: transaction.type,
@@ -4423,28 +4473,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with vendor names and statistics
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
-          // Get vendor name
           const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+          const ownerUser = client.userId ? await storage.getUser(client.userId) : null;
 
           // Count orders for this client
-          const allOrders = await storage.getOrders();
-          const clientOrders = allOrders.filter(order =>
-            order.clientId === client.id ||
-            order.clientId === client.userId ||
-            (order.contactName && order.contactName.toLowerCase().includes(client.name.toLowerCase()))
+          const clientOrders = await storage.getOrdersByClient(client.id);
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue || '0'), 0
           );
-
-          // Calculate total spent
-          const totalSpent = clientOrders
-            .filter(order => order.status !== 'cancelled')
-            .reduce((sum, order) => sum + parseFloat(order.totalValue || '0'), 0);
 
           return {
             ...client,
-            userCode: (client as any).userCode || null, // Incluir userCode
+            userCode: ownerUser?.username || null,
             vendorName: vendor?.name || null,
             ordersCount: clientOrders.length,
-            totalSpent: totalSpent
+            totalSpent,
           };
         })
       );
@@ -4519,7 +4562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         client: {
           ...client,
-          userCode: username
+          userCode: username // Include userCode in response
         }
       };
 
@@ -5138,7 +5181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json(response);
-    } catch (error) {console.error("Error creating budget:", error);
+    } catch (error) {
+      console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
@@ -5156,7 +5200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName} (${itemKey})`);
+          console.log(`[CREATE BUDGET] Removing duplicate budget update item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
@@ -6061,8 +6105,8 @@ Para mais detalhes, entre em contato conosco!`;
             items: enrichedItems,
             clientName: clientName,
             clientAddress: clientAddress || 'Endereço não informado',
-            clientPhone: clientPhone,
-            clientEmail: clientEmail,
+            clientPhone,
+            clientEmail,
             lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
@@ -6482,7 +6526,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Apply additional filters
       if (search) {
         const searchTerm = (search as string).toLowerCase();
-        filteredLogs = filteredLogs.filter((log: any) => 
+        filteredLogs = filteredLogs.filter((log: any) =>
           log.action.toLowerCase().includes(searchTerm) ||
           log.description.toLowerCase().includes(searchTerm) ||
           log.userName.toLowerCase().includes(searchTerm)
@@ -6514,14 +6558,14 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         if (startDate) {
-          filteredLogs = filteredLogs.filter((log: any) => 
+          filteredLogs = filteredLogs.filter((log: any) =>
             new Date(log.createdAt) >= startDate
           );
         }
       }
 
       // Sort by most recent first
-      filteredLogs.sort((a: any, b: any) => 
+      filteredLogs.sort((a: any, b: any) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 

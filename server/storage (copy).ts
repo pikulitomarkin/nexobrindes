@@ -81,6 +81,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   getUsersByRole(role: string): Promise<User[]>;
+  authenticateUser(username: string, password: string): Promise<User | null>; // Added for authentication
 
   // Orders
   getOrders(): Promise<Order[]>;
@@ -109,6 +110,7 @@ export interface IStorage {
 
   // Commissions
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
+  getCommissionsByPartner(partnerId: string): Promise<Commission[]>; // Added getCommissionsByPartner
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
@@ -137,6 +139,7 @@ export interface IStorage {
   createClient(clientData: InsertClient): Promise<Client>;
   updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
+  getClientByUserId(userId: string): Promise<Client | undefined>; // Added for retrieving client by userId
 
   // Products
   getProducts(options?: {
@@ -471,6 +474,12 @@ export class MemStorage implements IStorage {
     this.createTestUsers();
   }
 
+  // Helper method to get product name by ID
+  private async getProductName(productId: string): Promise<string> {
+    const product = await this.getProduct(productId);
+    return product?.name || 'Produto não encontrado';
+  }
+
   // Helper to load all mock data
   private async loadData(): Promise<any> {
     // Ensure all necessary arrays/maps are initialized before returning
@@ -511,6 +520,67 @@ export class MemStorage implements IStorage {
   private async saveData(data: any): Promise<void> {
     this.mockData = data;
     return Promise.resolve();
+  }
+
+  // Calculate and create commissions for an order
+  private async calculateCommissions(order: Order): Promise<void> {
+    try {
+      // Get vendor commission settings
+      const vendor = await this.getVendor(order.vendorId);
+      const commissionSettings = await this.getCommissionSettings();
+
+      const vendorRate = vendor?.commissionRate || commissionSettings?.vendorCommissionRate || '10.00';
+      const orderValue = parseFloat(order.totalValue);
+      const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
+
+      // Create vendor commission
+      const vendorCommission: Commission = {
+        id: `commission-${order.id}-vendor`,
+        vendorId: order.vendorId,
+        partnerId: null,
+        orderId: order.id,
+        percentage: vendorRate,
+        amount: vendorCommissionAmount.toFixed(2),
+        status: 'pending',
+        type: 'vendor',
+        orderValue: order.totalValue,
+        orderNumber: order.orderNumber,
+        paidAt: null,
+        deductedAt: null,
+        createdAt: new Date()
+      };
+
+      this.commissions.set(vendorCommission.id, vendorCommission);
+
+      // Create partner commissions - divide equally among 3 partners
+      const partnerRate = commissionSettings?.partnerCommissionRate || '15.00';
+      const totalPartnerCommission = (orderValue * parseFloat(partnerRate)) / 100;
+      const individualPartnerCommission = totalPartnerCommission / 3; // Divide by 3 partners
+
+      const partnerIds = ['partner-1', 'partner-2', 'partner-3'];
+
+      for (let i = 0; i < partnerIds.length; i++) {
+        const partnerCommission: Commission = {
+          id: `commission-${order.id}-partner-${i + 1}`,
+          vendorId: null,
+          partnerId: partnerIds[i],
+          orderId: order.id,
+          percentage: (parseFloat(partnerRate) / 3).toFixed(2), // Individual percentage
+          amount: individualPartnerCommission.toFixed(2),
+          status: 'confirmed', // Partners get paid immediately when order starts
+          type: 'partner',
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber,
+          paidAt: new Date(), // Paid immediately
+          deductedAt: null,
+          createdAt: new Date()
+        };
+
+        this.commissions.set(partnerCommission.id, partnerCommission);
+      }
+    } catch (error) {
+      console.error('Error calculating commissions:', error);
+    }
   }
 
   // Create test users for each role
@@ -926,7 +996,7 @@ export class MemStorage implements IStorage {
     this.clients.set(client4.id, client4);
     this.clients.set(client5.id, client5);
 
-    // Limpar todos os dados de pedidos, orçamentos, etc.
+    // Limpar dados de pedidos, orçamentos, etc.
     mockOrders = [];
     mockBudgets = [];
 
@@ -1286,7 +1356,10 @@ export class MemStorage implements IStorage {
 
   // Client methods
   async getClients(): Promise<Client[]> {
-    return Array.from(this.clients.values());
+    return Array.from(this.clients.values()).map(client => ({
+      ...client,
+      userCode: (client as any).userCode || null
+    }));
   }
 
   async getClient(id: string): Promise<Client | undefined> {
@@ -1295,27 +1368,46 @@ export class MemStorage implements IStorage {
 
   async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
     const id = randomUUID();
-    const client: Client & { userCode?: string } = {
-      ...clientData,
+
+    console.log(`Storage: === CREATING CLIENT ===`);
+    console.log(`Storage: Input data:`, {
+      name: clientData.name,
+      vendorId: clientData.vendorId,
+      branchId: clientData.branchId,
+      userId: clientData.userId,
+      userCode: clientData.userCode,
+      email: clientData.email,
+      phone: clientData.phone,
+      isActive: clientData.isActive
+    });
+
+    const newClient: Client & { userCode?: string } = {
       id,
-      vendorId: clientData.vendorId || null,
       userId: clientData.userId || null,
+      name: clientData.name,
       email: clientData.email || null,
       phone: clientData.phone || null,
       whatsapp: clientData.whatsapp || null,
       cpfCnpj: clientData.cpfCnpj || null,
       address: clientData.address || null,
-      userCode: (clientData as any).userCode || null,
+      vendorId: clientData.vendorId || null,
+      branchId: clientData.branchId || null,
+      userCode: clientData.userCode || null, // Store userCode
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
-    this.clients.set(id, client);
-    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
-    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
-    return client;
+    console.log(`Storage: About to save client with ID: ${id}`);
+    console.log(`Storage: Client object:`, newClient);
+
+    this.clients.set(id, newClient);
+
+    console.log(`Storage: Client saved to map. Map size before: ${this.clients.size - 1}, after: ${this.clients.size}`);
+    console.log(`Storage: Verification - can retrieve client: ${this.clients.has(id)}`);
+    console.log(`Storage: Retrieved client:`, this.clients.get(id));
+
+    return newClient;
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
@@ -1452,6 +1544,29 @@ export class MemStorage implements IStorage {
 
     // Auto-deduct partner commissions if any are marked for deduction
     await this.autoDeductPartnerCommissions(order);
+
+    // Log the order creation
+    const vendor = await this.getUser(order.vendorId);
+    if (vendor) {
+      await this.createSystemLog({
+        userId: order.vendorId,
+        userName: vendor.name,
+        userRole: vendor.role,
+        action: 'CREATE',
+        entity: 'orders',
+        entityId: order.id,
+        description: `Pedido ${order.orderNumber} criado para ${order.contactName}`,
+        details: JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          contactName: order.contactName,
+          totalValue: order.totalValue,
+          product: order.product
+        }),
+        level: 'info'
+      });
+    }
+
 
     return order;
   }
@@ -1622,6 +1737,45 @@ export class MemStorage implements IStorage {
       return updatedOrder;
     }
     return undefined;
+  }
+
+  // Update order shipping status based on production orders
+  async updateOrderShippingStatus(orderId: string): Promise<void> {
+    try {
+      const productionOrders = await this.getProductionOrdersByOrder(orderId);
+      const totalOrders = productionOrders.length;
+
+      if (totalOrders === 0) {
+        console.log(`Order ${orderId} has no production orders`);
+        return;
+      }
+
+      const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const readyOrders = productionOrders.filter(po => po.status === 'ready');
+      const shippedCount = shippedOrders.length;
+
+      console.log(`Order ${orderId} shipping status: ${shippedCount}/${totalOrders} producers shipped, ${readyOrders.length} ready`);
+
+      let newStatus = 'production'; // Default status
+
+      if (shippedCount === 0) {
+        if (readyOrders.length > 0) {
+          newStatus = 'ready'; // Some ready for shipping
+        } else {
+          newStatus = 'production'; // Still in production
+        }
+      } else if (shippedCount === totalOrders) {
+        newStatus = 'shipped'; // All shipped - order complete
+      } else {
+        newStatus = 'partial_shipped'; // Some despachados - envio parcial
+      }
+
+      console.log(`Order ${orderId} shipping status update: ${shippedCount}/${totalOrders} shipped -> ${newStatus}`);
+
+      await this.updateOrderStatus(orderId, newStatus);
+    } catch (error) {
+      console.error(`Error updating order ${orderId} shipping status:`, error);
+    }
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
@@ -1945,7 +2099,6 @@ export class MemStorage implements IStorage {
     if (receivable) {
       const totalAmount = parseFloat(receivable.amount); // MANTER valor original sempre
       let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-
       if (totalPaid >= totalAmount) {
         status = 'paid';
       } else if (totalPaid > 0) {
@@ -2071,6 +2224,13 @@ export class MemStorage implements IStorage {
   // Commission methods
   async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
     return Array.from(this.commissions.values()).filter(commission => commission.vendorId === vendorId);
+  }
+
+  // Added method to get commissions by partnerId
+  async getCommissionsByPartner(partnerId: string): Promise<Commission[]> {
+    return Array.from(this.commissions.values()).filter(commission =>
+      commission.partnerId === partnerId
+    );
   }
 
   async getAllCommissions(): Promise<Commission[]> {
@@ -2209,53 +2369,66 @@ export class MemStorage implements IStorage {
   }
 
   async createPartner(partnerData: any): Promise<User> {
+    console.log('Storage: Creating partner with data:', partnerData);
+
+    // Validate required fields
+    if (!partnerData.name || partnerData.name.trim().length === 0) {
+      throw new Error("Nome é obrigatório");
+    }
+
+    if (!partnerData.username || partnerData.username.trim().length === 0) {
+      throw new Error("Nome de usuário é obrigatório");
+    }
+
+    if (!partnerData.password || partnerData.password.length < 6) {
+      throw new Error("Senha deve ter pelo menos 6 caracteres");
+    }
+
+    // Check if username already exists
+    const existingUser = await this.getUserByUsername(partnerData.username.trim());
+    if (existingUser) {
+      throw new Error("Nome de usuário já existe");
+    }
+
     // Create user first
     const newUser: User = {
       id: randomUUID(),
-      username: partnerData.username,
-      password: partnerData.password || "123456",
+      username: partnerData.username.trim(),
+      password: partnerData.password,
       role: 'partner',
-      name: partnerData.name,
-      email: partnerData.email || null,
-      phone: partnerData.phone || null,
+      name: partnerData.name.trim(),
+      email: partnerData.email?.trim() || null,
+      phone: partnerData.phone?.trim() || null,
+      address: partnerData.address?.trim() || null,
+      specialty: partnerData.specialty?.trim() || null,
       vendorId: null,
       isActive: true
     };
 
+    console.log('Storage: Adding user to users map:', { id: newUser.id, username: newUser.username, role: newUser.role });
     this.users.set(newUser.id, newUser);
 
-    // Create partner profiles for all 3 partners
-    const partnerProfile1: Partner = {
-      id: "partner-profile-1",
-      userId: "partner-1",
-      commissionRate: "15.00",
+    // Create partner profile
+    const partnerProfile: Partner = {
+      id: randomUUID(),
+      userId: newUser.id,
+      commissionRate: partnerData.commissionRate || "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    const partnerProfile2: Partner = {
-      id: "partner-profile-2",
-      userId: "partner-2",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    console.log('Storage: Adding partner profile to partners map:', { id: partnerProfile.id, userId: partnerProfile.userId });
+    this.partners.set(partnerProfile.id, partnerProfile);
 
-    const partnerProfile3: Partner = {
-      id: "partner-profile-3",
-      userId: "partner-3",
-      commissionRate: "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.partners.set(partnerProfile1.id, partnerProfile1);
-    this.partners.set(partnerProfile2.id, partnerProfile2);
-    this.partners.set(partnerProfile3.id, partnerProfile3);
+    console.log('Storage: Partner created successfully. Total users:', this.users.size, 'Total partners:', this.partners.size);
     return newUser;
+  }
+
+  private generatePartnerCode(): string {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `SOC${timestamp}${randomStr}`;
   }
 
   async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
@@ -2557,7 +2730,6 @@ export class MemStorage implements IStorage {
     return { imported, errors };
   }
 
-
   async searchProducts(query: string): Promise<any[]> {
     if (!query) return Array.from(this.products.values());
 
@@ -2661,11 +2833,7 @@ export class MemStorage implements IStorage {
     const allBudgets = Array.from(this.budgets.values());
     console.log(`Storage: Total budgets in storage: ${allBudgets.length}`);
 
-    const vendorBudgets = allBudgets.filter(budget => {
-      const isMatch = budget.vendorId === vendorId;
-      console.log(`Storage: Budget ${budget.budgetNumber} - vendorId: ${budget.vendorId}, matches ${vendorId}: ${isMatch}`);
-      return isMatch;
-    });
+    const vendorBudgets = allBudgets.filter(budget => budget.vendorId === vendorId);
 
     console.log(`Storage: Found ${vendorBudgets.length} budgets for vendor ${vendorId}`);
 
@@ -2719,6 +2887,19 @@ export class MemStorage implements IStorage {
     return enrichedBudgets;
   }
 
+  // Helper function to get branchId from order or vendor
+  private async getBranchIdForOrder(order: Order): Promise<string | null> {
+    if (order.branchId) {
+      return order.branchId;
+    }
+    if (order.vendorId) {
+      const vendor = await this.getVendor(order.vendorId);
+      return vendor?.branchId || null;
+    }
+    return null;
+  }
+
+
   // Helper function to parse monetary values in either BRL format or standard format
   // BRL: "15.000,00" (dot=thousands, comma=decimal) -> 15000.00
   // Standard: "15000.00" (dot=decimal, no thousands) -> 15000.00
@@ -2758,15 +2939,15 @@ export class MemStorage implements IStorage {
   }
 
   async createBudget(budgetData: any): Promise<any> {
-    const id = generateId('budget');
+    const budgetNumber = `ORC-${Date.now()}`;
     const now = new Date();
 
     // Normalize monetary fields to ensure consistency
     const normalizedTotalValue = this.parseBRLCurrency(budgetData.totalValue);
 
     const newBudget = {
-      id,
-      budgetNumber: `ORC-${Date.now()}`,
+      id: generateId('budget'),
+      budgetNumber,
       title: budgetData.title || 'Orçamento sem título',
       description: budgetData.description || '',
       clientId: budgetData.clientId || null,
@@ -2804,11 +2985,31 @@ export class MemStorage implements IStorage {
       contactName: newBudget.contactName
     });
 
-    // Process items
-    console.log(`[CREATE BUDGET] Processing ${budgetData.items.length} items from request`);
+    // Process items - only if not already processed
+    console.log(`[CREATE BUDGET] Processing ${budgetData.items?.length || 0} items from request`);
     if (budgetData.items && budgetData.items.length > 0) {
-      for (const itemData of budgetData.items) {
-        await this.createBudgetItem(newBudget.id, itemData);
+      // Remove duplicates based on productId, producerId, quantity, and unitPrice
+      const seenItems = new Set();
+      const uniqueItems = budgetData.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`[CREATE BUDGET] Removing duplicate item: ${item.productName} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
+
+      for (const itemData of uniqueItems) {
+        // Ensure productName is included in itemData
+        const enrichedItemData = {
+          ...itemData,
+          productName: itemData.productName || await this.getProductName(itemData.productId)
+        };
+
+        await this.createBudgetItem(newBudget.id, enrichedItemData);
       }
     }
 
@@ -2818,6 +3019,27 @@ export class MemStorage implements IStorage {
       for (const photoUrl of budgetData.photos) {
         await this.createBudgetPhoto(newBudget.id, { photoUrl });
       }
+    }
+
+    // Log the budget creation
+    const vendor = await this.getUser(newBudget.vendorId);
+    if (vendor) {
+      await this.createSystemLog({
+        userId: newBudget.vendorId,
+        userName: vendor.name,
+        userRole: vendor.role,
+        action: 'CREATE',
+        entity: 'budgets',
+        entityId: newBudget.id,
+        description: `Orçamento ${newBudget.budgetNumber} criado para ${newBudget.contactName}`,
+        details: JSON.stringify({
+          budgetId: newBudget.id,
+          budgetNumber: newBudget.budgetNumber,
+          contactName: newBudget.contactName,
+          totalValue: newBudget.totalValue
+        }),
+        level: 'info'
+      });
     }
 
     return newBudget;
@@ -2910,7 +3132,7 @@ export class MemStorage implements IStorage {
     // Convert budget items to order format
     const orderItems = uniqueBudgetItems.map((item: any) => ({
       productId: item.productId,
-      productName: item.productName || 'Produto',
+      productName: item.productName,
       producerId: item.producerId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
@@ -2946,27 +3168,19 @@ export class MemStorage implements IStorage {
       // Calculate item total with all components - parse BRL format values
       const basePrice = this.parseBRLCurrency(item.unitPrice) * item.quantity;
 
-      // Item customization (valor por unidade personalizada)
-      const itemCustomization = item.hasItemCustomization ?
-        item.quantity * this.parseBRLCurrency(item.itemCustomizationValue) : 0;
-
-      // General customization (valor por unidade aplicado à quantidade total)
-      const generalCustomization = item.hasGeneralCustomization ?
-        item.quantity * this.parseBRLCurrency(item.generalCustomizationValue) : 0;
-
-      let itemSubtotal = basePrice + itemCustomization + generalCustomization;
-
-      // Apply item discount (sobre o preço base apenas)
-      if (item.hasItemDiscount) {
-        if (item.itemDiscountType === 'percentage') {
-          const discountAmount = (basePrice * this.parsePercentage(item.itemDiscountPercentage)) / 100;
-          itemSubtotal -= discountAmount;
-        } else if (item.itemDiscountType === 'value') {
-          itemSubtotal -= this.parseBRLCurrency(item.itemDiscountValue);
-        }
+      // Apply item customization if applicable (now as fixed value)
+      if (item.hasItemCustomization) {
+        const customizationValue = parseFloat(item.itemCustomizationValue || '0');
+        return sum + basePrice + customizationValue;
       }
 
-      return sum + Math.max(0, itemSubtotal);
+      // Add general customization value if applicable
+      if (item.hasGeneralCustomization) {
+        const generalCustomizationValue = parseFloat(item.generalCustomizationValue || '0');
+        return sum + basePrice + generalCustomizationValue;
+      }
+
+      return sum + basePrice;
     }, 0);
 
     // Apply general discount to the subtotal
@@ -3041,49 +3255,88 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any) {
-    const id = generateId('budget-item');
+  async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
+    // Validate required fields
+    if (!itemData.productId) {
+      console.log('Rejecting invalid budget item - missing productId:', itemData);
+      throw new Error('ProductId is required for budget items');
+    }
 
-    const item = {
+    // Get product name from product if not provided
+    let productName = itemData.productName;
+    if (!productName && itemData.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    }
+
+    if (!productName) {
+      console.log('Rejecting invalid budget item - unable to determine product name:', itemData);
+      throw new Error('ProductName is required for budget items');
+    }
+
+    // Validate quantity and unitPrice
+    if (!itemData.quantity || parseFloat(itemData.quantity.toString()) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid quantity: ${itemData.quantity}`, itemData);
+      throw new Error('Quantity must be greater than 0');
+    }
+
+    if (!itemData.unitPrice || parseFloat(itemData.unitPrice.toString()) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid unitPrice: ${itemData.unitPrice}`, itemData);
+      throw new Error('Unit price must be greater than 0');
+    }
+
+
+    // Check for duplicate items in the same budget (same product, producer, quantity, and unit price)
+    const existingItems = Array.from(this.budgetItems.values())
+      .filter(item => item.budgetId === budgetId);
+
+    const duplicateKey = `${itemData.productId}-${itemData.producerId || 'internal'}-${itemData.quantity}-${itemData.unitPrice}`;
+    const hasDuplicate = existingItems.some(existing => {
+      const existingKey = `${existing.productId}-${existing.producerId || 'internal'}-${existing.quantity}-${existing.unitPrice}`;
+      return existingKey === duplicateKey;
+    });
+
+    if (hasDuplicate) {
+      console.log(`Preventing duplicate budget item creation: ${productName} (${duplicateKey})`);
+      throw new Error(`Este item já foi adicionado ao orçamento com as mesmas especificações`);
+    }
+
+    const id = generateId('budget-item');
+    const newItem = {
       id,
       budgetId,
-      productId: itemData.productId || null,
-      productName: itemData.productName || '',
+      productId: itemData.productId,
       producerId: itemData.producerId || null,
-      quantity: parseInt(itemData.quantity) || 1,
-      unitPrice: this.parseBRLCurrency(itemData.unitPrice),
-      totalPrice: this.parseBRLCurrency(itemData.totalPrice),
-      // Item customization fields
-      hasItemCustomization: itemData.hasItemCustomization || false,
-      selectedCustomizationId: itemData.selectedCustomizationId || null,
-      itemCustomizationValue: this.parseBRLCurrency(itemData.itemCustomizationValue),
-      itemCustomizationDescription: itemData.itemCustomizationDescription || '',
-      additionalCustomizationNotes: itemData.additionalCustomizationNotes || '',
-      customizationPhoto: itemData.customizationPhoto || '', // Add customization photo field
-      // General customization fields
-      hasGeneralCustomization: itemData.hasGeneralCustomization || false,
-      generalCustomizationName: itemData.generalCustomizationName || '',
-      generalCustomizationValue: this.parseBRLCurrency(itemData.generalCustomizationValue),
-      // Product dimensions
-      productWidth: itemData.productWidth || null,
-      productHeight: itemData.productHeight || null,
-      productDepth: itemData.productDepth || null,
-      // Item discount
-      hasItemDiscount: itemData.hasItemDiscount || false,
-      itemDiscountType: itemData.itemDiscountType || 'percentage',
-      itemDiscountPercentage: this.parsePercentage(itemData.itemDiscountPercentage),
-      itemDiscountValue: this.parseBRLCurrency(itemData.itemDiscountValue),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      quantity: parseFloat(itemData.quantity.toString()),
+      unitPrice: parseFloat(itemData.unitPrice.toString()),
+      totalPrice: parseFloat(itemData.totalPrice.toString()),
+      productName: productName,
+      createdAt: new Date()
     };
 
-    this.budgetItems.set(id, item);
-    return item;
+    this.budgetItems.set(id, newItem);
+    console.log(`Budget item created: ${id} for budget ${budgetId} - Product: ${newItem.productName}`);
+    return newItem;
   }
 
   async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
     const item = this.budgetItems.get(itemId);
     if (!item) return null;
+
+    // Get product name if productId is provided and productName is missing
+    let productName = itemData.productName;
+    if (!productName && itemData.productId && itemData.productId !== item.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    } else if (!productName && itemData.productId === item.productId) {
+      productName = item.productName; // Keep existing if product is the same and name not provided
+    }
+
+    // Ensure productName is set if it's still missing
+    if (!productName && itemData.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    }
 
     const updatedItem = {
       ...item,
@@ -3091,16 +3344,17 @@ export class MemStorage implements IStorage {
       // Preserve customization photo if not explicitly updated
       customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : item.customizationPhoto,
       // Recalculate fields if they are present in itemData
-      quantity: itemData.quantity !== undefined ? parseFloat(itemData.quantity) : item.quantity,
-      unitPrice: itemData.unitPrice !== undefined ? parseFloat(itemData.unitPrice) : item.unitPrice,
-      totalPrice: itemData.totalPrice !== undefined ? parseFloat(itemData.totalPrice) : item.totalPrice,
-      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue) : item.itemCustomizationValue,
-      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue) : item.generalCustomizationValue,
-      itemDiscountPercentage: itemData.itemDiscountPercentage !== undefined ? parseFloat(itemData.itemDiscountPercentage) : item.itemDiscountPercentage,
-      itemDiscountValue: itemData.itemDiscountValue !== undefined ? parseFloat(itemData.itemDiscountValue) : item.itemDiscountValue,
-      productWidth: itemData.productWidth !== undefined ? parseFloat(itemData.productWidth) : item.productWidth,
-      productHeight: itemData.productHeight !== undefined ? parseFloat(itemData.productHeight) : item.productHeight,
-      productDepth: itemData.productDepth !== undefined ? parseFloat(itemData.productDepth) : item.productDepth,
+      quantity: itemData.quantity !== undefined ? parseFloat(itemData.quantity.toString()) : item.quantity,
+      unitPrice: itemData.unitPrice !== undefined ? parseFloat(itemData.unitPrice.toString()) : item.unitPrice,
+      totalPrice: itemData.totalPrice !== undefined ? parseFloat(itemData.totalPrice.toString()) : item.totalPrice,
+      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue.toString()) : item.itemCustomizationValue,
+      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue.toString()) : item.generalCustomizationValue,
+      itemDiscountPercentage: itemData.itemDiscountPercentage !== undefined ? parseFloat(itemData.itemDiscountPercentage.toString()) : item.itemDiscountPercentage,
+      itemDiscountValue: itemData.itemDiscountValue !== undefined ? parseFloat(itemData.itemDiscountValue.toString()) : item.itemDiscountValue,
+      productWidth: itemData.productWidth !== undefined ? parseFloat(itemData.productWidth.toString()) : item.productWidth,
+      productHeight: itemData.productHeight !== undefined ? parseFloat(itemData.productHeight.toString()) : item.productHeight,
+      productDepth: itemData.productDepth !== undefined ? parseFloat(itemData.productDepth.toString()) : item.productDepth,
+      productName: productName || item.productName, // Use the resolved or existing productName
       updatedAt: new Date()
     };
 
@@ -3275,7 +3529,7 @@ export class MemStorage implements IStorage {
     if (!budget) return;
 
     let subtotal = items.reduce((sum, item) => {
-      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity || '1');
+      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity ||'1');
 
       // Apply item customization if applicable (now as fixed value)
       if (item.hasItemCustomization) {
@@ -3488,6 +3742,7 @@ export class MemStorage implements IStorage {
 
 
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
+    // Get all orders and convert to receivables format
     const orders = await this.getOrders();
 
     // Get manual receivables from mockData
@@ -3495,32 +3750,75 @@ export class MemStorage implements IStorage {
 
     const orderReceivables = orders
       .filter(order => order.status !== 'cancelled') // Não incluir pedidos cancelados
-      .map(order => {
-        const totalValue = parseFloat(order.totalValue || "0");
-        const paidValue = parseFloat(order.paidValue || "0");
-        const remainingValue = Math.max(0, totalValue - paidValue);
-
-        // Get minimum payment (entrada + frete) from budget if available
-        let minimumPaymentValue = "0.00";
-        if (order.budgetId) {
-          // Try to get budget payment info for minimum payment calculation
-          const downPayment = parseFloat(order.downPayment || "0");
-          const shippingCost = parseFloat(order.shippingCost || "0");
-          minimumPaymentValue = downPayment > 0 || shippingCost > 0 ?
-            (downPayment + shippingCost).toFixed(2) : "0.00";
+      .map(async (order) => {
+        // Get client name
+        let clientName = order.contactName || "Cliente não informado";
+        if (!clientName && order.clientId) {
+          const client = await this.getClient(order.clientId);
+          if (client) {
+            clientName = client.name;
+          } else {
+            const clientByUserId = await this.getClientByUserId(order.clientId);
+            if (clientByUserId) {
+              clientName = clientByUserId.name;
+            }
+          }
         }
 
+        // Get vendor's branch info
+        let branchId = order.branchId || null;
+        if (!branchId && order.vendorId) {
+          const vendor = await this.getVendor(order.vendorId);
+          branchId = vendor?.branchId || null;
+        }
+
+        // Get payments for this order to calculate correct received amount
+        const payments = await this.getPaymentsByOrder(order.id);
+        const confirmedPayments = payments.filter(p => p.status === 'confirmed');
+        const receivedAmount = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        // Calculate minimum payment (entrada + frete) from order/budget info
+        let minimumPayment = "0.00";
+        const downPayment = parseFloat(order.downPayment || '0');
+        const shippingCost = parseFloat(order.shippingCost || '0');
+
+        if (downPayment > 0 || shippingCost > 0) {
+          minimumPayment = (downPayment + shippingCost).toFixed(2);
+        }
+
+        // If order was converted from budget, get budget payment info
+        if (order.budgetId) {
+          try {
+            const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
+            if (budgetPaymentInfo) {
+              const budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || '0');
+              const budgetShipping = parseFloat(budgetPaymentInfo.shippingCost || '0');
+
+              if (budgetDownPayment > 0 || budgetShipping > 0) {
+                minimumPayment = (budgetDownPayment + budgetShipping).toFixed(2);
+              }
+            }
+          } catch (error) {
+            console.log(`Error fetching budget payment info for order ${order.id}:`, error);
+          }
+        }
+
+        console.log(`Order ${order.orderNumber}: total=${order.totalValue}, received=${receivedAmount.toFixed(2)}, minimum=${minimumPayment}, branchId=${branchId}`);
+
+        // Calculate status based on payments and minimum payment
+        const totalValue = parseFloat(order.totalValue);
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-        if (paidValue >= totalValue) {
+
+        if (receivedAmount >= totalValue) {
           status = 'paid';
-        } else if (paidValue > 0) {
-          // Check if minimum payment requirement is met
-          if (parseFloat(minimumPaymentValue) > 0 && paidValue >= parseFloat(minimumPaymentValue)) {
+        } else if (receivedAmount > 0) {
+          const minPayment = parseFloat(minimumPayment);
+          if (minPayment > 0 && receivedAmount >= minPayment) {
             status = 'partial';
-          } else if (parseFloat(minimumPaymentValue) > 0 && paidValue < parseFloat(minimumPaymentValue)) {
-            status = 'pending'; // Minimum not met
+          } else if (minPayment > 0 && receivedAmount < minPayment) {
+            status = 'pending';
           } else {
-            status = 'partial'; // No minimum requirement
+            status = 'partial';
           }
         }
 
@@ -3534,44 +3832,34 @@ export class MemStorage implements IStorage {
           id: `ar-${order.id}`,
           orderId: order.id,
           orderNumber: order.orderNumber,
-          clientName: order.contactName || 'Cliente não identificado',
-          amount: order.totalValue || "0.00", // ✅ CORRIGIDO: Sempre usar valor original do pedido
-          receivedAmount: order.paidValue || "0.00",
-          minimumPayment: minimumPaymentValue,
-          status: status,
-          dueDate: order.deadline ? new Date(order.deadline) : null,
-          createdAt: new Date(order.createdAt),
-          lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
-          isManual: false,
-          type: 'order',
+          clientId: order.clientId,
+          clientName: clientName,
+          vendorId: order.vendorId,
+          branchId: branchId, // Include branch information
           description: `Venda: ${order.product}`,
-          notes: order.notes || '',
-          // Store remaining value for calculations if needed
-          remainingValue: remainingValue.toFixed(2)
+          amount: order.totalValue, // SEMPRE valor original do pedido
+          receivedAmount: receivedAmount.toFixed(2),
+          minimumPayment: minimumPayment, // Entrada + frete obrigatório
+          dueDate: order.deadline,
+          status: status,
+          type: 'sale',
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt
         };
       });
 
     // Convert manual receivables to the expected format
     const formattedManualReceivables = manualReceivables.map(receivable => ({
-      id: receivable.id,
-      orderId: null,
-      orderNumber: 'MANUAL',
-      clientName: receivable.clientName,
-      amount: receivable.amount,
-      receivedAmount: receivable.receivedAmount || "0.00",
-      minimumPayment: receivable.minimumPayment || "0.00", // Add minimumPayment
-      status: receivable.status,
-      dueDate: receivable.dueDate ? new Date(receivable.dueDate) : null,
-      createdAt: new Date(receivable.createdAt),
-      lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
-      isManual: true,
-      type: 'manual',
-      description: receivable.description,
-      notes: receivable.notes
+      ...receivable,
+      clientName: receivable.clientName || 'Cliente Manual',
+      receivedAmount: receivable.receivedAmount || '0.00',
+      minimumPayment: receivable.minimumPayment || '0.00',
+      branchId: receivable.branchId || null, // Include branch for manual receivables too
+      type: 'manual'
     }));
 
     console.log(`Returning ${orderReceivables.length} order receivables and ${formattedManualReceivables.length} manual receivables`);
-    return [...orderReceivables, ...formattedManualReceivables];
+    return [...await Promise.all(orderReceivables), ...formattedManualReceivables];
   }
 
   // This method is for creating manual receivables directly, not order-based ones.
@@ -4021,24 +4309,58 @@ export class MemStorage implements IStorage {
   }
 
   // Quote Requests methods
-  async createConsolidatedQuoteRequest(data: any) {
-    const id = generateId("quote-req");
-    const quoteRequest = {
-      id,
+  async createConsolidatedQuoteRequest(data: any): Promise<any> {
+    const id = generateId('quote-req');
+
+    // Get client information if clientId is provided
+    let contactName = data.contactName || 'Nome não informado';
+    let whatsapp = data.whatsapp || null;
+    let email = data.email || null;
+
+    if (data.clientId) {
+      const client = await this.getClient(data.clientId);
+      if (client) {
+        contactName = client.name;
+        whatsapp = client.whatsapp || client.phone || null;
+        email = client.email || null;
+      } else {
+        // Try to get client by userId
+        const clientByUserId = await this.getClientByUserId(data.clientId);
+        if (clientByUserId) {
+          contactName = clientByUserId.name;
+          whatsapp = clientByUserId.whatsapp || clientByUserId.phone || null;
+          email = clientByUserId.email || null;
+        }
+      }
+    }
+
+    console.log("Creating consolidated quote request:", {
       clientId: data.clientId,
       vendorId: data.vendorId,
-      contactName: data.contactName,
-      whatsapp: data.whatsapp || "",
-      email: data.email || "",
-      observations: data.observations || "",
+      contactName: contactName,
+      whatsapp: whatsapp,
+      email: email,
+      productCount: data.products.length,
+      totalValue: data.totalEstimatedValue
+    });
+
+    const quoteRequest = {
+      id: id,
+      clientId: data.clientId,
+      vendorId: data.vendorId,
+      contactName: contactName,
+      whatsapp: whatsapp,
+      email: email,
+      observations: data.observations || null,
       totalEstimatedValue: data.totalEstimatedValue || 0,
-      status: data.status || "pending",
+      status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date(),
-      products: data.products || []
+      // Consolidate products info
+      productCount: data.products.length,
+      products: data.products
     };
 
-    // Salvar o orçamento principal
     this.quoteRequests.push(quoteRequest);
 
     console.log(`Created consolidated quote request ${id} with ${data.products.length} products`);
@@ -4057,68 +4379,154 @@ export class MemStorage implements IStorage {
     return quoteRequest;
   }
 
-  async getQuoteRequestsByVendor(vendorId: string) {
+  async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
     const requests = this.quoteRequests.filter(request => request.vendorId === vendorId);
 
-    // Enriquecer cada orçamento com informações dos produtos
-    const enrichedRequests = requests.map(request => {
+    // Enriquecer cada orçamento com informações dos produtos e cliente
+    const enrichedRequests = await Promise.all(requests.map(async request => {
+      // Buscar informações do cliente
+      let clientName = request.contactName;
+      let clientEmail = request.email;
+      let clientWhatsapp = request.whatsapp;
+
+      // Se não tiver contactName, tentar buscar pelo clientId
+      if (!clientName && request.clientId) {
+        const client = await this.getClient(request.clientId);
+        if (client) {
+          clientName = client.name;
+          clientEmail = client.email || request.email;
+          clientWhatsapp = client.whatsapp || request.whatsapp;
+        } else {
+          // Tentar buscar o usuário diretamente
+          const user = await this.getUser(request.clientId);
+          if (user) {
+            clientName = user.name;
+            clientEmail = user.email || request.email;
+          }
+        }
+      }
+
+      // Buscar informações do vendedor
+      const vendor = await this.getUser(request.vendorId);
+      const vendorName = vendor?.name || 'Vendedor não identificado';
+
       if (request.products && request.products.length > 0) {
-        // Orçamento consolidado
+        // Consolidado com múltiplos produtos
+        const productSummary = request.products.length > 1
+          ? `${request.products[0].productName} e mais ${request.products.length - 1} produto(s)`
+          : request.products[0].productName;
+
         return {
           ...request,
+          contactName: clientName,
+          clientName: clientName,
+          email: clientEmail,
+          whatsapp: clientWhatsapp,
+          vendorName: vendorName,
           productCount: request.products.length,
-          productNames: request.products.map(p => p.productName).join(", "),
-          // Para compatibilidade com código existente, usar o primeiro produto
-          productId: request.products[0]?.productId || null,
-          productName: request.products.length > 1
-            ? `${request.products[0]?.productName} e mais ${request.products.length - 1} produto(s)`
-            : request.products[0]?.productName || "Produtos diversos",
-          quantity: request.products.reduce((total, p) => total + p.quantity, 0)
+          productName: productSummary,
+          productSummary: productSummary,
+          quantity: request.products.reduce((total, p) => total + p.quantity, 0),
+          totalProducts: request.products.length
         };
       } else {
-        // Orçamento antigo (single product)
+        // Request antigo (single product)
         return {
           ...request,
+          contactName: clientName,
+          clientName: clientName,
+          email: clientEmail,
+          whatsapp: clientWhatsapp,
+          vendorName: vendorName,
           productCount: 1,
-          productNames: request.productName || "Produto não especificado"
+          totalProducts: 1
         };
       }
-    });
+    }));
 
     console.log(`Found ${enrichedRequests.length} quote requests for vendor ${vendorId}`);
     return enrichedRequests;
   }
 
-  async getQuoteRequestsByClient(clientId: string) {
-    console.log(`Searching quote requests for client: ${clientId}`);
-    const requests = this.quoteRequests.filter(request => request.clientId === clientId);
+  async getQuoteRequestsByClient(clientId: string): Promise<any[]> {
+    console.log(`Storage: Searching quote requests for client ${clientId}`);
 
-    // Enriquecer cada orçamento com informações dos produtos
-    const enrichedRequests = requests.map(request => {
+    let matchingRequests = [];
+
+    // Buscar solicitações que correspondem ao cliente de várias formas
+    for (const request of this.quoteRequests) {
+      let shouldInclude = false;
+
+      // 1. Comparação direta com clientId
+      if (request.clientId === clientId) {
+        shouldInclude = true;
+        console.log(`Found direct match: ${request.id}`);
+      }
+
+      // 2. Se clientId é um userId, verificar se há client record com esse userId
+      if (!shouldInclude) {
+        try {
+          const clientRecord = await this.getClientByUserId(clientId);
+          if (clientRecord && request.clientId === clientRecord.id) {
+            shouldInclude = true;
+            console.log(`Found userId match via client record: ${request.id}`);
+          }
+        } catch (e) {
+          // Continue searching
+        }
+      }
+
+      // 3. Se request.clientId é um client record, verificar se o userId bate
+      if (!shouldInclude && request.clientId) {
+        try {
+          const requestClientRecord = await this.getClient(request.clientId);
+          if (requestClientRecord && requestClientRecord.userId === clientId) {
+            shouldInclude = true;
+            console.log(`Found client record match: ${request.id}`);
+          }
+        } catch (e) {
+          // Continue searching
+        }
+      }
+
+      if (shouldInclude) {
+        matchingRequests.push(request);
+      }
+    }
+
+    // Enriquecer as solicitações encontradas
+    const enrichedRequests = await Promise.all(matchingRequests.map(async request => {
+      // Buscar informações do vendedor
+      const vendor = await this.getUser(request.vendorId);
+      const vendorName = vendor?.name || 'Vendedor não identificado';
+
       if (request.products && request.products.length > 0) {
-        // Orçamento consolidado
+        // Consolidado com múltiplos produtos
+        const productSummary = request.products.length > 1
+          ? `${request.products[0].productName} e mais ${request.products.length - 1} produto(s)`
+          : request.products[0].productName;
+
         return {
           ...request,
+          vendorName: vendorName,
           productCount: request.products.length,
-          productNames: request.products.map(p => p.productName).join(", "),
-          // Para compatibilidade com código existente, usar o primeiro produto
-          productId: request.products[0]?.productId || null,
-          productName: request.products.length > 1
-            ? `${request.products[0]?.productName} e mais ${request.products.length - 1} produto(s)`
-            : request.products[0]?.productName || "Produtos diversos",
-          quantity: request.products.reduce((total, p) => total + p.quantity, 0)
+          productName: productSummary,
+          productSummary: productSummary,
+          quantity: request.products.reduce((total, p) => total + p.quantity, 0),
+          totalProducts: request.products.length
         };
       } else {
-        // Orçamento antigo (single product)
+        // Request antigo (single product)
         return {
           ...request,
+          vendorName: vendorName,
           productCount: 1,
-          productNames: request.productName || "Produto não especificado"
+          totalProducts: 1
         };
       }
-    });
+    }));
 
-    console.log(`Found ${enrichedRequests.length} quote requests for client ${clientId}`);
+    console.log(`Storage: Found ${enrichedRequests.length} quote requests for client ${clientId}`);
     return enrichedRequests;
   }
 
@@ -4410,6 +4818,35 @@ export class MemStorage implements IStorage {
 
     this.mockData.systemLogs.push(log);
     console.log(`[LOG] ${userName} (${userRole}) - ${action} - ${description}`);
+  }
+
+  // Added authenticateUser method with system logging
+  async authenticateUser(username: string, password: string): Promise<User | null> {
+    const user = Array.from(this.users.values()).find(
+      (u) => u.username === username && u.password === password && u.isActive
+    );
+
+    if (user) {
+      console.log(`Login successful for: ${user.username} role: ${user.role}`);
+
+      // Log successful login
+      await this.createSystemLog({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: 'LOGIN',
+        entity: 'users',
+        entityId: user.id,
+        description: `Login realizado com sucesso`,
+        details: `Role: ${user.role}`,
+        level: 'info'
+      });
+
+      return user;
+    }
+
+    console.log(`Login failed for username: ${username}`);
+    return null;
   }
 }
 
