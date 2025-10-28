@@ -579,7 +579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/pending-orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
-      
+
       const pendingOrders = (orders || []).filter(o => {
         const total = parseFloat(o.totalValue || "0");
         const paid  = parseFloat(o.paidValue  || "0");
@@ -3604,34 +3604,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (receivable.orderId) {
         // This is an order-based receivable - create payment for the order
+        const order = await storage.getOrder(receivable.orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Pedido relacionado não encontrado" });
+        }
+
+        // Validate payment amount against remaining balance
+        const requested = parseFloat(amount);
+        const alreadyPaid = parseFloat(order.paidValue || '0');
+        const total = parseFloat(order.totalValue);
+
+        // Never accept payment above the remaining amount
+        const allowable = Math.max(0, total - alreadyPaid);
+        const finalAmount = Math.min(requested, allowable);
+
+        if (finalAmount !== requested) {
+          console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
+        }
+
+        // Create payment with confirmed status - this automatically calls updateOrderPaidValue()
         paymentRecord = await storage.createPayment({
           orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: method || "manual",
-          status: "confirmed",
+          amount: finalAmount.toFixed(2),
+          method: method || 'manual',
+          status: 'confirmed',
           transactionId: transactionId || `MANUAL-${Date.now()}`,
-          notes: notes || "",
+          notes: notes || '',
           paidAt: new Date()
         });
 
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const totalValue = parseFloat(order.totalValue);
-          const currentPaid = parseFloat(order.paidValue || '0');
-          const thisPayment = parseFloat(amount);
-          const newPaid = currentPaid + thisPayment;
-          const newRemaining = Math.max(totalValue - newPaid, 0);
+        console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
 
-          // >>> CRITICAL: NEVER send totalValue in update! <<<
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: newPaid.toFixed(2),
-            remainingAmount: newRemaining.toFixed(2),
-            __origin: 'receivables' // Safety flag for storage layer
-          });
-
-          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
-        }
+        // Note: No need to manually update order.paidValue here as createPayment() with 
+        // status='confirmed' already calls updateOrderPaidValue() which:
+        // 1. Sums all confirmed payments for the order
+        // 2. Updates order.paidValue 
+        // 3. Updates the corresponding accountsReceivable status/receivedAmount
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -5165,7 +5173,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           selectedCustomizationId: item.selectedCustomizationId || "",
           itemCustomizationValue: itemCustomizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
-          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
           // General Customization
           hasGeneralCustomization: item.hasGeneralCustomization || false,
@@ -6064,18 +6071,14 @@ Para mais detalhes, entre em contato conosco!`;
           let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          if (!order) {
-            return null; // Skip if order doesn't exist
-          }
-
           // Always use contactName as primary client identifier
-          let clientName = order.contactName;
+          let clientName = order?.contactName;
           let clientAddress = null;
-          let clientPhone = order.contactPhone;
-          let clientEmail = order.contactEmail;
+          let clientPhone = order?.contactPhone;
+          let clientEmail = order?.contactEmail;
 
           // Only if contactName is missing, try to get from client record
-          if (!clientName && order.clientId) {
+          if (!clientName && order?.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
@@ -6108,14 +6111,14 @@ Para mais detalhes, entre em contato conosco!`;
 
           return {
             ...po,
-            orderNumber: order.orderNumber || `PO-${po.id}`,
-            product: order.product || 'Produto não informado',
+            orderNumber: order?.orderNumber || `PO-${po.id}`,
+            product: order?.product || 'Produto não informado',
             clientName: clientName,
             clientAddress: clientAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
-            order: {
+            order: order ? {
               ...order,
               clientName: clientName,
               clientAddress: clientAddress,
@@ -6125,7 +6128,7 @@ Para mais detalhes, entre em contato conosco!`;
                 ? 'Sede Principal - Retirada no Local'
                 : (clientAddress || 'Endereço não informado'),
               deliveryType: order.deliveryType || 'delivery'
-            }
+            } : null
           };
         })
       );
