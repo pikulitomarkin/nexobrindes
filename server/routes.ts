@@ -4994,7 +4994,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich items with product data and calculate totals
       const enrichedItems = await Promise.all(
         items.map(async (item) => {
-          const product = await storage.getProduct(item.productId);
+          const product =await storage.getProduct(item.productId);
           const quantity = item.quantity;
           const unitPrice = parseFloat(item.unitPrice);
           const customizationValue = parseFloat(item.itemCustomizationValue || '0');

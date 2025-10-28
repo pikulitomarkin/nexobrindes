@@ -2842,15 +2842,15 @@ export class MemStorage implements IStorage {
       contactName: newBudget.contactName
     });
 
-    // Process items
+    // Process items - only if not already processed
     console.log(`[CREATE BUDGET] Processing ${budgetData.items?.length || 0} items from request`);
     if (budgetData.items && budgetData.items.length > 0) {
-      // Remove duplicates before processing
+      // Remove duplicates based on productId, producerId, quantity, and unitPrice
       const seenItems = new Set();
-      const uniqueItems = budgetData.items.filter((item: any) => {
+      const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          console.log(`[CREATE BUDGET] Removing duplicate item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
