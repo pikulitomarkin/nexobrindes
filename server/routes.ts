@@ -3211,15 +3211,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (receivable.orderId) {
         // This is an order-based receivable - create payment for the order
-        paymentRecord = await storage.createPayment({
-          orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: method || "manual",
-          status: "confirmed",
-          transactionId: transactionId || `MANUAL-${Date.now()}`,
-          notes: notes || "",
-          paidAt: new Date()
-        });
+        // Get current order to prevent overpayments
+        const order = await storage.getOrder(receivable.orderId);
+        if (order) {
+          const requested = parseFloat(amount);
+          const alreadyPaid = parseFloat(order.paidValue || '0');
+          const total = parseFloat(order.totalValue);
+          
+          // Never accept payment above the remaining amount
+          const allowable = Math.max(0, total - alreadyPaid);
+          const finalAmount = Math.min(requested, allowable);
+          
+          if (finalAmount !== requested) {
+            console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
+          }
+          
+          paymentRecord = await storage.createPayment({
+            orderId: receivable.orderId,
+            amount: finalAmount.toFixed(2),
+            method: method || "manual",
+            status: "confirmed",
+            transactionId: transactionId || `MANUAL-${Date.now()}`,
+            notes: notes || "",
+            paidAt: new Date()
+          });
+        } else {
+          throw new Error('Pedido não encontrado');
+        }
 
         // Get current order to calculate new paid value safely
         const order = await storage.getOrder(receivable.orderId);
