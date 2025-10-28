@@ -344,12 +344,6 @@ export default function ClientOrders() {
                     {order.producerName || 'Em definição'}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Vendedor</p>
-                  <p className="font-medium text-gray-900">
-                    {order.vendorName || 'Não informado'}
-                  </p>
-                </div>
               </div>
 
               {/* Items Summary - Show unique items count */}
