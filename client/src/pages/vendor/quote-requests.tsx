@@ -68,7 +68,7 @@ export default function VendorQuoteRequests() {
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       pending: "bg-yellow-100 text-yellow-800",
-      reviewing: "bg-blue-100 text-blue-800", 
+      reviewing: "bg-blue-100 text-blue-800",
       quoted: "bg-green-100 text-green-800",
       rejected: "bg-red-100 text-red-800",
     };
@@ -139,7 +139,7 @@ export default function VendorQuoteRequests() {
             >
               Pendentes ({quoteRequests?.filter((r: any) => r.status === "pending").length || 0})
             </Button>
-            
+
             <Button
               variant={statusFilter === "quoted" ? "default" : "outline"}
               size="sm"
@@ -304,14 +304,14 @@ export default function VendorQuoteRequests() {
           <CardContent className="p-12 text-center">
             <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <p className="text-xl font-medium text-gray-600 mb-2">
-              {statusFilter === "all" ? 
+              {statusFilter === "all" ?
                 "Nenhuma solicitação de orçamento encontrada" :
-                `Nenhuma solicitação ${statusFilter === "pending" ? "pendente" : 
-                 statusFilter === "reviewing" ? "em análise" : 
+                `Nenhuma solicitação ${statusFilter === "pending" ? "pendente" :
+                 statusFilter === "reviewing" ? "em análise" :
                  statusFilter === "quoted" ? "orçada" : "rejeitada"} encontrada`}
             </p>
             <p className="text-gray-500">
-              {statusFilter === "all" ? 
+              {statusFilter === "all" ?
                 "As solicitações dos seus clientes aparecerão aqui." :
                 "Tente selecionar um filtro diferente."}
             </p>
