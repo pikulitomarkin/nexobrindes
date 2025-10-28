@@ -472,6 +472,12 @@ export class MemStorage implements IStorage {
     this.createTestUsers();
   }
 
+  // Helper method to get product name by ID
+  private async getProductName(productId: string): Promise<string> {
+    const product = await this.getProduct(productId);
+    return product?.name || 'Produto não encontrado';
+  }
+
   // Helper to load all mock data
   private async loadData(): Promise<any> {
     // Ensure all necessary arrays/maps are initialized before returning
@@ -2836,10 +2842,30 @@ export class MemStorage implements IStorage {
     });
 
     // Process items
-    console.log(`[CREATE BUDGET] Processing ${budgetData.items.length} items from request`);
+    console.log(`[CREATE BUDGET] Processing ${budgetData.items?.length || 0} items from request`);
     if (budgetData.items && budgetData.items.length > 0) {
-      for (const itemData of budgetData.items) {
-        await this.createBudgetItem(newBudget.id, itemData);
+      // Remove duplicates before processing
+      const seenItems = new Set();
+      const uniqueItems = budgetData.items.filter((item: any) => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
+
+      for (const itemData of uniqueItems) {
+        // Ensure productName is included in itemData
+        const enrichedItemData = {
+          ...itemData,
+          productName: itemData.productName || await this.getProductName(itemData.productId)
+        };
+        
+        await this.createBudgetItem(newBudget.id, enrichedItemData);
       }
     }
 
