@@ -409,6 +409,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let clientEmail = budget.contactEmail || '';
       let clientPhone = budget.contactPhone || '';
 
+      // Try to get client data if clientId exists
+      let client = null;
+      if (budget.clientId) {
+        client = await storage.getClient(budget.clientId);
+        if (!client) {
+          // Try to get by userId if not found as client
+          client = await storage.getClientByUserId(budget.clientId);
+        }
+      }
+
       console.log(`Client lookup - budget.clientId: ${budget.clientId}, found client:`, !!client);
 
       if (client) {
@@ -416,6 +426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientEmail = client.email || budget.contactEmail || '';
         clientPhone = client.phone || budget.contactPhone || '';
       }
+
+      console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
 
       console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
 

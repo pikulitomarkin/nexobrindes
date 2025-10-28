@@ -2803,10 +2803,15 @@ export class MemStorage implements IStorage {
 
     // Get client info if clientId exists
     let clientName = budget.contactName;
+    let clientEmail = budget.contactEmail || '';
+    let clientPhone = budget.contactPhone || '';
+    
     if (budget.clientId) {
       const client = this.clients.get(budget.clientId);
       if (client) {
         clientName = client.name;
+        clientEmail = client.email || budget.contactEmail || '';
+        clientPhone = client.phone || budget.contactPhone || '';
       }
     }
 
@@ -2824,6 +2829,8 @@ export class MemStorage implements IStorage {
       items,
       photos,
       clientName,
+      clientEmail,
+      clientPhone,
       vendorName
     };
   }
