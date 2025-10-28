@@ -9,6 +9,135 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 
+// Isolated component for convert to budget button
+function ConvertToBudgetButton({ requestId, uniqueKey }: {
+  requestId: string;
+  uniqueKey: string;
+}) {
+  const { toast } = useToast();
+  const [pending, setPending] = useState(false);
+
+  const { mutate } = useMutation({
+    // REMOVIDO: mutationKey - cada botão tem sua própria instância independente
+    mutationFn: async () => {
+      console.log(`Converting quote request ${requestId} to budget`);
+
+      const response = await fetch(`/api/quote-requests/${requestId}/convert-to-budget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Erro ao converter em orçamento");
+      return response.json();
+    },
+    onMutate: () => {
+      setPending(true);
+    },
+    onSuccess: (data) => {
+      setPending(false);
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const vendorId = currentUser.id;
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      toast({
+        title: "Sucesso!",
+        description: "Solicitação convertida em orçamento oficial! Agora você pode editá-lo na aba de Orçamentos.",
+      });
+    },
+    onError: (error: any) => {
+      setPending(false);
+      console.error(`Error converting to budget ${requestId}:`, error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao converter em orçamento",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Button
+      size="sm"
+      className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!pending) mutate();
+      }}
+      disabled={pending}
+      title="Converter em orçamento oficial"
+      data-testid={`button-convert-${uniqueKey}`}
+    >
+      <FileText className="h-4 w-4 mr-1" />
+      {pending ? 'Convertendo...' : 'Converter em Orçamento'}
+    </Button>
+  );
+}
+
+// Isolated component for reject button
+function RejectRequestButton({ requestId, uniqueKey }: {
+  requestId: string;
+  uniqueKey: string;
+}) {
+  const { toast } = useToast();
+  const [pending, setPending] = useState(false);
+
+  const { mutate } = useMutation({
+    // REMOVIDO: mutationKey - cada botão tem sua própria instância independente
+    mutationFn: async () => {
+      console.log(`Rejecting quote request ${requestId}`);
+
+      const response = await fetch(`/api/quote-requests/${requestId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+      if (!response.ok) throw new Error("Erro ao rejeitar solicitação");
+      return response.json();
+    },
+    onMutate: () => {
+      setPending(true);
+    },
+    onSuccess: () => {
+      setPending(false);
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const vendorId = currentUser.id;
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/vendor", vendorId] });
+      toast({
+        title: "Sucesso!",
+        description: "Solicitação rejeitada com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      setPending(false);
+      console.error(`Error rejecting request ${requestId}:`, error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao rejeitar solicitação",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="text-red-600 border-red-300 hover:bg-red-50"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!pending) mutate();
+      }}
+      disabled={pending}
+      title="Rejeitar esta solicitação"
+      data-testid={`button-reject-${uniqueKey}`}
+    >
+      <X className="h-4 w-4 mr-1" />
+      {pending ? 'Rejeitando...' : 'Rejeitar'}
+    </Button>
+  );
+}
+
 export default function VendorQuoteRequests() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const currentUser = user; // Renamed for clarity, assuming 'user' from localStorage is the current vendor
@@ -27,43 +156,7 @@ export default function VendorQuoteRequests() {
     },
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await fetch(`/api/quote-requests/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar status");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/vendor", vendorId] });
-      toast({
-        title: "Sucesso!",
-        description: "Status atualizado com sucesso",
-      });
-    },
-  });
-
-  const convertToBudgetMutation = useMutation({
-    mutationFn: async (quoteRequestId: string) => {
-      const response = await fetch(`/api/quote-requests/${quoteRequestId}/convert-to-budget`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error("Erro ao converter em orçamento");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quote-requests/vendor", vendorId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
-      toast({
-        title: "Sucesso!",
-        description: "Solicitação convertida em orçamento oficial! Agora você pode editá-lo na aba de Orçamentos.",
-      });
-    },
-  });
+  
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
@@ -266,33 +359,16 @@ export default function VendorQuoteRequests() {
                 <div className="flex space-x-2">
                   {request.status === 'pending' && (
                     <>
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          convertToBudgetMutation.mutate(request.id);
-                        }}
-                        disabled={convertToBudgetMutation.isPending || updateStatusMutation.isPending}
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        {convertToBudgetMutation.isPending ? 'Convertendo...' : 'Converter em Orçamento'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-300 hover:bg-red-50"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          updateStatusMutation.mutate({ id: request.id, status: 'rejected' });
-                        }}
-                        disabled={updateStatusMutation.isPending || convertToBudgetMutation.isPending}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        {updateStatusMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
-                      </Button>
+                      <ConvertToBudgetButton
+                        key={`convert-${request.id}`}
+                        requestId={request.id}
+                        uniqueKey={`${request.id}-convert`}
+                      />
+                      <RejectRequestButton
+                        key={`reject-${request.id}`}
+                        requestId={request.id}
+                        uniqueKey={`${request.id}-reject`}
+                      />
                     </>
                   )}
 
