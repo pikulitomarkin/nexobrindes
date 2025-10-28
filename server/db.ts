@@ -1,7 +1,10 @@
-// Import storage and export as db for compatibility with existing imports
-import { storage } from "./storage";
-export const db = storage;
-export { eq, desc, sql } from "drizzle-orm";
+// Import PostgreSQL storage adapter and export as db
+import { pgStorage } from "./storage.pg";
+export const db = pgStorage;
+export { eq, desc, sql, and, or, like, isNull, not } from "drizzle-orm";
+
+// Export pg query builder for direct queries if needed
+export { pg as query } from "./pgClient";
 
 // Re-export types from schema for compatibility
 export type {
