@@ -208,7 +208,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-6 overflow-y-auto">
+          <nav className="flex-1 p-6">
             <ul className="space-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
