@@ -580,27 +580,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check shipping status and update main order accordingly
       const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
       const shippedOrders = allProductionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
-      const allShipped = shippedOrders.length === allProductionOrders.length;
-      const someShipped = shippedOrders.length > 0;
+      const totalOrders = allProductionOrders.length;
+      const shippedCount = shippedOrders.length;
 
-      console.log(`Order ${orderId} shipping status: ${shippedOrders.length}/${allProductionOrders.length} shipped`);
+      console.log(`Order ${orderId} shipping status: ${shippedCount}/${totalOrders} producers shipped`);
 
-      if (allShipped) {
+      let newStatus = 'production'; // Default status
+
+      if (shippedCount === 0) {
+        // No orders shipped yet - keep current status or set to production
+        newStatus = 'production';
+      } else if (shippedCount === totalOrders) {
         // All production orders shipped - mark as fully shipped
-        await storage.updateOrderStatus(orderId, 'shipped');
-        console.log(`Order ${orderId} marked as fully shipped`);
-      } else if (someShipped) {
+        newStatus = 'shipped';
+        console.log(`Order ${orderId} marked as fully shipped - all ${totalOrders} producers completed`);
+      } else {
         // Some but not all shipped - mark as partial
-        await storage.updateOrderStatus(orderId, 'partial_shipped');
-        console.log(`Order ${orderId} marked as partially shipped`);
+        newStatus = 'partial_shipped';
+        console.log(`Order ${orderId} marked as partially shipped - ${shippedCount}/${totalOrders} producers shipped`);
       }
 
-      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
+      // Update the main order status
+      await storage.updateOrderStatus(orderId, newStatus);
+
+      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}, new status: ${newStatus}`);
 
       res.json({
         success: true,
         message: "Pedido despachado com sucesso",
-        productionOrder: updatedPO
+        productionOrder: updatedPO,
+        orderStatus: newStatus,
+        shippingProgress: {
+          shipped: shippedCount,
+          total: totalOrders
+        }
       });
     } catch (error) {
       console.error("Error dispatching order:", error);

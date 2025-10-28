@@ -157,7 +157,7 @@ export default function ClientOrders() {
       production: "bg-purple-100 text-purple-800",
       ready: "bg-orange-100 text-orange-800",
       shipped: "bg-green-100 text-green-800",
-      partial_shipped: "bg-yellow-100 text-yellow-800 animate-pulse",
+      partial_shipped: "bg-yellow-100 text-yellow-800 animate-pulse border border-yellow-300",
       delivered: "bg-green-100 text-green-800",
       completed: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
@@ -169,7 +169,7 @@ export default function ClientOrders() {
       production: "Em Produção",
       ready: "Pronto para Envio",
       shipped: "Enviado",
-      partial_shipped: "Enviado Parcialmente",
+      partial_shipped: "🚚 Envio Parcial",
       delivered: "Entregue",
       completed: "Finalizado",
       cancelled: "Cancelado",
@@ -314,14 +314,18 @@ export default function ClientOrders() {
                 {/* Progress Line */}
                 <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200">
                   <div
-                    className="h-full gradient-bg transition-all duration-500"
+                    className={`h-full transition-all duration-500 ${
+                      order.status === "partial_shipped" 
+                        ? "bg-gradient-to-r from-green-500 to-yellow-400" 
+                        : "gradient-bg"
+                    }`}
                     style={{
                       width: order.status === "pending" ? "0%" :
                              order.status === "confirmed" ? "20%" :
                              order.status === "production" ? "40%" :
                              order.status === "ready" ? "60%" :
                              order.status === "shipped" ? "80%" :
-                             order.status === "partial_shipped" ? "65%" :
+                             order.status === "partial_shipped" ? "70%" :
                              ["delivered", "completed"].includes(order.status) ? "100%" : "0%"
                     }}
                   ></div>

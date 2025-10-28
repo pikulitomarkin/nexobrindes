@@ -1652,7 +1652,7 @@ export class MemStorage implements IStorage {
   // Update order shipping status based on production orders
   async updateOrderShippingStatus(orderId: string): Promise<void> {
     try {
-      const productionOrders = this.getProductionOrdersByOrder(orderId);
+      const productionOrders = await this.getProductionOrdersByOrder(orderId);
       const totalOrders = productionOrders.length;
 
       if (totalOrders === 0) {
@@ -1662,24 +1662,25 @@ export class MemStorage implements IStorage {
 
       const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
       const readyOrders = productionOrders.filter(po => po.status === 'ready');
+      const shippedCount = shippedOrders.length;
 
-      console.log(`Order ${orderId} shipping status: ${shippedOrders.length}/${totalOrders} producers shipped, ${readyOrders.length} ready`);
+      console.log(`Order ${orderId} shipping status: ${shippedCount}/${totalOrders} producers shipped, ${readyOrders.length} ready`);
 
       let newStatus = 'production'; // Default status
 
-      if (shippedOrders.length === 0) {
+      if (shippedCount === 0) {
         if (readyOrders.length > 0) {
           newStatus = 'ready'; // Some ready for shipping
         } else {
           newStatus = 'production'; // Still in production
         }
-      } else if (shippedOrders.length === totalOrders) {
+      } else if (shippedCount === totalOrders) {
         newStatus = 'shipped'; // All shipped - order complete
       } else {
         newStatus = 'partial_shipped'; // Alguns despachados - envio parcial
       }
 
-      console.log(`Order ${orderId} shipping status update: ${shippedOrders.length}/${totalOrders} shipped -> ${newStatus}`);
+      console.log(`Order ${orderId} shipping status update: ${shippedCount}/${totalOrders} shipped -> ${newStatus}`);
 
       await this.updateOrderStatus(orderId, newStatus);
     } catch (error) {
