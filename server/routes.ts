@@ -5560,7 +5560,8 @@ Para mais detalhes, entre em contato conosco!`;
             producerName: producer?.name || null,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado')
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
           };
         })
       );
