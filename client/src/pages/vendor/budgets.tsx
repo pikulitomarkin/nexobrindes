@@ -368,8 +368,23 @@ export default function VendorBudgets() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidar múltiplas queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/receivables"] });
+      
+      // Forçar refetch imediato
       queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      
+      // Refetch com delay para garantir que o backend processou
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+        queryClient.refetchQueries({ queryKey: ["/api/dashboard/stats"] });
+        queryClient.refetchQueries({ queryKey: ["/api/finance/overview"] });
+      }, 100);
+      
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");
@@ -396,8 +411,23 @@ export default function VendorBudgets() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidar múltiplas queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/receivables"] });
+      
+      // Forçar refetch imediato
       queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      
+      // Refetch com delay para garantir que o backend processou
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+        queryClient.refetchQueries({ queryKey: ["/api/dashboard/stats"] });
+        queryClient.refetchQueries({ queryKey: ["/api/finance/overview"] });
+      }, 100);
+      
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");
@@ -475,9 +505,25 @@ export default function VendorBudgets() {
     onSuccess: () => {
       // Invalidar múltiplas queries para garantir atualização
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors", vendorId, "orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/receivables"] });
+      
+      // Forçar refetch imediato
+      queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      
+      // Refetch com delay para garantir que o backend processou
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+        queryClient.refetchQueries({ queryKey: ["/api/orders"] });
+        queryClient.refetchQueries({ queryKey: ["/api/dashboard/stats"] });
+        queryClient.refetchQueries({ queryKey: ["/api/finance/overview"] });
+        queryClient.refetchQueries({ queryKey: ["/api/finance/receivables"] });
+      }, 200);
 
       setConvertDialogOpen(false);
       setBudgetToConvert(null);

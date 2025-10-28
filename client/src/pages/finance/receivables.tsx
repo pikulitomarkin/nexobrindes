@@ -47,7 +47,10 @@ export default function FinanceReceivables() {
         throw new Error('Erro ao carregar contas a receber');
       }
       return response.json();
-    }
+    },
+    refetchInterval: 30000, // Refetch a cada 30 segundos
+    refetchOnWindowFocus: true,
+    staleTime: 10000, // Dados ficam "frescos" por 10 segundos
   });
 
   // Fetch branches data
@@ -63,7 +66,9 @@ export default function FinanceReceivables() {
         throw new Error('Erro ao carregar filiais');
       }
       return response.json();
-    }
+    },
+    refetchInterval: 60000, // Refetch a cada minuto
+    staleTime: 300000, // Branches mudam menos, 5 minutos de cache
   });
 
   // Convert API data to expected format - SEMPRE mostrar valor total original do pedido

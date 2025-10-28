@@ -11,14 +11,23 @@ export default function AdminDashboard() {
   
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
+    refetchInterval: 30000, // Refetch a cada 30 segundos
+    refetchOnWindowFocus: true,
+    staleTime: 10000, // Dados ficam "frescos" por 10 segundos
   });
 
   const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    staleTime: 10000,
   });
 
   const { data: financeOverview } = useQuery({
     queryKey: ["/api/finance/overview"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    staleTime: 10000,
   });
 
   const handleLogout = () => {
