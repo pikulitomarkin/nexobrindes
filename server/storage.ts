@@ -1649,22 +1649,42 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  // Update order shipping status based on production orders
   async updateOrderShippingStatus(orderId: string): Promise<void> {
-    const productionOrders = await this.getProductionOrdersByOrder(orderId);
-    if (productionOrders.length === 0) return;
+    try {
+      const productionOrders = this.getProductionOrdersByOrder(orderId);
+      const totalOrders = productionOrders.length;
 
-    const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
-    const totalOrders = productionOrders.length;
+      if (totalOrders === 0) {
+        console.log(`Order ${orderId} has no production orders`);
+        return;
+      }
 
-    let newStatus = 'production';
-    if (shippedOrders.length === totalOrders) {
-      newStatus = 'shipped'; // Todos despachados - pedido totalmente enviado
-    } else if (shippedOrders.length > 0) {
-      newStatus = 'partial_shipped'; // Alguns despachados - envio parcial
+      const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const readyOrders = productionOrders.filter(po => po.status === 'ready');
+
+      console.log(`Order ${orderId} shipping status: ${shippedOrders.length}/${totalOrders} producers shipped, ${readyOrders.length} ready`);
+
+      let newStatus = 'production'; // Default status
+
+      if (shippedOrders.length === 0) {
+        if (readyOrders.length > 0) {
+          newStatus = 'ready'; // Some ready for shipping
+        } else {
+          newStatus = 'production'; // Still in production
+        }
+      } else if (shippedOrders.length === totalOrders) {
+        newStatus = 'shipped'; // All shipped - order complete
+      } else {
+        newStatus = 'partial_shipped'; // Alguns despachados - envio parcial
+      }
+
+      console.log(`Order ${orderId} shipping status update: ${shippedOrders.length}/${totalOrders} shipped -> ${newStatus}`);
+
+      await this.updateOrderStatus(orderId, newStatus);
+    } catch (error) {
+      console.error(`Error updating order ${orderId} shipping status:`, error);
     }
-
-    console.log(`Order ${orderId} shipping status update: ${shippedOrders.length}/${totalOrders} shipped -> ${newStatus}`);
-    await this.updateOrderStatus(orderId, newStatus);
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {

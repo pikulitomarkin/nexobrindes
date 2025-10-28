@@ -577,12 +577,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      // Update main order status to shipped if this was the last pending production order
+      // Check shipping status and update main order accordingly
       const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
-      const allShipped = allProductionOrders.every(po => po.status === 'shipped' || po.status === 'delivered');
+      const shippedOrders = allProductionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const allShipped = shippedOrders.length === allProductionOrders.length;
+      const someShipped = shippedOrders.length > 0;
+
+      console.log(`Order ${orderId} shipping status: ${shippedOrders.length}/${allProductionOrders.length} shipped`);
 
       if (allShipped) {
+        // All production orders shipped - mark as fully shipped
         await storage.updateOrderStatus(orderId, 'shipped');
+        console.log(`Order ${orderId} marked as fully shipped`);
+      } else if (someShipped) {
+        // Some but not all shipped - mark as partial
+        await storage.updateOrderStatus(orderId, 'partial_shipped');
+        console.log(`Order ${orderId} marked as partially shipped`);
       }
 
       console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
@@ -1017,6 +1027,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating production order status:", error);
       res.status(500).json({ error: "Erro ao atualizar status da ordem de produção: " + error.message });
+    }
+  });
+
+  // Get shipping details for order (for partial shipping status)
+  app.get("/api/orders/:id/shipping-details", async (req, res) => {
+    try {
+      const { id: orderId } = req.params;
+      console.log(`Fetching shipping details for order: ${orderId}`);
+
+      // Get all production orders for this order
+      const productionOrders = await storage.getProductionOrdersByOrder(orderId);
+      console.log(`Found ${productionOrders.length} production orders for order ${orderId}`);
+
+      if (productionOrders.length === 0) {
+        return res.json({
+          shippedCount: 0,
+          totalCount: 0,
+          shipmentDetails: []
+        });
+      }
+
+      // Count shipped vs total producers
+      const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const totalCount = productionOrders.length;
+      const shippedCount = shippedOrders.length;
+
+      console.log(`Shipping status: ${shippedCount}/${totalCount} producers have shipped`);
+
+      // Get detailed shipping info for each production order
+      const shipmentDetails = await Promise.all(
+        productionOrders.map(async (po) => {
+          const producer = await storage.getUser(po.producerId);
+          
+          // Parse order details to get items for this producer
+          let producerItems = [];
+          if (po.orderDetails) {
+            try {
+              const orderDetails = JSON.parse(po.orderDetails);
+              if (orderDetails.items) {
+                producerItems = orderDetails.items.filter(item => 
+                  item.producerId === po.producerId
+                );
+              }
+            } catch (e) {
+              console.log(`Error parsing order details for PO ${po.id}:`, e);
+            }
+          }
+
+          return {
+            producerId: po.producerId,
+            producerName: producer?.name || 'Produtor não encontrado',
+            status: po.status,
+            trackingCode: po.trackingCode,
+            dispatchDate: po.status === 'shipped' || po.status === 'delivered' ? po.updatedAt : null,
+            items: producerItems.map(item => ({
+              productName: item.productName || 'Produto',
+              quantity: item.quantity || 1
+            }))
+          };
+        })
+      );
+
+      res.json({
+        shippedCount,
+        totalCount,
+        shipmentDetails
+      });
+    } catch (error) {
+      console.error("Error fetching shipping details:", error);
+      res.status(500).json({ error: "Failed to fetch shipping details" });
     }
   });
 
