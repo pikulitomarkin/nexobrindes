@@ -497,6 +497,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get bank transactions for reconciliation (with optional filters)
+  app.get("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      // Optional filters via query: ?status=unmatched|matched & type=credit|debit
+      const { status, type } = req.query as { status?: string; type?: string };
+
+      const all = await storage.getBankTransactions(); // from storage.ts
+      const normalized = (all || []).map(tx => ({
+        id: tx.id,
+        importId: tx.importId || null,
+        fitId: tx.fitId || null,
+        date: tx.date,
+        hasValidDate: !!tx.hasValidDate,
+        amount: typeof tx.amount === "string" ? tx.amount : String(tx.amount),
+        description: tx.description || "",
+        memo: tx.memo || "",
+        bankRef: tx.bankRef || "",
+        originalType: tx.originalType || "",
+        type: tx.type || (parseFloat(tx.amount) >= 0 ? "credit" : "debit"),
+        status: tx.status || "unmatched",
+        matchedOrderId: tx.matchedOrderId || null,
+        matchedPaymentId: tx.matchedPaymentId || null,
+        matchedAt: tx.matchedAt || null,
+        notes: tx.notes || "",
+      }));
+
+      const filtered = normalized.filter(tx => {
+        const okStatus = status ? tx.status === status : true;
+        const okType   = type ? tx.type   === type   : true;
+        return okStatus && okType;
+      });
+
+      console.log(`Returning ${filtered.length} bank transactions (status: ${status || 'all'}, type: ${type || 'all'})`);
+      res.json(filtered);
+    } catch (err: any) {
+      console.error("Error fetching bank transactions:", err);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  // Reconciliation summary (used to load the panel without skeleton freezing)
+  app.get("/api/finance/reconciliation", async (req, res) => {
+    try {
+      const [txs, orders] = await Promise.all([
+        storage.getBankTransactions(),
+        storage.getOrders(),
+      ]);
+
+      const totalTx = txs?.length || 0;
+      const matched = txs?.filter(t => t.status === "matched").length || 0;
+      const unmatched = totalTx - matched;
+
+      const pendingOrders = (orders || []).filter(o => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        const remaining = total - paid;
+        return o.status !== "cancelled" && remaining > 0.01;
+      });
+
+      const totalRemaining = pendingOrders.reduce((acc, o) => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        return acc + (total - paid);
+      }, 0);
+
+      console.log(`Reconciliation summary: ${totalTx} total transactions, ${matched} matched, ${unmatched} unmatched, ${pendingOrders.length} pending orders`);
+
+      res.json({
+        bank: { total: totalTx, matched, unmatched },
+        orders: { pendingCount: pendingOrders.length, totalRemaining: Number(totalRemaining.toFixed(2)) },
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("Error building reconciliation summary:", err);
+      res.status(500).json({ error: "Failed to build reconciliation summary" });
+    }
+  });
+
+  // Get pending orders for reconciliation
+  app.get("/api/finance/pending-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+
+      const pendingOrders = (orders || []).filter(o => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        const remaining = total - paid;
+        return o.status !== "cancelled" && remaining > 0.01;
+      });
+
+      // Enrich with client names and budget info
+      const enrichedOrders = await Promise.all(
+        pendingOrders.map(async (order) => {
+          let clientName = order.contactName;
+
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          // Get budget payment info if order was converted from budget
+          let budgetInfo = null;
+          if (order.budgetId) {
+            try {
+              const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+              if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+                budgetInfo = {
+                  downPayment: parseFloat(budgetPaymentInfo.downPayment),
+                  remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                  installments: budgetPaymentInfo.installments || 1
+                };
+              }
+            } catch (error) {
+              console.log("Error fetching budget info for order:", order.id, error);
+            }
+          }
+
+          return {
+            ...order,
+            clientName: clientName,
+            budgetInfo: budgetInfo
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} pending orders for reconciliation`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching pending orders:", error);
+      res.status(500).json({ error: "Failed to fetch pending orders" });
+    }
+  });
+
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password, preferredRole } = req.body;
@@ -577,20 +726,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      // Update main order status to shipped if this was the last pending production order
+      // Check shipping status and update main order accordingly
       const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
-      const allShipped = allProductionOrders.every(po => po.status === 'shipped' || po.status === 'delivered');
+      const shippedOrders = allProductionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const totalOrders = allProductionOrders.length;
+      const shippedCount = shippedOrders.length;
 
-      if (allShipped) {
-        await storage.updateOrderStatus(orderId, 'shipped');
+      console.log(`Order ${orderId} shipping status: ${shippedCount}/${totalOrders} producers shipped`);
+
+      let newStatus = 'production'; // Default status
+
+      if (shippedCount === 0) {
+        // No orders shipped yet - keep current status or set to production
+        newStatus = 'production';
+      } else if (shippedCount === totalOrders) {
+        // All production orders shipped - mark as fully shipped
+        newStatus = 'shipped';
+        console.log(`Order ${orderId} marked as fully shipped - all ${totalOrders} producers completed`);
+      } else {
+        // Some but not all shipped - mark as partial
+        newStatus = 'partial_shipped';
+        console.log(`Order ${orderId} marked as partially shipped - ${shippedCount}/${totalOrders} producers shipped`);
       }
 
-      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
+      // Update the main order status
+      await storage.updateOrderStatus(orderId, newStatus);
+
+      console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}, new status: ${newStatus}`);
 
       res.json({
         success: true,
         message: "Pedido despachado com sucesso",
-        productionOrder: updatedPO
+        productionOrder: updatedPO,
+        orderStatus: newStatus,
+        shippingProgress: {
+          shipped: shippedCount,
+          total: totalOrders
+        }
       });
     } catch (error) {
       console.error("Error dispatching order:", error);
@@ -999,6 +1171,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get expenses for finance module
+  app.get("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenses();
+      console.log(`Returning ${expenses?.length || 0} expenses for finance module`);
+      res.json(expenses || []);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  // Create expense
+  app.post("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenseData = req.body;
+      console.log("Creating expense:", expenseData);
+
+      const expense = await storage.createExpense({
+        ...expenseData,
+        amount: parseFloat(expenseData.amount).toFixed(2),
+        date: new Date(expenseData.date),
+        status: expenseData.status || 'pending',
+        createdBy: expenseData.createdBy || 'system',
+        createdAt: new Date()
+      });
+
+      console.log("Expense created successfully:", expense.id);
+      res.json(expense);
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
   // Update production order status
   app.patch("/api/production-orders/:id/status", async (req, res) => {
     try {
@@ -1017,6 +1224,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating production order status:", error);
       res.status(500).json({ error: "Erro ao atualizar status da ordem de produção: " + error.message });
+    }
+  });
+
+  // Get shipping details for order (for partial shipping status)
+  app.get("/api/orders/:id/shipping-details", async (req, res) => {
+    try {
+      const { id: orderId } = req.params;
+      console.log(`Fetching shipping details for order: ${orderId}`);
+
+      // Get all production orders for this order
+      const productionOrders = await storage.getProductionOrdersByOrder(orderId);
+      console.log(`Found ${productionOrders.length} production orders for order ${orderId}`);
+
+      if (productionOrders.length === 0) {
+        return res.json({
+          shippedCount: 0,
+          totalCount: 0,
+          shipmentDetails: []
+        });
+      }
+
+      // Count shipped vs total producers
+      const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
+      const totalCount = productionOrders.length;
+      const shippedCount = shippedOrders.length;
+
+      console.log(`Shipping status: ${shippedCount}/${totalCount} producers have shipped`);
+
+      // Get detailed shipping info for each production order
+      const shipmentDetails = await Promise.all(
+        productionOrders.map(async (po) => {
+          const producer = await storage.getUser(po.producerId);
+
+          // Parse order details to get items for this producer
+          let producerItems = [];
+          if (po.orderDetails) {
+            try {
+              const orderDetails = JSON.parse(po.orderDetails);
+              if (orderDetails.items) {
+                producerItems = orderDetails.items.filter(item => 
+                  item.producerId === po.producerId
+                );
+              }
+            } catch (e) {
+              console.log(`Error parsing order details for PO ${po.id}:`, e);
+            }
+          }
+
+          return {
+            producerId: po.producerId,
+            producerName: producer?.name || 'Produtor não encontrado',
+            status: po.status,
+            trackingCode: po.trackingCode,
+            dispatchDate: po.status === 'shipped' || po.status === 'delivered' ? po.updatedAt : null,
+            items: producerItems.map(item => ({
+              productName: item.productName || 'Produto',
+              quantity: item.quantity || 1
+            }))
+          };
+        })
+      );
+
+      res.json({
+        shippedCount,
+        totalCount,
+        shipmentDetails
+      });
+    } catch (error) {
+      console.error("Error fetching shipping details:", error);
+      res.status(500).json({ error: "Failed to fetch shipping details" });
     }
   });
 
@@ -2894,6 +3171,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get commissions for a specific partner
+  app.get("/api/commissions/partner/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const commissions = await storage.getCommissionsByPartner(partnerId);
+
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching partner commissions:", error);
+      res.status(500).json({ error: "Failed to fetch partner commissions" });
+    }
+  });
+
+  // Get quote requests by client
+  app.get("/api/quote-requests/client/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      console.log(`Fetching quote requests for client: ${clientId}`);
+
+      const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
+      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}`);
+
+      res.json(quoteRequests);
+    } catch (error) {
+      console.error("Error fetching quote requests by client:", error);
+      res.status(500).json({ error: "Failed to fetch quote requests for client" });
+    }
+  });
+
+  // Get all partners
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+
+      // Enrich with commission totals
+      const enrichedPartners = await Promise.all(
+        partners.map(async (partner) => {
+          const commissions = await storage.getCommissionsByPartner(partner.id);
+          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+
+          return {
+            ...partner,
+            totalCommissions
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedPartners.length} partners`);
+      res.json(enrichedPartners);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  // Update partner (admin only)
+  app.put("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const partnerData = req.body;
+
+      // Validate required fields
+      if (!partnerData.name || partnerData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      // Update user information
+      const updatedUser = await storage.updateUser(id, {
+        name: partnerData.name.trim(),
+        email: partnerData.email?.trim() || null,
+        phone: partnerData.phone?.trim() || null,
+        isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Sócio atualizado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating partner:", error);
+      res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
+    }
+  });
+
   // Get all accounts receivable (orders + manual)
   app.get("/api/finance/receivables", async (req, res) => {
     try {
@@ -3234,34 +3620,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (receivable.orderId) {
         // This is an order-based receivable - create payment for the order
+        const order = await storage.getOrder(receivable.orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Pedido relacionado não encontrado" });
+        }
+
+        // Validate payment amount against remaining balance
+        const requested = parseFloat(amount);
+        const alreadyPaid = parseFloat(order.paidValue || '0');
+        const total = parseFloat(order.totalValue);
+
+        // Never accept payment above the remaining amount
+        const allowable = Math.max(0, total - alreadyPaid);
+        const finalAmount = Math.min(requested, allowable);
+
+        if (finalAmount !== requested) {
+          console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
+        }
+
+        // Create payment with confirmed status - this automatically calls updateOrderPaidValue()
         paymentRecord = await storage.createPayment({
           orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: method || "manual",
-          status: "confirmed",
+          amount: finalAmount.toFixed(2),
+          method: method || 'manual',
+          status: 'confirmed',
           transactionId: transactionId || `MANUAL-${Date.now()}`,
-          notes: notes || "",
+          notes: notes || '',
           paidAt: new Date()
         });
 
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const totalValue = parseFloat(order.totalValue);
-          const currentPaid = parseFloat(order.paidValue || '0');
-          const thisPayment = parseFloat(amount);
-          const newPaid = currentPaid + thisPayment;
-          const newRemaining = Math.max(totalValue - newPaid, 0);
+        console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
 
-          // >>> CRITICAL: NEVER send totalValue in update! <<<
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: newPaid.toFixed(2),
-            remainingAmount: newRemaining.toFixed(2),
-            __origin: 'receivables' // Safety flag for storage layer
-          });
-
-          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
-        }
+        // Note: No need to manually update order.paidValue here as createPayment() with 
+        // status='confirmed' already calls updateOrderPaidValue() which:
+        // 1. Sums all confirmed payments for the order
+        // 2. Updates order.paidValue 
+        // 3. Updates the corresponding accountsReceivable status/receivedAmount
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -4029,26 +4423,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with vendor names and statistics
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
+          // Get vendor name
           const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
 
-          // Get client orders count and total spent
-          const orders = await storage.getOrders();
-          const clientOrders = orders.filter(order =>
+          // Count orders for this client
+          const allOrders = await storage.getOrders();
+          const clientOrders = allOrders.filter(order =>
             order.clientId === client.id ||
             order.clientId === client.userId ||
-            order.contactName === client.name
+            (order.contactName && order.contactName.toLowerCase().includes(client.name.toLowerCase()))
           );
 
-          const totalSpent = clientOrders.reduce((sum, order) =>
-            sum + parseFloat(order.totalValue), 0
-          );
+          // Calculate total spent
+          const totalSpent = clientOrders
+            .filter(order => order.status !== 'cancelled')
+            .reduce((sum, order) => sum + parseFloat(order.totalValue || '0'), 0);
 
           return {
             ...client,
+            userCode: (client as any).userCode || null, // Incluir userCode
             vendorName: vendor?.name || null,
             ordersCount: clientOrders.length,
-            totalSpent: totalSpent,
-            userCode: client.userCode || client.username || 'N/A'
+            totalSpent: totalSpent
           };
         })
       );
@@ -4795,7 +5191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           selectedCustomizationId: item.selectedCustomizationId || "",
           itemCustomizationValue: itemCustomizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
-          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
           // General Customization
           hasGeneralCustomization: item.hasGeneralCustomization || false,
@@ -5181,7 +5576,7 @@ Para mais detalhes, entre em contato conosco!`;
       if (!deleted) {
         return res.status(404).json({ error: "Payment method not found" });
       }
-      res.json({ success: true });
+      res.json({ success:true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete payment method" });
     }
@@ -5378,7 +5773,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Route to get customization options filtered by category and quantity
+  // Get customization options filtered by category and quantity
   app.get("/api/customization-options", async (req, res) => {
     try {
       const { category, quantity } = req.query;
@@ -5694,18 +6089,14 @@ Para mais detalhes, entre em contato conosco!`;
           let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          if (!order) {
-            return null; // Skip if order doesn't exist
-          }
-
           // Always use contactName as primary client identifier
-          let clientName = order.contactName;
+          let clientName = order?.contactName;
           let clientAddress = null;
-          let clientPhone = order.contactPhone;
-          let clientEmail = order.contactEmail;
+          let clientPhone = order?.contactPhone;
+          let clientEmail = order?.contactEmail;
 
           // Only if contactName is missing, try to get from client record
-          if (!clientName && order.clientId) {
+          if (!clientName && order?.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
@@ -5738,14 +6129,14 @@ Para mais detalhes, entre em contato conosco!`;
 
           return {
             ...po,
-            orderNumber: order.orderNumber || `PO-${po.id}`,
-            product: order.product || 'Produto não informado',
+            orderNumber: order?.orderNumber || `PO-${po.id}`,
+            product: order?.product || 'Produto não informado',
             clientName: clientName,
             clientAddress: clientAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
-            order: {
+            order: order ? {
               ...order,
               clientName: clientName,
               clientAddress: clientAddress,
@@ -5755,7 +6146,7 @@ Para mais detalhes, entre em contato conosco!`;
                 ? 'Sede Principal - Retirada no Local'
                 : (clientAddress || 'Endereço não informado'),
               deliveryType: order.deliveryType || 'delivery'
-            }
+            } : null
           };
         })
       );
@@ -5774,7 +6165,7 @@ Para mais detalhes, entre em contato conosco!`;
   // Expedition routes
   app.get("/api/expedition/orders", async (req, res) => {
     try {
-      // Get orders that are ready for expedition (completed, ready for shipping)
+      // Get orders that are readyfor expedition (completed, ready for shipping)
       const orders = await storage.getOrders();
       const expeditionOrders = orders.filter(order =>
         ['ready', 'shipped'].includes(order.status)
@@ -5834,7 +6225,7 @@ Para mais detalhes, entre em contato conosco!`;
       );
 
       console.log(`Returning ${enrichedOrders.length} expedition orders`);
-      res.json(enrichedorders);
+      res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching expedition orders:", error);
       res.status(500).json({ error: "Failed to fetch expedition orders" });
@@ -5995,7 +6386,7 @@ Para mais detalhes, entre em contato conosco!`;
         index === self.findIndex(b => b.id === budget.id)
       );
 
-      console.log(`Found ${uniqueBudgets.length}unique budgets for client ${clientId}`);
+      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
 
       // Enrich with vendor names and items
       const enrichedBudgets = await Promise.all(
@@ -6042,19 +6433,10 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // System Logs routes
+  // System logs
   app.get("/api/admin/logs", async (req, res) => {
     try {
-      const { search, action, user, level, date } = req.query;
-
-      const logs = await storage.getSystemLogs({
-        search: search as string,
-        action: action as string,
-        userId: user as string,
-        level: level as string,
-        dateFilter: date as string,
-      });
-
+      const logs = await storage.getSystemLogs();
       res.json(logs);
     } catch (error) {
       console.error("Error fetching system logs:", error);
@@ -6062,33 +6444,92 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/admin/logs/export", async (req, res) => {
+  // Vendor logs - filtered for vendor and their clients
+  app.get("/api/vendor/logs", async (req, res) => {
     try {
-      const { search, action, user, level, date } = req.query;
+      const { vendorId, search, action, level, date } = req.query;
 
-      const logs = await storage.getSystemLogs({
-        search: search as string,
-        action: action as string,
-        userId: user as string,
-        level: level as string,
-        dateFilter: date as string,
+      if (!vendorId) {
+        return res.status(400).json({ error: "Vendor ID is required" });
+      }
+
+      const allLogs = await storage.getSystemLogs();
+      const vendorClients = await storage.getClientsByVendor(vendorId as string);
+      const vendorClientIds = vendorClients.map(c => c.userId || c.id);
+
+      // Filter logs for vendor and their clients
+      let filteredLogs = allLogs.filter((log: any) => {
+        // Logs do próprio vendedor
+        if (log.userId === vendorId) return true;
+
+        // Logs dos clientes do vendedor
+        if (vendorClientIds.includes(log.userId)) return true;
+
+        // Logs de entidades relacionadas ao vendedor (pedidos, orçamentos, etc)
+        if (log.details) {
+          try {
+            const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+            if (details.vendorId === vendorId) return true;
+            if (details.vendor === vendorId) return true;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+
+        return false;
       });
 
-      // Convert logs to CSV
-      const csvHeaders = 'Data,Usuário,Ação,Entidade,Descrição,Nível,IP\n';
-      const csvData = logs.map((log: any) => {
-        const date = new Date(log.createdAt).toLocaleString('pt-BR');
-        return `"${date}","${log.userName}","${log.action}","${log.entity || ''}","${log.description}","${log.level}","${log.ipAddress || ''}"`;
-      }).join('\n');
+      // Apply additional filters
+      if (search) {
+        const searchTerm = (search as string).toLowerCase();
+        filteredLogs = filteredLogs.filter((log: any) => 
+          log.action.toLowerCase().includes(searchTerm) ||
+          log.description.toLowerCase().includes(searchTerm) ||
+          log.userName.toLowerCase().includes(searchTerm)
+        );
+      }
 
-      const csv = csvHeaders + csvData;
+      if (action && action !== 'all') {
+        filteredLogs = filteredLogs.filter((log: any) => log.action === action);
+      }
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="system-logs.csv"');
-      res.send(csv);
+      if (level && level !== 'all') {
+        filteredLogs = filteredLogs.filter((log: any) => log.level === level);
+      }
+
+      if (date && date !== 'all') {
+        const now = new Date();
+        let startDate;
+
+        switch (date) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        }
+
+        if (startDate) {
+          filteredLogs = filteredLogs.filter((log: any) => 
+            new Date(log.createdAt) >= startDate
+          );
+        }
+      }
+
+      // Sort by most recent first
+      filteredLogs.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      console.log(`Found ${filteredLogs.length} logs for vendor ${vendorId}`);
+      res.json(filteredLogs);
     } catch (error) {
-      console.error("Error exporting system logs:", error);
-      res.status(500).json({ error: "Failed to export system logs" });
+      console.error("Error fetching vendor logs:", error);
+      res.status(500).json({ error: "Failed to fetch vendor logs" });
     }
   });
 
