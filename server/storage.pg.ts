@@ -262,11 +262,17 @@ export class PgStorage implements IStorage {
       status = 'partial';
     }
 
+    // Ensure deadline is a Date object
+    let dueDate = new Date();
+    if (order.deadline) {
+      dueDate = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline;
+    }
+
     await pg.insert(schema.accountsReceivable).values({
-      orderId: order.id,  // CRITICAL: Include orderId!
+      orderId: order.id,
       clientId: order.clientId!,
       vendorId: order.vendorId,
-      dueDate: order.deadline || new Date(),
+      dueDate: dueDate,
       amount: order.totalValue,
       receivedAmount: paidValue,
       minimumPayment: minimumPaymentValue,
@@ -396,7 +402,17 @@ export class PgStorage implements IStorage {
   // ==================== PAYMENTS ====================
   
   async getPayments(): Promise<Payment[]> {
-    return await pg.select().from(schema.payments).orderBy(desc(schema.payments.createdAt));
+    return await pg.select({
+      id: schema.payments.id,
+      orderId: schema.payments.orderId,
+      amount: schema.payments.amount,
+      method: schema.payments.method,
+      status: schema.payments.status,
+      transactionId: schema.payments.transactionId,
+      paidAt: schema.payments.paidAt,
+      createdAt: schema.payments.createdAt,
+      bankTransactionId: schema.payments.bankTransactionId
+    }).from(schema.payments).orderBy(desc(schema.payments.createdAt));
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
@@ -713,8 +729,19 @@ export class PgStorage implements IStorage {
   }
 
   async createBudget(budgetData: InsertBudget): Promise<Budget> {
+    // Convert string dates to Date objects if they exist
+    const processedData = { ...budgetData };
+    
+    if (processedData.validUntil && typeof processedData.validUntil === 'string') {
+      processedData.validUntil = new Date(processedData.validUntil);
+    }
+    
+    if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
+      processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    }
+
     const results = await pg.insert(schema.budgets).values({
-      ...budgetData,
+      ...processedData,
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
@@ -722,8 +749,19 @@ export class PgStorage implements IStorage {
   }
 
   async updateBudget(id: string, budgetData: Partial<InsertBudget>): Promise<Budget | undefined> {
+    // Convert string dates to Date objects if they exist
+    const processedData = { ...budgetData };
+    
+    if (processedData.validUntil && typeof processedData.validUntil === 'string') {
+      processedData.validUntil = new Date(processedData.validUntil);
+    }
+    
+    if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
+      processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    }
+
     const results = await pg.update(schema.budgets)
-      .set({ ...budgetData, updatedAt: new Date() })
+      .set({ ...processedData, updatedAt: new Date() })
       .where(eq(schema.budgets.id, id))
       .returning();
     return results[0];
