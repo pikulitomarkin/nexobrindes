@@ -1658,11 +1658,12 @@ export class MemStorage implements IStorage {
 
     let newStatus = 'production';
     if (shippedOrders.length === totalOrders) {
-      newStatus = 'shipped'; // Todos despachados
+      newStatus = 'shipped'; // Todos despachados - pedido totalmente enviado
     } else if (shippedOrders.length > 0) {
-      newStatus = 'partial_shipped'; // Alguns despachados
+      newStatus = 'partial_shipped'; // Alguns despachados - envio parcial
     }
 
+    console.log(`Order ${orderId} shipping status update: ${shippedOrders.length}/${totalOrders} shipped -> ${newStatus}`);
     await this.updateOrderStatus(orderId, newStatus);
   }
 

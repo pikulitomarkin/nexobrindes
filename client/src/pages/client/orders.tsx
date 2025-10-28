@@ -5,6 +5,122 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { toast } from "@/components/ui/use-toast";
+import { Separator } from "@/components/ui/separator";
+import { Calendar, Clock, Package, Truck, User, CreditCard, FileText, Phone, Mail, CheckCircle } from "lucide-react";
+
+// Component to display shipping details
+function ShippingDetailsCard({ orderId, status }: { orderId: string, status: string }) {
+  const { data: shippingDetails, isLoading } = useQuery({
+    queryKey: [`/api/orders/${orderId}/shipping-details`],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/${orderId}/shipping-details`);
+      if (!response.ok) throw new Error('Failed to fetch shipping details');
+      return response.json();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  if (isLoading || !shippingDetails) {
+    return (
+      <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg animate-pulse">
+        <div className="h-4 bg-gray-300 rounded w-1/2 mb-2"></div>
+        <div className="h-3 bg-gray-300 rounded w-3/4"></div>
+      </div>
+    );
+  }
+
+  const isPartialShipped = status === 'partial_shipped';
+  const isFullyShipped = status === 'shipped';
+
+  return (
+    <div className={`mt-4 p-4 border rounded-lg ${
+      isPartialShipped ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'
+    }`}>
+      <div className="flex items-center gap-2 mb-3">
+        <Truck className={`h-4 w-4 ${isPartialShipped ? 'text-yellow-600' : 'text-blue-600'}`} />
+        <span className={`text-sm font-medium ${isPartialShipped ? 'text-yellow-800' : 'text-blue-800'}`}>
+          {isPartialShipped
+            ? `Envio Parcial - ${shippingDetails.shippedCount}/${shippingDetails.totalCount} produtores despacharam`
+            : 'Pedido Totalmente Despachado!'
+          }
+        </span>
+      </div>
+
+      {/* Detalhes dos envios */}
+      {shippingDetails.shipmentDetails && shippingDetails.shipmentDetails.length > 0 && (
+        <div className="mt-4 space-y-3">
+          <h4 className={`text-md font-semibold ${isPartialShipped ? 'text-yellow-900' : 'text-blue-900'}`}>
+            Status dos Envios:
+          </h4>
+          {shippingDetails.shipmentDetails.map((shipment: any, index: number) => (
+            <div key={index} className={`bg-white p-4 rounded-lg border ${
+              isPartialShipped ? 'border-yellow-200' : 'border-blue-200'
+            }`}>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <div className={`font-semibold ${isPartialShipped ? 'text-yellow-900' : 'text-blue-900'}`}>
+                    🏭 {shipment.producerName}
+                  </div>
+                  <div className={`text-sm mt-1 ${isPartialShipped ? 'text-yellow-700' : 'text-blue-700'}`}>
+                    {shipment.items?.length || 0} item(s) neste envio
+                  </div>
+                </div>
+                <div className="text-right">
+                  {shipment.status === 'shipped' ? (
+                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                      ✓ Enviado
+                    </span>
+                  ) : (
+                    <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
+                      ⏳ Aguardando
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {shipment.status === 'shipped' && (
+                <div className="mt-2 space-y-1">
+                  {shipment.trackingCode && (
+                    <div className="text-xs text-gray-600">
+                      <strong>Código de rastreio:</strong>
+                      <span className="font-mono ml-1">{shipment.trackingCode}</span>
+                    </div>
+                  )}
+                  {shipment.dispatchDate && (
+                    <div className="text-xs text-gray-600">
+                      <strong>Despachado em:</strong> {new Date(shipment.dispatchDate).toLocaleDateString('pt-BR')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lista de itens enviados */}
+              {shipment.items && shipment.items.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="text-xs font-medium text-gray-700 mb-2">Itens neste envio:</div>
+                  <div className="space-y-1">
+                    {shipment.items.map((item: any, itemIndex: number) => (
+                      <div key={itemIndex} className="text-xs text-gray-600">
+                        • {item.productName} (Qtd: {item.quantity})
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className={`text-xs mt-3 ${isPartialShipped ? 'text-yellow-600' : 'text-blue-600'}`}>
+        {isPartialShipped
+          ? 'Alguns itens já foram despachados. Os demais serão enviados conforme ficarem prontos.'
+          : 'Todos os itens foram despachados. A entrega será confirmada pelo nosso sistema de logística.'
+        }
+      </div>
+    </div>
+  );
+}
 
 export default function ClientOrders() {
   // Get current user ID from localStorage (or auth context)
@@ -37,12 +153,12 @@ export default function ClientOrders() {
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
-      pending: "bg-yellow-100 text-yellow-800",
+      pending: "bg-gray-100 text-gray-800",
       confirmed: "bg-blue-100 text-blue-800",
       production: "bg-purple-100 text-purple-800",
       ready: "bg-orange-100 text-orange-800",
-      shipped: "bg-indigo-100 text-indigo-800",
-      partial_shipped: "bg-cyan-100 text-cyan-800",
+      shipped: "bg-green-100 text-green-800",
+      partial_shipped: "bg-yellow-100 text-yellow-800 animate-pulse",
       delivered: "bg-green-100 text-green-800",
       completed: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
@@ -236,9 +352,9 @@ export default function ClientOrders() {
               {/* Items Summary - Show unique items count */}
               {(() => {
                 const items = order.budgetItems || order.items || [];
-                const uniqueItems = items.filter((item: any, index: number, self: any[]) => 
-                  self.findIndex(i => 
-                    i.productId === item.productId && 
+                const uniqueItems = items.filter((item: any, index: number, self: any[]) =>
+                  self.findIndex(i =>
+                    i.productId === item.productId &&
                     i.producerId === item.producerId &&
                     i.quantity === item.quantity &&
                     (i.unitPrice === item.unitPrice || i.totalPrice === item.totalPrice) &&
@@ -274,9 +390,9 @@ export default function ClientOrders() {
                   <div className="flex items-center gap-2 mb-2">
                     <CreditCard className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-800">
-                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue) 
-                        ? 'Pagamento completo realizado' 
-                        : (order.budgetInfo ? 'Entrada paga conforme orçamento' : 'Entrada paga')}: 
+                      {parseFloat(order.paidValue || '0') >= parseFloat(order.totalValue)
+                        ? 'Pagamento completo realizado'
+                        : (order.budgetInfo ? 'Entrada paga conforme orçamento' : 'Entrada paga')}:
                       R$ {parseFloat(order.paidValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -323,60 +439,7 @@ export default function ClientOrders() {
               )}
 
               {order.status === 'partial_shipped' && (
-                <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-cyan-600" />
-                    <span className="text-sm font-medium text-cyan-800">
-                      Envio parcial em andamento!
-                    </span>
-                  </div>
-                  <div className="text-xs text-cyan-600 mt-1 mb-2">
-                    Parte do pedido já foi enviada. Os demais itens serão despachados assim que ficarem prontos.
-                  </div>
-                  
-                  {/* Detalhes dos envios */}
-                  {order.shipmentDetails && order.shipmentDetails.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <div className="text-xs font-medium text-cyan-800">Detalhes dos envios:</div>
-                      {order.shipmentDetails.map((shipment: any, index: number) => (
-                        <div key={index} className="bg-white p-2 rounded border border-cyan-200">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-xs text-cyan-900">
-                                {shipment.producerName}
-                              </div>
-                              <div className="text-xs text-cyan-700">
-                                {shipment.items?.length || 0} item(s)
-                                {shipment.items && shipment.items.length > 0 && (
-                                  <span className="ml-1">
-                                    - {shipment.items.map((item: any) => item.product?.name || item.productName).join(', ')}
-                                  </span>
-                                )}
-                              </div>
-                              {shipment.trackingCode && (
-                                <div className="text-xs text-cyan-600 mt-1">
-                                  Rastreio: {shipment.trackingCode}
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-xs">
-                              {shipment.status === 'shipped' ? (
-                                <span className="text-green-600 font-medium">✓ Enviado</span>
-                              ) : (
-                                <span className="text-orange-600 font-medium">⏳ Pendente</span>
-                              )}
-                            </div>
-                          </div>
-                          {shipment.shippedAt && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Enviado em: {new Date(shipment.shippedAt).toLocaleDateString('pt-BR')}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <ShippingDetailsCard orderId={order.id} status={order.status} />
               )}
             </CardContent>
           </Card>

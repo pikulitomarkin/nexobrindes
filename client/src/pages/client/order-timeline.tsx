@@ -6,6 +6,144 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar, Clock, Package, Truck, CheckCircle, User, CreditCard, FileText, Phone, Mail, MapPin, Home } from "lucide-react";
 import { Link } from "wouter";
 
+// Component to display shipping status in timeline
+function ShippingStatusCard({ orderId, status }: { orderId: string, status: string }) {
+  const { data: shippingDetails, isLoading } = useQuery({
+    queryKey: [`/api/orders/${orderId}/shipping-details`],
+    queryFn: async () => {
+      const response = await fetch(`/api/orders/${orderId}/shipping-details`);
+      if (!response.ok) throw new Error('Failed to fetch shipping details');
+      return response.json();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  if (isLoading || !shippingDetails) {
+    return (
+      <Card className="mb-8 border-gray-200 bg-gray-50">
+        <CardContent className="p-6 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
+            <div>
+              <div className="h-6 bg-gray-300 rounded w-48 mb-2"></div>
+              <div className="h-4 bg-gray-300 rounded w-64"></div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isPartialShipped = status === 'partial_shipped';
+  const isFullyShipped = status === 'shipped';
+
+  return (
+    <Card className={`mb-8 ${
+      isPartialShipped ? 'border-yellow-200 bg-yellow-50' : 'border-blue-200 bg-blue-50'
+    }`}>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              isPartialShipped ? 'bg-yellow-100' : 'bg-blue-100'
+            }`}>
+              <Truck className={`h-6 w-6 ${isPartialShipped ? 'text-yellow-600' : 'text-blue-600'}`} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-semibold ${isPartialShipped ? 'text-yellow-900' : 'text-blue-900'}`}>
+                {isPartialShipped 
+                  ? `Envio Parcial Realizado!`
+                  : 'Pedido Totalmente Enviado!'
+                }
+              </h3>
+              <p className={`${isPartialShipped ? 'text-yellow-700' : 'text-blue-700'}`}>
+                {isPartialShipped 
+                  ? `${shippingDetails.shippedCount} de ${shippingDetails.totalCount} produtores já despacharam seus itens. Os demais serão enviados conforme ficarem prontos.`
+                  : 'Todos os itens foram despachados e estão a caminho. A confirmação de entrega será feita pela nossa equipe de logística.'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Detalhes dos envios */}
+        {shippingDetails.shipmentDetails && shippingDetails.shipmentDetails.length > 0 && (
+          <div className="mt-6 space-y-4">
+            <h4 className={`text-md font-semibold ${isPartialShipped ? 'text-yellow-900' : 'text-blue-900'}`}>
+              Detalhes dos Envios:
+            </h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              {shippingDetails.shipmentDetails.map((shipment: any, index: number) => (
+                <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        🏭 {shipment.producerName}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {shipment.items?.length || 0} item(s)
+                      </div>
+                    </div>
+                    <div>
+                      {shipment.status === 'shipped' ? (
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                          ✓ Despachado
+                        </span>
+                      ) : (
+                        <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                          ⏳ Preparando
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {shipment.status === 'shipped' && (
+                    <div className="space-y-2 mb-3">
+                      {shipment.trackingCode && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Package className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-600">Rastreio:</span>
+                          <span className="font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {shipment.trackingCode}
+                          </span>
+                        </div>
+                      )}
+                      {shipment.dispatchDate && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-600">Despachado:</span>
+                          <span className="text-gray-800">
+                            {new Date(shipment.dispatchDate).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Lista de itens */}
+                  {shipment.items && shipment.items.length > 0 && (
+                    <div className="pt-3 border-t border-gray-100">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Itens:</div>
+                      <div className="space-y-1 max-h-20 overflow-y-auto">
+                        {shipment.items.map((item: any, itemIndex: number) => (
+                          <div key={itemIndex} className="text-sm text-gray-600 flex justify-between">
+                            <span>• {item.productName}</span>
+                            <span className="text-gray-500">Qtd: {item.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ClientOrderTimeline() {
   const [, params] = useRoute("/client/order/:id/timeline");
   const queryClient = useQueryClient();
@@ -188,24 +326,8 @@ export default function ClientOrderTimeline() {
         {/* Order Summary */}
         <div className="lg:col-span-2">
           {/* Delivery Status Information */}
-          {order.status === 'shipped' && (
-            <Card className="mb-8 border-blue-200 bg-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Truck className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-blue-900">Pedido Enviado!</h3>
-                      <p className="text-blue-700">
-                        Seu pedido foi despachado e está a caminho. A confirmação de entrega será feita pela nossa equipe de logística quando você receber o produto.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {(order.status === 'shipped' || order.status === 'partial_shipped') && (
+            <ShippingStatusCard orderId={order.id} status={order.status} />
           )}
 
           {order.status === 'partial_shipped' && (
