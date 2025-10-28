@@ -21,6 +21,7 @@ import AdminBudgets from "@/pages/admin/budgets";
 import AdminClients from "@/pages/admin/clients";
 import AdminVendors from "@/pages/admin/vendors";
 import AdminProducers from "@/pages/admin/producers";
+import AdminLogistics from "@/pages/admin/logistics";
 import AdminProducts from "@/pages/admin/products";
 import AdminSettings from "@/pages/admin/settings";
 import AdminCommissionManagement from "@/pages/admin/commission-management";
@@ -158,6 +159,7 @@ function App() {
                   <Route path="/admin/branches" component={AdminBranches} />
                   <Route path="/admin/partners" component={AdminPartners} />
                   <Route path="/admin/producers" component={AdminProducers} />
+                  <Route path="/admin/logistics" component={AdminLogistics} />
                   <Route path="/admin/products" component={AdminProducts} />
                   <Route path="/admin/settings" component={AdminSettings} />
                   <Route path="/admin/commission-management" component={AdminCommissionManagement} />
