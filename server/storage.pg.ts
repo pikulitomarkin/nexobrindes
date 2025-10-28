@@ -622,9 +622,27 @@ export class PgStorage implements IStorage {
     let imported = 0;
     const errors: string[] = [];
 
+    // Clean numeric fields helper
+    const cleanNumericField = (value: any) => {
+      if (value === "" || value === undefined || value === null) return null;
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num.toString();
+    };
+
     for (const productData of productsData) {
       try {
-        await this.createProduct(productData);
+        // Clean the product data before creating
+        const cleanedProductData = {
+          ...productData,
+          // Clean numeric fields
+          weight: cleanNumericField(productData.weight),
+          height: cleanNumericField(productData.height),
+          width: cleanNumericField(productData.width),
+          depth: cleanNumericField(productData.depth),
+          basePrice: productData.basePrice || "0.00"
+        };
+
+        await this.createProduct(cleanedProductData);
         imported++;
       } catch (error: any) {
         errors.push(`Error importing ${productData.name}: ${error.message}`);

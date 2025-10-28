@@ -1122,14 +1122,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Preço base deve ser maior que zero" });
       }
 
-      // Set default values
+      // Clean numeric fields - convert empty strings to null
+      const cleanNumericField = (value: any) => {
+        if (value === "" || value === undefined || value === null) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num.toString();
+      };
+
+      // Set default values with proper numeric field handling
       const newProduct = {
         ...productData,
         producerId: productData.producerId || 'internal',
         type: productData.producerId === 'internal' || !productData.producerId ? 'internal' : 'external',
         isActive: productData.isActive !== undefined ? productData.isActive : true,
         unit: productData.unit || 'un',
-        category: productData.category || 'Geral'
+        category: productData.category || 'Geral',
+        // Clean numeric fields
+        weight: cleanNumericField(productData.weight),
+        height: cleanNumericField(productData.height),
+        width: cleanNumericField(productData.width),
+        depth: cleanNumericField(productData.depth)
       };
 
       const product = await storage.createProduct(newProduct);
@@ -1168,7 +1180,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Updating logistics product ${id}:`, updateData);
 
-      const updatedProduct = await storage.updateProduct(id, updateData);
+      // Clean numeric fields - convert empty strings to null
+      const cleanNumericField = (value: any) => {
+        if (value === "" || value === undefined || value === null) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num.toString();
+      };
+
+      // Clean the update data
+      const cleanedUpdateData = {
+        ...updateData,
+        // Clean numeric fields if they exist in the update
+        weight: updateData.weight !== undefined ? cleanNumericField(updateData.weight) : undefined,
+        height: updateData.height !== undefined ? cleanNumericField(updateData.height) : undefined,
+        width: updateData.width !== undefined ? cleanNumericField(updateData.width) : undefined,
+        depth: updateData.depth !== undefined ? cleanNumericField(updateData.depth) : undefined
+      };
+
+      // Remove undefined values
+      Object.keys(cleanedUpdateData).forEach(key => {
+        if (cleanedUpdateData[key] === undefined) {
+          delete cleanedUpdateData[key];
+        }
+      });
+
+      const updatedProduct = await storage.updateProduct(id, cleanedUpdateData);
       if (!updatedProduct) {
         return res.status(404).json({ error: "Produto não encontrado" });
       }
