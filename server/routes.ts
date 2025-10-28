@@ -444,7 +444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       console.log(`=== PDF DATA PREPARED ===`);
-      console.log(`Budget: ${data.budget.budgetNumber} - ${data.budget.title}`);
+      console.log(`Budget: ${pdfData.budget.budgetNumber} - ${pdfData.budget.title}`);
       console.log(`Items: ${enrichedItems.length}`);
       console.log(`Client: ${clientName} (${clientEmail})`);
       console.log(`Vendor: ${vendor?.name || 'Unknown'} (${vendor?.email || 'No email'})`);
