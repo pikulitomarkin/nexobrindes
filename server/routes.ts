@@ -1924,14 +1924,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         uniqueOrders.map(async (order) => {
-          const vendor = await storage.getUser(order.vendorId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName;
 
-          // Get production order for tracking info
-          let productionOrder = null;
-          if (order.producerId) {
-            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-            productionOrder = productionOrders[0] || null;
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          // If still no name, use a descriptive message instead of "Unknown"
+          if (!clientName) {
+            clientName = "Nome não informado";
           }
 
           // Get budget photos and items if order was converted from budget
@@ -1997,12 +2013,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...order,
             paidValue: actualPaidValue.toFixed(2), // Use budget down payment or payments
             remainingValue: remainingBalance.toFixed(2), // Add remaining balance
-            vendorName: vendor?.name || 'Unknown',
-            producerName: producer?.name || null,
+            vendorName: "Unknown", // Placeholder, needs vendor lookup
+            producerName: null, // Placeholder, needs producer lookup
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
-            trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
-            estimatedDelivery: productionOrder?.deliveryDeadline || null,
             payments: payments.filter(p => p.status === 'confirmed'), // Include payment details
             budgetInfo: originalBudgetInfo // Include original budget payment info
           };
@@ -4673,48 +4687,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
 
       // Process budget items with ALL customization data
-      for (const item of uniqueItems) {
-        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
-        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
-        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
-
-        // Calculate total price including customizations and discounts
-        let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {
-          totalPrice += (itemCustomizationValue * quantity);
-        }
-        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
-          totalPrice += (generalCustomizationValue * quantity);
+      for (const itemData of uniqueItems) {
+        // Ensure productName is included in itemData
+        let productName = itemData.productName;
+        if (!productName || productName.trim() === '') {
+          const product = await storage.getProduct(itemData.productId);
+          productName = product?.name || `Produto ${itemData.productId}`;
         }
 
-        await storage.createBudgetItem(newBudget.id, {
-          productId: item.productId,
-          producerId: item.producerId || 'internal',
-          quantity: quantity,
-          unitPrice: unitPrice.toFixed(2),
-          totalPrice: totalPrice.toFixed(2),
-          // Item Customization
-          hasItemCustomization: item.hasItemCustomization || false,
-          selectedCustomizationId: item.selectedCustomizationId || "",
-          itemCustomizationValue: itemCustomizationValue.toFixed(2),
-          itemCustomizationDescription: item.itemCustomizationDescription || "",
-          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
-          customizationPhoto: item.customizationPhoto || "",
-          // General Customization
-          hasGeneralCustomization: item.hasGeneralCustomization || false,
-          generalCustomizationName: item.generalCustomizationName || "",
-          generalCustomizationValue: generalCustomizationValue.toFixed(2),
-          // Product dimensions
-          productWidth: item.productWidth,
-          productHeight: item.productHeight,
-          productDepth: item.productDepth,
-          // Item discount
-          hasItemDiscount: item.hasItemDiscount || false,
-          itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
-          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
-        });
+        const enrichedItemData = {
+          ...itemData,
+          productName: productName.trim()
+        };
+
+        await storage.createBudgetItem(newBudget.id, enrichedItemData);
       }
 
       // Save payment and shipping information
@@ -5655,6 +5641,9 @@ Para mais detalhes, entre em contato conosco!`;
             }
           }
 
+          const vendor = await storage.getUser(order.vendorId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
           // Get payment information
           const payments = await storage.getPaymentsByOrder(order.id);
           const lastPayment = payments
@@ -5854,7 +5843,7 @@ Para mais detalhes, entre em contato conosco!`;
       );
 
       console.log(`Returning ${enrichedOrders.length} expedition orders`);
-      res.json(enrichedOrders);
+      res.json(enrichedorders);
     } catch (error) {
       console.error("Error fetching expedition orders:", error);
       res.status(500).json({ error: "Failed to fetch expedition orders" });
