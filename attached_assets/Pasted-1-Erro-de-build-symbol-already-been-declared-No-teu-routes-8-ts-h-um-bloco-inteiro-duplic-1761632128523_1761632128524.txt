@@ -1,0 +1,159 @@
+1) Erro de build (“symbol … already been declared”)
+
+No teu routes (8).ts há um bloco inteiro duplicado lá no final — por isso o esbuild acusa:
+
+upload declarado 2x
+
+requireAuth declarado 2x
+
+parseOFXBuffer declarado 2x
+
+generateId declarado 2x
+
+e uma segunda registerRoutes (dupla exportação)
+
+Como corrigir (simples e definitivo)
+
+Remova o bloco duplicado que começa ali perto de:
+
+Linha ~6330: const upload = multer({ ... })
+
+e engloba a segunda registerRoutes que inicia em ~6546
+
+vai até o fim do arquivo.
+
+Em resumo: delete de ~6330 até o fim do arquivo.
+(Esse bloco é cópia do primeiro, só que repetido; manter apenas a primeira definição elimina todos os “already been declared”.)
+
+Se preferir granular:
+
+Apague as segundas declarações de upload, requireAuth, parseOFXBuffer, generateId e toda a segunda registerRoutes.
+
+Após isso, o comando tsx server/index.ts deve subir sem esse erro.
+
+2) “Entrada” dobrando no Contas a Receber (R$ 1.800 vira R$ 3.600)
+
+O que encontrei:
+
+O endpoint POST /api/receivables/:id/payment existe duas vezes no arquivo (duplicado), e além disso, na versão que está valendo ele não cria um “Payment” quando o título é vinculado a um pedido (recebível “de pedido”).
+
+Resultado típico quando a tela dispara chamadas em sequência ou quando endpoints duplicados ficam ativos: você registra a entrada e o lado que recalcula o paidValue roda mais de uma vez / caminhos diferentes atualizam o mesmo saldo → aparenta “dobrar”.
+
+O que vamos fazer
+
+Eliminar as rotas duplicadas (passo 1 acima já resolve a parte de “duas rotas rodando”).
+
+Ajustar a rota única POST /api/receivables/:id/payment para que, quando o receivable pertencer a um pedido (receivable.orderId), ela:
+
+crie um Payment confirmado para esse pedido (com method: 'manual', status: 'confirmed');
+
+use um transactionId idempotente (se informado pelo front, evitar duplicata; se não, gerar um);
+
+recalcule o paidValue via updateOrderPaidValue(orderId) apenas uma vez.
+
+Guardar idempotência no storage: se já houver Payment com o mesmo transactionId para o pedido, não criar de novo.
+
+Patch no backend
+(A) Em storage (4).ts — util pra idempotência:
+
+Adicione estes métodos (ou equivalentes no teu repositório/DAO):
+
+// Listar pagamentos (já existe getPayments, senão ajuste)
+async getPayments(): Promise<Payment[]> {
+  return Array.from(this.payments.values());
+}
+
+// Buscar payment por transactionId (idempotência)
+async getPaymentByTransactionId(txId: string): Promise<Payment | undefined> {
+  return Array.from(this.payments.values()).find(p => p.transactionId === txId);
+}
+
+
+E, se quiser ser à prova de clique-duplo, no próprio createPayment:
+
+async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+  if (insertPayment.transactionId) {
+    const dup = await this.getPaymentByTransactionId(insertPayment.transactionId);
+    if (dup) return dup; // idempotente
+  }
+  // ... resto do método como já está
+}
+
+(B) Em routes (8).ts — dentro da primeira registerRoutes (a que fica no início do arquivo), substitua o corpo da rota POST /api/receivables/:id/payment por algo assim:
+app.post("/api/receivables/:id/payment", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, method, transactionId, notes } = req.body;
+
+    const value = Number.parseFloat(String(amount).replace(",", "."));
+    if (!Number.isFinite(value) || value <= 0) {
+      return res.status(400).json({ error: "Valor deve ser maior que zero" });
+    }
+
+    const receivables = await storage.getAccountsReceivable();
+    const receivable = receivables.find(r => r.id === id);
+    if (!receivable) {
+      return res.status(404).json({ error: "Conta a receber não encontrada" });
+    }
+
+    let paymentRecord: any = null;
+
+    if (receivable.orderId) {
+      // 💡 IDMP: se vier um transactionId do front, não duplica
+      if (transactionId) {
+        const existing = await storage.getPaymentByTransactionId(transactionId);
+        if (existing) {
+          await storage.updateOrderPaidValue(receivable.orderId);
+          return res.json({ success: true, payment: existing, idempotent: true });
+        }
+      }
+
+      // Cria um Payment confirmado para o pedido (manual)
+      const payment = await storage.createPayment({
+        orderId: receivable.orderId,
+        amount: value.toFixed(2),
+        method: method || "manual",
+        status: "confirmed",
+        transactionId: transactionId || `MAN-${Date.now()}`,
+        reconciliationStatus: "manual",
+        paidAt: new Date()
+      });
+
+      // Atualiza o paidValue a partir dos Payments confirmados
+      await storage.updateOrderPaidValue(receivable.orderId);
+      paymentRecord = payment;
+
+    } else {
+      // Recebível manual (não vinculado a pedido): só somar no título
+      const current = Number.parseFloat(String(receivable.receivedAmount || "0"));
+      const updated = await storage.updateAccountsReceivable(id, {
+        receivedAmount: (current + value).toFixed(2),
+        status: (current + value) >= Number.parseFloat(String(receivable.amount))
+          ? "paid"
+          : ((current + value) > 0 ? "partial" : "pending")
+      });
+
+      paymentRecord = {
+        id: `payment-${Date.now()}`,
+        amount: value.toFixed(2),
+        method: method || "manual",
+        transactionId: transactionId || `MAN-${Date.now()}`,
+        notes: notes || "",
+        paidAt: new Date(),
+        receivable: updated.id
+      };
+    }
+
+    return res.json({ success: true, payment: paymentRecord });
+
+  } catch (error: any) {
+    console.error("Error processing receivables payment:", error);
+    return res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+  }
+});
+
+
+Isso garante que apenas um caminho atualiza o saldo:
+• para pedido → via Payments confirmados (e o updateOrderPaidValue consolida);
+• para título manual → via receivedAmount do próprio receivable.
+Com a idempotência, um clique duplo ou repetição de requisição não duplica o pagamento.
