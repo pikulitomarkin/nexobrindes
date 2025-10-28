@@ -405,7 +405,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Get client information
-      const client = await storage.getClient(budget.clientId);
       let clientName = budget.contactName || 'Cliente não informado';
       let clientEmail = budget.contactEmail || '';
       let clientPhone = budget.contactPhone || '';
@@ -2499,7 +2498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log user creation
+      // Log producer creation
       await storage.logUserAction(
         req.user?.id || 'admin-1',
         req.user?.name || 'Administrador',
@@ -2602,10 +2601,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clients = await storage.getClientsByVendor(vendorId);
       console.log(`Found ${clients.length} clients for vendor ${vendorId}`);
 
-      res.json(clients);
+      // Enrich with order stats
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const ownerUser = client.userId ? await storage.getUser(client.userId) : null;
+          const clientOrders = await storage.getOrdersByClient(client.id);
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue || '0'), 0
+          );
+
+          return {
+            ...client,
+            userCode: ownerUser?.username || null,
+            ordersCount: clientOrders.length,
+            totalSpent,
+          };
+        })
+      );
+
+      res.json(enrichedClients);
     } catch (error) {
-      console.error("Error fetching clients by vendor:", error);
-      res.status(500).json({ error: "Failed to fetch clients" });
+      console.error("Error fetching vendor clients:", error);
+      res.status(500).json({ error: "Failed to fetch vendor clients" });
     }
   });
 
@@ -4456,28 +4473,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with vendor names and statistics
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
-          // Get vendor name
           const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+          const ownerUser = client.userId ? await storage.getUser(client.userId) : null;
 
           // Count orders for this client
-          const allOrders = await storage.getOrders();
-          const clientOrders = allOrders.filter(order =>
-            order.clientId === client.id ||
-            order.clientId === client.userId ||
-            (order.contactName && order.contactName.toLowerCase().includes(client.name.toLowerCase()))
+          const clientOrders = await storage.getOrdersByClient(client.id);
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue || '0'), 0
           );
-
-          // Calculate total spent
-          const totalSpent = clientOrders
-            .filter(order => order.status !== 'cancelled')
-            .reduce((sum, order) => sum + parseFloat(order.totalValue || '0'), 0);
 
           return {
             ...client,
-            userCode: (client as any).userCode || null, // Incluir userCode
+            userCode: ownerUser?.username || null,
             vendorName: vendor?.name || null,
             ordersCount: clientOrders.length,
-            totalSpent: totalSpent
+            totalSpent,
           };
         })
       );
