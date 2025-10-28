@@ -2749,7 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return updated user without password
       const { password: _, ...userWithoutPassword } = updatedUser;
-
+      
       console.log("Partner updated successfully:", updatedUser.id);
       res.json({
         success: true,
@@ -2805,7 +2805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {
         username: username.trim()
       };
-
+      
       if (password && password.trim().length > 0) {
         updateData.password = password.trim();
       }
@@ -2818,7 +2818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return updated user without password
       const { password: _, ...userWithoutPassword } = updatedUser;
-
+      
       console.log("Partner credentials updated successfully:", updatedUser.id);
       res.json({
         success: true,
@@ -3217,15 +3217,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const requested = parseFloat(amount);
           const alreadyPaid = parseFloat(order.paidValue || '0');
           const total = parseFloat(order.totalValue);
-
+          
           // Never accept payment above the remaining amount
           const allowable = Math.max(0, total - alreadyPaid);
           const finalAmount = Math.min(requested, allowable);
-
+          
           if (finalAmount !== requested) {
             console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
           }
-
+          
           paymentRecord = await storage.createPayment({
             orderId: receivable.orderId,
             amount: finalAmount.toFixed(2),
@@ -3235,8 +3235,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: notes || "",
             paidAt: new Date()
           });
+        } else {
+          throw new Error('Pedido não encontrado');
+        }
 
-          // Calculate new paid value safely
+        // Get current order to calculate new paid value safely
+        const order = await storage.getOrder(receivable.orderId);
+        if (order) {
           const totalValue = parseFloat(order.totalValue);
           const currentPaid = parseFloat(order.paidValue || '0');
           const thisPayment = parseFloat(amount);
@@ -3251,8 +3256,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
-        } else {
-          throw new Error('Pedido não encontrado');
         }
       } else {
         // This is a manual receivable - update the receivable directly
@@ -5557,8 +5560,7 @@ Para mais detalhes, entre em contato conosco!`;
             producerName: producer?.name || null,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado'),
-            deliveryType: order.deliveryType || 'delivery'
+              : (clientAddress || 'Endereço não informado')
           };
         })
       );
@@ -5977,7 +5979,9 @@ Para mais detalhes, entre em contato conosco!`;
       console.error("Error exporting system logs:", error);
       res.status(500).json({ error: "Failed to export system logs" });
     }
-  });  app.post("/api/admin/logs", async (req, res) => {
+  });
+
+  app.post("/api/admin/logs", async (req, res) => {
     try {
       const logData = req.body;
 

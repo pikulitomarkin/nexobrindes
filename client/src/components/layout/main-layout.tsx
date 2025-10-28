@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -19,10 +20,7 @@ import {
   Calculator,
   User,
   Building2,
-  Percent,
-  Activity,
-  LayoutDashboard,
-  TrendingUp
+  Percent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -91,7 +89,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/reports", icon: FileText, label: "Relatórios" },
           { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
           { href: "/logistics/dashboard", icon: Package, label: "Logística" },
-          { href: "/partner/logs", icon: Activity, label: "Logs do Sistema" },
         ];
       case "vendor":
         return [
