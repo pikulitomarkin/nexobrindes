@@ -59,12 +59,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Define navigation items for each role
   const adminNavigation = [
     { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
+    { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
     { href: "/admin/products", icon: Package, label: "Produtos" },
     { href: "/admin/producers", icon: Factory, label: "Produtores" },
     { href: "/admin/clients", icon: Users, label: "Clientes" },
     { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
     { href: "/admin/partners", icon: User, label: "Sócios" },
     { href: "/admin/branches", icon: Building2, label: "Filiais" },
+    { href: "/admin/logistics", icon: Package, label: "Logística" },
+    { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
     { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
