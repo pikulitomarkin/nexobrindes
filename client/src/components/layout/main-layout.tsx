@@ -96,6 +96,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/vendor/orders", icon: ShoppingCart, label: "Pedidos" },
     { href: "/vendor/clients", icon: Users, label: "Clientes" },
     { href: "/vendor/commissions", icon: DollarSign, label: "Comissões" },
+    { href: "/vendor/logs", icon: ClipboardList, label: "Meus Logs" },
   ];
 
   const clientNavigation = [
