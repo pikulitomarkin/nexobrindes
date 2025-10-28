@@ -2537,12 +2537,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalValue: quoteRequest.totalEstimatedValue || 0
       };
 
+      // Create budget without items first (items are already included in budgetData)
       const newBudget = await storage.createBudget(budgetData);
 
-      // Processar itens do orçamento
-      for (const item of budgetData.items) {
-        await storage.createBudgetItem(newBudget.id, item);
-      }
+      // Items are automatically created by storage.createBudget, no need to create them again
 
       // Marcar a solicitação como convertida
       await storage.updateQuoteRequestStatus(id, "quoted");
