@@ -313,6 +313,8 @@ export default function LogisticsDashboard() {
       paid: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
       confirmed: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
       production: "bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium",
+      pending: "bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium",
+      accepted: "bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium",
       ready: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse",
       shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
       delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
@@ -321,6 +323,8 @@ export default function LogisticsDashboard() {
     const statusLabels = {
       paid: "Pago - Aguardando Envio para Produção",
       confirmed: "Confirmado - Pago",
+      pending: "Pendente",
+      accepted: "Aceito",
       production: "Em Produção",
       ready: "🚚 PRONTO PARA EXPEDIÇÃO",
       shipped: "Despachado para Cliente",
@@ -642,9 +646,12 @@ export default function LogisticsDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="accepted">Aceito</SelectItem>
                     <SelectItem value="production">Em Produção</SelectItem>
                     <SelectItem value="ready">Pronto para Despacho</SelectItem>
                     <SelectItem value="shipped">Despachado</SelectItem>
+                    <SelectItem value="delivered">Entregue</SelectItem>
                   </SelectContent>
                 </Select>
               )}

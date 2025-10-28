@@ -136,6 +136,40 @@ export default function AdminLogs() {
     }
   };
 
+  // Função para traduzir ações
+  const translateAction = (action: string) => {
+    switch (action) {
+      case 'CREATE':
+        return 'CRIAR';
+      case 'UPDATE':
+        return 'ATUALIZAR';
+      case 'DELETE':
+        return 'EXCLUIR';
+      case 'LOGIN':
+        return 'LOGIN';
+      case 'LOGOUT':
+        return 'LOGOUT';
+      default:
+        return action;
+    }
+  };
+
+  // Função para traduzir níveis
+  const translateLevel = (level: string) => {
+    switch (level) {
+      case 'error':
+        return 'Erro';
+      case 'warning':
+        return 'Aviso';
+      case 'success':
+        return 'Sucesso';
+      case 'info':
+        return 'Info';
+      default:
+        return level;
+    }
+  };
+
   // Filtrar logs
   const filteredLogs = logs.filter((log: any) => {
     const matchesSearch = !searchTerm || 
@@ -355,7 +389,7 @@ export default function AdminLogs() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge className={getActionColor(log.action)}>
-                            {log.action}
+                            {translateAction(log.action)}
                           </Badge>
                           <span className="text-sm text-gray-600">
                             por <strong>{log.userName}</strong>
