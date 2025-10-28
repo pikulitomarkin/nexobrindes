@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,37 @@ import { BarChart3, Users, ShoppingCart, Package, TrendingUp, Factory, LogOut, D
 import { Link } from "wouter";
 
 export default function PartnerDashboard() {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ["/api/auth/verify"],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token");
+
+      const response = await fetch("/api/auth/verify", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Invalid token");
+
+      return response.json();
+    },
+  });
+
+  // Get partner specific data
+  const { data: partnerData, isLoading: partnerLoading } = useQuery({
+    queryKey: ["/api/partners", user?.user?.id],
+    queryFn: async () => {
+      if (!user?.user?.id) return null;
+
+      const response = await fetch(`/api/partners/${user.user.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!response.ok) return null;
+
+      return response.json();
+    },
+    enabled: !!user?.user?.id,
+  });
+
 
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -24,16 +53,8 @@ export default function PartnerDashboard() {
     select: (data) => {
       // Filtrar apenas comissões deste sócio específico
       return data?.filter((commission: any) => 
-        commission.partnerId === user.id && commission.type === 'partner'
+        commission.partnerId === user?.user?.id && commission.type === 'partner'
       ) || [];
-    }
-  });
-
-  // Query para dados específicos do sócio
-  const { data: partnerData } = useQuery({
-    queryKey: ["/api/partners"],
-    select: (data) => {
-      return data?.find((partner: any) => partner.userId === user.id);
     }
   });
 
@@ -72,11 +93,11 @@ export default function PartnerDashboard() {
   // Cálculos específicos das comissões deste sócio
   const totalPartnerCommissions = partnerCommissions?.reduce((sum: number, commission: any) => 
     sum + parseFloat(commission.amount || '0'), 0) || 0;
-  
+
   const pendingPartnerCommissions = partnerCommissions?.filter((c: any) => 
     ['pending', 'confirmed'].includes(c.status)).reduce((sum: number, c: any) => 
     sum + parseFloat(c.amount || '0'), 0) || 0;
-  
+
   const paidPartnerCommissions = partnerCommissions?.filter((c: any) => 
     c.status === 'paid').reduce((sum: number, c: any) => 
     sum + parseFloat(c.amount || '0'), 0) || 0;
@@ -107,6 +128,26 @@ export default function PartnerDashboard() {
     );
   };
 
+  if (userLoading || partnerLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+  }
+
+  if (!user || !user.user || !partnerData) {
+    // Redirecionar para o login se o usuário não estiver autenticado ou não for um sócio válido
+    // Em um aplicativo real, você pode querer mostrar uma mensagem de erro mais amigável ou uma página 404.
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-center p-4">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Acesso Não Autorizado</h1>
+        <p className="text-gray-600 mb-6">
+          Você não tem permissão para acessar esta página ou seus dados de sócio não foram encontrados.
+        </p>
+        <Button onClick={() => window.location.href = "/login"}>
+          Voltar para o Login
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header - Idêntico ao admin */}
@@ -114,9 +155,9 @@ export default function PartnerDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Painel do Sócio</h1>
-            <p className="text-gray-600">Bem-vindo, {user.name}</p>
-            {user.userCode && (
-              <p className="text-sm text-blue-600 font-mono">Código de Acesso: {user.userCode}</p>
+            <p className="text-gray-600">Bem-vindo, {user.user.name}</p>
+            {user.user.userCode && (
+              <p className="text-sm text-blue-600 font-mono">Código de Acesso: {user.user.userCode}</p>
             )}
             {partnerData && (
               <p className="text-sm text-green-600">Taxa de Comissão: {partnerData.commissionRate}%</p>

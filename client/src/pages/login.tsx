@@ -96,7 +96,9 @@ export default function Login() {
     { username: "produtor1", password: "123456", role: "producer", label: "Produtor", icon: Factory, color: "text-purple-600" },
     { username: "logistica1", password: "123456", role: "logistics", label: "Logística", icon: Factory, color: "text-indigo-600" },
     { username: "financeiro1", password: "123456", role: "finance", label: "Financeiro", icon: DollarSign, color: "text-green-600" },
-    { username: "admin", password: "123456", role: "partner", label: "Sócio", icon: DollarSign, color: "text-yellow-600" },
+    { username: "socio1", password: "123456", role: "partner", label: "Sócio 1", icon: DollarSign, color: "text-yellow-600" },
+    { username: "socio2", password: "123456", role: "partner", label: "Sócio 2", icon: DollarSign, color: "text-yellow-600" },
+    { username: "socio3", password: "123456", role: "partner", label: "Sócio 3", icon: DollarSign, color: "text-yellow-600" },
   ];
 
   const quickLogin = (user: any) => {

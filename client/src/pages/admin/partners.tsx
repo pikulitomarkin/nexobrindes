@@ -88,19 +88,40 @@ export default function AdminPartners() {
 
   const updatePartnerMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Partner> & { id: string }) => {
-      const response = await fetch(`/api/partners/${id}`, {
+      // Atualizar o usuário (dados principais)
+      const userResponse = await fetch(`/api/users/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: data.password || undefined
+        }),
       });
-      if (!response.ok) throw new Error("Failed to update partner");
-      return response.json();
+      if (!userResponse.ok) throw new Error("Failed to update partner user data");
+
+      // Atualizar dados específicos do sócio se necessário
+      if (data.commissionRate) {
+        const partnerResponse = await fetch(`/api/partners/${id}/commission`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("token")}`
+          },
+          body: JSON.stringify({ commissionRate: data.commissionRate }),
+        });
+        if (!partnerResponse.ok) throw new Error("Failed to update partner commission");
+      }
+
+      return userResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsDialogOpen(false);
       setEditingPartner(null);
       resetForm();
@@ -109,10 +130,10 @@ export default function AdminPartners() {
         description: "Sócio atualizado com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao atualizar sócio",
+        description: `Erro ao atualizar sócio: ${error.message}`,
         variant: "destructive",
       });
     },

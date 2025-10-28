@@ -1,6 +1,6 @@
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useState, Suspense } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
 import Login from "@/pages/login";
@@ -204,54 +204,54 @@ function App() {
                   <Route path="/partner/commission-management" component={PartnerCommissionManagement} />
 
                   {/* Finance Routes - accessible by admin and finance users */}
-                  <Route path="/finance" 
+                  <Route path="/finance"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinanceIndex />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/receivables" 
+                  <Route path="/finance/receivables"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinanceReceivables />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/payables" 
+                  <Route path="/finance/payables"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinancePayables />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/payments" 
+                  <Route path="/finance/payments"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinancePayments />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/expenses" 
+                  <Route path="/finance/expenses"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinanceExpenses />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/commission-payouts" 
+                  <Route path="/finance/commission-payouts"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinanceCommissionPayouts />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
-                  <Route path="/finance/reconciliation" 
+                  <Route path="/finance/reconciliation"
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance"]}>
                         <FinanceReconciliation />
                       </ProtectedRoute>
-                    )} 
+                    )}
                   />
 
                   {/* Logistics Routes */}

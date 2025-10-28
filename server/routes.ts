@@ -2258,6 +2258,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Partners endpoints
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+      res.json(partners);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const partnerData = req.body;
+      const partner = await storage.createPartner(partnerData);
+      res.json(partner);
+    } catch (error) {
+      console.error("Error creating partner:", error);
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  app.get("/api/partners/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const partner = await storage.getPartner(partnerId);
+      res.json(partner);
+    } catch (error) {
+      console.error("Error fetching partner:", error);
+      res.status(500).json({ error: "Failed to fetch partner" });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner commission:", error);
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
   // Quote Requests routes - Consolidated version
   app.post("/api/quote-requests/consolidated", async (req, res) => {
     try {
