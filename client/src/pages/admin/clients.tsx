@@ -94,6 +94,7 @@ export default function AdminClients() {
         ...data,
         userCode: userCode
       };
+      console.log("Sending client data with userCode:", clientData);
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

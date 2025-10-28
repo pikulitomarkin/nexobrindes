@@ -2355,7 +2355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // If still no name, use a descriptive message instead of "Unknown"
+          // If still no name, use a descriptive message
           if (!clientName) {
             clientName = "Nome não informado";
           }
@@ -2466,7 +2466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Creating producer with request data:', { name, email, phone, specialty, address, username: username || userCode, hasPassword: !!password });
 
       // Use userCode as username if username is not provided
-      const finalUsername = username || userCode || email;
+      const finalUsername = userCode || username || email;
 
       if (!finalUsername) {
         return res.status(400).json({ error: "Username ou código de usuário é obrigatório" });
@@ -2945,7 +2945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vendor,
         monthlySales,
         totalCommissions,
-        confirmedOrders: orders.filter(o => o.status !== 'pending').length
+        confirmedOrders: orders.filter(o => o.status !== 'cancelled').length
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch vendor info" });
@@ -4519,7 +4519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         client: {
           ...client,
-          userCode: username
+          userCode: username // Include userCode in response
         }
       };
 
@@ -6061,8 +6061,8 @@ Para mais detalhes, entre em contato conosco!`;
             items: enrichedItems,
             clientName: clientName,
             clientAddress: clientAddress || 'Endereço não informado',
-            clientPhone: clientPhone,
-            clientEmail: clientEmail,
+            clientPhone,
+            clientEmail,
             lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
