@@ -240,25 +240,25 @@ export default function ProductionDashboard() {
           </div>
         );
       case 'accepted':
-          return (
-            <Button
-              size="sm"
-              className="bg-purple-600 hover:bg-purple-700"
-              onClick={() => handleStatusUpdate(order, 'production')}
-              disabled={updateStatusMutation.isPending}
-            >
-              <Clock className="h-4 w-4 mr-1" />
-              {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}
-            </Button>
-          );
+        return (
+          <Button
+            size="sm"
+            className="bg-purple-600 hover:bg-purple-700"
+            onClick={() => handleStatusUpdate(order, 'production')}
+            disabled={updateStatusMutation.isPending}
+          >
+            <Clock className="h-4 w-4 mr-1" />
+            {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}
+          </Button>
+        );
       case 'production':
         return (
           <Button
             size="sm"
             className="bg-green-600 hover:bg-green-700"
             onClick={() => handleStatusUpdate(order, 'ready')}
-            disabled={updateStatusMutation.isPending || !order.producerValue}
-            title={!order.producerValue ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
+            disabled={updateStatusMutation.isPending || !order.producerValue || parseFloat(order.producerValue || '0') <= 0}
+            title={(!order.producerValue || parseFloat(order.producerValue || '0') <= 0) ? "Você deve definir o valor do serviço antes de marcar como pronto" : ""}
           >
             <Package className="h-4 w-4 mr-1" />
             {updateStatusMutation.isPending ? 'Finalizando...' : 'Marcar Pronto'}
