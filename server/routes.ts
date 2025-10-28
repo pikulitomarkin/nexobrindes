@@ -2003,18 +2003,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Check if contactName matches user info (fallback for orders created from budgets)
-        if (!shouldInclude && order.contactName) {
-          try {
-            const user = await storage.getUser(clientId);
-            if (user && user.name === order.contactName) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
         if (shouldInclude) {
           orders.push(order);
         }
@@ -3430,11 +3418,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let paymentRecord;
 
-      // For order-based receivables, update order paidValue (which also updates the receivable)
       if (receivable.orderId) {
-        // Update order paid value based on all confirmed payments
-        // This method already updates the related accounts receivable automatically
-        await storage.updateOrderPaidValue(receivable.orderId);
+        // This is an order-based receivable - create payment for the order
+        paymentRecord = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          status: "confirmed",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        });
+
+        // Get current order to calculate new paid value safely
+        const order = await storage.getOrder(receivable.orderId);
+        if (order) {
+          const totalValue = parseFloat(order.totalValue);
+          const currentPaid = parseFloat(order.paidValue || '0');
+          const thisPayment = parseFloat(amount);
+          const newPaid = currentPaid + thisPayment;
+          const newRemaining = Math.max(totalValue - newPaid, 0);
+
+          // >>> CRITICAL: NEVER send totalValue in update! <<<
+          await storage.updateOrder(receivable.orderId, {
+            paidValue: newPaid.toFixed(2),
+            remainingAmount: newRemaining.toFixed(2),
+            __origin: 'receivables' // Safety flag for storage layer
+          });
+
+          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
+        }
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -3460,6 +3473,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing receivables payment:", error);
       res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+    }
+  });
+
+  // Create manual payables endpoint
+  app.post("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const { beneficiary, description, amount, dueDate, category, notes } = req.body;
+
+      if (!beneficiary || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create a manual payable entry
+      const payable = await storage.createManualPayable({
+        beneficiary,
+        description,
+        amount: parseFloat(amount).toFixed(2),
+        dueDate: new Date(dueDate),
+        category: category || 'Outros',
+        notes: notes || null
+      });
+
+      console.log(`Created manual payable: ${payable.id} - ${payable.description} - R$ ${payable.amount}`);
+      res.json(payable);
+    } catch (error) {
+      console.error("Error creating manual payable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a pagar: " + error.message });
+    }
+  });
+
+  // Get manual payables endpoint
+  app.get("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const payables = await storage.getManualPayables();
+      console.log(`Returning ${payables.length} manual payables to frontend`);
+      res.json(payables);
+    } catch (error) {
+      console.error("Error fetching manual payables:", error);
+      res.status(500).json({ error: "Erro ao buscar contas a pagar manuais: " + error.message });
+    }
+  });
+
+  // Pay manual payable endpoint
+  app.post("/api/finance/payables/manual/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes, transactionId } = req.body;
+
+      console.log(`Processing payment for manual payable: ${id}`, { paymentMethod, notes, transactionId });
+
+      // Update the manual payable status to paid
+      const updatedPayable = await storage.updateManualPayable(id, {
+        status: 'paid',
+        paidBy: 'admin-1', // Could be req.user.id in real auth
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        paymentNotes: notes || null,
+        transactionId: transactionId || null
+      });
+
+      if (!updatedPayable) {
+        return res.status(404).json({ error: "Conta a pagar não encontrada" });
+      }
+
+      console.log(`Manual payable ${id} marked as paid successfully`);
+
+      res.json({
+        success: true,
+        payable: updatedPayable,
+        message: "Pagamento registrado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error processing manual payable payment:", error);
+      res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
     }
   });
 
@@ -4654,7 +4741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Check if contactName matches user info (fallback for orders created from budgets)
+        // Also check if contactName matches user info (fallback for orders created from budgets)
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
@@ -5141,10 +5228,6 @@ Para mais detalhes, entre em contato conosco!`;
           hasCustomization: budget.hasCustomization,
           customizationPercentage: budget.customizationPercentage,
           customizationDescription: budget.customizationDescription,
-          hasDiscount: budget.hasDiscount,
-          discountType: budget.discountType,
-          discountPercentage: budget.discountPercentage,
-          discountValue: budget.discountValue,
           createdAt: budget.createdAt,
           photos: photoUrls,
           paymentMethodId: paymentInfo?.paymentMethodId || null,
@@ -5565,7 +5648,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
       }
 
-      // Update payment status to paid with all paymentdetails
+      // Update payment status to paid with all payment details
       const updatedPayment = await storage.updateProducerPayment(payment.id, {
         status: 'paid',
         paidBy: 'admin-1', // Could be req.user.id in real auth
@@ -5716,7 +5799,7 @@ Para mais detalhes, entre em contato conosco!`;
               clientAddress = clientRecord.address;
               clientPhone = clientRecord.phone || order.contactPhone;
               clientEmail = clientRecord.email || order.contactEmail;
-            }else {
+            } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 clientName = clientByUserId.name;
@@ -6076,7 +6159,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        // Check if contactName matches user info (fallback for orders created from budgets)
+        // Also check if contactName matches user info (fallback for orders created from budgets)
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
@@ -6265,4 +6348,3 @@ Para mais detalhes, entre em contato conosco!`;
   const httpServer = createServer(app);
   return httpServer;
 }
-</new_str>

@@ -560,14 +560,9 @@ export default function FinanceReceivables() {
                                 // Suggest minimum payment if not met, otherwise remaining amount
                                 const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
                                 const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
-                                
-                                // Calculate only what's missing from the minimum payment (entrada)
-                                const missingOfMinimum = Math.max(0, parseFloat(receivable.minimumPayment || "0") - receivedSoFar);
-                                
-                                const suggestedAmount = (!isMinimumMet && parseFloat(receivable.minimumPayment || "0") > 0)
-                                  ? missingOfMinimum.toFixed(2)
-                                  : remainingAmount.toFixed(2);
-                                
+                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
+                                  minimumPayment.toString() : 
+                                  remainingAmount.toString();
                                 setPaymentData({
                                   ...paymentData,
                                   amount: suggestedAmount
