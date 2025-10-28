@@ -4451,48 +4451,37 @@ export class MemStorage implements IStorage {
   async getQuoteRequestsByClient(clientId: string): Promise<any[]> {
     console.log(`Storage: Searching quote requests for client ${clientId}`);
 
-    let matchingRequests = [];
-
-    // Buscar solicitações que correspondem ao cliente de várias formas
-    for (const request of this.quoteRequests) {
-      let shouldInclude = false;
-
-      // 1. Comparação direta com clientId
+    const requests = this.quoteRequests.filter(request => {
+      // Check direct match with clientId
       if (request.clientId === clientId) {
-        shouldInclude = true;
         console.log(`Found direct match: ${request.id}`);
+        return true;
       }
 
-      // 2. Se clientId é um userId, verificar se há client record com esse userId
-      if (!shouldInclude) {
-        try {
-          const clientRecord = await this.getClientByUserId(clientId);
-          if (clientRecord && request.clientId === clientRecord.id) {
-            shouldInclude = true;
-            console.log(`Found userId match via client record: ${request.id}`);
-          }
-        } catch (e) {
-          // Continue searching
+      // Check if clientId is a userId and request.clientId is a client record ID
+      try {
+        const clientRecord = this.clients.get(request.clientId);
+        if (clientRecord && clientRecord.userId === clientId) {
+          console.log(`Found match via client record: ${request.id} (clientRecord.userId: ${clientRecord.userId})`);
+          return true;
         }
+      } catch (e) {
+        // Continue checking
       }
 
-      // 3. Se request.clientId é um client record, verificar se o userId bate
-      if (!shouldInclude && request.clientId) {
-        try {
-          const requestClientRecord = await this.getClient(request.clientId);
-          if (requestClientRecord && requestClientRecord.userId === clientId) {
-            shouldInclude = true;
-            console.log(`Found client record match: ${request.id}`);
-          }
-        } catch (e) {
-          // Continue searching
+      // Check if clientId is a client record ID and request.clientId is a userId
+      try {
+        const userClientRecord = Array.from(this.clients.values()).find(c => c.userId === clientId);
+        if (userClientRecord && request.clientId === userClientRecord.id) {
+          console.log(`Found match via user client record: ${request.id} (userClientRecord.id: ${userClientRecord.id})`);
+          return true;
         }
+      } catch (e) {
+        // Continue checking
       }
 
-      if (shouldInclude) {
-        matchingRequests.push(request);
-      }
-    }
+      return false;
+    });
 
     // Enriquecer as solicitações encontradas
     const enrichedRequests = await Promise.all(matchingRequests.map(async request => {
