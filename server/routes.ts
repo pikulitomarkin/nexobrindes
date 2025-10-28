@@ -2700,11 +2700,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const partnerData = req.body;
       console.log("Updating partner:", id, partnerData);
 
+      // Validate required fields
+      if (!partnerData.name || partnerData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
       // Update user information
       const updatedUser = await storage.updateUser(id, {
-        name: partnerData.name,
-        email: partnerData.email,
-        phone: partnerData.phone,
+        name: partnerData.name.trim(),
+        email: partnerData.email?.trim() || null,
+        phone: partnerData.phone?.trim() || null,
         isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
       });
 
@@ -2712,8 +2717,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Sócio não encontrado" });
       }
 
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      
       console.log("Partner updated successfully:", updatedUser.id);
-      res.json(updatedUser);
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Sócio atualizado com sucesso"
+      });
     } catch (error) {
       console.error("Error updating partner:", error);
       res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
@@ -2738,6 +2750,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting partner:", error);
       res.status(500).json({ error: "Erro ao remover sócio: " + error.message });
+    }
+  });
+
+  // Update partner username/password (admin only)
+  app.put("/api/partners/:id/credentials", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { username, password } = req.body;
+      console.log("Updating partner credentials:", id, { username, hasPassword: !!password });
+
+      // Validate required fields
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Código de acesso é obrigatório" });
+      }
+
+      // Check if username already exists (but not for the current user)
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser && existingUser.id !== id) {
+        return res.status(400).json({ error: "Código de acesso já está em uso" });
+      }
+
+      // Update user credentials
+      const updateData: any = {
+        username: username.trim()
+      };
+      
+      if (password && password.trim().length > 0) {
+        updateData.password = password.trim();
+      }
+
+      const updatedUser = await storage.updateUser(id, updateData);
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      
+      console.log("Partner credentials updated successfully:", updatedUser.id);
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Credenciais do sócio atualizadas com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating partner credentials:", error);
+      res.status(500).json({ error: "Erro ao atualizar credenciais do sócio: " + error.message });
     }
   });
 
@@ -2770,7 +2830,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("Partner created successfully:", newUser.id);
-      res.json(newUser);
+      res.json({
+        success: true,
+        partner: newUser,
+        message: "Sócio criado com sucesso"
+      });
     } catch (error) {
       console.error("Error creating partner:", error);
       res.status(500).json({ error: "Erro ao criar sócio: " + error.message });

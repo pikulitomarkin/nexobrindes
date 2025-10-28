@@ -88,8 +88,10 @@ export default function AdminPartners() {
 
   const updatePartnerMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Partner> & { id: string }) => {
-      // Atualizar o usuário (dados principais)
-      const userResponse = await fetch(`/api/users/${id}`, {
+      console.log("Updating partner with data:", data);
+      
+      // Usar o endpoint correto de partners
+      const response = await fetch(`/api/partners/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -99,25 +101,19 @@ export default function AdminPartners() {
           name: data.name,
           email: data.email,
           phone: data.phone,
-          password: data.password || undefined
+          isActive: data.isActive !== undefined ? data.isActive : true
         }),
       });
-      if (!userResponse.ok) throw new Error("Failed to update partner user data");
-
-      // Atualizar dados específicos do sócio se necessário
-      if (data.commissionRate) {
-        const partnerResponse = await fetch(`/api/partners/${id}/commission`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token")}`
-          },
-          body: JSON.stringify({ commissionRate: data.commissionRate }),
-        });
-        if (!partnerResponse.ok) throw new Error("Failed to update partner commission");
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Erro ao atualizar sócio: ${response.statusText}`);
       }
-
-      return userResponse.json();
+      
+      const result = await response.json();
+      console.log("Update result:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
