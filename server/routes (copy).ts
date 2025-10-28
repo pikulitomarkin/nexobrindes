@@ -305,10 +305,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching budgets for vendor: ${vendorId}`);
-      
+
       const budgets = await storage.getBudgetsByVendor(vendorId);
       console.log(`Found ${budgets.length} budgets for vendor ${vendorId}`);
-      
+
       res.json(budgets);
     } catch (error) {
       console.error("Error fetching budgets by vendor:", error);
@@ -320,24 +320,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
       const { id } = req.params;
-      const budget = await storage.getBudget(id);
+      console.log(`=== PDF DATA REQUEST FOR BUDGET: ${id} ===`);
 
+      const budget = await storage.getBudget(id);
       if (!budget) {
+        console.log(`ERROR: Budget not found: ${id}`);
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Get all budget data including item photos
-      const budgetData = {
-        budget: budget,
-        items: budget.items || [],
-        photos: budget.photos || [],
-        itemPhotos: budget.items?.map((item: any) => item.customizationPhoto).filter(Boolean) || []
+      console.log(`Found budget: ${budget.budgetNumber} - ${budget.title}`);
+
+      // Get budget items with product details
+      const items = await storage.getBudgetItems(id);
+      console.log(`Found ${items.length} budget items:`, items.map(item => ({
+        id: item.id,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice
+      })));
+
+      // Filter and validate items before enriching
+      const validItems = items.filter(item => {
+        const isValid = item.productId &&
+                       item.productName &&
+                       item.productName.trim() !== '' &&
+                       item.quantity > 0 &&
+                       item.unitPrice > 0;
+
+        if (!isValid) {
+          console.log(`Filtering out invalid item for PDF:`, {
+            id: item.id,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice
+          });
+        }
+
+        return isValid;
+      });
+
+      // Remove duplicates based on productId, producerId, quantity, and unitPrice
+      const uniqueValidItems = [];
+      const seenItemKeys = new Set();
+
+      for (const item of validItems) {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (!seenItemKeys.has(itemKey)) {
+          seenItemKeys.add(itemKey);
+          uniqueValidItems.push(item);
+        } else {
+          console.log(`Removing duplicate item for PDF: ${item.productName} (${itemKey})`);
+        }
+      }
+
+      console.log(`Processing ${uniqueValidItems.length} unique valid items for PDF (filtered from ${items.length} total items)`);
+
+      // Enrich items with product data
+      const enrichedItems = await Promise.all(
+        uniqueValidItems.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          return {
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            hasItemCustomization: item.hasItemCustomization,
+            itemCustomizationPercentage: item.itemCustomizationPercentage,
+            itemCustomizationDescription: item.itemCustomizationDescription,
+            itemCustomizationValue: item.itemCustomizationValue,
+            customizationPhoto: item.customizationPhoto,
+            productWidth: item.productWidth,
+            productHeight: item.productHeight,
+            productDepth: item.productDepth,
+            product: {
+              name: product?.name || item.productName || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
+      );
+
+      // Get client information
+      const client = await storage.getClient(budget.clientId);
+      let clientName = budget.contactName || 'Cliente não informado';
+      let clientEmail = budget.contactEmail || '';
+      let clientPhone = budget.contactPhone || '';
+
+      console.log(`Client lookup - budget.clientId: ${budget.clientId}, found client:`, !!client);
+
+      if (client) {
+        clientName = client.name;
+        clientEmail = client.email || budget.contactEmail || '';
+        clientPhone = client.phone || budget.contactPhone || '';
+      }
+
+      console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
+
+      // Get vendor information
+      const vendor = await storage.getUser(budget.vendorId);
+      console.log(`Vendor lookup - budget.vendorId: ${budget.vendorId}, found vendor:`, !!vendor);
+
+      // Get budget photos
+      const photos = await storage.getBudgetPhotos(id);
+      const photoUrls = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+      // Get payment and shipping methods
+      const paymentMethods = await storage.getPaymentMethods();
+      const shippingMethods = await storage.getShippingMethods();
+
+      // Get payment info
+      const paymentInfo = await storage.getBudgetPaymentInfo(id);
+
+      // Calculate total budget value
+      const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+
+      const pdfData = {
+        budget: {
+          id: budget.id,
+          budgetNumber: budget.budgetNumber,
+          title: budget.title,
+          description: budget.description,
+          clientId: budget.clientId,
+          vendorId: budget.vendorId,
+          totalValue: totalBudget.toFixed(2),
+          validUntil: budget.validUntil,
+          deliveryDeadline: budget.deliveryDeadline,
+          hasCustomization: budget.hasCustomization,
+          customizationPercentage: budget.customizationPercentage,
+          customizationDescription: budget.customizationDescription,
+          hasDiscount: budget.hasDiscount,
+          discountType: budget.discountType,
+          discountPercentage: budget.discountPercentage,
+          discountValue: budget.discountValue,
+          createdAt: budget.createdAt,
+          photos: photoUrls,
+          paymentMethodId: paymentInfo?.paymentMethodId || null,
+          shippingMethodId: paymentInfo?.shippingMethodId || null,
+          installments: paymentInfo?.installments || 1,
+          downPayment: paymentInfo?.downPayment || "0.00",
+          remainingAmount: paymentInfo?.remainingAmount || "0.00",
+          shippingCost: paymentInfo?.shippingCost || "0.00"
+        },
+        items: enrichedItems,
+        client: {
+          name: clientName,
+          email: clientEmail,
+          phone: clientPhone
+        },
+        vendor: {
+          name: vendor?.name || 'Vendedor',
+          email: vendor?.email || '',
+          phone: vendor?.phone || ''
+        },
+        paymentMethods: paymentMethods || [],
+        shippingMethods: shippingMethods || []
       };
 
-      res.json(budgetData);
+      console.log(`=== PDF DATA PREPARED ===`);
+      console.log(`Budget: ${pdfData.budget.budgetNumber} - ${pdfData.budget.title}`);
+      console.log(`Items: ${enrichedItems.length}`);
+      console.log(`Client: ${clientName} (${clientEmail})`);
+      console.log(`Vendor: ${vendor?.name || 'Unknown'} (${vendor?.email || 'No email'})`);
+      console.log(`Total Value: R$ ${totalBudget.toFixed(2)}`);
+      console.log(`=== SENDING RESPONSE ===`);
+
+      res.json(pdfData);
     } catch (error) {
-      console.error("Error fetching budget PDF data:", error);
-      res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF" });
+      console.error("=== ERROR IN PDF DATA ENDPOINT ===");
+      console.error("Error details:", error);
+      console.error("Stack trace:", error.stack);
+      res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF: " + error.message });
     }
   });
 
@@ -629,17 +785,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if there are still producers without production orders
         const allProductionOrders = await storage.getProductionOrdersByOrder(id);
         const uniqueProducers = new Set();
-        
+
         // Count unique producers in the order items
         allItems.forEach((item: any) => {
           if (item.producerId && item.producerId !== 'internal') {
             uniqueProducers.add(item.producerId);
           }
         });
-        
+
         // Count unique producers with production orders
         const producersWithOrders = new Set(allProductionOrders.map(po => po.producerId));
-        
+
         // Only mark as production if all producers have been sent
         if (uniqueProducers.size === producersWithOrders.size) {
           await storage.updateOrder(id, { status: 'production' });
@@ -2332,44 +2488,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Criar orçamento oficial baseado na solicitação
       const budgetData = {
+        budgetNumber: `ORC-${Date.now()}`,
         clientId: quoteRequest.clientId,
         vendorId: quoteRequest.vendorId,
         contactName: quoteRequest.contactName,
-        contactPhone: quoteRequest.whatsapp,
-        contactEmail: quoteRequest.email,
-        title: `Orçamento baseado na solicitação`,
-        description: quoteRequest.observations || "",
-        validUntil: null,
-        deliveryDeadline: null,
+        contactPhone: quoteRequest.whatsapp || '',
+        contactEmail: quoteRequest.email || '',
+        title: `Orçamento - ${quoteRequest.products.map(p => p.productName).join(', ')}`,
+        description: quoteRequest.observations || '',
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        deliveryDeadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(), // 45 days from now
         deliveryType: "delivery",
+        status: "draft",
+        paymentMethodId: "pm-1", // Default to PIX
+        shippingMethodId: "sm-1", // Default to Correios PAC
+        installments: 1,
+        downPayment: 0,
+        remainingAmount: quoteRequest.totalEstimatedValue || 0,
+        shippingCost: 0,
         hasDiscount: false,
         discountType: "percentage",
         discountPercentage: 0,
         discountValue: 0,
-        items: quoteRequest.products ? quoteRequest.products.map((product: any) => ({
+        items: (quoteRequest.products || []).map((product: any) => ({
           productId: product.productId,
           productName: product.productName,
-          producerId: 'internal', // Pode ser ajustado conforme necessário
-          quantity: product.quantity,
-          unitPrice: parseFloat(product.basePrice),
-          totalPrice: parseFloat(product.basePrice) * product.quantity,
+          producerId: product.producerId || 'internal',
+          quantity: product.quantity || 1,
+          unitPrice: parseFloat(product.basePrice) || 0,
+          totalPrice: (product.quantity || 1) * (parseFloat(product.basePrice) || 0),
           hasItemCustomization: false,
-          selectedCustomizationId: "",
+          selectedCustomizationId: '',
           itemCustomizationValue: 0,
-          itemCustomizationDescription: "",
-          additionalCustomizationNotes: product.observations || "",
-          customizationPhoto: "",
+          itemCustomizationDescription: '',
+          additionalCustomizationNotes: product.observations || '',
+          customizationPhoto: '',
           hasGeneralCustomization: false,
-          generalCustomizationName: "",
+          generalCustomizationName: '',
           generalCustomizationValue: 0,
           hasItemDiscount: false,
-          itemDiscountType: "percentage",
+          itemDiscountType: 'percentage',
           itemDiscountPercentage: 0,
           itemDiscountValue: 0,
-          productWidth: "",
-          productHeight: "",
-          productDepth: ""
-        })) : [],
+          productWidth: '',
+          productHeight: '',
+          productDepth: ''
+        })) || [],
         totalValue: quoteRequest.totalEstimatedValue || 0
       };
 
@@ -3845,6 +4009,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all clients
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+
+      // Enrich with vendor names and statistics
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+
+          // Get client orders count and total spent
+          const orders = await storage.getOrders();
+          const clientOrders = orders.filter(order =>
+            order.clientId === client.id ||
+            order.clientId === client.userId ||
+            order.contactName === client.name
+          );
+
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue), 0
+          );
+
+          return {
+            ...client,
+            vendorName: vendor?.name || null,
+            ordersCount: clientOrders.length,
+            totalSpent: totalSpent,
+            userCode: client.userCode || client.username || 'N/A'
+          };
+        })
+      );
+
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Create client endpoint
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log("=== CREATING CLIENT ===");
+      console.log("Request body:", JSON.stringify(clientData, null, 2));
+
+      // Validate required fields
+      if (!clientData.name) {
+        console.log("ERROR: Nome é obrigatório");
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!clientData.password) {
+        console.log("ERROR: Senha é obrigatória");
+        return res.status(400).json({ error: "Senha é obrigatória" });
+      }
+
+      // Use userCode as username if provided, otherwise generate one
+      const username = clientData.userCode || `cli_${Date.now()}`;
+      console.log(`Generated username: ${username}`);
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        console.log(`ERROR: Username ${username} already exists`);
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      console.log("Creating user account...");
+      // Create user first
+      const user = await storage.createUser({
+        username: username,
+        password: clientData.password,
+        role: "client",
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        isActive: true
+      });
+
+      console.log(`User created with ID: ${user.id}`);
+      console.log("Creating client profile...");
+
+      // Create client profile
+      const client = await storage.createClient({
+        userId: user.id,
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        whatsapp: clientData.whatsapp || null,
+        cpfCnpj: clientData.cpfCnpj || null,
+        address: clientData.address || null,
+        vendorId: clientData.vendorId || null,
+        isActive: true
+      });
+
+      console.log(`SUCCESS: Client created successfully: ${client.id} - ${client.name}`);
+
+      const response = {
+        success: true,
+        client: {
+          ...client,
+          userCode: username
+        }
+      };
+
+      console.log("Sending response:", JSON.stringify(response, null, 2));
+      res.json(response);
+    } catch (error) {
+      console.error("ERROR creating client:", error);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Erro ao criar cliente: " + error.message });
+    }
+  });
+
   // Create payments endpoint (used by receivables module)
   app.post("/api/payments", async (req, res) => {
     try {
@@ -4399,10 +4678,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
-        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
 
-        // Calculate total price including all customizations
+        // Calculate total price including customizations and discounts
         let totalPrice = unitPrice * quantity;
         if (item.hasItemCustomization && itemCustomizationValue > 0) {
           totalPrice += (itemCustomizationValue * quantity);
@@ -4429,9 +4708,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: generalCustomizationValue.toFixed(2),
           // Product dimensions
-          productWidth: item.productWidth ? parseFloat(item.productWidth) : null,
-          productHeight: item.productHeight ? parseFloat(item.productHeight) : null,
-          productDepth: item.productDepth ? parseFloat(item.productDepth) : null
+          productWidth: item.productWidth,
+          productHeight: item.productHeight,
+          productDepth: item.productDepth,
+          // Item discount
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
         });
       }
 
@@ -4513,10 +4797,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
-        const generalCustomizationValue =typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
 
-        // Calculate total price including all customizations
+        // Calculate total price including customizations and discounts
         let totalPrice = unitPrice * quantity;
         if (item.hasItemCustomization && itemCustomizationValue > 0) {
           totalPrice += (itemCustomizationValue * quantity);
@@ -4543,9 +4827,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: generalCustomizationValue.toFixed(2),
           // Product dimensions
-          productWidth: item.productWidth ? parseFloat(item.productWidth) : null,
-          productHeight: item.productHeight ? parseFloat(item.productHeight) : null,
-          productDepth: item.productDepth ? parseFloat(item.productDepth) : null
+          productWidth: item.productWidth,
+          productHeight: item.productHeight,
+          productDepth: item.productDepth,
+          // Item discount
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
         });
       }
 
@@ -5384,7 +5673,7 @@ Para mais detalhes, entre em contato conosco!`;
                   const producer = await storage.getUser(item.producerId);
                   producerCache.set(item.producerId, producer?.name || null);
                 }
-                
+
                 return {
                   ...item,
                   producerName: producerCache.get(item.producerId) || `Produtor ${item.producerId.slice(-6)}`
