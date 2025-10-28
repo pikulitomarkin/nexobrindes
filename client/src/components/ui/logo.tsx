@@ -6,8 +6,8 @@ interface LogoProps {
 
 export function Logo({ className = '', variant = 'full', size = 'md' }: LogoProps) {
   const sizes = {
-    sm: { icon: 24, text: 'text-lg' },
-    md: { icon: 40, text: 'text-2xl' },
+    sm: { icon: 32, text: 'text-lg' },
+    md: { icon: 48, text: 'text-2xl' },
     lg: { icon: 64, text: 'text-4xl' }
   };
 
@@ -18,61 +18,43 @@ export function Logo({ className = '', variant = 'full', size = 'md' }: LogoProp
     <svg
       width={iconSize}
       height={iconSize}
-      viewBox="0 0 64 64"
+      viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="flex-shrink-0"
     >
-      {/* Fundo do presente/caixa */}
-      <rect x="12" y="24" width="40" height="32" rx="4" fill="url(#gradient1)" />
+      {/* Círculo externo com gradiente */}
+      <circle cx="50" cy="50" r="45" fill="url(#bgGradient)" />
       
-      {/* Laço do presente - horizontal */}
-      <rect x="12" y="36" width="40" height="6" fill="url(#gradient2)" />
-      
-      {/* Laço do presente - vertical */}
-      <rect x="29" y="24" width="6" height="32" fill="url(#gradient2)" />
-      
-      {/* Nó do laço */}
-      <circle cx="32" cy="20" r="6" fill="url(#gradient3)" />
-      <circle cx="32" cy="20" r="4" fill="white" opacity="0.3" />
+      {/* Letra N estilizada formando uma conexão */}
+      <path 
+        d="M30 35 L30 65 L42 50 L42 65 M42 35 L54 50 L54 35 M54 65 L66 50 L66 65 L66 35" 
+        stroke="white" 
+        strokeWidth="5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        fill="none"
+      />
       
       {/* Pontos de conexão (representando "nexo") */}
-      <circle cx="20" cy="32" r="2" fill="white" opacity="0.8" />
-      <circle cx="44" cy="32" r="2" fill="white" opacity="0.8" />
-      <circle cx="32" cy="46" r="2" fill="white" opacity="0.8" />
-      
-      {/* Linhas de conexão sutis */}
-      <path d="M20 32 L32 20" stroke="white" strokeWidth="1" opacity="0.4" />
-      <path d="M44 32 L32 20" stroke="white" strokeWidth="1" opacity="0.4" />
+      <circle cx="30" cy="35" r="4" fill="#FCD34D" />
+      <circle cx="54" cy="50" r="4" fill="#FCD34D" />
+      <circle cx="66" cy="35" r="4" fill="#FCD34D" />
       
       <defs>
-        <linearGradient id="gradient1" x1="12" y1="24" x2="52" y2="56" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="100%" stopColor="#06b6d4" />
-        </linearGradient>
-        <linearGradient id="gradient2" x1="12" y1="36" x2="52" y2="42" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#14b8a6" />
-          <stop offset="100%" stopColor="#06b6d4" />
-        </linearGradient>
-        <linearGradient id="gradient3" x1="26" y1="14" x2="38" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#f59e0b" />
-          <stop offset="100%" stopColor="#ef4444" />
+        <linearGradient id="bgGradient" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#2563EB" />
+          <stop offset="50%" stopColor="#0891B2" />
+          <stop offset="100%" stopColor="#14B8A6" />
         </linearGradient>
       </defs>
     </svg>
   );
 
   const LogoText = () => (
-    <div className="flex flex-col leading-none">
-      <span className={`font-bold bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent ${textSize}`}>
-        Nexo Brindes
-      </span>
-      {size !== 'sm' && (
-        <span className="text-xs text-gray-500 mt-0.5 font-medium tracking-wide">
-          Sua conexão com presentes únicos
-        </span>
-      )}
-    </div>
+    <span className={`font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 bg-clip-text text-transparent ${textSize}`}>
+      Nexo Brindes
+    </span>
   );
 
   if (variant === 'icon') {
