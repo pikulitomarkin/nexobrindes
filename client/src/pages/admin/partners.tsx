@@ -56,19 +56,26 @@ export default function AdminPartners() {
   });
 
   const createPartnerMutation = useMutation({
-    mutationFn: async (newPartner: Omit<Partner, "id" | "createdAt" | "isActive">) => {
+    mutationFn: async (partnerData: typeof partnerForm) => {
+      console.log('Sending partner data:', partnerData);
       const response = await fetch("/api/partners", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify(newPartner),
+        body: JSON.stringify(partnerData),
       });
-      if (!response.ok) throw new Error("Failed to create partner");
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create partner");
+      }
+      
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Partner created successfully:', data);
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
       setIsDialogOpen(false);
       resetForm();
@@ -77,10 +84,11 @@ export default function AdminPartners() {
         description: "Sócio criado com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      console.error('Error creating partner:', error);
       toast({
         title: "Erro",
-        description: "Erro ao criar sócio",
+        description: error.message || "Erro ao criar sócio",
         variant: "destructive",
       });
     },
@@ -170,14 +178,35 @@ export default function AdminPartners() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!partnerForm.name || !partnerForm.email || !partnerForm.username || !partnerForm.password) {
+    // Validate required fields
+    if (!partnerForm.name || partnerForm.name.trim().length === 0) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Nome é obrigatório",
         variant: "destructive",
       });
       return;
     }
+
+    if (!partnerForm.username || partnerForm.username.trim().length === 0) {
+      toast({
+        title: "Erro",
+        description: "Nome de usuário é obrigatório",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!partnerForm.password || partnerForm.password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "Senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Submitting partner form:', partnerForm);
 
     if (editingPartner) {
       updatePartnerMutation.mutate({
@@ -359,9 +388,9 @@ export default function AdminPartners() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{partner.username}</div>
-                          {partner.userCode && (
-                            <div className="text-xs text-blue-600 font-mono">#{partner.userCode}</div>
+                          <div className="text-sm font-medium text-gray-900">{partner.username || partner.userCode || "N/A"}</div>
+                          {(partner.userCode || partner.username) && (
+                            <div className="text-xs text-blue-600 font-mono">#{partner.userCode || partner.username}</div>
                           )}
                         </div>
                       </td>

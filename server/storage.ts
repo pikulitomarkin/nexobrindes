@@ -2367,27 +2367,43 @@ export class MemStorage implements IStorage {
   }
 
   async createPartner(partnerData: any): Promise<User> {
-    // Generate unique userCode if not provided
-    const userCode = partnerData.userCode || this.generatePartnerCode();
+    console.log('Storage: Creating partner with data:', partnerData);
+
+    // Validate required fields
+    if (!partnerData.name || partnerData.name.trim().length === 0) {
+      throw new Error("Nome é obrigatório");
+    }
+
+    if (!partnerData.username || partnerData.username.trim().length === 0) {
+      throw new Error("Nome de usuário é obrigatório");
+    }
+
+    if (!partnerData.password || partnerData.password.length < 6) {
+      throw new Error("Senha deve ter pelo menos 6 caracteres");
+    }
+
+    // Check if username already exists
+    const existingUser = await this.getUserByUsername(partnerData.username.trim());
+    if (existingUser) {
+      throw new Error("Nome de usuário já existe");
+    }
 
     // Create user first
     const newUser: User = {
       id: randomUUID(),
-      username: partnerData.username || userCode,
-      password: partnerData.password || "123456",
+      username: partnerData.username.trim(),
+      password: partnerData.password,
       role: 'partner',
-      name: partnerData.name,
-      email: partnerData.email || null,
-      phone: partnerData.phone || null,
-      address: partnerData.address || null,
-      specialty: partnerData.specialty || null,
+      name: partnerData.name.trim(),
+      email: partnerData.email?.trim() || null,
+      phone: partnerData.phone?.trim() || null,
+      address: partnerData.address?.trim() || null,
+      specialty: partnerData.specialty?.trim() || null,
       vendorId: null,
       isActive: true
     };
 
-    // Add userCode to user object for partner access
-    (newUser as any).userCode = userCode;
-
+    console.log('Storage: Adding user to users map:', { id: newUser.id, username: newUser.username, role: newUser.role });
     this.users.set(newUser.id, newUser);
 
     // Create partner profile
@@ -2400,7 +2416,10 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
 
+    console.log('Storage: Adding partner profile to partners map:', { id: partnerProfile.id, userId: partnerProfile.userId });
     this.partners.set(partnerProfile.id, partnerProfile);
+
+    console.log('Storage: Partner created successfully. Total users:', this.users.size, 'Total partners:', this.partners.size);
     return newUser;
   }
 

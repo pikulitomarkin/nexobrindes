@@ -3076,11 +3076,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: partner.id,
           name: partner.name,
           email: partner.email || "",
-          accessCode: partner.username || "",
+          username: partner.username || "",
+          userCode: partner.username || "",
           phone: partner.phone || "",
-          commissionRate: partnerProfile?.commissionRate || '5.00',
+          commissionRate: partnerProfile?.commissionRate || '15.00',
           createdAt: partner.createdAt,
-          isActive: true
+          isActive: partner.isActive || true
         };
       }));
 
@@ -3093,46 +3094,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create partner (admin-level user)
   app.post("/api/partners", async (req, res) => {
-    const { name, email, phone, username, password } = req.body;
-
-    if (!name || !email || !username || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // Create user first
-    const userId = generateId("partner");
-    const user = {
-      id: userId,
-      username,
-      password,
-      role: "partner",
-      name,
-      email,
-      phone: phone || "",
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
-    // Create partner profile
-    const partner = {
-      id: userId,
-      userId,
-      name,
-      email,
-      phone: phone || "",
-      username,
-      password, // Note: Storing password directly here is insecure for production.
-      createdAt: new Date().toISOString(),
-      isActive: true,
-    };
-
     try {
-      await storage.addUser(user); // Assuming addUser exists and handles user creation
-      await storage.addPartner(partner); // Assuming addPartner exists for partner-specific data
-      res.json(partner);
+      const { name, email, phone, username, password } = req.body;
+
+      console.log('Creating partner with request data:', { name, email, phone, username: username, hasPassword: !!password });
+
+      // Validate required fields
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Nome de usuário é obrigatório" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser) {
+        console.log('Username already exists:', username);
+        return res.status(400).json({ error: "Nome de usuário já existe" });
+      }
+
+      // Create partner using storage method
+      const newPartner = await storage.createPartner({
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        username: username.trim(),
+        password: password,
+        commissionRate: '15.00' // Default commission rate for partners
+      });
+
+      // Log partner creation
+      await storage.logUserAction(
+        req.user?.id || 'admin-1',
+        req.user?.name || 'Administrador',
+        req.user?.role || 'admin',
+        'CREATE',
+        'users',
+        newPartner.id,
+        `Sócio criado: ${newPartner.name} - Usuário: ${newPartner.username}`,
+        'success',
+        {
+          userName: newPartner.name,
+          username: newPartner.username,
+          role: newPartner.role,
+          email: newPartner.email
+        }
+      );
+
+      console.log('Partner created successfully:', { id: newPartner.id, username: newPartner.username, name: newPartner.name });
+
+      // Return partner without password
+      const { password: _, ...partnerWithoutPassword } = newPartner;
+
+      res.json({
+        success: true,
+        partner: {
+          ...partnerWithoutPassword,
+          userCode: newPartner.username,
+          commissionRate: '15.00'
+        }
+      });
     } catch (error) {
-      console.error("Error creating partner:", error);
-      res.status(500).json({ error: "Failed to create partner" });
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: "Failed to create partner: " + error.message });
     }
   });
 
