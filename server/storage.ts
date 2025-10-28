@@ -1366,7 +1366,7 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient): Promise<Client> {
+  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
     const id = randomUUID();
 
     console.log(`Storage: === CREATING CLIENT ===`);
@@ -1375,12 +1375,13 @@ export class MemStorage implements IStorage {
       vendorId: clientData.vendorId,
       branchId: clientData.branchId,
       userId: clientData.userId,
+      userCode: clientData.userCode,
       email: clientData.email,
       phone: clientData.phone,
       isActive: clientData.isActive
     });
 
-    const newClient: Client = {
+    const newClient: Client & { userCode?: string } = {
       id,
       userId: clientData.userId || null,
       name: clientData.name,
@@ -1391,6 +1392,7 @@ export class MemStorage implements IStorage {
       address: clientData.address || null,
       vendorId: clientData.vendorId || null,
       branchId: clientData.branchId || null,
+      userCode: clientData.userCode || null, // Store userCode
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()

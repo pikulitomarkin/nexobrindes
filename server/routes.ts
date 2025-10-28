@@ -1263,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const orderDetails = JSON.parse(po.orderDetails);
               if (orderDetails.items) {
-                producerItems = orderDetails.items.filter(item => 
+                producerItems = orderDetails.items.filter(item =>
                   item.producerId === po.producerId
                 );
               }
@@ -2384,8 +2384,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      console.log(`Returning ${enrichedOrders.length} enriched production orders`);
-      res.json(enrichedOrders);
+      // Filter out null entries
+      const validOrders = enrichedOrders.filter(order => order !== null);
+
+      console.log(`Returning ${validOrders.length} enriched production orders`);
+      res.json(validOrders);
     } catch (error) {
       console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
@@ -3681,10 +3684,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
 
-        // Note: No need to manually update order.paidValue here as createPayment() with 
+        // Note: No need to manually update order.paidValue here as createPayment() with
         // status='confirmed' already calls updateOrderPaidValue() which:
         // 1. Sums all confirmed payments for the order
-        // 2. Updates order.paidValue 
+        // 2. Updates order.paidValue
         // 3. Updates the corresponding accountsReceivable status/receivedAmount
       } else {
         // This is a manual receivable - update the receivable directly
@@ -3994,7 +3997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createBankTransaction({
             importId: importRecord.id,
             fitId: transaction.fitId,
-            date: new Date(transaction.date),
+            date: new Date(transaction.date), // Ensure date is a Date object
             amount: transaction.amount, // Keep original negative value
             description: transaction.description,
             type: transaction.type,
@@ -5168,7 +5171,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json(response);
-    } catch (error) {console.error("Error creating budget:", error);
+    } catch (error) {
+      console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
@@ -5186,7 +5190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName} (${itemKey})`);
+          console.log(`[CREATE BUDGET] Removing duplicate budget update item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
@@ -6512,7 +6516,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Apply additional filters
       if (search) {
         const searchTerm = (search as string).toLowerCase();
-        filteredLogs = filteredLogs.filter((log: any) => 
+        filteredLogs = filteredLogs.filter((log: any) =>
           log.action.toLowerCase().includes(searchTerm) ||
           log.description.toLowerCase().includes(searchTerm) ||
           log.userName.toLowerCase().includes(searchTerm)
@@ -6544,14 +6548,14 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         if (startDate) {
-          filteredLogs = filteredLogs.filter((log: any) => 
+          filteredLogs = filteredLogs.filter((log: any) =>
             new Date(log.createdAt) >= startDate
           );
         }
       }
 
       // Sort by most recent first
-      filteredLogs.sort((a: any, b: any) => 
+      filteredLogs.sort((a: any, b: any) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
