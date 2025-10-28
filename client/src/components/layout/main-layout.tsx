@@ -169,7 +169,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -180,10 +180,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Sidebar with gradient */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        w-64 bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl flex-shrink-0
+        fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white flex-shrink-0">
             <Logo size="sm" variant="full" />
