@@ -6327,9 +6327,6 @@ Para mais detalhes, entre em contato conosco!`;
   const httpServer = createServer(app);
   return httpServer;
 }
-``````typescript
-<replit_final_file>
-import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from 'multer';
 import express from 'express';
