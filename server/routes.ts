@@ -3235,13 +3235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: notes || "",
             paidAt: new Date()
           });
-        } else {
-          throw new Error('Pedido não encontrado');
-        }
 
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
+          // Calculate new paid value safely
           const totalValue = parseFloat(order.totalValue);
           const currentPaid = parseFloat(order.paidValue || '0');
           const thisPayment = parseFloat(amount);
@@ -3256,6 +3251,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
+        } else {
+          throw new Error('Pedido não encontrado');
         }
       } else {
         // This is a manual receivable - update the receivable directly
