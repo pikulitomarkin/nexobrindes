@@ -169,7 +169,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -184,7 +184,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white flex-shrink-0">
             <Logo size="sm" variant="full" />
