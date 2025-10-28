@@ -1762,7 +1762,7 @@ export class MemStorage implements IStorage {
       } else if (shippedCount === totalOrders) {
         newStatus = 'shipped'; // All shipped - order complete
       } else {
-        newStatus = 'partial_shipped'; // Alguns despachados - envio parcial
+        newStatus = 'partial_shipped'; // Some despachados - envio parcial
       }
 
       console.log(`Order ${orderId} shipping status update: ${shippedCount}/${totalOrders} shipped -> ${newStatus}`);
@@ -2864,6 +2864,19 @@ export class MemStorage implements IStorage {
     return enrichedBudgets;
   }
 
+  // Helper function to get branchId from order or vendor
+  private async getBranchIdForOrder(order: Order): Promise<string | null> {
+    if (order.branchId) {
+      return order.branchId;
+    }
+    if (order.vendorId) {
+      const vendor = await this.getVendor(order.vendorId);
+      return vendor?.branchId || null;
+    }
+    return null;
+  }
+
+
   // Helper function to parse monetary values in either BRL format or standard format
   // BRL: "15.000,00" (dot=thousands, comma=decimal) -> 15000.00
   // Standard: "15000.00" (dot=decimal, no thousands) -> 15000.00
@@ -3714,6 +3727,7 @@ export class MemStorage implements IStorage {
 
 
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
+    // Get all orders and convert to receivables format
     const orders = await this.getOrders();
 
     // Get manual receivables from mockData
@@ -3721,32 +3735,75 @@ export class MemStorage implements IStorage {
 
     const orderReceivables = orders
       .filter(order => order.status !== 'cancelled') // Não incluir pedidos cancelados
-      .map(order => {
-        const totalValue = parseFloat(order.totalValue || "0");
-        const paidValue = parseFloat(order.paidValue || "0");
-        const remainingValue = Math.max(0, totalValue - paidValue);
-
-        // Get minimum payment (entrada + frete) from budget if available
-        let minimumPaymentValue = "0.00";
-        if (order.budgetId) {
-          // Try to get budget payment info for minimum payment calculation
-          const downPayment = parseFloat(order.downPayment || "0");
-          const shippingCost = parseFloat(order.shippingCost || "0");
-          minimumPaymentValue = downPayment > 0 || shippingCost > 0 ?
-            (downPayment + shippingCost).toFixed(2) : "0.00";
+      .map(async (order) => {
+        // Get client name
+        let clientName = order.contactName || "Cliente não informado";
+        if (!clientName && order.clientId) {
+          const client = await this.getClient(order.clientId);
+          if (client) {
+            clientName = client.name;
+          } else {
+            const clientByUserId = await this.getClientByUserId(order.clientId);
+            if (clientByUserId) {
+              clientName = clientByUserId.name;
+            }
+          }
         }
 
+        // Get vendor's branch info
+        let branchId = order.branchId || null;
+        if (!branchId && order.vendorId) {
+          const vendor = await this.getVendor(order.vendorId);
+          branchId = vendor?.branchId || null;
+        }
+
+        // Get payments for this order to calculate correct received amount
+        const payments = await this.getPaymentsByOrder(order.id);
+        const confirmedPayments = payments.filter(p => p.status === 'confirmed');
+        const receivedAmount = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+        // Calculate minimum payment (entrada + frete) from order/budget info
+        let minimumPayment = "0.00";
+        const downPayment = parseFloat(order.downPayment || '0');
+        const shippingCost = parseFloat(order.shippingCost || '0');
+
+        if (downPayment > 0 || shippingCost > 0) {
+          minimumPayment = (downPayment + shippingCost).toFixed(2);
+        }
+
+        // If order was converted from budget, get budget payment info
+        if (order.budgetId) {
+          try {
+            const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
+            if (budgetPaymentInfo) {
+              const budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || '0');
+              const budgetShipping = parseFloat(budgetPaymentInfo.shippingCost || '0');
+
+              if (budgetDownPayment > 0 || budgetShipping > 0) {
+                minimumPayment = (budgetDownPayment + budgetShipping).toFixed(2);
+              }
+            }
+          } catch (error) {
+            console.log(`Error fetching budget payment info for order ${order.id}:`, error);
+          }
+        }
+
+        console.log(`Order ${order.orderNumber}: total=${order.totalValue}, received=${receivedAmount.toFixed(2)}, minimum=${minimumPayment}, branchId=${branchId}`);
+
+        // Calculate status based on payments and minimum payment
+        const totalValue = parseFloat(order.totalValue);
         let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
-        if (paidValue >= totalValue) {
+
+        if (receivedAmount >= totalValue) {
           status = 'paid';
-        } else if (paidValue > 0) {
-          // Check if minimum payment requirement is met
-          if (parseFloat(minimumPaymentValue) > 0 && paidValue >= parseFloat(minimumPaymentValue)) {
-            status = 'partial';
-          } else if (parseFloat(minimumPaymentValue) > 0 && paidValue < parseFloat(minimumPaymentValue)) {
-            status = 'pending'; // Minimum not met
+        } else if (receivedAmount > 0) {
+          const minPayment = parseFloat(minimumPayment);
+          if (minPayment > 0 && receivedAmount >= minPayment) {
+            status = 'partial'; // Entrada + frete pagos, restante pendente
+          } else if (minPayment > 0 && receivedAmount < minPayment) {
+            status = 'pending'; // Entrada + frete ainda não pagos completamente
           } else {
-            status = 'partial'; // No minimum requirement
+            status = 'partial'; // Sem exigência de entrada, qualquer valor é parcial
           }
         }
 
@@ -3760,44 +3817,34 @@ export class MemStorage implements IStorage {
           id: `ar-${order.id}`,
           orderId: order.id,
           orderNumber: order.orderNumber,
-          clientName: order.contactName || 'Cliente não identificado',
-          amount: order.totalValue || "0.00", // ✅ CORRIGIDO: Sempre usar valor original do pedido
-          receivedAmount: order.paidValue || "0.00",
-          minimumPayment: minimumPaymentValue,
-          status: status,
-          dueDate: order.deadline ? new Date(order.deadline) : null,
-          createdAt: new Date(order.createdAt),
-          lastPaymentDate: order.lastPaymentDate ? new Date(order.lastPaymentDate) : null,
-          isManual: false,
-          type: 'order',
+          clientId: order.clientId,
+          clientName: clientName,
+          vendorId: order.vendorId,
+          branchId: branchId, // Include branch information
           description: `Venda: ${order.product}`,
-          notes: order.notes || '',
-          // Store remaining value for calculations if needed
-          remainingValue: remainingValue.toFixed(2)
+          amount: order.totalValue, // SEMPRE valor original do pedido
+          receivedAmount: receivedAmount.toFixed(2),
+          minimumPayment: minimumPayment, // Entrada + frete obrigatório
+          dueDate: order.deadline,
+          status: status,
+          type: 'sale',
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt
         };
       });
 
     // Convert manual receivables to the expected format
     const formattedManualReceivables = manualReceivables.map(receivable => ({
-      id: receivable.id,
-      orderId: null,
-      orderNumber: 'MANUAL',
-      clientName: receivable.clientName,
-      amount: receivable.amount,
-      receivedAmount: receivable.receivedAmount || "0.00",
-      minimumPayment: receivable.minimumPayment || "0.00", // Add minimumPayment
-      status: receivable.status,
-      dueDate: receivable.dueDate ? new Date(receivable.dueDate) : null,
-      createdAt: new Date(receivable.createdAt),
-      lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
-      isManual: true,
-      type: 'manual',
-      description: receivable.description,
-      notes: receivable.notes
+      ...receivable,
+      clientName: receivable.clientName || 'Cliente Manual',
+      receivedAmount: receivable.receivedAmount || '0.00',
+      minimumPayment: receivable.minimumPayment || '0.00',
+      branchId: receivable.branchId || null, // Include branch for manual receivables too
+      type: 'manual'
     }));
 
     console.log(`Returning ${orderReceivables.length} order receivables and ${formattedManualReceivables.length} manual receivables`);
-    return [...orderReceivables, ...formattedManualReceivables];
+    return [...await Promise.all(orderReceivables), ...formattedManualReceivables];
   }
 
   // This method is for creating manual receivables directly, not order-based ones.

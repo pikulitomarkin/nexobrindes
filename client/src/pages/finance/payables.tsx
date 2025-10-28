@@ -262,6 +262,7 @@ export default function FinancePayables() {
         orderNumber: payment.orderNumber,
         productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
         category: 'Produção',
+        branchId: payment.branchId || null, // Add branch info
         actualId: payment.id // Store the original ID
       })),
 
@@ -277,7 +278,8 @@ export default function FinancePayables() {
         status: 'approved',
         beneficiary: expense.vendorName || 'Despesa Geral',
         category: expense.category,
-        orderNumber: expense.orderNumber || '-'
+        orderNumber: expense.orderNumber || '-',
+        branchId: expense.branchId || null // Add branch info
       })),
 
     // Confirmed commissions not paid
@@ -292,7 +294,8 @@ export default function FinancePayables() {
         status: 'confirmed',
         beneficiary: commission.vendorName || commission.partnerName,
         category: commission.type === 'vendor' ? 'Comissão Vendedor' : 'Comissão Parceiro',
-        orderNumber: commission.orderNumber
+        orderNumber: commission.orderNumber,
+        branchId: commission.branchId || null // Add branch info
       })),
 
     // Cancelled orders with payments (refunds)
@@ -308,6 +311,7 @@ export default function FinancePayables() {
         beneficiary: order.clientName,
         category: 'Estorno',
         orderNumber: order.orderNumber,
+        branchId: order.branchId || null, // Add branch info from order
         originalOrder: order
       })),
 
@@ -321,7 +325,8 @@ export default function FinancePayables() {
       status: payable.status,
       beneficiary: payable.beneficiary,
       category: payable.category,
-      orderNumber: 'MANUAL'
+      orderNumber: 'MANUAL',
+      branchId: payable.branchId || null // Add branch info
     }))
   ];
 
