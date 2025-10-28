@@ -339,9 +339,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         unitPrice: item.unitPrice
       })));
 
+      // Filter and validate items before enriching
+      const validItems = items.filter(item => {
+        const isValid = item.productId && 
+                       item.productName && 
+                       item.productName.trim() !== '' &&
+                       item.quantity > 0 &&
+                       item.unitPrice > 0;
+        
+        if (!isValid) {
+          console.log(`Filtering out invalid item for PDF:`, {
+            id: item.id,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice
+          });
+        }
+        
+        return isValid;
+      });
+
+      // Remove duplicates based on productId, producerId, quantity, and unitPrice
+      const uniqueValidItems = [];
+      const seenItemKeys = new Set();
+
+      for (const item of validItems) {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (!seenItemKeys.has(itemKey)) {
+          seenItemKeys.add(itemKey);
+          uniqueValidItems.push(item);
+        } else {
+          console.log(`Removing duplicate item for PDF: ${item.productName} (${itemKey})`);
+        }
+      }
+
+      console.log(`Processing ${uniqueValidItems.length} unique valid items for PDF (filtered from ${items.length} total items)`);
+
       // Enrich items with product data
       const enrichedItems = await Promise.all(
-        items.map(async (item) => {
+        uniqueValidItems.map(async (item) => {
           const product = await storage.getProduct(item.productId);
           return {
             id: item.id,
@@ -358,7 +395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productHeight: item.productHeight,
             productDepth: item.productDepth,
             product: {
-              name: product?.name || 'Produto não encontrado',
+              name: product?.name || item.productName || 'Produto não encontrado',
               description: product?.description || '',
               category: product?.category || '',
               imageLink: product?.imageLink || ''

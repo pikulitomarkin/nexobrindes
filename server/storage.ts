@@ -1296,7 +1296,7 @@ export class MemStorage implements IStorage {
 
   async createClient(clientData: InsertClient): Promise<Client> {
     const id = randomUUID();
-    
+
     console.log(`Storage: === CREATING CLIENT ===`);
     console.log(`Storage: Input data:`, {
       name: clientData.name,
@@ -1326,9 +1326,9 @@ export class MemStorage implements IStorage {
 
     console.log(`Storage: About to save client with ID: ${id}`);
     console.log(`Storage: Client object:`, newClient);
-    
+
     this.clients.set(id, newClient);
-    
+
     console.log(`Storage: Client saved to map. Map size before: ${this.clients.size - 1}, after: ${this.clients.size}`);
     console.log(`Storage: Verification - can retrieve client: ${this.clients.has(id)}`);
     console.log(`Storage: Retrieved client:`, this.clients.get(id));
@@ -2696,11 +2696,7 @@ export class MemStorage implements IStorage {
     const allBudgets = Array.from(this.budgets.values());
     console.log(`Storage: Total budgets in storage: ${allBudgets.length}`);
 
-    const vendorBudgets = allBudgets.filter(budget => {
-      const isMatch = budget.vendorId === vendorId;
-      console.log(`Storage: Budget ${budget.budgetNumber} - vendorId: ${budget.vendorId}, matches ${vendorId}: ${isMatch}`);
-      return isMatch;
-    });
+    const vendorBudgets = allBudgets.filter(budget => budget.vendorId === vendorId);
 
     console.log(`Storage: Found ${vendorBudgets.length} budgets for vendor ${vendorId}`);
 
@@ -3076,44 +3072,50 @@ export class MemStorage implements IStorage {
     return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
   }
 
-  async createBudgetItem(budgetId: string, itemData: any) {
-    const id = generateId('budget-item');
+  async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
+    // Validate required fields to prevent empty/invalid items
+    if (!itemData.productId || !itemData.productName || itemData.productName.trim() === '') {
+      console.log(`Rejecting invalid budget item - missing productId or productName:`, itemData);
+      throw new Error('ProductId and productName are required for budget items');
+    }
 
-    const item = {
+    if (!itemData.quantity || parseFloat(itemData.quantity) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid quantity:`, itemData);
+      throw new Error('Quantity must be greater than 0');
+    }
+
+    if (!itemData.unitPrice || parseFloat(itemData.unitPrice) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid unitPrice:`, itemData);
+      throw new Error('Unit price must be greater than 0');
+    }
+
+    // Check for duplicate items in the same budget (same product, producer, quantity, and unit price)
+    const existingItems = Array.from(this.budgetItems.values())
+      .filter(item => item.budgetId === budgetId);
+
+    const duplicateKey = `${itemData.productId}-${itemData.producerId || 'internal'}-${itemData.quantity}-${itemData.unitPrice}`;
+    const hasDuplicate = existingItems.some(existing => {
+      const existingKey = `${existing.productId}-${existing.producerId || 'internal'}-${existing.quantity}-${existing.unitPrice}`;
+      return existingKey === duplicateKey;
+    });
+
+    if (hasDuplicate) {
+      console.log(`Preventing duplicate budget item creation: ${itemData.productName} (${duplicateKey})`);
+      throw new Error(`Este item já foi adicionado ao orçamento com as mesmas especificações`);
+    }
+
+    const id = generateId('budget-item');
+    const newItem = {
       id,
       budgetId,
-      productId: itemData.productId || null,
-      productName: itemData.productName || '',
-      producerId: itemData.producerId || null,
-      quantity: parseInt(itemData.quantity) || 1,
-      unitPrice: this.parseBRLCurrency(itemData.unitPrice),
-      totalPrice: this.parseBRLCurrency(itemData.totalPrice),
-      // Item customization fields
-      hasItemCustomization: itemData.hasItemCustomization || false,
-      selectedCustomizationId: itemData.selectedCustomizationId || null,
-      itemCustomizationValue: this.parseBRLCurrency(itemData.itemCustomizationValue),
-      itemCustomizationDescription: itemData.itemCustomizationDescription || '',
-      additionalCustomizationNotes: itemData.additionalCustomizationNotes || '',
-      customizationPhoto: itemData.customizationPhoto || '', // Add customization photo field
-      // General customization fields
-      hasGeneralCustomization: itemData.hasGeneralCustomization || false,
-      generalCustomizationName: itemData.generalCustomizationName || '',
-      generalCustomizationValue: this.parseBRLCurrency(itemData.generalCustomizationValue),
-      // Product dimensions
-      productWidth: itemData.productWidth || null,
-      productHeight: itemData.productHeight || null,
-      productDepth: itemData.productDepth || null,
-      // Item discount
-      hasItemDiscount: itemData.hasItemDiscount || false,
-      itemDiscountType: itemData.itemDiscountType || 'percentage',
-      itemDiscountPercentage: this.parsePercentage(itemData.itemDiscountPercentage),
-      itemDiscountValue: this.parseBRLCurrency(itemData.itemDiscountValue),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      ...itemData,
+      productName: itemData.productName.trim(), // Ensure productName is trimmed
+      createdAt: new Date()
     };
 
-    this.budgetItems.set(id, item);
-    return item;
+    this.budgetItems.set(id, newItem);
+    console.log(`Budget item created: ${id} for budget ${budgetId} - Product: ${newItem.productName}`);
+    return newItem;
   }
 
   async updateBudgetItem(itemId: string, itemData: any): Promise<any> {
