@@ -320,24 +320,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log(`Fetching PDF data for budget: ${id}`);
+      
       const budget = await storage.getBudget(id);
-
       if (!budget) {
+        console.log(`Budget not found: ${id}`);
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Get all budget data including item photos
-      const budgetData = {
-        budget: budget,
-        items: budget.items || [],
-        photos: budget.photos || [],
-        itemPhotos: budget.items?.map((item: any) => item.customizationPhoto).filter(Boolean) || []
+      // Get budget items with product details
+      const items = await storage.getBudgetItems(id);
+      console.log(`Found ${items.length} budget items`);
+
+      // Enrich items with product data
+      const enrichedItems = await Promise.all(
+        items.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          return {
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            hasItemCustomization: item.hasItemCustomization,
+            itemCustomizationPercentage: item.itemCustomizationPercentage,
+            itemCustomizationDescription: item.itemCustomizationDescription,
+            itemCustomizationValue: item.itemCustomizationValue,
+            customizationPhoto: item.customizationPhoto,
+            productWidth: item.productWidth,
+            productHeight: item.productHeight,
+            productDepth: item.productDepth,
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
+      );
+
+      // Get client information
+      const client = await storage.getClient(budget.clientId);
+      let clientName = budget.contactName || 'Cliente não informado';
+      let clientEmail = budget.contactEmail || '';
+      let clientPhone = budget.contactPhone || '';
+
+      if (client) {
+        clientName = client.name;
+        clientEmail = client.email || budget.contactEmail || '';
+        clientPhone = client.phone || budget.contactPhone || '';
+      }
+
+      // Get vendor information
+      const vendor = await storage.getUser(budget.vendorId);
+
+      // Get budget photos
+      const photos = await storage.getBudgetPhotos(id);
+      const photoUrls = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+      // Get payment and shipping methods
+      const paymentMethods = await storage.getPaymentMethods();
+      const shippingMethods = await storage.getShippingMethods();
+
+      // Get payment info
+      const paymentInfo = await storage.getBudgetPaymentInfo(id);
+
+      // Calculate total budget value
+      const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+
+      const pdfData = {
+        budget: {
+          id: budget.id,
+          budgetNumber: budget.budgetNumber,
+          title: budget.title,
+          description: budget.description,
+          clientId: budget.clientId,
+          vendorId: budget.vendorId,
+          totalValue: totalBudget.toFixed(2),
+          validUntil: budget.validUntil,
+          deliveryDeadline: budget.deliveryDeadline,
+          hasCustomization: budget.hasCustomization,
+          customizationPercentage: budget.customizationPercentage,
+          customizationDescription: budget.customizationDescription,
+          hasDiscount: budget.hasDiscount,
+          discountType: budget.discountType,
+          discountPercentage: budget.discountPercentage,
+          discountValue: budget.discountValue,
+          createdAt: budget.createdAt,
+          photos: photoUrls,
+          paymentMethodId: paymentInfo?.paymentMethodId || null,
+          shippingMethodId: paymentInfo?.shippingMethodId || null,
+          installments: paymentInfo?.installments || 1,
+          downPayment: paymentInfo?.downPayment || "0.00",
+          remainingAmount: paymentInfo?.remainingAmount || "0.00",
+          shippingCost: paymentInfo?.shippingCost || "0.00"
+        },
+        items: enrichedItems,
+        client: {
+          name: clientName,
+          email: clientEmail,
+          phone: clientPhone
+        },
+        vendor: {
+          name: vendor?.name || 'Vendedor',
+          email: vendor?.email || '',
+          phone: vendor?.phone || ''
+        },
+        paymentMethods: paymentMethods || [],
+        shippingMethods: shippingMethods || []
       };
 
-      res.json(budgetData);
+      console.log(`PDF data prepared for budget ${id}: ${enrichedItems.length} items, client: ${clientName}`);
+      res.json(pdfData);
     } catch (error) {
       console.error("Error fetching budget PDF data:", error);
-      res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF" });
+      res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF: " + error.message });
     }
   });
 

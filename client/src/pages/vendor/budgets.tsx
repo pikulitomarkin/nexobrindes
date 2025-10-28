@@ -420,12 +420,30 @@ export default function VendorBudgets() {
 
   const generatePDFMutation = useMutation({
     mutationFn: async (budgetId: string) => {
+      console.log('Starting PDF generation for budget:', budgetId);
       const response = await fetch(`/api/budgets/${budgetId}/pdf-data`);
-      if (!response.ok) throw new Error("Erro ao buscar dados do orçamento");
-      return response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PDF data fetch failed:', errorText);
+        throw new Error(`Erro ao buscar dados do orçamento: ${errorText}`);
+      }
+      const data = await response.json();
+      console.log('PDF data received:', data);
+      return data;
     },
     onSuccess: async (data) => {
       try {
+        console.log('Generating PDF with data:', data);
+        
+        // Validate data before generating PDF
+        if (!data.budget) {
+          throw new Error('Dados do orçamento não encontrados na resposta da API');
+        }
+        
+        if (!data.items || data.items.length === 0) {
+          throw new Error('Nenhum item encontrado no orçamento');
+        }
+
         const pdfGenerator = new PDFGenerator();
         const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
 
@@ -433,7 +451,7 @@ export default function VendorBudgets() {
         const url = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `orcamento-${data.budget.budgetNumber}.pdf`;
+        link.download = `orcamento-${data.budget.budgetNumber || 'sem-numero'}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -447,15 +465,16 @@ export default function VendorBudgets() {
         console.error('Error generating PDF:', error);
         toast({
           title: "Erro",
-          description: "Erro ao gerar PDF. Tente novamente.",
+          description: `Erro ao gerar PDF: ${error.message}`,
           variant: "destructive"
         });
       }
     },
     onError: (error) => {
+      console.error('PDF generation mutation error:', error);
       toast({
         title: "Erro",
-        description: "Erro ao buscar dados do orçamento.",
+        description: `Erro ao buscar dados do orçamento: ${error.message}`,
         variant: "destructive"
       });
     }

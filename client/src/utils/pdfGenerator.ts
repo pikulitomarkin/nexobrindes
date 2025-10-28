@@ -420,26 +420,16 @@ export class PDFGenerator {
           imageUrl = `${window.location.origin}${item.customizationPhoto}`;
         }
 
-        // Load image
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // Load image with better error handling
+        const img = await this.loadImageWithFallback(imageUrl);
 
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            console.warn(`Failed to load image: ${imageUrl}`);
-            resolve(null); // Continue even if image fails to load
-          };
-          img.src = imageUrl;
-        });
-
-        if (img.complete && img.naturalWidth > 0) {
+        if (img) {
           this.addNewPageIfNeeded(120);
 
           // Product name
           this.doc.setFontSize(12);
           this.doc.setFont('helvetica', 'bold');
-          this.doc.text(item.product.name, this.margin, this.currentY);
+          this.doc.text(item.product?.name || 'Produto', this.margin, this.currentY);
           this.currentY += 5;
 
           // Customization description if available
@@ -455,8 +445,8 @@ export class PDFGenerator {
           this.currentY += 5;
 
           // Calculate image dimensions (maintain aspect ratio and make it larger)
-          const maxWidth = 120; // Increased from 80
-          const maxHeight = 90;  // Increased from 60
+          const maxWidth = 120;
+          const maxHeight = 90;
 
           let width = maxWidth;
           let height = (img.naturalHeight / img.naturalWidth) * width;
@@ -476,40 +466,109 @@ export class PDFGenerator {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg', 0.9); // Higher quality
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
 
             this.doc.addImage(imageData, 'JPEG', imageX, this.currentY, width, height);
-            this.currentY += height + 15; // More spacing between images
+            this.currentY += height + 15;
           }
+        } else {
+          // Add placeholder text for failed images
+          this.doc.setFontSize(10);
+          this.doc.setTextColor(150, 150, 150);
+          this.doc.text(`Imagem de personalização não disponível para ${item.product?.name || 'produto'}`, this.margin, this.currentY);
+          this.currentY += 15;
+          this.doc.setTextColor(0, 0, 0);
         }
       } catch (error) {
         console.error('Error adding product customization image to PDF:', error);
-        // Continue with next image even if this one fails
+        // Add error placeholder
+        this.doc.setFontSize(10);
+        this.doc.setTextColor(150, 150, 150);
+        this.doc.text(`Erro ao carregar imagem de ${item.product?.name || 'produto'}`, this.margin, this.currentY);
+        this.currentY += 15;
+        this.doc.setTextColor(0, 0, 0);
       }
     }
 
     this.currentY += 10;
   }
 
+  private async loadImageWithFallback(src: string): Promise<HTMLImageElement | null> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        if (img.complete && img.naturalWidth > 0) {
+          resolve(img);
+        } else {
+          resolve(null);
+        }
+      };
+      
+      img.onerror = () => {
+        console.warn(`Failed to load image: ${src}`);
+        resolve(null);
+      };
+      
+      // Set timeout to avoid hanging
+      setTimeout(() => {
+        resolve(null);
+      }, 5000);
+      
+      img.src = src;
+    });
+  }
+
   public async generateBudgetPDF(data: BudgetPDFData): Promise<Blob> {
     try {
+      console.log('Starting PDF generation for budget:', data.budget?.budgetNumber);
+      
+      // Validate required data
+      if (!data.budget) {
+        throw new Error('Dados do orçamento não encontrados');
+      }
+      
+      if (!data.client) {
+        throw new Error('Dados do cliente não encontrados');
+      }
+      
+      if (!data.vendor) {
+        throw new Error('Dados do vendedor não encontrados');
+      }
+
       this.currentY = 20;
 
+      console.log('Adding header...');
       this.addHeader(data);
+      
+      console.log('Adding client and vendor info...');
       this.addClientVendorInfo(data);
+      
+      console.log('Adding items...');
       await this.addItems(data);
+      
+      console.log('Adding total...');
       this.addTotal(data);
+      
+      console.log('Adding payment and shipping info...');
       this.addPaymentShippingInfo(data);
+      
+      console.log('Adding description...');
       this.addDescription(data);
+      
+      console.log('Adding customization images...');
       await this.addProductCustomizationImages(data);
 
+      console.log('Generating PDF blob...');
       return new Promise((resolve) => {
         const pdfBlob = this.doc.output('blob');
+        console.log('PDF generated successfully, size:', pdfBlob.size, 'bytes');
         resolve(pdfBlob);
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
-      throw new Error('Falha ao gerar PDF');
+      throw new Error(`Falha ao gerar PDF: ${error.message}`);
     }
   }
 
