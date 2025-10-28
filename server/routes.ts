@@ -3888,26 +3888,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients", async (req, res) => {
     try {
       const clientData = req.body;
-      console.log("Creating client:", clientData);
+      console.log("=== CREATING CLIENT ===");
+      console.log("Request body:", JSON.stringify(clientData, null, 2));
 
       // Validate required fields
       if (!clientData.name) {
+        console.log("ERROR: Nome é obrigatório");
         return res.status(400).json({ error: "Nome é obrigatório" });
       }
 
       if (!clientData.password) {
+        console.log("ERROR: Senha é obrigatória");
         return res.status(400).json({ error: "Senha é obrigatória" });
       }
 
       // Use userCode as username if provided, otherwise generate one
       const username = clientData.userCode || `cli_${Date.now()}`;
+      console.log(`Generated username: ${username}`);
 
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log(`ERROR: Username ${username} already exists`);
         return res.status(400).json({ error: "Código de usuário já existe" });
       }
 
+      console.log("Creating user account...");
       // Create user first
       const user = await storage.createUser({
         username: username,
@@ -3918,6 +3924,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone: clientData.phone || null,
         isActive: true
       });
+
+      console.log(`User created with ID: ${user.id}`);
+      console.log("Creating client profile...");
 
       // Create client profile
       const client = await storage.createClient({
@@ -3932,17 +3941,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      console.log(`Client created successfully: ${client.id} - ${client.name}`);
+      console.log(`SUCCESS: Client created successfully: ${client.id} - ${client.name}`);
 
-      res.json({
+      const response = {
         success: true,
         client: {
           ...client,
           userCode: username
         }
-      });
+      };
+
+      console.log("Sending response:", JSON.stringify(response, null, 2));
+      res.json(response);
     } catch (error) {
-      console.error("Error creating client:", error);
+      console.error("ERROR creating client:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: "Erro ao criar cliente: " + error.message });
     }
   });
