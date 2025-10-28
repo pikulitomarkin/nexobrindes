@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Building2, MapPin, Crown } from "lucide-react";
+import { Plus, Edit, Building2, MapPin, Crown, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -108,6 +108,37 @@ export default function AdminBranches() {
       });
     },
   });
+
+  const deleteBranchMutation = useMutation({
+    mutationFn: async (branchId: string) => {
+      const response = await fetch(`/api/branches/${branchId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erro ao excluir filial");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/branches"] });
+      toast({
+        title: "Sucesso!",
+        description: "Filial excluída com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteBranch = (branchId: string, branchName: string) => {
+    if (confirm(`Tem certeza que deseja excluir a filial "${branchName}"?`)) {
+      deleteBranchMutation.mutate(branchId);
+    }
+  };
 
   const onSubmit = (data: BranchFormValues) => {
     if (editingBranch) {
@@ -286,6 +317,15 @@ export default function AdminBranches() {
                       title="Editar"
                     >
                       <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteBranch(branch.id, branch.name)}
+                      title="Excluir"
+                      disabled={deleteBranchMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
                     </Button>
                   </div>
                   
