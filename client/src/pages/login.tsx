@@ -90,21 +90,6 @@ export default function Login() {
     }
   };
 
-  const demoUsers = [
-    { username: "admin", password: "123456", role: "admin", label: "Administrador", icon: Shield, color: "text-red-600" },
-    { username: "vendedor1", password: "123456", role: "vendor", label: "Vendedor", icon: Users, color: "text-blue-600" },
-    { username: "cliente1", password: "123456", role: "client", label: "Cliente", icon: User, color: "text-green-600" },
-    { username: "produtor1", password: "123456", role: "producer", label: "Produtor", icon: Factory, color: "text-purple-600" },
-    { username: "logistica1", password: "123456", role: "logistics", label: "Logística", icon: Factory, color: "text-indigo-600" },
-    { username: "financeiro1", password: "123456", role: "finance", label: "Financeiro", icon: DollarSign, color: "text-green-600" },
-    { username: "admin", password: "123456", role: "partner", label: "Sócio", icon: DollarSign, color: "text-yellow-600" },
-  ];
-
-  const quickLogin = (user: any) => {
-    setUsername(user.username);
-    setPassword(user.password);
-    setSelectedProfile(user.role);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 flex items-center justify-center p-4">
@@ -131,6 +116,24 @@ export default function Login() {
                         Administrador
                       </div>
                     </SelectItem>
+                    <SelectItem value="vendor">
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        Vendedor
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="client">
+                      <div className="flex items-center">
+                        <User className="h-4 w-4 mr-2" />
+                        Cliente
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="producer">
+                      <div className="flex items-center">
+                        <Factory className="h-4 w-4 mr-2" />
+                        Produtor
+                      </div>
+                    </SelectItem>
                     <SelectItem value="logistics">
                       <div className="flex items-center">
                         <Factory className="h-4 w-4 mr-2" />
@@ -139,7 +142,7 @@ export default function Login() {
                     </SelectItem>
                     <SelectItem value="partner">
                       <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2" />
+                        <DollarSign className="h-4 w-4 mr-2" />
                         Sócio
                       </div>
                     </SelectItem>
@@ -188,42 +191,6 @@ export default function Login() {
                 {isLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Usuários de teste</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              {demoUsers.map((user, index) => {
-                const Icon = user.icon;
-                return (
-                  <button
-                    key={`${user.username}-${user.role}-${index}`}
-                    data-testid={`button-demo-${user.username}-${user.role}`}
-                    onClick={() => quickLogin(user)}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors text-left"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Icon className={`h-5 w-5 ${user.color}`} />
-                      <div>
-                        <p className="font-medium text-sm">{user.label}</p>
-                        <p className="text-xs text-gray-500">{user.username}</p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-400">Clique para preencher</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="text-center text-xs text-gray-500">
-              <p>Clique em qualquer usuário para preencher automaticamente</p>
-            </div>
           </CardContent>
         </Card>
       </div>
