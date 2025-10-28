@@ -89,7 +89,7 @@ export default function VendorBudgets() {
     contactPhone: "",
     contactEmail: "",
     vendorId: vendorId,
-    branchId: "", // Nova propriedade para filial do orçamento
+    branchId: "matriz", // Definir matriz como padrão
     validUntil: "",
     deliveryDeadline: "",
     deliveryType: "delivery", // 'delivery' or 'pickup'
@@ -343,7 +343,7 @@ export default function VendorBudgets() {
       contactPhone: "",
       contactEmail: "",
       vendorId: vendorId,
-      branchId: "", // Incluir branchId no reset
+      branchId: "matriz", // Manter matriz como padrão no reset
       validUntil: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -886,7 +886,7 @@ export default function VendorBudgets() {
                 <div>
                   <Label htmlFor="budget-branch">Filial do Orçamento *</Label>
                   <Select
-                    value={vendorBudgetForm.branchId || ""}
+                    value={vendorBudgetForm.branchId || "matriz"}
                     onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, branchId: value })}
                     required
                   >
@@ -894,6 +894,7 @@ export default function VendorBudgets() {
                       <SelectValue placeholder="Selecione a filial" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="matriz">Matriz (Padrão)</SelectItem>
                       {branches?.map((branch: any) => (
                         <SelectItem key={branch.id} value={branch.id}>
                           {branch.name} - {branch.city}

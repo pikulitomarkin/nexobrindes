@@ -93,7 +93,7 @@ export default function VendorOrders() {
     contactPhone: "",
     contactEmail: "",
     vendorId: vendorId,
-    branchId: "", // Nova propriedade para filial do pedido
+    branchId: "matriz", // Definir matriz como padrão
     deadline: "",
     deliveryDeadline: "",
     deliveryType: "delivery", // 'delivery' or 'pickup'
@@ -343,7 +343,7 @@ export default function VendorOrders() {
       contactPhone: "",
       contactEmail: "",
       vendorId: vendorId,
-      branchId: "", // Incluir branchId no reset
+      branchId: "matriz", // Manter matriz como padrão no reset
       deadline: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -600,14 +600,9 @@ export default function VendorOrders() {
       return;
     }
 
-    // Validar filial obrigatória
+    // Garantir que sempre tenha uma filial (matriz como padrão)
     if (!vendorOrderForm.branchId) {
-      toast({
-        title: "Erro",
-        description: "A filial do pedido é obrigatória",
-        variant: "destructive"
-      });
-      return;
+      setVendorOrderForm(prev => ({ ...prev, branchId: "matriz" }));
     }
 
     // Validar datas obrigatórias
@@ -944,7 +939,7 @@ export default function VendorOrders() {
                 <div>
                   <Label htmlFor="order-branch">Filial do Pedido *</Label>
                   <Select
-                    value={vendorOrderForm.branchId || ""}
+                    value={vendorOrderForm.branchId || "matriz"}
                     onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, branchId: value })}
                     required
                   >
@@ -952,6 +947,7 @@ export default function VendorOrders() {
                       <SelectValue placeholder="Selecione a filial" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="matriz">Matriz (Padrão)</SelectItem>
                       {branches?.map((branch: any) => (
                         <SelectItem key={branch.id} value={branch.id}>
                           {branch.name} - {branch.city}
