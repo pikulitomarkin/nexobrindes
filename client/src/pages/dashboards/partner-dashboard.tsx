@@ -39,18 +39,18 @@ export default function PartnerDashboard() {
   });
 
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: orders } = useQuery({
+  const { data: orders } = useQuery<any[]>({
     queryKey: ["/api/orders"],
   });
 
   // Query específica para as comissões deste sócio
-  const { data: partnerCommissions } = useQuery({
+  const { data: partnerCommissions = [] } = useQuery<any[]>({
     queryKey: ["/api/commissions"],
-    select: (data) => {
+    select: (data: any[]) => {
       // Filtrar apenas comissões deste sócio específico
       return data?.filter((commission: any) => 
         commission.partnerId === user?.user?.id && commission.type === 'partner'
@@ -59,17 +59,17 @@ export default function PartnerDashboard() {
   });
 
   // Query para todos os pedidos (sócio tem acesso completo)
-  const { data: allOrders } = useQuery({
+  const { data: allOrders = [] } = useQuery<any[]>({
     queryKey: ["/api/orders"],
   });
 
   // Query para todos os vendedores (sócio pode gerenciar)
-  const { data: allVendors } = useQuery({
+  const { data: allVendors = [] } = useQuery<any[]>({
     queryKey: ["/api/vendors"],
   });
 
   // Query para todos os clientes (sócio pode gerenciar)
-  const { data: allClients } = useQuery({
+  const { data: allClients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
 
@@ -81,7 +81,7 @@ export default function PartnerDashboard() {
 
   const quickActions = [
     { href: "/admin/orders", icon: ShoppingCart, label: "Gerenciar Pedidos", color: "text-blue-600" },
-    { href: "/partner/commission-management", icon: TrendingUp, label: "Minhas Comissões", color: "text-green-600" },
+    { href: "/partner/my-commissions", icon: TrendingUp, label: "Minhas Comissões", color: "text-green-600" },
     { href: "/admin/producers", icon: Factory, label: "Produtores", color: "text-purple-600" },
     { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
     { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
@@ -331,7 +331,7 @@ export default function PartnerDashboard() {
           <Card data-testid="card-recent-commissions">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Minhas Comissões Recentes</CardTitle>
-              <Link href="/partner/commission-management">
+              <Link href="/partner/my-commissions">
                 <Button variant="outline" size="sm" data-testid="button-view-all-commissions">
                   <Eye className="h-4 w-4 mr-2" />
                   Ver Todas

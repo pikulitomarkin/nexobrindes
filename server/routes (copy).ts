@@ -1481,15 +1481,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get production orders for shipping details
       const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-      
+
       // Get shipment details for partial/complete shipping
       const shipmentDetails = await Promise.all(
         productionOrders.map(async (po) => {
           const producer = await storage.getUser(po.producerId);
-          
+
           // Filter items for this specific producer
           const producerItems = budgetItems.filter(item => item.producerId === po.producerId);
-          
+
           return {
             producerId: po.producerId,
             producerName: producer?.name || 'Produtor Desconhecido',
@@ -2258,6 +2258,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Partners endpoints
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+      res.json(partners);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const partnerData = req.body;
+      const partner = await storage.createPartner(partnerData);
+      res.json(partner);
+    } catch (error) {
+      console.error("Error creating partner:", error);
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  app.get("/api/partners/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const partner = await storage.getPartner(partnerId);
+      res.json(partner);
+    } catch (error) {
+      console.error("Error fetching partner:", error);
+      res.status(500).json({ error: "Failed to fetch partner" });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner commission:", error);
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
   // Quote Requests routes - Consolidated version
   app.post("/api/quote-requests/consolidated", async (req, res) => {
     try {
@@ -2620,6 +2666,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get commissions for a specific partner
+  app.get("/api/commissions/partner/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const commissions = await storage.getCommissionsByPartner(partnerId);
+
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching partner commissions:", error);
+      res.status(500).json({ error: "Failed to fetch partner commissions" });
+    }
+  });
+
   // Partners routes
   // Get all partners
   app.get("/api/partners", async (req, res) => {
@@ -2654,11 +2730,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const partnerData = req.body;
       console.log("Updating partner:", id, partnerData);
 
+      // Validate required fields
+      if (!partnerData.name || partnerData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
       // Update user information
       const updatedUser = await storage.updateUser(id, {
-        name: partnerData.name,
-        email: partnerData.email,
-        phone: partnerData.phone,
+        name: partnerData.name.trim(),
+        email: partnerData.email?.trim() || null,
+        phone: partnerData.phone?.trim() || null,
         isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
       });
 
@@ -2666,8 +2747,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Sócio não encontrado" });
       }
 
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+
       console.log("Partner updated successfully:", updatedUser.id);
-      res.json(updatedUser);
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Sócio atualizado com sucesso"
+      });
     } catch (error) {
       console.error("Error updating partner:", error);
       res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
@@ -2692,6 +2780,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting partner:", error);
       res.status(500).json({ error: "Erro ao remover sócio: " + error.message });
+    }
+  });
+
+  // Update partner username/password (admin only)
+  app.put("/api/partners/:id/credentials", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { username, password } = req.body;
+      console.log("Updating partner credentials:", id, { username, hasPassword: !!password });
+
+      // Validate required fields
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Código de acesso é obrigatório" });
+      }
+
+      // Check if username already exists (but not for the current user)
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser && existingUser.id !== id) {
+        return res.status(400).json({ error: "Código de acesso já está em uso" });
+      }
+
+      // Update user credentials
+      const updateData: any = {
+        username: username.trim()
+      };
+
+      if (password && password.trim().length > 0) {
+        updateData.password = password.trim();
+      }
+
+      const updatedUser = await storage.updateUser(id, updateData);
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+
+      console.log("Partner credentials updated successfully:", updatedUser.id);
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Credenciais do sócio atualizadas com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating partner credentials:", error);
+      res.status(500).json({ error: "Erro ao atualizar credenciais do sócio: " + error.message });
     }
   });
 
@@ -2724,7 +2860,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("Partner created successfully:", newUser.id);
-      res.json(newUser);
+      res.json({
+        success: true,
+        partner: newUser,
+        message: "Sócio criado com sucesso"
+      });
     } catch (error) {
       console.error("Error creating partner:", error);
       res.status(500).json({ error: "Erro ao criar sócio: " + error.message });
@@ -3071,9 +3211,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (receivable.orderId) {
         // This is an order-based receivable - create payment for the order
+        // Get current order to prevent overpayments
+        const order = await storage.getOrder(receivable.orderId);
+        if (!order) {
+          throw new Error('Pedido não encontrado');
+        }
+
+        const requested = parseFloat(amount);
+        const alreadyPaid = parseFloat(order.paidValue || '0');
+        const total = parseFloat(order.totalValue);
+
+        // Never accept payment above the remaining amount
+        const allowable = Math.max(0, total - alreadyPaid);
+        const finalAmount = Math.min(requested, allowable);
+
+        if (finalAmount !== requested) {
+          console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
+        }
+
         paymentRecord = await storage.createPayment({
           orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
+          amount: finalAmount.toFixed(2),
           method: method || "manual",
           status: "confirmed",
           transactionId: transactionId || `MANUAL-${Date.now()}`,
@@ -3081,24 +3239,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paidAt: new Date()
         });
 
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const totalValue = parseFloat(order.totalValue);
-          const currentPaid = parseFloat(order.paidValue || '0');
-          const thisPayment = parseFloat(amount);
-          const newPaid = currentPaid + thisPayment;
-          const newRemaining = Math.max(totalValue - newPaid, 0);
+        // Calculate new paid value safely
+        const totalValue = parseFloat(order.totalValue);
+        const currentPaid = parseFloat(order.paidValue || '0');
+        const thisPayment = parseFloat(amount);
+        const newPaid = currentPaid + thisPayment;
+        const newRemaining = Math.max(totalValue - newPaid, 0);
 
-          // >>> CRITICAL: NEVER send totalValue in update! <<<
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: newPaid.toFixed(2),
-            remainingAmount: newRemaining.toFixed(2),
-            __origin: 'receivables' // Safety flag for storage layer
-          });
+        // >>> CRITICAL: NEVER send totalValue in update! <<<
+        await storage.updateOrder(receivable.orderId, {
+          paidValue: newPaid.toFixed(2),
+          remainingAmount: newRemaining.toFixed(2),
+          __origin: 'receivables' // Safety flag for storage layer
+        });
 
-          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
-        }
+        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -4277,7 +4432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Also check if contactName matches user info (fallback for orders created from budgets)
+        // ContactName check for orders created from budgets
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
@@ -4348,11 +4503,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      // Validar personalizações antes de criar o orçamento - apenas logar alertas
+      // Validate customizations before creating the budget - only log warnings
       let customizationWarnings = [];
 
       if (req.body.items && req.body.items.length > 0) {
-        console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
+        console.log("Validating budget item customizations:", JSON.stringify(req.body.items, null, 2));
 
         for (const item of req.body.items) {
           console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
@@ -4365,13 +4520,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
               const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
 
-              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+              console.log(`Validation: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
 
               if (itemQty < minQty) {
-                console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando orçamento mesmo assim`);
+                console.log(`WARNING: ${itemQty} < ${minQty} - Saving budget anyway`);
                 customizationWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
               } else {
-                console.log(`APROVADO: ${itemQty} >= ${minQty}`);
+                console.log(`APPROVED: ${itemQty} >= ${minQty}`);
               }
             }
           }
@@ -4403,7 +4558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {          totalPrice += (itemCustomizationValue * quantity);
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
         }
         if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
           totalPrice += (generalCustomizationValue * quantity);
@@ -4474,14 +4630,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       );
 
-      // Incluir alertas na resposta se existirem
+      // Include warnings in the response if any
       const response = {
         ...newBudget,
         warnings: customizationWarnings.length > 0 ? customizationWarnings : undefined
       };
 
       res.json(response);
-    } catch (error) {console.error("Error creating budget:", error);
+    } catch (error) {
+      console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
     }
   });
@@ -4512,7 +4669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
-        const generalCustomizationValue =typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : item.generalCustomizationValue || 0;
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
@@ -5400,7 +5557,8 @@ Para mais detalhes, entre em contato conosco!`;
             producerName: producer?.name || null,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado')
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
           };
         })
       );
@@ -5702,7 +5860,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        // Also check if contactName matches user info (fallback for orders created from budgets)
+        // ContactName check for orders created from budgets
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
