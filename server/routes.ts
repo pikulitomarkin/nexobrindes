@@ -3418,36 +3418,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let paymentRecord;
 
+      // For order-based receivables, update order paidValue (which also updates the receivable)
       if (receivable.orderId) {
-        // This is an order-based receivable - create payment for the order
-        paymentRecord = await storage.createPayment({
-          orderId: receivable.orderId,
-          amount: parseFloat(amount).toFixed(2),
-          method: method || "manual",
-          status: "confirmed",
-          transactionId: transactionId || `MANUAL-${Date.now()}`,
-          notes: notes || "",
-          paidAt: new Date()
-        });
-
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const totalValue = parseFloat(order.totalValue);
-          const currentPaid = parseFloat(order.paidValue || '0');
-          const thisPayment = parseFloat(amount);
-          const newPaid = currentPaid + thisPayment;
-          const newRemaining = Math.max(totalValue - newPaid, 0);
-
-          // >>> CRITICAL: NEVER send totalValue in update! <<<
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: newPaid.toFixed(2),
-            remainingAmount: newRemaining.toFixed(2),
-            __origin: 'receivables' // Safety flag for storage layer
-          });
-
-          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
-        }
+        // Update order paid value based on all confirmed payments
+        // This method already updates the related accounts receivable automatically
+        await storage.updateOrderPaidValue(receivable.orderId);
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
@@ -5648,7 +5623,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
       }
 
-      // Update payment status to paid with all payment details
+      // Update payment status to paid with all paymentdetails
       const updatedPayment = await storage.updateProducerPayment(payment.id, {
         status: 'paid',
         paidBy: 'admin-1', // Could be req.user.id in real auth
