@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { toast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, Package, Truck, User, CreditCard, FileText, Phone, Mail, CheckCircle } from "lucide-react";
+import { Clock, Package, Truck, User, CreditCard, FileText, Phone, Mail, CheckCircle } from "lucide-react";
 
 // Component to display shipping details
 function ShippingDetailsCard({ orderId, status }: { orderId: string, status: string }) {
