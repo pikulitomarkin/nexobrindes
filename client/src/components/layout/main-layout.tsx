@@ -169,7 +169,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -180,12 +180,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Sidebar with gradient */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 w-64 h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-screen">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white">
+          <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white flex-shrink-0">
             <Logo size="sm" variant="full" />
             <Button
               variant="ghost"
@@ -198,7 +198,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* User Info */}
-          <div className="p-6 border-b border-white/20">
+          <div className="p-6 border-b border-white/20 flex-shrink-0">
             <div className="text-sm font-medium text-white/90">
               {user.name || "Usuário"}
             </div>
@@ -238,7 +238,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="p-6 border-t border-white/20">
+          <div className="p-6 border-t border-white/20 flex-shrink-0">
             <div className="text-xs text-white/70 text-center">
               {roleOptions.find(role => role.value === currentRole)?.label}
             </div>
