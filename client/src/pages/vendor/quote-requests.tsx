@@ -171,7 +171,7 @@ export default function VendorQuoteRequests() {
                   <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                     <span className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      {request.contactName}
+                      {request.contactName || request.clientName || 'Cliente não identificado'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -200,11 +200,6 @@ export default function VendorQuoteRequests() {
                       <span className="flex items-center gap-1">
                         <Mail className="h-4 w-4" />
                         {request.email}
-                      </span>
-                    )}
-                    {!request.whatsapp && !request.email && (
-                      <span className="text-gray-400">
-                        Sem informações de contato adicionais
                       </span>
                     )}
                   </div>
@@ -274,8 +269,12 @@ export default function VendorQuoteRequests() {
                       <Button
                         size="sm"
                         className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
-                        onClick={() => convertToBudgetMutation.mutate(request.id)}
-                        disabled={convertToBudgetMutation.isPending}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          convertToBudgetMutation.mutate(request.id);
+                        }}
+                        disabled={convertToBudgetMutation.isPending || updateStatusMutation.isPending}
                       >
                         <FileText className="h-4 w-4 mr-1" />
                         {convertToBudgetMutation.isPending ? 'Convertendo...' : 'Converter em Orçamento'}
@@ -284,11 +283,15 @@ export default function VendorQuoteRequests() {
                         size="sm"
                         variant="outline"
                         className="text-red-600 border-red-300 hover:bg-red-50"
-                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
-                        disabled={updateStatusMutation.isPending}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          updateStatusMutation.mutate({ id: request.id, status: 'rejected' });
+                        }}
+                        disabled={updateStatusMutation.isPending || convertToBudgetMutation.isPending}
                       >
                         <X className="h-4 w-4 mr-1" />
-                        Rejeitar
+                        {updateStatusMutation.isPending ? 'Rejeitando...' : 'Rejeitar'}
                       </Button>
                     </>
                   )}

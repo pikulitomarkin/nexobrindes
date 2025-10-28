@@ -4155,15 +4155,45 @@ export class MemStorage implements IStorage {
     return quoteRequest;
   }
 
-  async getQuoteRequestsByVendor(vendorId: string) {
+  async getQuoteRequestsByVendor(vendorId: string): Promise<any[]> {
     const requests = this.quoteRequests.filter(request => request.vendorId === vendorId);
 
-    // Enriquecer cada orçamento com informações dos produtos
-    const enrichedRequests = requests.map(request => {
+    // Enriquecer cada orçamento com informações dos produtos e cliente
+    const enrichedRequests = await Promise.all(requests.map(async request => {
+      // Buscar informações do cliente
+      let clientName = request.contactName;
+      let clientEmail = request.email;
+      let clientWhatsapp = request.whatsapp;
+
+      // Se não tiver contactName, tentar buscar pelo clientId
+      if (!clientName && request.clientId) {
+        const client = await this.getClient(request.clientId);
+        if (client) {
+          clientName = client.name;
+          clientEmail = client.email || request.email;
+          clientWhatsapp = client.whatsapp || request.whatsapp;
+        } else {
+          // Tentar buscar o usuário diretamente
+          const user = await this.getUser(request.clientId);
+          if (user) {
+            clientName = user.name;
+            clientEmail = user.email || request.email;
+          }
+        }
+      }
+
+      const baseRequest = {
+        ...request,
+        contactName: clientName || 'Cliente não identificado',
+        clientName: clientName || 'Cliente não identificado',
+        email: clientEmail || request.email,
+        whatsapp: clientWhatsapp || request.whatsapp
+      };
+
       if (request.products && request.products.length > 0) {
         // Orçamento consolidado
         return {
-          ...request,
+          ...baseRequest,
           productCount: request.products.length,
           productNames: request.products.map(p => p.productName).join(", "),
           // Para compatibilidade com código existente, usar o primeiro produto
@@ -4176,12 +4206,12 @@ export class MemStorage implements IStorage {
       } else {
         // Orçamento antigo (single product)
         return {
-          ...request,
+          ...baseRequest,
           productCount: 1,
           productNames: request.productName || "Produto não especificado"
         };
       }
-    });
+    }));
 
     console.log(`Found ${enrichedRequests.length} quote requests for vendor ${vendorId}`);
     return enrichedRequests;
