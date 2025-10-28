@@ -171,7 +171,7 @@ export default function VendorQuoteRequests() {
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <span className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      {request.contactName}
+                      {request.contactName || 'Cliente não identificado'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -257,6 +257,11 @@ export default function VendorQuoteRequests() {
                     <span className="flex items-center gap-1">
                       <Mail className="h-4 w-4" />
                       {request.email}
+                    </span>
+                  )}
+                  {!request.whatsapp && !request.email && (
+                    <span className="text-yellow-600 text-xs">
+                      Dados de contato não informados
                     </span>
                   )}
                 </div>

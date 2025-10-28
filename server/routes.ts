@@ -2350,7 +2350,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const quoteRequests = await storage.getQuoteRequestsByVendor(vendorId);
-      res.json(quoteRequests);
+      
+      // Enriquecer com dados do cliente
+      const enrichedRequests = await Promise.all(
+        quoteRequests.map(async (request) => {
+          let clientData = {
+            contactName: request.contactName,
+            whatsapp: request.whatsapp,
+            email: request.email
+          };
+
+          // Se não tem dados de contato na request, buscar do cliente cadastrado
+          if (request.clientId && (!request.contactName || !request.whatsapp || !request.email)) {
+            try {
+              // Primeiro tentar buscar como cliente
+              let client = await storage.getClient(request.clientId);
+              
+              if (!client) {
+                // Se não encontrou, buscar por userId
+                client = await storage.getClientByUserId(request.clientId);
+              }
+              
+              if (!client) {
+                // Fallback para usuário
+                const user = await storage.getUser(request.clientId);
+                if (user) {
+                  client = {
+                    name: user.name,
+                    phone: user.phone,
+                    email: user.email
+                  };
+                }
+              }
+
+              if (client) {
+                clientData = {
+                  contactName: request.contactName || client.name || 'Cliente não identificado',
+                  whatsapp: request.whatsapp || client.whatsapp || client.phone || '',
+                  email: request.email || client.email || ''
+                };
+              }
+            } catch (error) {
+              console.log(`Error fetching client data for request ${request.id}:`, error);
+            }
+          }
+
+          return {
+            ...request,
+            ...clientData
+          };
+        })
+      );
+
+      res.json(enrichedRequests);
     } catch (error) {
       console.error("Error fetching quote requests:", error);
       res.status(500).json({ error: "Failed to fetch quote requests" });
