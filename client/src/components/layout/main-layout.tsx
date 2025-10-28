@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -11,14 +12,15 @@ import {
   Menu,
   X,
   Home,
-  Settings, // Added Settings icon import
+  Settings,
   LogOut,
-  ClipboardList, // Import ClipboardList if it was intended to be used elsewhere
+  ClipboardList,
   MessageCircle,
-  BarChart3, // Added BarChart3 icon
-  Calculator, // Added Calculator icon
-  User, // Added User icon
-  Building2 // Added Building2 icon
+  BarChart3,
+  Calculator,
+  User,
+  Building2,
+  Percent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +51,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { value: "vendor", label: "Vendedor" },
     { value: "client", label: "Cliente" },
     { value: "producer", label: "Produtor" },
+    { value: "partner", label: "Sócio" },
     { value: "finance", label: "Financeiro" },
     { value: "logistics", label: "Logística" },
   ];
@@ -64,6 +67,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
           { href: "/admin/partners", icon: User, label: "Sócios" },
           { href: "/admin/branches", icon: Building2, label: "Filiais" },
+          { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
+          { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
           { href: "/admin/reports", icon: FileText, label: "Relatórios" },
           { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
@@ -72,11 +77,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
       case "partner":
         return [
           { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/partner/products", icon: Package, label: "Produtos" },
-          { href: "/partner/producers", icon: Factory, label: "Produtores" },
-          { href: "/partner/clients", icon: Users, label: "Clientes" },
-          { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
-          { href: "/partner/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+          { href: "/admin/products", icon: Package, label: "Produtos" },
+          { href: "/admin/producers", icon: Factory, label: "Produtores" },
+          { href: "/admin/clients", icon: Users, label: "Clientes" },
+          { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
+          { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
+          { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
+          { href: "/partner/my-commissions", icon: Percent, label: "Minhas Comissões" },
+          { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+          { href: "/admin/reports", icon: FileText, label: "Relatórios" },
+          { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
         ];
       case "vendor":
         return [
