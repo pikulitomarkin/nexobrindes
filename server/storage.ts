@@ -3536,47 +3536,30 @@ export class MemStorage implements IStorage {
 
   // Update account receivable
   async updateAccountsReceivable(id: string, data: any): Promise<any> {
-    console.log(`Updating receivable ${id} with updates:`, data);
+    console.log(`[UPDATE RECEIVABLE] Updating receivable ${id} with data:`, data);
 
-    // Find in manual receivables
-    const receivables = await this.getManualReceivables();
-    const actualId = id.startsWith('manual-') ? id.replace('manual-', '') : id;
-    const receivableIndex = receivables.findIndex((r: any) => r.id === actualId);
-
-    if (receivableIndex !== -1) {
-      const receivable = receivables[receivableIndex];
-      const updatedReceivable = {
-        ...receivable,
-        ...data,
-        updatedAt: new Date()
-      };
-
-      // Update in the array
-      this.mockData.manualReceivables[receivableIndex] = updatedReceivable;
-
-      console.log(`Updated manual receivable ${actualId}: status=${updatedReceivable.status}, receivedAmount=${updatedReceivable.receivedAmount}`);
+    // First check if receivable exists in Map
+    const receivable = this.accountsReceivable.get(id);
+    if (receivable) {
+      const updatedReceivable = { ...receivable, ...data, updatedAt: new Date() };
+      this.accountsReceivable.set(id, updatedReceivable);
+      console.log(`[UPDATE RECEIVABLE] Updated receivable ${id}: amount=${updatedReceivable.amount}, status=${updatedReceivable.status}, receivedAmount=${updatedReceivable.receivedAmount}`);
       return updatedReceivable;
     }
 
-    // Check if it's an order-based receivable and update the order
-    const orders = await this.getOrders();
-    const order = orders.find((o: any) => o.id === id);
-    if (order) {
-      // Update the order's paid value
-      const currentPaidValue = parseFloat(order.paidValue || '0');
-      const additionalPayment = parseFloat(data.receivedAmount || '0');
-      const newPaidValue = currentPaidValue + additionalPayment;
-
-      const updatedOrder = await this.updateOrder(order.id, { paidValue: newPaidValue.toFixed(2) });
-
-      if (updatedOrder) {
-        console.log(`Updated order receivable ${id}: new paidValue=${updatedOrder.paidValue}`);
-        return updatedOrder;
-      }
+    // If not found in Map, check if it's a manual receivable in mockData
+    const manualReceivables = this.mockData.manualReceivables || [];
+    const manualReceivable = manualReceivables.find(r => r.id === id);
+    if (manualReceivable) {
+      const updatedReceivable = { ...manualReceivable, ...data, updatedAt: new Date() };
+      const index = manualReceivables.findIndex(r => r.id === id);
+      this.mockData.manualReceivables[index] = updatedReceivable;
+      console.log(`[UPDATE RECEIVABLE] Updated manual receivable ${id}: amount=${updatedReceivable.amount}, status=${updatedReceivable.status}, receivedAmount=${updatedReceivable.receivedAmount}`);
+      return updatedReceivable;
     }
 
-    console.log(`Receivable ${id} not found for update`);
-    return undefined; // Return undefined if not found or not updated
+    console.error(`[UPDATE RECEIVABLE] Receivable ${id} not found in Map or mockData`);
+    return undefined;
   }
 
 
