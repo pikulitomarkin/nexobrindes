@@ -410,30 +410,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let clientPhone = budget.contactPhone || '';
 
       // Try to get client data if clientId exists
-      let client = null;
       if (budget.clientId) {
-        client = await storage.getClient(budget.clientId);
-        if (!client) {
-          // Try to get by userId if not found as client
-          client = await storage.getClientByUserId(budget.clientId);
+        try {
+          const client = await storage.getClient(budget.clientId);
+          if (client) {
+            clientName = client.name;
+            clientEmail = client.email || budget.contactEmail || '';
+            clientPhone = client.phone || budget.contactPhone || '';
+          } else {
+            // Try to get by userId if not found as client
+            const clientByUserId = await storage.getClientByUserId(budget.clientId);
+            if (clientByUserId) {
+              clientName = clientByUserId.name;
+              clientEmail = clientByUserId.email || budget.contactEmail || '';
+              clientPhone = clientByUserId.phone || budget.contactPhone || '';
+            }
+          }
+        } catch (error) {
+          console.log(`Error fetching client data for PDF: ${error.message}`);
         }
       }
-
-      console.log(`Client lookup - budget.clientId: ${budget.clientId}, found client:`, !!client);
-
-      if (client) {
-        clientName = client.name;
-        clientEmail = client.email || budget.contactEmail || '';
-        clientPhone = client.phone || budget.contactPhone || '';
-      }
-
-      console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
 
       console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
 
       // Get vendor information
-      const vendor = await storage.getUser(budget.vendorId);
-      console.log(`Vendor lookup - budget.vendorId: ${budget.vendorId}, found vendor:`, !!vendor);
+      let vendor = null;
+      try {
+        vendor = await storage.getUser(budget.vendorId);
+        console.log(`Vendor lookup - budget.vendorId: ${budget.vendorId}, found vendor:`, !!vendor);
+      } catch (error) {
+        console.log(`Error fetching vendor data for PDF: ${error.message}`);
+      }
 
       // Get budget photos
       const photos = await storage.getBudgetPhotos(id);
