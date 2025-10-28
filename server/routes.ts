@@ -1188,7 +1188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let photos = [];
       if (order.budgetId) {
         const budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
-        photos = budgetPhotos.map(photo => photo.photoUrl || photo.imageUrl);
+        photos = budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl);
       }
 
       // Parse order details if available and filter items for this producer
@@ -4677,7 +4677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = req.body.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
@@ -4686,21 +4686,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
 
-      // Process budget items with ALL customization data
+      // Process each item
       for (const itemData of uniqueItems) {
-        // Ensure productName is included in itemData
-        let productName = itemData.productName;
-        if (!productName || productName.trim() === '') {
-          const product = await storage.getProduct(itemData.productId);
-          productName = product?.name || `Produto ${itemData.productId}`;
+        try {
+          await storage.createBudgetItem(newBudget.id, itemData);
+        } catch (error) {
+          console.error(`Error creating budget item:`, error);
+          // Continue with other items, don't fail the entire budget
         }
-
-        const enrichedItemData = {
-          ...itemData,
-          productName: productName.trim()
-        };
-
-        await storage.createBudgetItem(newBudget.id, enrichedItemData);
       }
 
       // Save payment and shipping information
@@ -4717,12 +4710,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Process budget photos
-      if (req.body.photos && req.body.photos.length > 0) {
+      console.log(`[CREATE BUDGET] Processing ${req.body.photos?.length || 0} photos from request`);
+      if (req.body.photos && Array.isArray(req.body.photos)) {
         for (const photoUrl of req.body.photos) {
-          await storage.createBudgetPhoto(newBudget.id, {
-            imageUrl: photoUrl,
-            description: "Imagem de personalização"
-          });
+          await storage.createBudgetPhoto(newBudget.id, { photoUrl });
         }
       }
 
@@ -4769,7 +4760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName || item.productId} (${itemKey})`);
+          console.log(`Removing duplicate budget update item: ${item.productName} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
@@ -6004,7 +5995,7 @@ Para mais detalhes, entre em contato conosco!`;
         index === self.findIndex(b => b.id === budget.id)
       );
 
-      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
+      console.log(`Found ${uniqueBudgets.length}unique budgets for client ${clientId}`);
 
       // Enrich with vendor names and items
       const enrichedBudgets = await Promise.all(
