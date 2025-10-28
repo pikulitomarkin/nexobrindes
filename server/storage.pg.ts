@@ -423,14 +423,54 @@ export class PgStorage implements IStorage {
     
     const newPayment = results[0];
 
-    // Update order paidValue
-    const order = await this.getOrder(newPayment.orderId);
-    if (order) {
-      const newPaidValue = addMoney(order.paidValue || "0.00", newPayment.amount);
-      await this.updateOrder(order.id, { paidValue: newPaidValue });
+    // Update order paidValue if status is confirmed
+    if (newPayment.status === 'confirmed') {
+      await this.updateOrderPaidValue(newPayment.orderId);
     }
 
     return newPayment;
+  }
+
+  async updateOrderPaidValue(orderId: string): Promise<void> {
+    // Get all confirmed payments for this order
+    const payments = await pg.select().from(schema.payments)
+      .where(and(
+        eq(schema.payments.orderId, orderId),
+        eq(schema.payments.status, 'confirmed')
+      ));
+
+    // Calculate total paid
+    const totalPaid = payments.reduce((sum, payment) => {
+      return sum + parseFloat(payment.amount);
+    }, 0);
+
+    // Update order with new paid value
+    await pg.update(schema.orders)
+      .set({ paidValue: totalPaid.toFixed(2) })
+      .where(eq(schema.orders.id, orderId));
+
+    // Update accounts receivable status
+    const accountsReceivable = await pg.select().from(schema.accountsReceivable)
+      .where(eq(schema.accountsReceivable.orderId, orderId));
+
+    for (const ar of accountsReceivable) {
+      const amount = parseFloat(ar.amount);
+      let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'open';
+      
+      if (totalPaid >= amount) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        status = 'partial';
+      }
+
+      await pg.update(schema.accountsReceivable)
+        .set({ 
+          receivedAmount: totalPaid.toFixed(2),
+          status: status,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.accountsReceivable.id, ar.id));
+    }
   }
 
   async getPaymentsByOrder(orderId: string): Promise<Payment[]> {
@@ -738,6 +778,11 @@ export class PgStorage implements IStorage {
     
     if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    }
+
+    // Generate budget number if not provided
+    if (!processedData.budgetNumber) {
+      processedData.budgetNumber = `ORC-${Date.now()}`;
     }
 
     const results = await pg.insert(schema.budgets).values({
