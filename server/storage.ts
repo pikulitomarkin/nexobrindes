@@ -3100,21 +3100,35 @@ export class MemStorage implements IStorage {
   }
 
   async createBudgetItem(budgetId: string, itemData: any): Promise<any> {
-    // Validate required fields to prevent empty/invalid items
-    if (!itemData.productId || !itemData.productName || itemData.productName.trim() === '') {
-      console.log(`Rejecting invalid budget item - missing productId or productName:`, itemData);
-      throw new Error('ProductId and productName are required for budget items');
+    // Validate required fields
+    if (!itemData.productId) {
+      console.log('Rejecting invalid budget item - missing productId:', itemData);
+      throw new Error('ProductId is required for budget items');
     }
 
-    if (!itemData.quantity || parseFloat(itemData.quantity) <= 0) {
-      console.log(`Rejecting invalid budget item - invalid quantity:`, itemData);
+    // Get product name from product if not provided
+    let productName = itemData.productName;
+    if (!productName && itemData.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    }
+
+    if (!productName) {
+      console.log('Rejecting invalid budget item - unable to determine product name:', itemData);
+      throw new Error('ProductName is required for budget items');
+    }
+
+    // Validate quantity and unitPrice
+    if (!itemData.quantity || parseFloat(itemData.quantity.toString()) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid quantity: ${itemData.quantity}`, itemData);
       throw new Error('Quantity must be greater than 0');
     }
 
-    if (!itemData.unitPrice || parseFloat(itemData.unitPrice) <= 0) {
-      console.log(`Rejecting invalid budget item - invalid unitPrice:`, itemData);
+    if (!itemData.unitPrice || parseFloat(itemData.unitPrice.toString()) <= 0) {
+      console.log(`Rejecting invalid budget item - invalid unitPrice: ${itemData.unitPrice}`, itemData);
       throw new Error('Unit price must be greater than 0');
     }
+
 
     // Check for duplicate items in the same budget (same product, producer, quantity, and unit price)
     const existingItems = Array.from(this.budgetItems.values())
@@ -3127,7 +3141,7 @@ export class MemStorage implements IStorage {
     });
 
     if (hasDuplicate) {
-      console.log(`Preventing duplicate budget item creation: ${itemData.productName} (${duplicateKey})`);
+      console.log(`Preventing duplicate budget item creation: ${productName} (${duplicateKey})`);
       throw new Error(`Este item já foi adicionado ao orçamento com as mesmas especificações`);
     }
 
@@ -3135,8 +3149,12 @@ export class MemStorage implements IStorage {
     const newItem = {
       id,
       budgetId,
-      ...itemData,
-      productName: itemData.productName.trim(), // Ensure productName is trimmed
+      productId: itemData.productId,
+      producerId: itemData.producerId || null,
+      quantity: parseFloat(itemData.quantity.toString()),
+      unitPrice: parseFloat(itemData.unitPrice.toString()),
+      totalPrice: parseFloat(itemData.totalPrice.toString()),
+      productName: productName,
       createdAt: new Date()
     };
 
@@ -3149,22 +3167,38 @@ export class MemStorage implements IStorage {
     const item = this.budgetItems.get(itemId);
     if (!item) return null;
 
+    // Get product name if productId is provided and productName is missing
+    let productName = itemData.productName;
+    if (!productName && itemData.productId && itemData.productId !== item.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    } else if (!productName && itemData.productId === item.productId) {
+      productName = item.productName; // Keep existing if product is the same and name not provided
+    }
+
+    // Ensure productName is set if it's still missing
+    if (!productName && itemData.productId) {
+      const product = await this.getProduct(itemData.productId);
+      productName = product?.name || 'Produto não encontrado';
+    }
+
     const updatedItem = {
       ...item,
       ...itemData,
       // Preserve customization photo if not explicitly updated
       customizationPhoto: itemData.customizationPhoto !== undefined ? itemData.customizationPhoto : item.customizationPhoto,
       // Recalculate fields if they are present in itemData
-      quantity: itemData.quantity !== undefined ? parseFloat(itemData.quantity) : item.quantity,
-      unitPrice: itemData.unitPrice !== undefined ? parseFloat(itemData.unitPrice) : item.unitPrice,
-      totalPrice: itemData.totalPrice !== undefined ? parseFloat(itemData.totalPrice) : item.totalPrice,
-      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue) : item.itemCustomizationValue,
-      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue) : item.generalCustomizationValue,
-      itemDiscountPercentage: itemData.itemDiscountPercentage !== undefined ? parseFloat(itemData.itemDiscountPercentage) : item.itemDiscountPercentage,
-      itemDiscountValue: itemData.itemDiscountValue !== undefined ? parseFloat(itemData.itemDiscountValue) : item.itemDiscountValue,
-      productWidth: itemData.productWidth !== undefined ? parseFloat(itemData.productWidth) : item.productWidth,
-      productHeight: itemData.productHeight !== undefined ? parseFloat(itemData.productHeight) : item.productHeight,
-      productDepth: itemData.productDepth !== undefined ? parseFloat(itemData.productDepth) : item.productDepth,
+      quantity: itemData.quantity !== undefined ? parseFloat(itemData.quantity.toString()) : item.quantity,
+      unitPrice: itemData.unitPrice !== undefined ? parseFloat(itemData.unitPrice.toString()) : item.unitPrice,
+      totalPrice: itemData.totalPrice !== undefined ? parseFloat(itemData.totalPrice.toString()) : item.totalPrice,
+      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue.toString()) : item.itemCustomizationValue,
+      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue.toString()) : item.generalCustomizationValue,
+      itemDiscountPercentage: itemData.itemDiscountPercentage !== undefined ? parseFloat(itemData.itemDiscountPercentage.toString()) : item.itemDiscountPercentage,
+      itemDiscountValue: itemData.itemDiscountValue !== undefined ? parseFloat(itemData.itemDiscountValue.toString()) : item.itemDiscountValue,
+      productWidth: itemData.productWidth !== undefined ? parseFloat(itemData.productWidth.toString()) : item.productWidth,
+      productHeight: itemData.productHeight !== undefined ? parseFloat(itemData.productHeight.toString()) : item.productHeight,
+      productDepth: itemData.productDepth !== undefined ? parseFloat(itemData.productDepth.toString()) : item.productDepth,
+      productName: productName || item.productName, // Use the resolved or existing productName
       updatedAt: new Date()
     };
 
