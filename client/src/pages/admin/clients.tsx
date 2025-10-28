@@ -120,6 +120,11 @@ export default function AdminClients() {
     createClientMutation.mutate(data);
   };
 
+  const handleEditClient = (client: any) => {
+    setSelectedClientId(client.id);
+    setShowEditClient(true);
+  };
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -204,7 +209,7 @@ export default function AdminClients() {
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -375,10 +380,7 @@ export default function AdminClients() {
                         variant="ghost" 
                         size="sm" 
                         title="Editar"
-                        onClick={() => {
-                          setSelectedClientId(client.id);
-                          setShowEditClient(true);
-                        }}
+                        onClick={() => handleEditClient(client)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -529,51 +531,51 @@ export default function AdminClients() {
               {(() => {
                 const client = clients?.find((c: any) => c.id === selectedClientId);
                 if (!client) return null;
-                
+
                 return (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-600">Nome:</label>
                       <p className="text-sm text-gray-900">{client.name}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
                       <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         {client.userCode || 'N/A'}
                       </p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Email:</label>
                       <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Telefone:</label>
                       <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
                       <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
                       <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
                     </div>
-                    
+
                     <div className="col-span-2">
                       <label className="text-sm font-medium text-gray-600">Endereço:</label>
                       <p className="text-sm text-gray-900">{client.address || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
                       <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
                       <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
@@ -599,6 +601,23 @@ export default function AdminClients() {
           </DialogHeader>
           {selectedClientId && (
             <div className="space-y-4">
+              <div className="bg-gray-50 p-3 rounded-lg mt-4 border">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
+                    <p className="font-mono font-bold text-blue-800">{clients?.find((c: any) => c.id === selectedClientId)?.userCode || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Vendedor</p>
+                    <p className="font-medium text-gray-900">{clients?.find((c: any) => c.id === selectedClientId)?.vendorName || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => handleEditClient(clients?.find((c: any) => c.id === selectedClientId))}>
+                    Editar
+                  </Button>
+                </div>
+              </div>
               <p className="text-sm text-gray-600">Funcionalidade de edição em desenvolvimento...</p>
               <Button onClick={() => setShowEditClient(false)}>
                 Fechar
