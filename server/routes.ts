@@ -5979,6 +5979,100 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Settings Routes - Payment Methods
+  app.get("/api/settings/payment-methods", async (req, res) => {
+    try {
+      const paymentMethods = await storage.getAllPaymentMethods();
+      res.json(paymentMethods);
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.post("/api/settings/payment-methods", async (req, res) => {
+    try {
+      const paymentMethod = await storage.createPaymentMethod(req.body);
+      res.json(paymentMethod);
+    } catch (error) {
+      console.error("Error creating payment method:", error);
+      res.status(500).json({ error: "Failed to create payment method" });
+    }
+  });
+
+  app.put("/api/settings/payment-methods/:id", async (req, res) => {
+    try {
+      const paymentMethod = await storage.updatePaymentMethod(req.params.id, req.body);
+      if (!paymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+      res.json(paymentMethod);
+    } catch (error) {
+      console.error("Error updating payment method:", error);
+      res.status(500).json({ error: "Failed to update payment method" });
+    }
+  });
+
+  app.delete("/api/settings/payment-methods/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePaymentMethod(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      res.status(500).json({ error: "Failed to delete payment method" });
+    }
+  });
+
+  // Settings Routes - Shipping Methods
+  app.get("/api/settings/shipping-methods", async (req, res) => {
+    try {
+      const shippingMethods = await storage.getAllShippingMethods();
+      res.json(shippingMethods);
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
+  app.post("/api/settings/shipping-methods", async (req, res) => {
+    try {
+      const shippingMethod = await storage.createShippingMethod(req.body);
+      res.json(shippingMethod);
+    } catch (error) {
+      console.error("Error creating shipping method:", error);
+      res.status(500).json({ error: "Failed to create shipping method" });
+    }
+  });
+
+  app.put("/api/settings/shipping-methods/:id", async (req, res) => {
+    try {
+      const shippingMethod = await storage.updateShippingMethod(req.params.id, req.body);
+      if (!shippingMethod) {
+        return res.status(404).json({ error: "Shipping method not found" });
+      }
+      res.json(shippingMethod);
+    } catch (error) {
+      console.error("Error updating shipping method:", error);
+      res.status(500).json({ error: "Failed to update shipping method" });
+    }
+  });
+
+  app.delete("/api/settings/shipping-methods/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteShippingMethod(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Shipping method not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting shipping method:", error);
+      res.status(500).json({ error: "Failed to delete shipping method" });
+    }
+  });
+
   // Settings Routes - Customization Options
   app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
     try {

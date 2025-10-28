@@ -169,6 +169,7 @@ function App() {
                   <Route path="/admin/producer-payments" component={AdminProducerPayments} />
                   <Route path="/admin/finance" component={AdminFinance} />
                   <Route path="/admin/customizations" component={AdminCustomizations} />
+                  <Route path="/admin/settings" component={AdminSettings} />
                   <Route path="/admin/logs" component={AdminLogs} />
 
                   {/* Vendor Routes */}

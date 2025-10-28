@@ -69,6 +69,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/branches", icon: Building2, label: "Filiais" },
     { href: "/admin/logistics", icon: Package, label: "Logística" },
     { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
+    { href: "/admin/settings", icon: Settings, label: "Configurações" },
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
     { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
