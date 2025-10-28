@@ -4312,24 +4312,40 @@ export class MemStorage implements IStorage {
   async createConsolidatedQuoteRequest(data: any): Promise<any> {
     const id = generateId('quote-req');
 
-    // Get client information if clientId is provided
+    // Determinar o clientId correto para salvar a solicitação
+    let finalClientId = data.clientId;
+
+    // Buscar informações do cliente se o ID for fornecido
     let contactName = data.contactName || 'Nome não informado';
     let whatsapp = data.whatsapp || null;
     let email = data.email || null;
 
     if (data.clientId) {
+      // Primeiro, tentar buscar como client record
       const client = await this.getClient(data.clientId);
       if (client) {
         contactName = client.name;
         whatsapp = client.whatsapp || client.phone || null;
         email = client.email || null;
+        // Use o userId do client se existir, senão use o próprio clientId
+        finalClientId = client.userId || data.clientId;
       } else {
-        // Try to get client by userId
+        // Tentar buscar como userId
         const clientByUserId = await this.getClientByUserId(data.clientId);
         if (clientByUserId) {
           contactName = clientByUserId.name;
           whatsapp = clientByUserId.whatsapp || clientByUserId.phone || null;
           email = clientByUserId.email || null;
+          // Use o userId (que é o data.clientId neste caso)
+          finalClientId = data.clientId;
+        } else {
+          // Verificar se é um usuário válido
+          const user = await this.getUser(data.clientId);
+          if (user) {
+            contactName = user.name;
+            email = user.email || null;
+            finalClientId = user.id;
+          }
         }
       }
     }
@@ -4346,7 +4362,7 @@ export class MemStorage implements IStorage {
 
     const quoteRequest = {
       id: id,
-      clientId: data.clientId,
+      clientId: finalClientId,
       vendorId: data.vendorId,
       contactName: contactName,
       whatsapp: whatsapp,
@@ -4356,7 +4372,7 @@ export class MemStorage implements IStorage {
       status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date(),
-      // Consolidate products info
+      // Consolidated products info
       productCount: data.products.length,
       products: data.products
     };
@@ -4458,7 +4474,7 @@ export class MemStorage implements IStorage {
         return true;
       }
 
-      // Check if clientId is a userId and request.clientId is a client record ID
+      // Check if clientId is a user ID and request.clientId isa client record ID
       try {
         const clientRecord = this.clients.get(request.clientId);
         if (clientRecord && clientRecord.userId === clientId) {

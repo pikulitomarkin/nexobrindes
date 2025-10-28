@@ -74,6 +74,8 @@ export default function ClientBudgets() {
     queryFn: async () => {
       try {
         console.log(`Fetching quote requests for client: ${clientId}`);
+        console.log(`User object:`, user);
+        
         const response = await fetch(`/api/quote-requests/client/${clientId}`);
         if (!response.ok) {
           console.error('Failed to fetch quote requests:', response.status, response.statusText);
@@ -83,7 +85,7 @@ export default function ClientBudgets() {
           throw new Error(`Failed to fetch quote requests: ${response.status}`);
         }
         const data = await response.json();
-        console.log('Quote requests fetched:', data);
+        console.log('Quote requests response:', data);
         return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error('Error fetching quote requests:', error);
@@ -91,9 +93,9 @@ export default function ClientBudgets() {
       }
     },
     enabled: !!clientId,
-    refetchInterval: 10000,
+    refetchInterval: 30000, // Aumentar intervalo para reduzir spam
     refetchOnWindowFocus: true,
-    retry: 1, // Reduzir retry para evitar spam
+    retry: 1,
   });
 
   const getStatusBadge = (status: string, type: 'budget' | 'request') => {
