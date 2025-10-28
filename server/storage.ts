@@ -81,6 +81,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   getUsersByRole(role: string): Promise<User[]>;
+  authenticateUser(username: string, password: string): Promise<User | null>; // Added for authentication
 
   // Orders
   getOrders(): Promise<Order[]>;
@@ -1539,6 +1540,29 @@ export class MemStorage implements IStorage {
     // Auto-deduct partner commissions if any are marked for deduction
     await this.autoDeductPartnerCommissions(order);
 
+    // Log the order creation
+    const vendor = await this.getUser(order.vendorId);
+    if (vendor) {
+      await this.createSystemLog({
+        userId: order.vendorId,
+        userName: vendor.name,
+        userRole: vendor.role,
+        action: 'CREATE',
+        entity: 'orders',
+        entityId: order.id,
+        description: `Pedido ${order.orderNumber} criado para ${order.contactName}`,
+        details: JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          contactName: order.contactName,
+          totalValue: order.totalValue,
+          product: order.product
+        }),
+        level: 'info'
+      });
+    }
+
+
     return order;
   }
 
@@ -2879,15 +2903,15 @@ export class MemStorage implements IStorage {
   }
 
   async createBudget(budgetData: any): Promise<any> {
-    const id = generateId('budget');
+    const budgetNumber = `ORC-${Date.now()}`;
     const now = new Date();
 
     // Normalize monetary fields to ensure consistency
     const normalizedTotalValue = this.parseBRLCurrency(budgetData.totalValue);
 
     const newBudget = {
-      id,
-      budgetNumber: `ORC-${Date.now()}`,
+      id: generateId('budget'),
+      budgetNumber,
       title: budgetData.title || 'Orçamento sem título',
       description: budgetData.description || '',
       clientId: budgetData.clientId || null,
@@ -2959,6 +2983,27 @@ export class MemStorage implements IStorage {
       for (const photoUrl of budgetData.photos) {
         await this.createBudgetPhoto(newBudget.id, { photoUrl });
       }
+    }
+
+    // Log the budget creation
+    const vendor = await this.getUser(newBudget.vendorId);
+    if (vendor) {
+      await this.createSystemLog({
+        userId: newBudget.vendorId,
+        userName: vendor.name,
+        userRole: vendor.role,
+        action: 'CREATE',
+        entity: 'budgets',
+        entityId: newBudget.id,
+        description: `Orçamento ${newBudget.budgetNumber} criado para ${newBudget.contactName}`,
+        details: JSON.stringify({
+          budgetId: newBudget.id,
+          budgetNumber: newBudget.budgetNumber,
+          contactName: newBudget.contactName,
+          totalValue: newBudget.totalValue
+        }),
+        level: 'info'
+      });
     }
 
     return newBudget;
@@ -4655,6 +4700,35 @@ export class MemStorage implements IStorage {
 
     this.mockData.systemLogs.push(log);
     console.log(`[LOG] ${userName} (${userRole}) - ${action} - ${description}`);
+  }
+
+  // Added authenticateUser method with system logging
+  async authenticateUser(username: string, password: string): Promise<User | null> {
+    const user = Array.from(this.users.values()).find(
+      (u) => u.username === username && u.password === password && u.isActive
+    );
+
+    if (user) {
+      console.log(`Login successful for: ${user.username} role: ${user.role}`);
+
+      // Log successful login
+      await this.createSystemLog({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: 'LOGIN',
+        entity: 'users',
+        entityId: user.id,
+        description: `Login realizado com sucesso`,
+        details: `Role: ${user.role}`,
+        level: 'info'
+      });
+
+      return user;
+    }
+
+    console.log(`Login failed for username: ${username}`);
+    return null;
   }
 }
 

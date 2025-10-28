@@ -42,26 +42,12 @@ export default function VendorLogs() {
         level: levelFilter,
         date: dateFilter
       });
+      
       const response = await fetch(`/api/vendor/logs?${params}`);
       if (!response.ok) {
-        // Se não existir endpoint específico, filtrar logs gerais
-        const generalResponse = await fetch(`/api/admin/logs?${params}`);
-        if (!generalResponse.ok) return [];
-        const allLogs = await generalResponse.json();
-        
-        // Filtrar logs apenas do vendedor e dos seus clientes
-        return allLogs.filter((log: any) => {
-          // Logs do próprio vendedor
-          if (log.userId === vendorId) return true;
-          
-          // Logs relacionados a ações do vendedor (pedidos, orçamentos, etc)
-          if (log.entity === 'orders' || log.entity === 'budgets' || log.entity === 'clients') {
-            return log.details?.vendorId === vendorId || log.userId === vendorId;
-          }
-          
-          return false;
-        });
+        throw new Error('Failed to fetch vendor logs');
       }
+      
       return response.json();
     },
     refetchInterval: 30000, // Atualiza a cada 30 segundos

@@ -1072,7 +1072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shipmentDetails = await Promise.all(
         productionOrders.map(async (po) => {
           const producer = await storage.getUser(po.producerId);
-          
+
           // Parse order details to get items for this producer
           let producerItems = [];
           if (po.orderDetails) {
@@ -5564,7 +5564,7 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Route to get customization options filtered by category and quantity
+  // Get customization options filtered by category and quantity
   app.get("/api/customization-options", async (req, res) => {
     try {
       const { category, quantity } = req.query;
@@ -5960,7 +5960,7 @@ Para mais detalhes, entre em contato conosco!`;
   // Expedition routes
   app.get("/api/expedition/orders", async (req, res) => {
     try {
-      // Get orders that are ready for expedition (completed, ready for shipping)
+      // Get orders that are readyfor expedition (completed, ready for shipping)
       const orders = await storage.getOrders();
       const expeditionOrders = orders.filter(order =>
         ['ready', 'shipped'].includes(order.status)
@@ -6020,7 +6020,7 @@ Para mais detalhes, entre em contato conosco!`;
       );
 
       console.log(`Returning ${enrichedOrders.length} expedition orders`);
-      res.json(enrichedorders);
+      res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching expedition orders:", error);
       res.status(500).json({ error: "Failed to fetch expedition orders" });
@@ -6181,7 +6181,7 @@ Para mais detalhes, entre em contato conosco!`;
         index === self.findIndex(b => b.id === budget.id)
       );
 
-      console.log(`Found ${uniqueBudgets.length}unique budgets for client ${clientId}`);
+      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
 
       // Enrich with vendor names and items
       const enrichedBudgets = await Promise.all(
@@ -6228,19 +6228,10 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // System Logs routes
+  // System logs
   app.get("/api/admin/logs", async (req, res) => {
     try {
-      const { search, action, user, level, date } = req.query;
-
-      const logs = await storage.getSystemLogs({
-        search: search as string,
-        action: action as string,
-        userId: user as string,
-        level: level as string,
-        dateFilter: date as string,
-      });
-
+      const logs = await storage.getSystemLogs();
       res.json(logs);
     } catch (error) {
       console.error("Error fetching system logs:", error);
@@ -6248,33 +6239,92 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  app.get("/api/admin/logs/export", async (req, res) => {
+  // Vendor logs - filtered for vendor and their clients
+  app.get("/api/vendor/logs", async (req, res) => {
     try {
-      const { search, action, user, level, date } = req.query;
+      const { vendorId, search, action, level, date } = req.query;
 
-      const logs = await storage.getSystemLogs({
-        search: search as string,
-        action: action as string,
-        userId: user as string,
-        level: level as string,
-        dateFilter: date as string,
+      if (!vendorId) {
+        return res.status(400).json({ error: "Vendor ID is required" });
+      }
+
+      const allLogs = await storage.getSystemLogs();
+      const vendorClients = await storage.getClientsByVendor(vendorId as string);
+      const vendorClientIds = vendorClients.map(c => c.userId || c.id);
+
+      // Filter logs for vendor and their clients
+      let filteredLogs = allLogs.filter((log: any) => {
+        // Logs do próprio vendedor
+        if (log.userId === vendorId) return true;
+
+        // Logs dos clientes do vendedor
+        if (vendorClientIds.includes(log.userId)) return true;
+
+        // Logs de entidades relacionadas ao vendedor (pedidos, orçamentos, etc)
+        if (log.details) {
+          try {
+            const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+            if (details.vendorId === vendorId) return true;
+            if (details.vendor === vendorId) return true;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+
+        return false;
       });
 
-      // Convert logs to CSV
-      const csvHeaders = 'Data,Usuário,Ação,Entidade,Descrição,Nível,IP\n';
-      const csvData = logs.map((log: any) => {
-        const date = new Date(log.createdAt).toLocaleString('pt-BR');
-        return `"${date}","${log.userName}","${log.action}","${log.entity || ''}","${log.description}","${log.level}","${log.ipAddress || ''}"`;
-      }).join('\n');
+      // Apply additional filters
+      if (search) {
+        const searchTerm = (search as string).toLowerCase();
+        filteredLogs = filteredLogs.filter((log: any) => 
+          log.action.toLowerCase().includes(searchTerm) ||
+          log.description.toLowerCase().includes(searchTerm) ||
+          log.userName.toLowerCase().includes(searchTerm)
+        );
+      }
 
-      const csv = csvHeaders + csvData;
+      if (action && action !== 'all') {
+        filteredLogs = filteredLogs.filter((log: any) => log.action === action);
+      }
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="system-logs.csv"');
-      res.send(csv);
+      if (level && level !== 'all') {
+        filteredLogs = filteredLogs.filter((log: any) => log.level === level);
+      }
+
+      if (date && date !== 'all') {
+        const now = new Date();
+        let startDate;
+
+        switch (date) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        }
+
+        if (startDate) {
+          filteredLogs = filteredLogs.filter((log: any) => 
+            new Date(log.createdAt) >= startDate
+          );
+        }
+      }
+
+      // Sort by most recent first
+      filteredLogs.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      console.log(`Found ${filteredLogs.length} logs for vendor ${vendorId}`);
+      res.json(filteredLogs);
     } catch (error) {
-      console.error("Error exporting system logs:", error);
-      res.status(500).json({ error: "Failed to export system logs" });
+      console.error("Error fetching vendor logs:", error);
+      res.status(500).json({ error: "Failed to fetch vendor logs" });
     }
   });
 
