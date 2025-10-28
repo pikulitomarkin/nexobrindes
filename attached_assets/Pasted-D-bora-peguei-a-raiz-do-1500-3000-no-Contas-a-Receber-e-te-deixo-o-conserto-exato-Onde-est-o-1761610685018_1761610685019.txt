@@ -1,0 +1,81 @@
+Débora, peguei a raiz do 1500 ➜ 3000 no “Contas a Receber” e te deixo o conserto exato.
+
+Onde está o erro (front)
+
+Arquivo: client/src/pages/finance/receivables.tsx
+Na hora que você clica no botão do card para “Entrada/Receber”, o código pré-preenche o campo com:
+
+const suggestedAmount = !isMinimumMet && minimumPayment > 0
+  ? minimumPayment.toString()         // ❌ valor TOTAL da entrada mínima
+  : remainingAmount.toString();
+
+
+Isso ignora o que já foi pago. Ex.: mínimo = 3000, já pagou 1500 → o correto para a “Entrada” seria sugerir apenas o que falta da entrada (= 1500), mas o código sugere 3000. Se a pessoa confirmar sem editar, o back vai registrar 3000 mesmo.
+
+Correção (front)
+
+Troque o cálculo do suggestedAmount para considerar o que já entrou:
+
+const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
+const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
+
+// antes: minimumPayment.toString()
+// agora: apenas o que falta da ENTRADA (mínimo - já pago), nunca negativo
+const missingOfMinimum = Math.max(0, parseFloat(receivable.minimumPayment || "0") - receivedSoFar);
+
+const suggestedAmount = (!isMinimumMet && parseFloat(receivable.minimumPayment || "0") > 0)
+  ? missingOfMinimum.toFixed(2)
+  : remainingAmount.toFixed(2);
+
+setPaymentData({
+  ...paymentData,
+  amount: suggestedAmount
+});
+
+
+Com isso:
+
+Se ainda não cumpriu a entrada mínima, o campo sugere só o que falta da entrada.
+
+Se a entrada já estiver ok, sugere o restante do pedido.
+
+Reforço no back (opcional, recomendado)
+
+Para evitar qualquer “sobre-lançamento” por engano, faça um clamp no server:
+
+Arquivo: server/routes.ts, endpoint POST /api/receivables/:id/payment (mesmo bloco onde cria paymentRecord):
+
+// Depois de carregar o order e antes de gravar:
+const requested = parseFloat(amount);
+const alreadyPaid = parseFloat(order.paidValue || '0');
+const total = parseFloat(order.totalValue);
+
+// nunca aceitar acima do restante
+const allowable = Math.max(0, total - alreadyPaid);
+const finalAmount = Math.min(requested, allowable);
+
+// use finalAmount no createPayment:
+paymentRecord = await storage.createPayment({
+  orderId: receivable.orderId,
+  amount: finalAmount.toFixed(2),
+  method: method || "manual",
+  status: "confirmed",
+  transactionId: transactionId || `MANUAL-${Date.now()}`,
+  notes: notes || "",
+  paidAt: new Date()
+});
+
+
+Observação: teu storage.updateOrderPaidValue já recalcula direitinho o paidValue e não mexe em totalValue. Mantém.
+
+Por que acontecia com você
+
+Pedido 3200, mínimo configurado (ex.: 3000), você entrou 1500.
+
+O botão de “Entrada” sugeria 3000 (total mínimo), não os 1500 que faltavam da entrada.
+
+Confirmando sem editar, o sistema lançava 3000.
+
+Com o patch acima, ele vai sugerir 1500 nesse cenário — e mesmo que alguém mande 3000, o back limita ao restante permitido.
+
+Se quiser, eu te mando o trecho de receivables.tsx já colado com o patch.
