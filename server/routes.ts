@@ -2765,40 +2765,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate });
 
+      // Validate required fields
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!userCode || userCode.trim().length === 0) {
+        return res.status(400).json({ error: "Código de usuário é obrigatório" });
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByUsername(userCode);
       if (existingUser) {
         return res.status(400).json({ error: "Código de usuário já existe" });
       }
 
-      // Create user first
-      const user = await storage.createUser({
-        username: userCode,
-        password: password,
-        role: "vendor",
-        name,
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
-        isActive: true
-      });
-
-      // Create vendor record
-      const vendor = await storage.createVendor({
-        userId: user.id,
+      // Create vendor using storage method (creates user + vendor record)
+      const newVendor = await storage.createVendor({
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        address: address?.trim() || null,
+        username: userCode.trim(),
+        password: password || "123456",
         commissionRate: commissionRate || '10.00'
       });
+
+      // Get vendor info
+      const vendorInfo = await storage.getVendor(newVendor.id);
 
       res.json({
         success: true,
         user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          address: user.address,
+          id: newVendor.id,
+          name: newVendor.name,
+          email: newVendor.email,
+          phone: newVendor.phone,
+          address: newVendor.address,
           userCode: userCode,
-          commissionRate: vendor.commissionRate,
+          commissionRate: vendorInfo?.commissionRate || commissionRate || '10.00',
           isActive: true
         }
       });
