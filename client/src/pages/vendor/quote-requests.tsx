@@ -168,7 +168,7 @@ export default function VendorQuoteRequests() {
                       request.productName
                     )}
                   </h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                     <span className="flex items-center gap-1">
                       <User className="h-4 w-4" />
                       {request.contactName}
@@ -184,6 +184,27 @@ export default function VendorQuoteRequests() {
                     {request.totalEstimatedValue > 0 && (
                       <span className="flex items-center gap-1 font-medium text-green-600">
                         Valor estimado: R$ {parseFloat(request.totalEstimatedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Contact Information */}
+                  <div className="flex items-center gap-4 text-sm text-blue-600 mb-2">
+                    {request.whatsapp && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-4 w-4" />
+                        {request.whatsapp}
+                      </span>
+                    )}
+                    {request.email && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-4 w-4" />
+                        {request.email}
+                      </span>
+                    )}
+                    {!request.whatsapp && !request.email && (
+                      <span className="text-gray-400">
+                        Sem informações de contato adicionais
                       </span>
                     )}
                   </div>
@@ -245,21 +266,7 @@ export default function VendorQuoteRequests() {
               )}
 
 
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  {request.whatsapp && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-4 w-4" />
-                      {request.whatsapp}
-                    </span>
-                  )}
-                  {request.email && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-4 w-4" />
-                      {request.email}
-                    </span>
-                  )}
-                </div>
+              <div className="flex justify-end items-center pt-4 border-t">
 
                 <div className="flex space-x-2">
                   {request.status === 'pending' && (

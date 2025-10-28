@@ -138,6 +138,7 @@ export interface IStorage {
   createClient(clientData: InsertClient): Promise<Client>;
   updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
+  getClientByUserId(userId: string): Promise<Client | undefined>; // Added for retrieving client by userId
 
   // Products
   getProducts(options?: {
@@ -2864,7 +2865,7 @@ export class MemStorage implements IStorage {
           ...itemData,
           productName: itemData.productName || await this.getProductName(itemData.productId)
         };
-        
+
         await this.createBudgetItem(newBudget.id, enrichedItemData);
       }
     }
@@ -2967,7 +2968,7 @@ export class MemStorage implements IStorage {
     // Convert budget items to order format
     const orderItems = uniqueBudgetItems.map((item: any) => ({
       productId: item.productId,
-      productName: item.productName || 'Produto',
+      productName: item.productName,
       producerId: item.producerId,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
@@ -4084,24 +4085,58 @@ export class MemStorage implements IStorage {
   }
 
   // Quote Requests methods
-  async createConsolidatedQuoteRequest(data: any) {
-    const id = generateId("quote-req");
-    const quoteRequest = {
-      id,
+  async createConsolidatedQuoteRequest(data: any): Promise<any> {
+    const id = generateId('quote-req');
+
+    // Get client information if clientId is provided
+    let contactName = data.contactName || 'Nome não informado';
+    let whatsapp = data.whatsapp || null;
+    let email = data.email || null;
+
+    if (data.clientId) {
+      const client = await this.getClient(data.clientId);
+      if (client) {
+        contactName = client.name;
+        whatsapp = client.whatsapp || client.phone || null;
+        email = client.email || null;
+      } else {
+        // Try to get client by userId
+        const clientByUserId = await this.getClientByUserId(data.clientId);
+        if (clientByUserId) {
+          contactName = clientByUserId.name;
+          whatsapp = clientByUserId.whatsapp || clientByUserId.phone || null;
+          email = clientByUserId.email || null;
+        }
+      }
+    }
+
+    console.log("Creating consolidated quote request:", {
       clientId: data.clientId,
       vendorId: data.vendorId,
-      contactName: data.contactName,
-      whatsapp: data.whatsapp || "",
-      email: data.email || "",
-      observations: data.observations || "",
+      contactName: contactName,
+      whatsapp: whatsapp,
+      email: email,
+      productCount: data.products.length,
+      totalValue: data.totalEstimatedValue
+    });
+
+    const quoteRequest = {
+      id: id,
+      clientId: data.clientId,
+      vendorId: data.vendorId,
+      contactName: contactName,
+      whatsapp: whatsapp,
+      email: email,
+      observations: data.observations || null,
       totalEstimatedValue: data.totalEstimatedValue || 0,
-      status: data.status || "pending",
+      status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date(),
-      products: data.products || []
+      // Consolidate products info
+      productCount: data.products.length,
+      products: data.products
     };
 
-    // Salvar o orçamento principal
     this.quoteRequests.push(quoteRequest);
 
     console.log(`Created consolidated quote request ${id} with ${data.products.length} products`);
