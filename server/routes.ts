@@ -2749,7 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return updated user without password
       const { password: _, ...userWithoutPassword } = updatedUser;
-      
+
       console.log("Partner updated successfully:", updatedUser.id);
       res.json({
         success: true,
@@ -2805,7 +2805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {
         username: username.trim()
       };
-      
+
       if (password && password.trim().length > 0) {
         updateData.password = password.trim();
       }
@@ -2818,7 +2818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return updated user without password
       const { password: _, ...userWithoutPassword } = updatedUser;
-      
+
       console.log("Partner credentials updated successfully:", updatedUser.id);
       res.json({
         success: true,
@@ -3217,15 +3217,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const requested = parseFloat(amount);
           const alreadyPaid = parseFloat(order.paidValue || '0');
           const total = parseFloat(order.totalValue);
-          
+
           // Never accept payment above the remaining amount
           const allowable = Math.max(0, total - alreadyPaid);
           const finalAmount = Math.min(requested, allowable);
-          
+
           if (finalAmount !== requested) {
             console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
           }
-          
+
           paymentRecord = await storage.createPayment({
             orderId: receivable.orderId,
             amount: finalAmount.toFixed(2),
@@ -5560,7 +5560,8 @@ Para mais detalhes, entre em contato conosco!`;
             producerName: producer?.name || null,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado')
+              : (clientAddress || 'Endereço não informado'),
+            deliveryType: order.deliveryType || 'delivery'
           };
         })
       );
@@ -5862,7 +5863,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        // Also check if contactName matches user info (fallback for orders created from budgets)
+        // ContactName check for orders created from budgets
         if (!shouldInclude && budget.contactName) {
           try {
             const user = await storage.getUser(clientId);
