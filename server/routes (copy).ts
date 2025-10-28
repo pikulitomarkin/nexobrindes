@@ -400,56 +400,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logistics - Get paid orders ready for production
-  app.get("/api/logistics/paid-orders", async (req, res) => {
-    try {
-      console.log("Fetching paid orders ready for production...");
-      const paidOrders = await storage.getPaidOrdersReadyForProduction();
-
-      console.log(`Found ${paidOrders.length} paid orders ready for production`);
-
-      // Enrich with client names and producer information
-      const enrichedOrders = await Promise.all(
-        paidOrders.map(async (order) => {
-          // Always use contactName as primary client identifier
-          let clientName = order.contactName;
-
-          // Only if contactName is missing, try to get from client record
-          if (!clientName && order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
-            if (clientRecord) {
-              clientName = clientRecord.name;
-            } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
-                  clientName = clientUser.name;
-                }
-              }
-            }
-          }
-
-          // If still no name, use a descriptive message
-          if (!clientName) {
-            clientName = "Nome não informado";
-          }
-
-          return {
-            ...order,
-            clientName: clientName
-          };
-        })
-      );
-
-      res.json(enrichedOrders);
-    } catch (error) {
-      console.error("Error fetching paid orders:", error);
-      res.status(500).json({ error: "Failed to fetch paid orders" });
-    }
-  });
 
   // Logistics dispatch order
   app.post("/api/logistics/dispatch-order", async (req, res) => {
@@ -674,9 +624,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
       }
 
-      // Update order status to production only if we created orders and it's not already in production
+      // Only update order status to production if ALL producers have received their orders
       if (createdOrders.length > 0 && order.status !== 'production') {
-        await storage.updateOrder(id, { status: 'production' });
+        // Check if there are still producers without production orders
+        const allProductionOrders = await storage.getProductionOrdersByOrder(id);
+        const uniqueProducers = new Set();
+        
+        // Count unique producers in the order items
+        allItems.forEach((item: any) => {
+          if (item.producerId && item.producerId !== 'internal') {
+            uniqueProducers.add(item.producerId);
+          }
+        });
+        
+        // Count unique producers with production orders
+        const producersWithOrders = new Set(allProductionOrders.map(po => po.producerId));
+        
+        // Only mark as production if all producers have been sent
+        if (uniqueProducers.size === producersWithOrders.size) {
+          await storage.updateOrder(id, { status: 'production' });
+        }
       }
 
       const message = producerId
@@ -5366,7 +5333,7 @@ Para mais detalhes, entre em contato conosco!`;
         return isPaid && isConfirmed && notInProduction && hasExternalItems;
       });
 
-      // Enrich with client information
+      // Enrich with client information and producer names
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
           let clientName = order.contactName || 'Cliente não identificado';
@@ -5401,17 +5368,35 @@ Para mais detalhes, entre em contato conosco!`;
             }
           }
 
-          const vendor = await storage.getUser(order.vendorId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-
           // Get payment information
           const payments = await storage.getPaymentsByOrder(order.id);
           const lastPayment = payments
             .filter(p => p.status === 'confirmed')
             .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
 
+          // Enrich items with producer names (cache producers to avoid duplicate queries)
+          const producerCache = new Map();
+          const enrichedItems = await Promise.all(
+            (order.items || []).map(async (item: any) => {
+              if (item.producerId && item.producerId !== 'internal') {
+                // Check cache first
+                if (!producerCache.has(item.producerId)) {
+                  const producer = await storage.getUser(item.producerId);
+                  producerCache.set(item.producerId, producer?.name || null);
+                }
+                
+                return {
+                  ...item,
+                  producerName: producerCache.get(item.producerId) || `Produtor ${item.producerId.slice(-6)}`
+                };
+              }
+              return item;
+            })
+          );
+
           return {
             ...order,
+            items: enrichedItems,
             clientName: clientName,
             clientAddress: clientAddress || 'Endereço não informado',
             clientPhone: clientPhone,
