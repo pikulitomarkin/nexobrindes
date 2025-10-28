@@ -3845,6 +3845,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all clients
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+      
+      // Enrich with vendor names and statistics
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+          
+          // Get client orders count and total spent
+          const orders = await storage.getOrders();
+          const clientOrders = orders.filter(order => 
+            order.clientId === client.id || 
+            order.clientId === client.userId ||
+            order.contactName === client.name
+          );
+          
+          const totalSpent = clientOrders.reduce((sum, order) => 
+            sum + parseFloat(order.totalValue), 0
+          );
+
+          return {
+            ...client,
+            vendorName: vendor?.name || null,
+            ordersCount: clientOrders.length,
+            totalSpent: totalSpent,
+            userCode: client.userCode || client.username || 'N/A'
+          };
+        })
+      );
+
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Create client endpoint
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log("Creating client:", clientData);
+
+      // Validate required fields
+      if (!clientData.name) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!clientData.password) {
+        return res.status(400).json({ error: "Senha é obrigatória" });
+      }
+
+      // Use userCode as username if provided, otherwise generate one
+      const username = clientData.userCode || `cli_${Date.now()}`;
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      // Create user first
+      const user = await storage.createUser({
+        username: username,
+        password: clientData.password,
+        role: "client",
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        isActive: true
+      });
+
+      // Create client profile
+      const client = await storage.createClient({
+        userId: user.id,
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        whatsapp: clientData.whatsapp || null,
+        cpfCnpj: clientData.cpfCnpj || null,
+        address: clientData.address || null,
+        vendorId: clientData.vendorId || null,
+        isActive: true
+      });
+
+      console.log(`Client created successfully: ${client.id} - ${client.name}`);
+
+      res.json({
+        success: true,
+        client: {
+          ...client,
+          userCode: username
+        }
+      });
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ error: "Erro ao criar cliente: " + error.message });
+    }
+  });
+
   // Create payments endpoint (used by receivables module)
   app.post("/api/payments", async (req, res) => {
     try {
