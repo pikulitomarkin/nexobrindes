@@ -47,10 +47,7 @@ export default function FinanceReceivables() {
         throw new Error('Erro ao carregar contas a receber');
       }
       return response.json();
-    },
-    refetchInterval: 30000, // Refetch a cada 30 segundos
-    refetchOnWindowFocus: true,
-    staleTime: 10000, // Dados ficam "frescos" por 10 segundos
+    }
   });
 
   // Fetch branches data
@@ -66,9 +63,7 @@ export default function FinanceReceivables() {
         throw new Error('Erro ao carregar filiais');
       }
       return response.json();
-    },
-    refetchInterval: 60000, // Refetch a cada minuto
-    staleTime: 300000, // Branches mudam menos, 5 minutos de cache
+    }
   });
 
   // Convert API data to expected format - SEMPRE mostrar valor total original do pedido
@@ -124,7 +119,6 @@ export default function FinanceReceivables() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/overview'] });
       setIsReceiveDialogOpen(false);
       setSelectedReceivable(null);
       setPaymentData({
@@ -140,7 +134,6 @@ export default function FinanceReceivables() {
       // Force refetch after a short delay to ensure data is fresh
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["/api/finance/receivables"] });
-        queryClient.refetchQueries({ queryKey: ["/api/finance/overview"] });
       }, 100);
     },
     onError: (error: any) => {
@@ -177,7 +170,6 @@ export default function FinanceReceivables() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/overview'] });
       setIsCreateDialogOpen(false);
       setNewReceivableData({
         clientName: "",
@@ -565,17 +557,12 @@ export default function FinanceReceivables() {
                               className={`h-7 px-2 panel-button ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
                               onClick={() => {
                                 setSelectedReceivable(receivable);
-                                // Calculate correctly considering what was already paid
+                                // Suggest minimum payment if not met, otherwise remaining amount
                                 const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
                                 const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
-                                
-                                // Calculate what's missing from minimum payment (never negative)
-                                const missingOfMinimum = Math.max(0, parseFloat(receivable.minimumPayment || "0") - receivedSoFar);
-                                
-                                const suggestedAmount = (!isMinimumMet && parseFloat(receivable.minimumPayment || "0") > 0)
-                                  ? missingOfMinimum.toFixed(2)
-                                  : remainingAmount.toFixed(2);
-                                
+                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
+                                  minimumPayment.toString() : 
+                                  remainingAmount.toString();
                                 setPaymentData({
                                   ...paymentData,
                                   amount: suggestedAmount

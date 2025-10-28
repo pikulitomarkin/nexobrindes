@@ -109,7 +109,6 @@ export interface IStorage {
 
   // Commissions
   getCommissionsByVendor(vendorId: string): Promise<Commission[]>;
-  getCommissionsByPartner(partnerId: string): Promise<Commission[]>; // Added getCommissionsByPartner
   getAllCommissions(): Promise<Commission[]>;
   createCommission(commission: InsertCommission): Promise<Commission>;
   updateCommissionStatus(id: string, status: string): Promise<Commission | undefined>;
@@ -927,7 +926,7 @@ export class MemStorage implements IStorage {
     this.clients.set(client4.id, client4);
     this.clients.set(client5.id, client5);
 
-    // Limpar dados de pedidos, orçamentos, etc.
+    // Limpar todos os dados de pedidos, orçamentos, etc.
     mockOrders = [];
     mockBudgets = [];
 
@@ -1294,46 +1293,29 @@ export class MemStorage implements IStorage {
     return this.clients.get(id);
   }
 
-  async createClient(clientData: InsertClient): Promise<Client> {
+  async createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }> {
     const id = randomUUID();
-    
-    console.log(`Storage: === CREATING CLIENT ===`);
-    console.log(`Storage: Input data:`, {
-      name: clientData.name,
-      vendorId: clientData.vendorId,
-      branchId: clientData.branchId,
-      userId: clientData.userId,
-      email: clientData.email,
-      phone: clientData.phone,
-      isActive: clientData.isActive
-    });
-
-    const newClient: Client = {
+    const client: Client & { userCode?: string } = {
+      ...clientData,
       id,
+      vendorId: clientData.vendorId || null,
       userId: clientData.userId || null,
-      name: clientData.name,
       email: clientData.email || null,
       phone: clientData.phone || null,
       whatsapp: clientData.whatsapp || null,
       cpfCnpj: clientData.cpfCnpj || null,
       address: clientData.address || null,
-      vendorId: clientData.vendorId || null,
-      branchId: clientData.branchId || null,
+      userCode: (clientData as any).userCode || null,
       isActive: clientData.isActive !== undefined ? clientData.isActive : true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    console.log(`Storage: About to save client with ID: ${id}`);
-    console.log(`Storage: Client object:`, newClient);
-    
-    this.clients.set(id, newClient);
-    
-    console.log(`Storage: Client saved to map. Map size before: ${this.clients.size - 1}, after: ${this.clients.size}`);
-    console.log(`Storage: Verification - can retrieve client: ${this.clients.has(id)}`);
-    console.log(`Storage: Retrieved client:`, this.clients.get(id));
-
-    return newClient;
+    console.log(`Storage: Creating client with vendorId: ${clientData.vendorId}`, client);
+    this.clients.set(id, client);
+    console.log(`Storage: Client added. Map size now: ${this.clients.size}`);
+    console.log(`Storage: Can retrieve client: ${this.clients.get(id) !== undefined}`);
+    return client;
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
@@ -1640,23 +1622,6 @@ export class MemStorage implements IStorage {
       return updatedOrder;
     }
     return undefined;
-  }
-
-  async updateOrderShippingStatus(orderId: string): Promise<void> {
-    const productionOrders = await this.getProductionOrdersByOrder(orderId);
-    if (productionOrders.length === 0) return;
-
-    const shippedOrders = productionOrders.filter(po => po.status === 'shipped' || po.status === 'delivered');
-    const totalOrders = productionOrders.length;
-
-    let newStatus = 'production';
-    if (shippedOrders.length === totalOrders) {
-      newStatus = 'shipped'; // Todos despachados
-    } else if (shippedOrders.length > 0) {
-      newStatus = 'partial_shipped'; // Alguns despachados
-    }
-
-    await this.updateOrderStatus(orderId, newStatus);
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
@@ -1980,6 +1945,7 @@ export class MemStorage implements IStorage {
     if (receivable) {
       const totalAmount = parseFloat(receivable.amount); // MANTER valor original sempre
       let status: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending';
+
       if (totalPaid >= totalAmount) {
         status = 'paid';
       } else if (totalPaid > 0) {
@@ -2105,13 +2071,6 @@ export class MemStorage implements IStorage {
   // Commission methods
   async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
     return Array.from(this.commissions.values()).filter(commission => commission.vendorId === vendorId);
-  }
-
-  // Added method to get commissions by partnerId
-  async getCommissionsByPartner(partnerId: string): Promise<Commission[]> {
-    return Array.from(this.commissions.values()).filter(commission =>
-      commission.partnerId === partnerId
-    );
   }
 
   async getAllCommissions(): Promise<Commission[]> {
@@ -2250,47 +2209,53 @@ export class MemStorage implements IStorage {
   }
 
   async createPartner(partnerData: any): Promise<User> {
-    // Generate unique userCode if not provided
-    const userCode = partnerData.userCode || this.generatePartnerCode();
-
     // Create user first
     const newUser: User = {
       id: randomUUID(),
-      username: partnerData.username || userCode,
+      username: partnerData.username,
       password: partnerData.password || "123456",
       role: 'partner',
       name: partnerData.name,
       email: partnerData.email || null,
       phone: partnerData.phone || null,
-      address: partnerData.address || null,
-      specialty: partnerData.specialty || null,
       vendorId: null,
       isActive: true
     };
 
-    // Add userCode to user object for partner access
-    (newUser as any).userCode = userCode;
-
     this.users.set(newUser.id, newUser);
 
-    // Create partner profile
-    const partnerProfile: Partner = {
-      id: randomUUID(),
-      userId: newUser.id,
-      commissionRate: partnerData.commissionRate || "15.00",
+    // Create partner profiles for all 3 partners
+    const partnerProfile1: Partner = {
+      id: "partner-profile-1",
+      userId: "partner-1",
+      commissionRate: "15.00",
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    this.partners.set(partnerProfile.id, partnerProfile);
-    return newUser;
-  }
+    const partnerProfile2: Partner = {
+      id: "partner-profile-2",
+      userId: "partner-2",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-  private generatePartnerCode(): string {
-    const timestamp = Date.now().toString().slice(-6);
-    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `SOC${timestamp}${randomStr}`;
+    const partnerProfile3: Partner = {
+      id: "partner-profile-3",
+      userId: "partner-3",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    this.partners.set(partnerProfile1.id, partnerProfile1);
+    this.partners.set(partnerProfile2.id, partnerProfile2);
+    this.partners.set(partnerProfile3.id, partnerProfile3);
+    return newUser;
   }
 
   async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
