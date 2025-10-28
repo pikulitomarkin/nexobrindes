@@ -2825,6 +2825,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE endpoints with validations
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validar se cliente tem pedidos
+      const orders = await storage.getOrders();
+      const clientOrders = orders.filter(order => order.clientId === id);
+      
+      if (clientOrders.length > 0) {
+        return res.status(400).json({ 
+          error: "Não é possível excluir este cliente pois existem pedidos associados a ele" 
+        });
+      }
+
+      // Excluir cliente
+      await storage.deleteClient(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      res.status(500).json({ error: "Failed to delete client" });
+    }
+  });
+
+  app.delete("/api/vendors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validar se vendedor tem pedidos
+      const orders = await storage.getOrders();
+      const vendorOrders = orders.filter(order => order.vendorId === id);
+      
+      if (vendorOrders.length > 0) {
+        return res.status(400).json({ 
+          error: "Não é possível excluir este vendedor pois existem pedidos associados a ele" 
+        });
+      }
+
+      // Excluir vendedor
+      await storage.deleteVendor(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      res.status(500).json({ error: "Failed to delete vendor" });
+    }
+  });
+
+  app.delete("/api/branches/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validar se filial tem pedidos
+      const orders = await storage.getOrders();
+      const branchOrders = orders.filter(order => order.branchId === id);
+      
+      if (branchOrders.length > 0) {
+        return res.status(400).json({ 
+          error: "Não é possível excluir esta filial pois existem pedidos associados a ela" 
+        });
+      }
+
+      // Excluir filial
+      await storage.deleteBranch(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting branch:', error);
+      res.status(500).json({ error: "Failed to delete branch" });
+    }
+  });
+
+  app.delete("/api/producers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validar se produtor tem pedidos de produção
+      const productionOrders = await storage.getProductionOrders();
+      const producerOrders = productionOrders.filter(po => po.producerId === id);
+      
+      if (producerOrders.length > 0) {
+        return res.status(400).json({ 
+          error: "Não é possível excluir este produtor pois existem pedidos de produção associados a ele" 
+        });
+      }
+
+      // Excluir produtor
+      await storage.deleteProducer(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting producer:', error);
+      res.status(500).json({ error: "Failed to delete producer" });
+    }
+  });
+
   // Quote Requests routes - Consolidated version
   app.post("/api/quote-requests/consolidated", async (req, res) => {
     try {

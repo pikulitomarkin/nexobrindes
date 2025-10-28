@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, MessageCircle, FileText, Building, MapPin, Hash, RefreshCw, User } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, MessageCircle, FileText, Building, MapPin, Hash, RefreshCw, User, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -116,6 +116,38 @@ export default function AdminClients() {
       });
     },
   });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      const response = await fetch(`/api/clients/${clientId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erro ao excluir cliente");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({
+        title: "Sucesso!",
+        description: "Cliente excluído com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClient = (clientId: string, clientName: string) => {
+    if (confirm(`Tem certeza que deseja excluir o cliente "${clientName}"?`)) {
+      deleteClientMutation.mutate(clientId);
+    }
+  };
 
   const onSubmit = (data: ClientFormValues) => {
     createClientMutation.mutate(data);
@@ -391,6 +423,15 @@ export default function AdminClients() {
                         onClick={() => handleEditClient(client)}
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        title="Excluir"
+                        onClick={() => handleDeleteClient(client.id, client.name)}
+                        disabled={deleteClientMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
                     </div>
                   </div>
