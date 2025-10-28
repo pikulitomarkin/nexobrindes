@@ -29,6 +29,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import cn from "clsx"; // Assuming clsx is available for conditional class merging
+import { Logo } from "@/components/ui/logo";
 
 
 // Mocking Link, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, SidebarGroupContent for demonstration
@@ -118,9 +119,8 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
 
   return (
     <div className="w-64 gradient-bg text-white shadow-xl">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-2">Nexo Brindes</h1>
-        <p className="text-blue-100 text-sm">Vendas & Produção</p>
+      <div className="p-6 bg-white">
+        <Logo size="md" variant="full" />
       </div>
 
       <nav className="mt-8">

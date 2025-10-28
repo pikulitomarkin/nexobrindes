@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Logo } from "@/components/ui/logo";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -154,12 +155,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/20">
-            <h1 className="text-2xl font-bold text-white">Nexo Brindes</h1>
+          <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white">
+            <Logo size="sm" variant="full" />
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden text-white hover:bg-white/20"
+              className="lg:hidden text-gray-600 hover:bg-gray-100"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="h-5 w-5" />

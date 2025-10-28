@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, User, Shield, Users, Factory, DollarSign } from "lucide-react";
+import { User, Shield, Users, Factory, DollarSign } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Logo } from "@/components/ui/logo";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -110,11 +111,10 @@ export default function Login() {
       <div className="w-full max-w-md">
         <Card className="shadow-2xl">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-teal-500 rounded-full flex items-center justify-center mb-4">
-              <LogIn className="h-8 w-8 text-white" />
+            <div className="mx-auto mb-6 flex justify-center">
+              <Logo size="lg" variant="full" />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Nexo Brindes</CardTitle>
-            <p className="text-gray-600">Acesse seu painel personalizado</p>
+            <p className="text-gray-600 text-sm">Acesse seu painel personalizado</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleLogin} className="space-y-4">
