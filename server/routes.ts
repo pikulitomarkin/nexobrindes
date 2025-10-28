@@ -2919,6 +2919,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics users routes
+  app.get("/api/logistics", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const logisticsUsers = users.filter(user => user.role === 'logistics');
+      res.json(logisticsUsers);
+    } catch (error) {
+      console.error('Error fetching logistics users:', error);
+      res.status(500).json({ error: "Failed to fetch logistics users" });
+    }
+  });
+
+  app.post("/api/logistics", async (req, res) => {
+    try {
+      const { name, email, phone, password, username, userCode } = req.body;
+
+      console.log('Creating logistics user with request data:', { name, email, phone, username: username || userCode, hasPassword: !!password });
+
+      // Use userCode as username if username is not provided
+      const finalUsername = userCode || username || email;
+
+      if (!finalUsername) {
+        return res.status(400).json({ error: "Username ou código de usuário é obrigatório" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(finalUsername);
+      if (existingUser) {
+        console.log('Username already exists:', finalUsername);
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const logisticsUser = await storage.createUser({
+        username: finalUsername,
+        password,
+        name,
+        email: email || null,
+        phone: phone || null,
+        role: 'logistics',
+        userCode: userCode || finalUsername
+      });
+
+      console.log('Logistics user created successfully:', logisticsUser.id);
+      
+      res.json({
+        ...logisticsUser,
+        password: password // Return password in response so it can be shown to admin
+      });
+    } catch (error) {
+      console.error('Error creating logistics user:', error);
+      res.status(500).json({ error: "Failed to create logistics user" });
+    }
+  });
+
+  app.delete("/api/logistics/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Deletar usuário de logística
+      await storage.deleteUser(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting logistics user:', error);
+      res.status(500).json({ error: "Failed to delete logistics user" });
+    }
+  });
+
   // Quote Requests routes - Consolidated version
   app.post("/api/quote-requests/consolidated", async (req, res) => {
     try {
