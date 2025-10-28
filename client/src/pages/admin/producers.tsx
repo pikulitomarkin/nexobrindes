@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck, Package } from "lucide-react";
+import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck, Package, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -147,6 +147,38 @@ export default function AdminProducers() {
       });
     },
   });
+
+  const deleteProducerMutation = useMutation({
+    mutationFn: async (producerId: string) => {
+      const response = await fetch(`/api/producers/${producerId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erro ao excluir produtor");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/producers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/producer-stats"] });
+      toast({
+        title: "Sucesso!",
+        description: "Produtor excluído com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteProducer = (producerId: string, producerName: string) => {
+    if (confirm(`Tem certeza que deseja excluir o produtor "${producerName}"?`)) {
+      deleteProducerMutation.mutate(producerId);
+    }
+  };
 
   const onSubmit = (data: ProducerFormValues) => {
     createProducerMutation.mutate(data);
@@ -391,6 +423,15 @@ export default function AdminProducers() {
                         }}
                       >
                         <Truck className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Excluir produtor"
+                        onClick={() => handleDeleteProducer(producer.id, producer.name)}
+                        disabled={deleteProducerMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
                     </div>
                   </div>
