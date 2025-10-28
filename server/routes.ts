@@ -497,6 +497,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get bank transactions for reconciliation (with optional filters)
+  app.get("/api/finance/bank-transactions", async (req, res) => {
+    try {
+      // Optional filters via query: ?status=unmatched|matched & type=credit|debit
+      const { status, type } = req.query as { status?: string; type?: string };
+
+      const all = await storage.getBankTransactions(); // from storage.ts
+      const normalized = (all || []).map(tx => ({
+        id: tx.id,
+        importId: tx.importId || null,
+        fitId: tx.fitId || null,
+        date: tx.date,
+        hasValidDate: !!tx.hasValidDate,
+        amount: typeof tx.amount === "string" ? tx.amount : String(tx.amount),
+        description: tx.description || "",
+        memo: tx.memo || "",
+        bankRef: tx.bankRef || "",
+        originalType: tx.originalType || "",
+        type: tx.type || (parseFloat(tx.amount) >= 0 ? "credit" : "debit"),
+        status: tx.status || "unmatched",
+        matchedOrderId: tx.matchedOrderId || null,
+        matchedPaymentId: tx.matchedPaymentId || null,
+        matchedAt: tx.matchedAt || null,
+        notes: tx.notes || "",
+      }));
+
+      const filtered = normalized.filter(tx => {
+        const okStatus = status ? tx.status === status : true;
+        const okType   = type ? tx.type   === type   : true;
+        return okStatus && okType;
+      });
+
+      console.log(`Returning ${filtered.length} bank transactions (status: ${status || 'all'}, type: ${type || 'all'})`);
+      res.json(filtered);
+    } catch (err: any) {
+      console.error("Error fetching bank transactions:", err);
+      res.status(500).json({ error: "Failed to fetch bank transactions" });
+    }
+  });
+
+  // Reconciliation summary (used to load the panel without skeleton freezing)
+  app.get("/api/finance/reconciliation", async (req, res) => {
+    try {
+      const [txs, orders] = await Promise.all([
+        storage.getBankTransactions(),
+        storage.getOrders(),
+      ]);
+
+      const totalTx = txs?.length || 0;
+      const matched = txs?.filter(t => t.status === "matched").length || 0;
+      const unmatched = totalTx - matched;
+
+      const pendingOrders = (orders || []).filter(o => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        const remaining = total - paid;
+        return o.status !== "cancelled" && remaining > 0.01;
+      });
+
+      const totalRemaining = pendingOrders.reduce((acc, o) => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        return acc + (total - paid);
+      }, 0);
+
+      console.log(`Reconciliation summary: ${totalTx} total transactions, ${matched} matched, ${unmatched} unmatched, ${pendingOrders.length} pending orders`);
+
+      res.json({
+        bank: { total: totalTx, matched, unmatched },
+        orders: { pendingCount: pendingOrders.length, totalRemaining: Number(totalRemaining.toFixed(2)) },
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("Error building reconciliation summary:", err);
+      res.status(500).json({ error: "Failed to build reconciliation summary" });
+    }
+  });
+
+  // Get pending orders for reconciliation
+  app.get("/api/finance/pending-orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      
+      const pendingOrders = (orders || []).filter(o => {
+        const total = parseFloat(o.totalValue || "0");
+        const paid  = parseFloat(o.paidValue  || "0");
+        const remaining = total - paid;
+        return o.status !== "cancelled" && remaining > 0.01;
+      });
+
+      // Enrich with client names and budget info
+      const enrichedOrders = await Promise.all(
+        pendingOrders.map(async (order) => {
+          let clientName = order.contactName;
+
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          // Get budget payment info if order was converted from budget
+          let budgetInfo = null;
+          if (order.budgetId) {
+            try {
+              const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+              if (budgetPaymentInfo && budgetPaymentInfo.downPayment) {
+                budgetInfo = {
+                  downPayment: parseFloat(budgetPaymentInfo.downPayment),
+                  remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                  installments: budgetPaymentInfo.installments || 1
+                };
+              }
+            } catch (error) {
+              console.log("Error fetching budget info for order:", order.id, error);
+            }
+          }
+
+          return {
+            ...order,
+            clientName: clientName,
+            budgetInfo: budgetInfo
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} pending orders for reconciliation`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching pending orders:", error);
+      res.status(500).json({ error: "Failed to fetch pending orders" });
+    }
+  });
+
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password, preferredRole } = req.body;
@@ -1019,6 +1168,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating producer value:", error);
       res.status(500).json({ error: "Erro ao atualizar valor do produtor" });
+    }
+  });
+
+  // Get expenses for finance module
+  app.get("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenses();
+      console.log(`Returning ${expenses?.length || 0} expenses for finance module`);
+      res.json(expenses || []);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  // Create expense
+  app.post("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenseData = req.body;
+      console.log("Creating expense:", expenseData);
+
+      const expense = await storage.createExpense({
+        ...expenseData,
+        amount: parseFloat(expenseData.amount).toFixed(2),
+        date: new Date(expenseData.date),
+        status: expenseData.status || 'pending',
+        createdBy: expenseData.createdBy || 'system',
+        createdAt: new Date()
+      });
+
+      console.log("Expense created successfully:", expense.id);
+      res.json(expense);
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      res.status(500).json({ error: "Failed to create expense" });
     }
   });
 
