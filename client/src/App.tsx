@@ -204,52 +204,52 @@ function App() {
                   <Route path="/partner/producers" component={() => <AdminProducers />} />
                   <Route path="/partner/products" component={() => <AdminProducts />} />
 
-                  {/* Finance Routes - accessible by admin and finance users */}
+                  {/* Finance Routes - accessible by admin, finance and partner users */}
                   <Route path="/finance"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceIndex />
                       </ProtectedRoute>
                     )}
                   />
                   <Route path="/finance/receivables"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceReceivables />
                       </ProtectedRoute>
                     )}
                   />
                   <Route path="/finance/payables"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinancePayables />
-                      </ProtectedRoute>
-                    )}
-                  />
-                  <Route path="/finance/payments"
-                    component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
-                        <FinancePayments />
                       </ProtectedRoute>
                     )}
                   />
                   <Route path="/finance/expenses"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceExpenses />
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route path="/finance/payments"
+                    component={() => (
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
+                        <FinancePayments />
                       </ProtectedRoute>
                     )}
                   />
                   <Route path="/finance/commission-payouts"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceCommissionPayouts />
                       </ProtectedRoute>
                     )}
                   />
                   <Route path="/finance/reconciliation"
                     component={() => (
-                      <ProtectedRoute requiredRoles={["admin", "finance"]}>
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceReconciliation />
                       </ProtectedRoute>
                     )}

@@ -85,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
     { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
-    { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+    { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" }nceiro" },
   ];
 
   const vendorNavigation = [
