@@ -91,7 +91,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         ];
       case "vendor":
         return [
-          { href: "/", icon: Home, label: "Dashboard" },
+          { href: "/vendor-dashboard", icon: Home, label: "Dashboard" },
           { href: "/vendor/products", icon: Package, label: "Catálogo" },
           { href: "/vendor/quote-requests", icon: MessageCircle, label: "Solicitações" },
           { href: "/vendor/budgets", icon: FileText, label: "Orçamentos" },

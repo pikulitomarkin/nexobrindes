@@ -9,6 +9,18 @@ import { Link } from "wouter";
 export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
+  // Redirecionar sócios para seu dashboard específico
+  if (user.role === 'partner') {
+    window.location.href = '/partner/dashboard';
+    return null;
+  }
+
+  // Redirecionar vendedores para seu dashboard específico
+  if (user.role === 'vendor') {
+    window.location.href = '/vendor-dashboard';
+    return null;
+  }
+
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -226,21 +238,19 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {user.role === "partner" && (
-              <Card data-testid="card-partner-commissions">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
-                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                        R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            <Card data-testid="card-partner-commissions">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                      R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Recent Orders & Quick Actions */}
