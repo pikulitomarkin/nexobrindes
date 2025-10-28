@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Clock, Truck, Home, Eye, Calendar, CreditCard, Package } from "lucide-react";
+import { CheckCircle, Clock, Truck, Home, Eye, Calendar, CreditCard, Package, User, FileText, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { toast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Clock, Package, Truck, User, CreditCard, FileText, Phone, Mail, CheckCircle } from "lucide-react";
 
 // Component to display shipping details
 function ShippingDetailsCard({ orderId, status }: { orderId: string, status: string }) {
