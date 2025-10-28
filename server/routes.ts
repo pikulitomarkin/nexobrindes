@@ -3213,50 +3213,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // This is an order-based receivable - create payment for the order
         // Get current order to prevent overpayments
         const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const requested = parseFloat(amount);
-          const alreadyPaid = parseFloat(order.paidValue || '0');
-          const total = parseFloat(order.totalValue);
-
-          // Never accept payment above the remaining amount
-          const allowable = Math.max(0, total - alreadyPaid);
-          const finalAmount = Math.min(requested, allowable);
-
-          if (finalAmount !== requested) {
-            console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
-          }
-
-          paymentRecord = await storage.createPayment({
-            orderId: receivable.orderId,
-            amount: finalAmount.toFixed(2),
-            method: method || "manual",
-            status: "confirmed",
-            transactionId: transactionId || `MANUAL-${Date.now()}`,
-            notes: notes || "",
-            paidAt: new Date()
-          });
-        } else {
+        if (!order) {
           throw new Error('Pedido não encontrado');
         }
 
-        // Get current order to calculate new paid value safely
-        const order = await storage.getOrder(receivable.orderId);
-        if (order) {
-          const totalValue = parseFloat(order.totalValue);
-          const currentPaid = parseFloat(order.paidValue || '0');
-          const thisPayment = parseFloat(amount);
-          const newPaid = currentPaid + thisPayment;
-          const newRemaining = Math.max(totalValue - newPaid, 0);
+        const requested = parseFloat(amount);
+        const alreadyPaid = parseFloat(order.paidValue || '0');
+        const total = parseFloat(order.totalValue);
 
-          // >>> CRITICAL: NEVER send totalValue in update! <<<
-          await storage.updateOrder(receivable.orderId, {
-            paidValue: newPaid.toFixed(2),
-            remainingAmount: newRemaining.toFixed(2),
-            __origin: 'receivables' // Safety flag for storage layer
-          });
+        // Never accept payment above the remaining amount
+        const allowable = Math.max(0, total - alreadyPaid);
+        const finalAmount = Math.min(requested, allowable);
 
-          console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
+        if (finalAmount !== requested) {
+          console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
         }
+
+        paymentRecord = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: finalAmount.toFixed(2),
+          method: method || "manual",
+          status: "confirmed",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        });
+
+        // Calculate new paid value safely
+        const totalValue = parseFloat(order.totalValue);
+        const currentPaid = parseFloat(order.paidValue || '0');
+        const thisPayment = parseFloat(amount);
+        const newPaid = currentPaid + thisPayment;
+        const newRemaining = Math.max(totalValue - newPaid, 0);
+
+        // >>> CRITICAL: NEVER send totalValue in update! <<<
+        await storage.updateOrder(receivable.orderId, {
+          paidValue: newPaid.toFixed(2),
+          remainingAmount: newRemaining.toFixed(2),
+          __origin: 'receivables' // Safety flag for storage layer
+        });
+
+        console.log(`[RECEIVABLE PAYMENT] Order ${receivable.orderId}: Payment ${amount} added. TotalValue=${totalValue} (unchanged), PaidValue=${newPaid}, Remaining=${newRemaining}`);
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
