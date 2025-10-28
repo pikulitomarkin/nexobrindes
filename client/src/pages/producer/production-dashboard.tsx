@@ -245,8 +245,7 @@ export default function ProductionDashboard() {
               size="sm"
               className="bg-purple-600 hover:bg-purple-700"
               onClick={() => handleStatusUpdate(order, 'production')}
-              disabled={updateStatusMutation.isPending || !order.producerValue || parseFloat(order.producerValue) <= 0}
-              title={(!order.producerValue || parseFloat(order.producerValue) <= 0) ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
+              disabled={updateStatusMutation.isPending}
             >
               <Clock className="h-4 w-4 mr-1" />
               {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}
