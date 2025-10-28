@@ -630,6 +630,37 @@ export class MemStorage implements IStorage {
     };
     this.users.set(partner3User.id, partner3User);
 
+    // Create partner profiles for the 3 partners
+    const partner1Profile: Partner = {
+      id: "partner-profile-1",
+      userId: "partner-1",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.partners.set(partner1Profile.id, partner1Profile);
+
+    const partner2Profile: Partner = {
+      id: "partner-profile-2",
+      userId: "partner-2",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.partners.set(partner2Profile.id, partner2Profile);
+
+    const partner3Profile: Partner = {
+      id: "partner-profile-3",
+      userId: "partner-3",
+      commissionRate: "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.partners.set(partner3Profile.id, partner3Profile);
+
     // Logistics user
     const logisticsUser = {
       id: "logistics-1",
