@@ -424,25 +424,34 @@ export default function VendorBudgets() {
       const response = await fetch(`/api/budgets/${budgetId}/pdf-data`);
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('PDF data fetch failed:', errorText);
-        throw new Error(`Erro ao buscar dados do orçamento: ${errorText}`);
+        console.error('PDF data fetch failed:', response.status, errorText);
+        throw new Error(`Erro ${response.status}: ${errorText}`);
       }
       const data = await response.json();
-      console.log('PDF data received:', data);
+      console.log('PDF data received successfully:', {
+        budgetId: data.budget?.id,
+        budgetNumber: data.budget?.budgetNumber,
+        itemCount: data.items?.length || 0,
+        hasClient: !!data.client,
+        hasVendor: !!data.vendor
+      });
       return data;
     },
     onSuccess: async (data) => {
       try {
-        console.log('Generating PDF with data:', data);
+        console.log('Processing PDF generation...');
         
-        // Validate data before generating PDF
+        // Validate essential data only
+        if (!data) {
+          throw new Error('Nenhum dado retornado da API');
+        }
+        
         if (!data.budget) {
           throw new Error('Dados do orçamento não encontrados na resposta da API');
         }
-        
-        if (!data.items || data.items.length === 0) {
-          throw new Error('Nenhum item encontrado no orçamento');
-        }
+
+        // Items validation is now optional - PDF can be generated without items
+        console.log(`Generating PDF for budget ${data.budget.budgetNumber} with ${data.items?.length || 0} items`);
 
         const pdfGenerator = new PDFGenerator();
         const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
@@ -463,9 +472,14 @@ export default function VendorBudgets() {
         });
       } catch (error) {
         console.error('Error generating PDF:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          data: data
+        });
         toast({
-          title: "Erro",
-          description: `Erro ao gerar PDF: ${error.message}`,
+          title: "Erro ao gerar PDF",
+          description: `${error.message}. Verifique o console para mais detalhes.`,
           variant: "destructive"
         });
       }
@@ -473,7 +487,7 @@ export default function VendorBudgets() {
     onError: (error) => {
       console.error('PDF generation mutation error:', error);
       toast({
-        title: "Erro",
+        title: "Erro na requisição",
         description: `Erro ao buscar dados do orçamento: ${error.message}`,
         variant: "destructive"
       });

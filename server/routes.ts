@@ -320,17 +320,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log(`Fetching PDF data for budget: ${id}`);
+      console.log(`=== PDF DATA REQUEST FOR BUDGET: ${id} ===`);
       
       const budget = await storage.getBudget(id);
       if (!budget) {
-        console.log(`Budget not found: ${id}`);
+        console.log(`ERROR: Budget not found: ${id}`);
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
+      console.log(`Found budget: ${budget.budgetNumber} - ${budget.title}`);
+
       // Get budget items with product details
       const items = await storage.getBudgetItems(id);
-      console.log(`Found ${items.length} budget items`);
+      console.log(`Found ${items.length} budget items:`, items.map(item => ({
+        id: item.id,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice
+      })));
 
       // Enrich items with product data
       const enrichedItems = await Promise.all(
@@ -366,14 +373,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let clientEmail = budget.contactEmail || '';
       let clientPhone = budget.contactPhone || '';
 
+      console.log(`Client lookup - budget.clientId: ${budget.clientId}, found client:`, !!client);
+      
       if (client) {
         clientName = client.name;
         clientEmail = client.email || budget.contactEmail || '';
         clientPhone = client.phone || budget.contactPhone || '';
       }
 
+      console.log(`Final client data:`, { name: clientName, email: clientEmail, phone: clientPhone });
+
       // Get vendor information
       const vendor = await storage.getUser(budget.vendorId);
+      console.log(`Vendor lookup - budget.vendorId: ${budget.vendorId}, found vendor:`, !!vendor);
 
       // Get budget photos
       const photos = await storage.getBudgetPhotos(id);
@@ -431,10 +443,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shippingMethods: shippingMethods || []
       };
 
-      console.log(`PDF data prepared for budget ${id}: ${enrichedItems.length} items, client: ${clientName}`);
+      console.log(`=== PDF DATA PREPARED ===`);
+      console.log(`Budget: ${data.budget.budgetNumber} - ${data.budget.title}`);
+      console.log(`Items: ${enrichedItems.length}`);
+      console.log(`Client: ${clientName} (${clientEmail})`);
+      console.log(`Vendor: ${vendor?.name || 'Unknown'} (${vendor?.email || 'No email'})`);
+      console.log(`Total Value: R$ ${totalBudget.toFixed(2)}`);
+      console.log(`=== SENDING RESPONSE ===`);
+      
       res.json(pdfData);
     } catch (error) {
-      console.error("Error fetching budget PDF data:", error);
+      console.error("=== ERROR IN PDF DATA ENDPOINT ===");
+      console.error("Error details:", error);
+      console.error("Stack trace:", error.stack);
       res.status(500).json({ error: "Erro ao buscar dados do orçamento para PDF: " + error.message });
     }
   });

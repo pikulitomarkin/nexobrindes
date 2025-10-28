@@ -523,18 +523,36 @@ export class PDFGenerator {
   public async generateBudgetPDF(data: BudgetPDFData): Promise<Blob> {
     try {
       console.log('Starting PDF generation for budget:', data.budget?.budgetNumber);
+      console.log('PDF data received:', {
+        hasBudget: !!data.budget,
+        hasClient: !!data.client,
+        hasVendor: !!data.vendor,
+        hasItems: !!data.items && data.items.length > 0,
+        itemCount: data.items?.length || 0
+      });
       
-      // Validate required data
+      // Validate required data with better error messages
+      if (!data || typeof data !== 'object') {
+        throw new Error('Dados do PDF não foram fornecidos');
+      }
+      
       if (!data.budget) {
-        throw new Error('Dados do orçamento não encontrados');
+        throw new Error('Dados do orçamento não encontrados na resposta da API');
       }
       
       if (!data.client) {
-        throw new Error('Dados do cliente não encontrados');
+        console.warn('Client data missing, using default values');
+        data.client = { name: 'Cliente não informado', email: '', phone: '' };
       }
       
       if (!data.vendor) {
-        throw new Error('Dados do vendedor não encontrados');
+        console.warn('Vendor data missing, using default values');
+        data.vendor = { name: 'Vendedor não informado', email: '', phone: '' };
+      }
+
+      if (!data.items || data.items.length === 0) {
+        console.warn('No items found, creating empty items array');
+        data.items = [];
       }
 
       this.currentY = 20;
