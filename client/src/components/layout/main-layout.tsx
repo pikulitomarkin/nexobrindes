@@ -18,7 +18,8 @@ import {
   BarChart3, // Added BarChart3 icon
   Calculator, // Added Calculator icon
   User, // Added User icon
-  Building2 // Added Building2 icon
+  Building2, // Added Building2 icon
+  TrendingUp // Added TrendingUp icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -52,74 +53,90 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { value: "producer", label: "Produtor" },
     { value: "finance", label: "Financeiro" },
     { value: "logistics", label: "Logística" },
+    { value: "partner", label: "Sócio" }, // Added partner role
+  ];
+
+  // Define navigation items for each role
+  const adminNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/admin/products", icon: Package, label: "Produtos" },
+    { href: "/admin/producers", icon: Factory, label: "Produtores" },
+    { href: "/admin/clients", icon: Users, label: "Clientes" },
+    { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
+    { href: "/admin/partners", icon: User, label: "Sócios" },
+    { href: "/admin/branches", icon: Building2, label: "Filiais" },
+    { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+    { href: "/admin/reports", icon: FileText, label: "Relatórios" },
+    { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
+    { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+  ];
+
+  const partnerNavigation = [
+    { href: "/partner/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/partner/commission-management", icon: DollarSign, label: "Minhas Comissões" },
+    { href: "/partner/products", icon: Package, label: "Produtos" },
+    { href: "/partner/producers", icon: Factory, label: "Produtores" },
+    { href: "/partner/clients", icon: Users, label: "Clientes" },
+    { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
+  ];
+
+  const vendorNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/vendor/products", icon: Package, label: "Catálogo" },
+    { href: "/vendor/quote-requests", icon: MessageCircle, label: "Solicitações" },
+    { href: "/vendor/budgets", icon: FileText, label: "Orçamentos" },
+    { href: "/vendor/orders", icon: ShoppingCart, label: "Pedidos" },
+    { href: "/vendor/clients", icon: Users, label: "Clientes" },
+    { href: "/vendor/commissions", icon: DollarSign, label: "Comissões" },
+  ];
+
+  const clientNavigation = [
+    { href: "/client/dashboard", icon: BarChart3, label: "Dashboard" },
+    { href: "/client/products", icon: Package, label: "Catálogo" },
+    { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
+    { href: "/client/budgets", icon: Calculator, label: "Meus Orçamentos" },
+    { href: "/client/profile", icon: User, label: "Meu Perfil" },
+  ];
+
+  const producerNavigation = [
+    { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
+    { href: "/producer/receivables", icon: CreditCard, label: "Contas a Receber" },
+  ];
+
+  const financeNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber" },
+    { href: "/finance/expenses", icon: FileText, label: "Notas de Despesas" },
+    { href: "/finance/commission-payouts", icon: Users, label: "Pagamentos de Comissão" },
+    { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
+    { href: "/finance/payments", icon: Package, label: "Pagamentos" },
+  ];
+
+  const logisticsNavigation = [
+    { href: "/logistics/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos Pagos" },
+    { href: "/logistics/production-tracking", icon: Factory, label: "Acompanhar Produção" },
+    { href: "/logistics/shipments", icon: Package, label: "Despachos" },
+    { href: "/logistics/products", icon: Package, label: "Produtos" },
+    { href: "/logistics/producers", icon: Factory, label: "Produtores" },
   ];
 
   const getMenuItems = () => {
     switch (currentRole) {
       case "admin":
-        return [
-          { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/admin/products", icon: Package, label: "Produtos" },
-          { href: "/admin/producers", icon: Factory, label: "Produtores" },
-          { href: "/admin/clients", icon: Users, label: "Clientes" },
-          { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
-          { href: "/admin/partners", icon: User, label: "Sócios" },
-          { href: "/admin/branches", icon: Building2, label: "Filiais" },
-          { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
-          { href: "/admin/reports", icon: FileText, label: "Relatórios" },
-          { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
-          { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
-        ];
+        return adminNavigation;
       case "partner":
-        return [
-          { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/partner/products", icon: Package, label: "Produtos" },
-          { href: "/partner/producers", icon: Factory, label: "Produtores" },
-          { href: "/partner/clients", icon: Users, label: "Clientes" },
-          { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
-          { href: "/partner/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
-        ];
+        return partnerNavigation;
       case "vendor":
-        return [
-          { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/vendor/products", icon: Package, label: "Catálogo" },
-          { href: "/vendor/quote-requests", icon: MessageCircle, label: "Solicitações" },
-          { href: "/vendor/budgets", icon: FileText, label: "Orçamentos" },
-          { href: "/vendor/orders", icon: ShoppingCart, label: "Pedidos" },
-          { href: "/vendor/clients", icon: Users, label: "Clientes" },
-          { href: "/vendor/commissions", icon: DollarSign, label: "Comissões" },
-        ];
+        return vendorNavigation;
       case "client":
-        return [
-          { href: "/client/dashboard", icon: BarChart3, label: "Dashboard" },
-          { href: "/client/products", icon: Package, label: "Catálogo" },
-          { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
-          { href: "/client/budgets", icon: Calculator, label: "Meus Orçamentos" },
-          { href: "/client/profile", icon: User, label: "Meu Perfil" },
-        ];
+        return clientNavigation;
       case "producer":
-        return [
-          { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
-          { href: "/producer/receivables", icon: CreditCard, label: "Contas a Receber" },
-        ];
+        return producerNavigation;
       case "finance":
-        return [
-          { href: "/", icon: Home, label: "Dashboard" },
-          { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber" },
-          { href: "/finance/expenses", icon: FileText, label: "Notas de Despesas" },
-          { href: "/finance/commission-payouts", icon: Users, label: "Pagamentos de Comissão" },
-          { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
-          { href: "/finance/payments", icon: Package, label: "Pagamentos" },
-        ];
+        return financeNavigation;
       case "logistics":
-        return [
-          { href: "/logistics/dashboard", icon: Home, label: "Dashboard" },
-          { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos Pagos" },
-          { href: "/logistics/production-tracking", icon: Factory, label: "Acompanhar Produção" },
-          { href: "/logistics/shipments", icon: Package, label: "Despachos" },
-          { href: "/logistics/products", icon: Package, label: "Produtos" },
-          { href: "/logistics/producers", icon: Factory, label: "Produtores" },
-        ];
+        return logisticsNavigation;
       default:
         return [];
     }

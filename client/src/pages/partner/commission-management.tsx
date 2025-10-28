@@ -1,183 +1,63 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { 
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Settings, Edit, Save, Plus, DollarSign, Users, Calculator, Percent } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-
-const commissionFormSchema = z.object({
-  commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
-});
-
-const partnerFormSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  email: z.string().email("Email inválido"),
-  username: z.string().min(3, "Username deve ter pelo menos 3 caracteres"),
-  commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
-});
-
-type CommissionFormValues = z.infer<typeof commissionFormSchema>;
-type PartnerFormValues = z.infer<typeof partnerFormSchema>;
+import { Calculator, DollarSign, Percent, TrendingUp, Eye, Calendar } from "lucide-react";
+import { Link } from "wouter";
 
 export default function PartnerCommissionManagement() {
-  const [editingVendor, setEditingVendor] = useState<string | null>(null);
-  const [editingPartner, setEditingPartner] = useState<string | null>(null);
-  const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
-  const { toast } = useToast();
+  // Get current user (partner) from localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const partnerId = user.id;
 
-  // Queries
-  const { data: commissions, isLoading: loadingCommissions } = useQuery({
+  console.log('Partner Commission Management - User:', user);
+  console.log('Partner Commission Management - Partner ID:', partnerId);
+
+  // Query specific partner commissions
+  const { data: partnerCommissions, isLoading: loadingCommissions } = useQuery({
+    queryKey: ["/api/commissions/partner", partnerId],
+    queryFn: async () => {
+      if (!partnerId) return [];
+
+      const response = await fetch(`/api/commissions/partner/${partnerId}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      if (!response.ok) throw new Error("Failed to fetch partner commissions");
+      return response.json();
+    },
+    enabled: !!partnerId,
+  });
+
+  // Get all commissions for context (filtered view)
+  const { data: allCommissions } = useQuery({
     queryKey: ["/api/commissions"],
+    select: (data) => {
+      // Show only partner type commissions for reference
+      return data?.filter((commission: any) => commission.type === 'partner') || [];
+    }
   });
 
-  const { data: vendors, isLoading: loadingVendors } = useQuery({
-    queryKey: ["/api/vendors"],
-  });
+  // Calculate totals for THIS partner only
+  const totalPartnerCommissions = partnerCommissions?.reduce((sum: number, commission: any) => 
+    sum + parseFloat(commission.amount || '0'), 0) || 0;
 
-  const { data: partners, isLoading: loadingPartners } = useQuery({
-    queryKey: ["/api/partners"],
-  });
+  const pendingPartnerCommissions = partnerCommissions?.filter((c: any) => 
+    ['pending', 'confirmed'].includes(c.status)).reduce((sum: number, c: any) => 
+    sum + parseFloat(c.amount || '0'), 0) || 0;
 
-  // Forms
-  const commissionForm = useForm<CommissionFormValues>({
-    resolver: zodResolver(commissionFormSchema),
-    defaultValues: { commissionRate: "" },
-  });
+  const paidPartnerCommissions = partnerCommissions?.filter((c: any) => 
+    c.status === 'paid').reduce((sum: number, c: any) => 
+    sum + parseFloat(c.amount || '0'), 0) || 0;
 
-  const partnerForm = useForm<PartnerFormValues>({
-    resolver: zodResolver(partnerFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      username: "",
-      commissionRate: "15.00",
-    },
-  });
-
-  // Mutations
-  const updateVendorCommissionMutation = useMutation({
-    mutationFn: async ({ vendorId, commissionRate }: { vendorId: string, commissionRate: string }) => {
-      const response = await fetch(`/api/vendors/${vendorId}/commission`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commissionRate }),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar comissão");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      setEditingVendor(null);
-      commissionForm.reset();
-      toast({ title: "Sucesso!", description: "Comissão do vendedor atualizada" });
-    },
-    onError: () => {
-      toast({ title: "Erro", description: "Não foi possível atualizar a comissão", variant: "destructive" });
-    },
-  });
-
-  const updatePartnerCommissionMutation = useMutation({
-    mutationFn: async ({ partnerId, commissionRate }: { partnerId: string, commissionRate: string }) => {
-      const response = await fetch(`/api/partners/${partnerId}/commission`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commissionRate }),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar comissão");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
-      setEditingPartner(null);
-      commissionForm.reset();
-      toast({ title: "Sucesso!", description: "Comissão do sócio atualizada" });
-    },
-    onError: () => {
-      toast({ title: "Erro", description: "Não foi possível atualizar a comissão", variant: "destructive" });
-    },
-  });
-
-  const createPartnerMutation = useMutation({
-    mutationFn: async (data: PartnerFormValues) => {
-      const response = await fetch("/api/partners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Erro ao criar sócio");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
-      setIsPartnerDialogOpen(false);
-      partnerForm.reset();
-      toast({ title: "Sucesso!", description: "Sócio criado com sucesso" });
-    },
-    onError: () => {
-      toast({ title: "Erro", description: "Não foi possível criar o sócio", variant: "destructive" });
-    },
-  });
-
-  const updateCommissionStatusMutation = useMutation({
-    mutationFn: async ({ commissionId, status }: { commissionId: string, status: string }) => {
-      const response = await fetch(`/api/commissions/${commissionId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!response.ok) throw new Error("Erro ao atualizar status");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
-      toast({ title: "Sucesso!", description: "Status da comissão atualizado" });
-    },
-    onError: () => {
-      toast({ title: "Erro", description: "Não foi possível atualizar o status", variant: "destructive" });
-    },
-  });
-
-  // Handlers
-  const handleEditVendorCommission = (vendor: any) => {
-    setEditingVendor(vendor.id);
-    commissionForm.setValue('commissionRate', vendor.commissionRate);
-  };
-
-  const handleEditPartnerCommission = (partner: any) => {
-    // Função removida - sócios não podem editar suas próprias comissões
-  };
-
-  const onPartnerSubmit = (data: PartnerFormValues) => {
-    createPartnerMutation.mutate(data);
-  };
-
-  // Calculate totals
-  const totalCommissions = commissions?.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
-  const pendingCommissions = commissions?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
-  const paidCommissions = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0) || 0;
-
-  if (loadingCommissions || loadingVendors || loadingPartners) {
+  if (loadingCommissions) {
     return (
       <div className="p-8">
         <div className="animate-pulse">
@@ -199,22 +79,26 @@ export default function PartnerCommissionManagement() {
           <div className="flex items-center">
             <Calculator className="h-8 w-8 gradient-text mr-3" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Comissões - Sócio</h1>
-              <p className="text-gray-600">Gerencie comissões de vendedores e sócios como sócio</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Minhas Comissões</h1>
+              <p className="text-gray-600">Visualize suas comissões de sócio</p>
+              <p className="text-sm text-blue-600 font-medium">Sócio: {user.name}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Overview Cards */}
+      {/* Overview Cards - Individual Partner Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="card-hover">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total de Comissões</p>
+                <p className="text-sm font-medium text-gray-600">Minhas Comissões Totais</p>
                 <p className="text-3xl font-bold gradient-text">
-                  R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {totalPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {partnerCommissions?.length || 0} pedidos
                 </p>
               </div>
               <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
@@ -228,9 +112,12 @@ export default function PartnerCommissionManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pendentes</p>
+                <p className="text-sm font-medium text-gray-600">A Receber</p>
                 <p className="text-3xl font-bold text-yellow-600">
-                  R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {pendingPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Pendentes/Confirmadas
                 </p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -244,215 +131,35 @@ export default function PartnerCommissionManagement() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pagas</p>
+                <p className="text-sm font-medium text-gray-600">Já Recebido</p>
                 <p className="text-3xl font-bold text-green-600">
-                  R$ {paidCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {paidPartnerCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Comissões pagas
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
+                <TrendingUp className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="vendors" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="vendors">Vendedores</TabsTrigger>
-          <TabsTrigger value="partners">Sócios</TabsTrigger>
-          <TabsTrigger value="commissions">Histórico</TabsTrigger>
+      <Tabs defaultValue="my-commissions" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="my-commissions">Minhas Comissões</TabsTrigger>
+          <TabsTrigger value="commission-info">Informações do Sistema</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="vendors" className="space-y-6">
+        <TabsContent value="my-commissions" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Comissões dos Vendedores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {vendors?.map((vendor: any) => (
-                  <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{vendor.name}</h3>
-                      <p className="text-sm text-gray-600">{vendor.email}</p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      {editingVendor === vendor.id ? (
-                        <Form {...commissionForm}>
-                          <form onSubmit={commissionForm.handleSubmit(onCommissionSubmit)} className="flex items-center space-x-2">
-                            <FormField
-                              control={commissionForm.control}
-                              name="commissionRate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <div className="flex items-center space-x-1">
-                                      <Input 
-                                        type="number" 
-                                        step="0.01" 
-                                        className="w-20" 
-                                        {...field} 
-                                      />
-                                      <span className="text-sm text-gray-500">%</span>
-                                    </div>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="submit" size="sm" className="gradient-bg text-white">
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingVendor(null)}
-                            >
-                              Cancelar
-                            </Button>
-                          </form>
-                        </Form>
-                      ) : (
-                        <>
-                          <span className="text-lg font-bold gradient-text">{vendor.commissionRate}%</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditVendorCommission(vendor)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="partners" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Comissões dos Sócios</CardTitle>
-                <Dialog open={isPartnerDialogOpen} onOpenChange={setIsPartnerDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="gradient-bg text-white">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Novo Sócio
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Novo Sócio</DialogTitle>
-                      <DialogDescription>
-                        Cadastre um novo sócio no sistema
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...partnerForm}>
-                      <form onSubmit={partnerForm.handleSubmit(onPartnerSubmit)} className="space-y-4">
-                        <FormField
-                          control={partnerForm.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={partnerForm.control}
-                          name="commissionRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Taxa de Comissão (%)</FormLabel>
-                              <FormControl>
-                                <Input type="number" step="0.01" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button 
-                          type="submit" 
-                          className="w-full gradient-bg text-white"
-                          disabled={createPartnerMutation.isPending}
-                        >
-                          Criar Sócio
-                        </Button>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {partners?.map((partner: any) => (
-                  <div key={partner.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{partner.name}</h3>
-                      <p className="text-sm text-gray-600">{partner.email}</p>
-                      <p className="text-xs text-gray-500">
-                        Total: R$ {partner.totalCommissions?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-lg font-bold gradient-text">{partner.commissionRate}%</span>
-                      <span className="text-sm text-gray-500">Apenas administrador pode alterar</span>
-                    </div>
-                  </div>
-                ))}
-
-                {(!partners || partners.length === 0) && (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Nenhum sócio cadastrado</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="commissions" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Histórico de Comissões</CardTitle>
+              <CardTitle>Histórico das Minhas Comissões</CardTitle>
+              <p className="text-sm text-gray-600">
+                Todas as comissões geradas para você como sócio
+              </p>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -466,19 +173,13 @@ export default function PartnerCommissionManagement() {
                         Pedido
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tipo
+                        Valor do Pedido
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Beneficiário
+                        Minha %
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor Pedido
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        %
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Comissão
+                        Minha Comissão
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -489,61 +190,62 @@ export default function PartnerCommissionManagement() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {commissions && commissions.length > 0 ? (
-                      commissions.map((commission: any) => (
-                        <tr key={commission.id}>
+                    {partnerCommissions && partnerCommissions.length > 0 ? (
+                      partnerCommissions.map((commission: any) => (
+                        <tr key={commission.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(commission.createdAt).toLocaleDateString('pt-BR')}
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                              {new Date(commission.createdAt).toLocaleDateString('pt-BR')}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             #{commission.orderNumber}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {commission.type === 'vendor' ? 'Vendedor' : 'Sócio'}
+                            R$ {parseFloat(commission.orderValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {commission.beneficiaryName}
+                            <Badge variant="outline">
+                              {commission.percentage}%
+                            </Badge>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            R$ {parseFloat(commission.orderValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {commission.rate}%
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
                             R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            <Badge className={`${
                               commission.status === 'paid' ? 'bg-green-100 text-green-800' :
+                              commission.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
                               commission.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {commission.status === 'paid' ? 'Pago' :
+                               commission.status === 'confirmed' ? 'Confirmado' :
                                commission.status === 'pending' ? 'Pendente' :
                                commission.status}
-                            </span>
+                            </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            {commission.status === 'pending' && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateCommissionStatusMutation.mutate({ 
-                                  commissionId: commission.id, 
-                                  status: 'paid' 
-                                })}
-                                disabled={updateCommissionStatusMutation.isPending}
-                              >
-                                Marcar como Pago
-                              </Button>
+                            {commission.orderId && (
+                              <Link href={`/admin/orders/${commission.orderId}`}>
+                                <div className="flex items-center text-blue-600 hover:text-blue-900 cursor-pointer">
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Ver Pedido
+                                </div>
+                              </Link>
                             )}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                          Nenhuma comissão encontrada
+                        <td colSpan={7} className="px-6 py-8 whitespace-nowrap text-sm text-gray-500 text-center">
+                          <div className="flex flex-col items-center">
+                            <DollarSign className="h-12 w-12 text-gray-300 mb-3" />
+                            <p className="text-lg font-medium text-gray-900 mb-1">Nenhuma comissão encontrada</p>
+                            <p className="text-gray-500">Suas comissões aparecerão aqui conforme os pedidos são criados</p>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -552,6 +254,69 @@ export default function PartnerCommissionManagement() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="commission-info" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Percent className="h-5 w-5 mr-2 text-blue-600" />
+                  Como Funcionam as Comissões
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">Sistema de Comissões dos Sócios</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Taxa total dos sócios: 15% do valor do pedido</li>
+                    <li>• Dividida igualmente entre 3 sócios: 5% cada</li>
+                    <li>• Pago imediatamente quando o pedido é criado</li>
+                    <li>• Status inicial: "Confirmado"</li>
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <h4 className="font-semibold text-yellow-900 mb-2">Em caso de Cancelamento</h4>
+                  <p className="text-sm text-yellow-800">
+                    Se um pedido for cancelado, o valor da comissão será descontado dos próximos pedidos automaticamente.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+                  Resumo do Sistema
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div className="p-3 bg-green-50 rounded">
+                    <p className="text-2xl font-bold text-green-600">15%</p>
+                    <p className="text-sm text-green-800">Taxa Total Sócios</p>
+                  </div>
+                  <div className="p-3 bg-blue-50 rounded">
+                    <p className="text-2xl font-bold text-blue-600">5%</p>
+                    <p className="text-sm text-blue-800">Sua Taxa Individual</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Exemplo de Cálculo</h4>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Pedido de R$ 1.000,00:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Total sócios: R$ 150,00 (15%)</li>
+                    <li>• Sua parte: R$ 50,00 (5%)</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

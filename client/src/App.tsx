@@ -197,11 +197,11 @@ function App() {
 
                   {/* Partner Routes */}
                   <Route path="/partner/dashboard" component={PartnerDashboard} />
-                  <Route path="/partner/clients" component={PartnerClients} />
-                  <Route path="/partner/vendors" component={PartnerVendors} />
-                  <Route path="/partner/producers" component={PartnerProducers} />
-                  <Route path="/partner/products" component={PartnerProducts} />
                   <Route path="/partner/commission-management" component={PartnerCommissionManagement} />
+                  <Route path="/partner/clients" component={() => <AdminClients />} />
+                  <Route path="/partner/vendors" component={() => <AdminVendors />} />
+                  <Route path="/partner/producers" component={() => <AdminProducers />} />
+                  <Route path="/partner/products" component={() => <AdminProducts />} />
 
                   {/* Finance Routes - accessible by admin and finance users */}
                   <Route path="/finance" 

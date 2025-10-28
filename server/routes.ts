@@ -2987,6 +2987,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get commissions for a specific partner
+  app.get("/api/commissions/partner/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const commissions = await storage.getCommissionsByPartner(partnerId);
+
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching partner commissions:", error);
+      res.status(500).json({ error: "Failed to fetch partner commissions" });
+    }
+  });
+
+  // Get all partners
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+
+      // Enrich with commission totals
+      const enrichedPartners = await Promise.all(
+        partners.map(async (partner) => {
+          const commissions = await storage.getCommissionsByPartner(partner.id);
+          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+
+          return {
+            ...partner,
+            totalCommissions
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedPartners.length} partners`);
+      res.json(enrichedPartners);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  // Update partner (admin only)
+  app.put("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const partnerData = req.body;
+
+      // Validate required fields
+      if (!partnerData.name || partnerData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      // Update user information
+      const updatedUser = await storage.updateUser(id, {
+        name: partnerData.name.trim(),
+        email: partnerData.email?.trim() || null,
+        phone: partnerData.phone?.trim() || null,
+        isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Sócio atualizado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating partner:", error);
+      res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
+    }
+  });
+
   // Get all accounts receivable (orders + manual)
   app.get("/api/finance/receivables", async (req, res) => {
     try {

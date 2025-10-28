@@ -1,3 +1,3 @@
 case "partner":
-              window.location.href = "/dashboard";
+              window.location.href = "/partner/dashboard";
               break;
