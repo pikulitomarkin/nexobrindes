@@ -93,6 +93,7 @@ export default function VendorOrders() {
     contactPhone: "",
     contactEmail: "",
     vendorId: vendorId,
+    branchId: "", // Nova propriedade para filial do pedido
     deadline: "",
     deliveryDeadline: "",
     deliveryType: "delivery", // 'delivery' or 'pickup'
@@ -177,6 +178,15 @@ export default function VendorOrders() {
     queryFn: async () => {
       const response = await fetch('/api/shipping-methods');
       if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
+  const { data: branches } = useQuery({
+    queryKey: ["/api/branches"],
+    queryFn: async () => {
+      const response = await fetch('/api/branches');
+      if (!response.ok) throw new Error('Failed to fetch branches');
       return response.json();
     },
   });
@@ -333,6 +343,7 @@ export default function VendorOrders() {
       contactPhone: "",
       contactEmail: "",
       vendorId: vendorId,
+      branchId: "", // Incluir branchId no reset
       deadline: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -513,6 +524,7 @@ export default function VendorOrders() {
       contactPhone: order.contactPhone || "",
       contactEmail: order.contactEmail || "",
       vendorId: order.vendorId,
+      branchId: order.branchId || "", // Incluir branchId do pedido existente
       deadline: order.deadline || "",
       deliveryDeadline: order.deliveryDeadline || "",
       deliveryType: order.deliveryType || "delivery",
@@ -583,6 +595,16 @@ export default function VendorOrders() {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um produto ao pedido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar filial obrigatória
+    if (!vendorOrderForm.branchId) {
+      toast({
+        title: "Erro",
+        description: "A filial do pedido é obrigatória",
         variant: "destructive"
       });
       return;
@@ -912,6 +934,30 @@ export default function VendorOrders() {
                     <SelectContent>
                       <SelectItem value="delivery">Entrega com Frete</SelectItem>
                       <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Seleção de Filial */}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label htmlFor="order-branch">Filial do Pedido *</Label>
+                  <Select
+                    value={vendorOrderForm.branchId || ""}
+                    onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, branchId: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a filial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches?.map((branch: any) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.city}
+                          {branch.isHeadquarters && " (Matriz)"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -89,6 +89,7 @@ export default function VendorBudgets() {
     contactPhone: "",
     contactEmail: "",
     vendorId: vendorId,
+    branchId: "", // Nova propriedade para filial do orçamento
     validUntil: "",
     deliveryDeadline: "",
     deliveryType: "delivery", // 'delivery' or 'pickup'
@@ -175,6 +176,15 @@ export default function VendorBudgets() {
     queryFn: async () => {
       const response = await fetch('/api/shipping-methods');
       if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
+  const { data: branches } = useQuery({
+    queryKey: ["/api/branches"],
+    queryFn: async () => {
+      const response = await fetch('/api/branches');
+      if (!response.ok) throw new Error('Failed to fetch branches');
       return response.json();
     },
   });
@@ -333,6 +343,7 @@ export default function VendorBudgets() {
       contactPhone: "",
       contactEmail: "",
       vendorId: vendorId,
+      branchId: "", // Incluir branchId no reset
       validUntil: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -865,6 +876,30 @@ export default function VendorBudgets() {
                     <SelectContent>
                       <SelectItem value="delivery">Entrega com Frete</SelectItem>
                       <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Seleção de Filial */}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label htmlFor="budget-branch">Filial do Orçamento *</Label>
+                  <Select
+                    value={vendorBudgetForm.branchId || ""}
+                    onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, branchId: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a filial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches?.map((branch: any) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.city}
+                          {branch.isHeadquarters && " (Matriz)"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

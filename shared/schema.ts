@@ -28,7 +28,7 @@ export const clients = pgTable("clients", {
   cpfCnpj: text("cpf_cnpj"),
   address: text("address"),
   vendorId: varchar("vendor_id").references(() => users.id), // Vendedor responsável
-  branchId: varchar("branch_id").references(() => branches.id), // Filial do cliente (vem do vendedor)
+  // branchId removido - filial vai no pedido/orçamento
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -39,7 +39,7 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   clientId: varchar("client_id").references(() => clients.id),
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
-  branchId: varchar("branch_id").references(() => branches.id), // Filial do pedido (vem do vendedor)
+  branchId: varchar("branch_id").references(() => branches.id), // Filial do pedido (escolhida no momento do pedido)
   budgetId: varchar("budget_id").references(() => budgets.id),
   product: text("product").notNull(),
   description: text("description"),
@@ -159,7 +159,7 @@ export const branches = pgTable("branches", {
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  branchId: varchar("branch_id").references(() => branches.id), // Referência à filial
+  // branchId removido - vendedores ficam na matriz
   salesLink: text("sales_link").unique(),
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default('10.00'),
   isActive: boolean("is_active").default(true),
@@ -204,6 +204,7 @@ export const budgets = pgTable("budgets", {
   budgetNumber: text("budget_number").notNull().unique(),
   clientId: varchar("client_id").references(() => clients.id), // Opcional - só obrigatório na conversão para pedido
   vendorId: varchar("vendor_id").references(() => users.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id), // Filial do orçamento
   contactName: text("contact_name").notNull(), // Nome de contato obrigatório
   contactPhone: text("contact_phone"), // Telefone de contato opcional
   contactEmail: text("contact_email"), // Email de contato opcional
