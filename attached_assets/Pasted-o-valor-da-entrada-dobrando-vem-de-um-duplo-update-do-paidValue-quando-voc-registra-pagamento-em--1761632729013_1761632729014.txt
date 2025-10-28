@@ -1,0 +1,96 @@
+o “valor da entrada dobrando” vem de um duplo update do paidValue quando você registra pagamento em Contas a Receber (vinculado a pedido).
+
+Onde está o bug
+
+No storage, toda vez que um Payment é criado com status: 'confirmed', ele já recalcula o paidValue do pedido (somando todos os pagamentos confirmados) via updateOrderPaidValue. Isso acontece automaticamente dentro de createPayment 
+
+storage (5)
+
+.
+
+Na sua rota POST /api/receivables/:id/payment (arquivo routes (9).ts), além de criar o Payment, o código recalcula manualmente de novo: pega paidValue atual, soma o valor desta entrada e faz updateOrder(...) com o resultado — o que duplica o efeito do pagamento (fica “1.800” → “3.600”) 
+
+routes (9)
+
+.
+
+Em resumo: createPayment(confirmed) já atualiza o paidValue; esse bloco extra somando de novo precisa sair.
+
+Como corrigir (patch cirúrgico)
+1) Ajuste a rota de pagamento de contas a receber (order-based)
+
+No routes (9).ts, na rota app.post("/api/receivables/:id/payment", ...):
+
+Mantenha a criação do Payment (com status: 'confirmed').
+
+Remova o bloco que pega order.paidValue e chama updateOrder(...) somando manualmente.
+
+Confie no recalculo automático do storage.createPayment(...) (ele já chama updateOrderPaidValue por dentro).
+
+Antes (trecho problemático): cria o Payment e depois soma novamente ao paidValue do pedido 
+
+routes (9)
+
+.
+
+Depois (modelo correto):
+
+// dentro do if (receivable.orderId) { ... }
+const paymentRecord = await storage.createPayment({
+  orderId: receivable.orderId,
+  amount: parseFloat(amount).toFixed(2),
+  method: method || "manual",
+  status: "confirmed",
+  transactionId: transactionId || `MANUAL-${Date.now()}`,
+  notes: notes || "",
+  paidAt: new Date(),
+});
+
+// NADA de somar manualmente aqui!
+// createPayment(confirmed) já chama updateOrderPaidValue() sozinho.
+
+
+Por que funciona: createPayment com status: 'confirmed' já chama updateOrderPaidValue(orderId) internamente 
+
+storage (5)
+
+. E esse updateOrderPaidValue:
+
+soma todos os Payments confirmados daquele pedido,
+
+grava paidValue, e
+
+atualiza o Accounts Receivable apenas em receivedAmount/status (nunca o valor “amount” original) — evitando a “troca” do valor do título 
+
+storage (5)
+
+ 
+
+storage (5)
+
+.
+
+2) Garanta que todas as variantes da rota usem a mesma regra
+
+Você tem variações da mesma rota em arquivos “routes (8).ts / (9).ts”. Em uma delas (versão antiga) o código nem cria Payment e só chama updateOrderPaidValue (o que não registra o pagamento individual) 
+
+routes (8)
+
+.
+Unifique para sempre criar Payment confirmado (como no patch acima) e não somar manualmente.
+
+Por que isso elimina a duplicação
+
+Um único ponto-fonte de verdade: o total pago do pedido passa a ser exclusivamente a soma dos Payments confirmados, calculada no storage (função updateOrderPaidValue) 
+
+storage (5)
+
+.
+
+A rota não mexe mais diretamente em paidValue, evitando duplo acréscimo.
+
+O Accounts Receivable mantém o amount original do pedido e só reflete receivedAmount/status a partir do somatório de payments, como já está implementado 
+
+storage (5)
+
+.
