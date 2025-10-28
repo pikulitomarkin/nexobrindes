@@ -51,6 +51,7 @@ export default function FinanceCommissionPayouts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       setIsPayDialogOpen(false);
       toast({
         title: "Sucesso!",

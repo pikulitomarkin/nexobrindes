@@ -369,6 +369,7 @@ export default function VendorBudgets() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");
@@ -396,6 +397,7 @@ export default function VendorBudgets() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.refetchQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");

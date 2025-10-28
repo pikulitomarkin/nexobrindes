@@ -232,6 +232,7 @@ export default function AdminBudgets() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      queryClient.refetchQueries({ queryKey: ["/api/budgets/admin"] });
       setIsCreateDialogOpen(false);
       resetAdminBudgetForm();
       setBudgetProductSearch("");

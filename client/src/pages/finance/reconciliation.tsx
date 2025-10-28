@@ -90,6 +90,7 @@ export default function FinanceReconciliation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       setIsExpenseDialogOpen(false);
       setExpenseData({
         description: "",
@@ -134,6 +135,7 @@ export default function FinanceReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/reconciliation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       setIsAssociationDialogOpen(false);
       setSelectedOrder(null);
       setSelectedTransactions([]);
@@ -218,6 +220,7 @@ export default function FinanceReconciliation() {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/reconciliation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       
       setIsAssociationDialogOpen(false);
       setSelectedOrder(null);

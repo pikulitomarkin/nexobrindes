@@ -53,6 +53,7 @@ export default function FinanceExpenses() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       setIsAddDialogOpen(false);
       setExpenseData({
         date: new Date().toISOString().split('T')[0],
