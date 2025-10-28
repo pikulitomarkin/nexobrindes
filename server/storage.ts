@@ -1356,7 +1356,10 @@ export class MemStorage implements IStorage {
 
   // Client methods
   async getClients(): Promise<Client[]> {
-    return Array.from(this.clients.values());
+    return Array.from(this.clients.values()).map(client => ({
+      ...client,
+      userCode: (client as any).userCode || null
+    }));
   }
 
   async getClient(id: string): Promise<Client | undefined> {

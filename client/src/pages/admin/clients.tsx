@@ -339,14 +339,12 @@ export default function AdminClients() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
-                      {client.userCode && (
-                        <div className="flex items-center mt-1">
-                          <User className="h-3 w-3 text-blue-600 mr-1" />
-                          <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {client.userCode}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex items-center mt-1">
+                        <User className="h-3 w-3 text-blue-600 mr-1" />
+                        <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          {(client as any).userCode || 'N/A'}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex space-x-2">
                       <Button 

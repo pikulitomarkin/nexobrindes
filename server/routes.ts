@@ -4423,26 +4423,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with vendor names and statistics
       const enrichedClients = await Promise.all(
         clients.map(async (client) => {
+          // Get vendor name
           const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
 
-          // Get client orders count and total spent
-          const orders = await storage.getOrders();
-          const clientOrders = orders.filter(order =>
+          // Count orders for this client
+          const allOrders = await storage.getOrders();
+          const clientOrders = allOrders.filter(order =>
             order.clientId === client.id ||
             order.clientId === client.userId ||
-            order.contactName === client.name
+            (order.contactName && order.contactName.toLowerCase().includes(client.name.toLowerCase()))
           );
 
-          const totalSpent = clientOrders.reduce((sum, order) =>
-            sum + parseFloat(order.totalValue), 0
-          );
+          // Calculate total spent
+          const totalSpent = clientOrders
+            .filter(order => order.status !== 'cancelled')
+            .reduce((sum, order) => sum + parseFloat(order.totalValue || '0'), 0);
 
           return {
             ...client,
+            userCode: (client as any).userCode || null, // Incluir userCode
             vendorName: vendor?.name || null,
             ordersCount: clientOrders.length,
-            totalSpent: totalSpent,
-            userCode: client.userCode || client.username || 'N/A'
+            totalSpent: totalSpent
           };
         })
       );
@@ -5574,7 +5576,7 @@ Para mais detalhes, entre em contato conosco!`;
       if (!deleted) {
         return res.status(404).json({ error: "Payment method not found" });
       }
-      res.json({ success: true });
+      res.json({ success:true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete payment method" });
     }
