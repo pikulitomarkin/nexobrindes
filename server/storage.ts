@@ -2805,7 +2805,7 @@ export class MemStorage implements IStorage {
     let clientName = budget.contactName;
     let clientEmail = budget.contactEmail || '';
     let clientPhone = budget.contactPhone || '';
-    
+
     if (budget.clientId) {
       const client = this.clients.get(budget.clientId);
       if (client) {
@@ -3259,7 +3259,32 @@ export class MemStorage implements IStorage {
 
   // Budget Items methods
   async getBudgetItems(budgetId: string): Promise<any[]> {
-    return Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
+    const items = Array.from(this.budgetItems.values()).filter(item => item.budgetId === budgetId);
+
+    console.log(`[STORAGE DEBUG] Getting budget items for budget ${budgetId}: found ${items.length} items`);
+
+    // Enrich items with product data
+    const enrichedItems = await Promise.all(
+      items.map(async (item, index) => {
+        const product = await this.getProduct(item.productId);
+
+        console.log(`[STORAGE DEBUG] Budget item ${index}: productId=${item.productId}, producerId=${item.producerId || 'NOT_SET'}, productName=${product?.name || 'NOT_FOUND'}`);
+
+        return {
+          ...item,
+          productName: product?.name || 'Produto não encontrado',
+          product: product
+        };
+      })
+    );
+
+    console.log(`[STORAGE DEBUG] Enriched budget items:`, enrichedItems.map(item => ({
+      productId: item.productId,
+      producerId: item.producerId,
+      productName: item.productName
+    })));
+
+    return enrichedItems;
   }
 
   async createBudgetItem(budgetId: string, itemData: any): Promise<any> {

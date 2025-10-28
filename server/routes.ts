@@ -316,6 +316,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint to check product-producer associations
+  app.get("/api/debug/budget-items/:budgetId", async (req, res) => {
+    try {
+      const { budgetId } = req.params;
+      
+      const budget = await storage.getBudget(budgetId);
+      if (!budget) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+      
+      const items = await storage.getBudgetItems(budgetId);
+      const producers = await storage.getUsersByRole('producer');
+      
+      const debugInfo = {
+        budgetId: budgetId,
+        budgetTitle: budget.title,
+        totalItems: items.length,
+        producers: producers.map(p => ({ id: p.id, name: p.name })),
+        items: items.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.productName,
+          producerId: item.producerId || 'NOT_SET',
+          hasProducer: !!item.producerId && item.producerId !== 'internal'
+        })),
+        itemsByProducer: {}
+      };
+      
+      // Group by producer
+      const grouped: { [key: string]: any[] } = {};
+      items.forEach(item => {
+        const pid = item.producerId || 'internal';
+        if (!grouped[pid]) grouped[pid] = [];
+        grouped[pid].push({
+          productId: item.productId,
+          productName: item.productName
+        });
+      });
+      debugInfo.itemsByProducer = grouped;
+      
+      console.log(`[DEBUG ENDPOINT] Budget ${budgetId} analysis:`, debugInfo);
+      res.json(debugInfo);
+    } catch (error) {
+      console.error("Debug endpoint error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get budget PDF data with all images
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
@@ -817,10 +865,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nenhum item encontrado no pedido" });
       }
 
-      // Group items by producer
+      // Group items by producer - PRODUCTION FIX
       const itemsByProducer = new Map();
-      allItems.forEach((item: any) => {
+      
+      console.log(`[PRODUCTION DEBUG] Processing ${allItems.length} total items for order ${id}`);
+      
+      allItems.forEach((item: any, index: number) => {
         const itemProducerId = item.producerId || 'internal';
+        
+        console.log(`[PRODUCTION DEBUG] Item ${index}: productId=${item.productId}, producerId=${itemProducerId}, productName=${item.productName || 'N/A'}`);
 
         // Only consider external producers
         if (itemProducerId && itemProducerId !== 'internal') {
@@ -831,21 +884,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 itemsByProducer.set(itemProducerId, []);
               }
               itemsByProducer.get(itemProducerId).push(item);
+              console.log(`[PRODUCTION DEBUG] Added item to specific producer ${itemProducerId}`);
+            } else {
+              console.log(`[PRODUCTION DEBUG] Skipping item - producer ${itemProducerId} doesn't match requested ${producerId}`);
             }
-            // Skip all other producers when producerId is specified
           } else {
             // No specific producer - process all external producers
             if (!itemsByProducer.has(itemProducerId)) {
               itemsByProducer.set(itemProducerId, []);
             }
             itemsByProducer.get(itemProducerId).push(item);
+            console.log(`[PRODUCTION DEBUG] Added item to producer ${itemProducerId} (processing all)`);
           }
+        } else {
+          console.log(`[PRODUCTION DEBUG] Skipping internal item: productId=${item.productId}, producerId=${itemProducerId}`);
         }
       });
 
-      console.log(`Items grouped by producer:`, Array.from(itemsByProducer.keys()));
-      console.log(`Requested specific producer:`, producerId);
-      console.log(`Processing ${itemsByProducer.size} producers`);
+      console.log(`[PRODUCTION DEBUG] Items grouped by producer:`, Array.from(itemsByProducer.keys()));
+      console.log(`[PRODUCTION DEBUG] Total producers with items: ${itemsByProducer.size}`);
+      console.log(`[PRODUCTION DEBUG] Requested specific producer:`, producerId);
+      console.log(`[PRODUCTION DEBUG] Processing ${itemsByProducer.size} producers`);
 
       if (itemsByProducer.size === 0) {
         const errorMsg = producerId ?
@@ -879,12 +938,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         photos = budgetPhotos.map(photo => photo.photoUrl || photo.imageUrl);
       }
 
-      // Create a separate production order for each producer
+      // Create a separate production order for each producer - PRODUCTION FIX
       for (const [currentProducerId, items] of itemsByProducer) {
+        console.log(`[PRODUCTION DEBUG] Processing producer: ${currentProducerId} with ${items.length} items`);
+        
         const producer = await storage.getUser(currentProducerId);
         if (!producer) {
-          console.log(`Producer not found: ${currentProducerId}`);
+          console.error(`[PRODUCTION ERROR] Producer not found: ${currentProducerId}`);
+          console.log(`[PRODUCTION DEBUG] Available producers:`, await storage.getUsersByRole('producer'));
           continue;
+        }
+        
+        console.log(`[PRODUCTION DEBUG] Found producer: ${producer.name} (ID: ${producer.id})`);
+        
+        // Validate that all items belong to this producer
+        const invalidItems = items.filter((item: any) => item.producerId !== currentProducerId);
+        if (invalidItems.length > 0) {
+          console.error(`[PRODUCTION ERROR] Found ${invalidItems.length} items not belonging to producer ${currentProducerId}:`, invalidItems);
         }
 
         // Calculate total value for this producer's items
