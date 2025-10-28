@@ -350,19 +350,19 @@ function App() {
           </ProtectedRoute>
 
           {/* Logistics routes */}
-          <ProtectedRoute path="/logistics/dashboard" allowedRoles={["admin", "logistics"]}>
+          <ProtectedRoute path="/logistics/dashboard" allowedRoles={["admin", "partner", "logistics"]}>
             <MainLayout>
               <LogisticsDashboard />
             </MainLayout>
           </ProtectedRoute>
 
-          <ProtectedRoute path="/logistics/products" allowedRoles={["admin", "logistics"]}>
+          <ProtectedRoute path="/logistics/products" allowedRoles={["admin", "partner", "logistics"]}>
             <MainLayout>
               <LogisticsProducts />
             </MainLayout>
           </ProtectedRoute>
 
-          <ProtectedRoute path="/logistics/producers" allowedRoles={["admin", "logistics"]}>
+          <ProtectedRoute path="/logistics/producers" allowedRoles={["admin", "partner", "logistics"]}>
             <MainLayout>
               <LogisticsProducers />
             </MainLayout>

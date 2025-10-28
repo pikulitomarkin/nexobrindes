@@ -13,13 +13,21 @@ export default function MyCommissions() {
 
   // Query específica para as comissões deste sócio
   const { data: partnerCommissions, isLoading } = useQuery({
-    queryKey: ["/api/commissions"],
-    select: (data) => {
-      // Filtrar apenas comissões deste sócio específico
-      return data?.filter((commission: any) => 
-        commission.partnerId === user?.user?.id && commission.type === 'partner'
-      ) || [];
-    }
+    queryKey: ["/api/commissions/partner", user?.user?.id],
+    queryFn: async () => {
+      if (!user?.user?.id) return [];
+      
+      const response = await fetch(`/api/commissions/partner/${user.user.id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      
+      if (!response.ok) throw new Error("Failed to fetch partner commissions");
+      
+      return response.json();
+    },
+    enabled: !!user?.user?.id,
   });
 
   // Cálculos das comissões

@@ -81,12 +81,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           { href: "/admin/producers", icon: Factory, label: "Produtores" },
           { href: "/admin/clients", icon: Users, label: "Clientes" },
           { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
+          { href: "/admin/branches", icon: Building2, label: "Filiais" },
           { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
           { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
           { href: "/partner/my-commissions", icon: Percent, label: "Minhas Comissões" },
           { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
           { href: "/admin/reports", icon: FileText, label: "Relatórios" },
           { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+          { href: "/logistics/dashboard", icon: Package, label: "Logística" },
         ];
       case "vendor":
         return [
