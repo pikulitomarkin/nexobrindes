@@ -21,7 +21,7 @@ import {
   CreditCard, Receipt, Banknote, UserCheck, Clock, CheckCircle2,
   Search, RefreshCw, BarChart3, Target, Percent, AlertCircle,
   TrendingDown, Activity, ShoppingCart, Package, Award, FileSpreadsheet,
-  FileDown, Printer
+  FileDown, Printer, Building2
 } from "lucide-react";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
@@ -183,11 +183,21 @@ export default function AdminReports() {
       // Filtro de produtor
       const producerMatch = producerFilter === 'all' || item.producerId === producerFilter;
       
-      // Filtro de filial
-      const branchMatch = branchFilter === 'all' || 
-        item.branchId === branchFilter ||
-        (branchFilter === 'matriz' && (!item.branchId || item.branchId === 'matriz')) ||
-        (item.vendorBranchId && item.vendorBranchId === branchFilter);
+      // Filtro de filial - lógica mais robusta
+      let branchMatch = true;
+      if (branchFilter !== 'all') {
+        if (branchFilter === 'matriz') {
+          // Para matriz, considerar itens sem branchId ou com branchId explicitamente 'matriz'
+          branchMatch = !item.branchId || item.branchId === 'matriz' || item.branchId === '' || 
+                       !item.vendorBranchId || item.vendorBranchId === 'matriz' || item.vendorBranchId === '';
+        } else {
+          // Para filiais específicas, verificar tanto branchId direto quanto vendorBranchId
+          branchMatch = item.branchId === branchFilter || 
+                       item.vendorBranchId === branchFilter ||
+                       // Para pedidos que herdam a filial do vendedor
+                       (vendors.find(v => v.id === item.vendorId)?.branchId === branchFilter);
+        }
+      }
       
       // Filtro de categoria (para despesas e outros)
       const categoryMatch = categoryFilter === 'all' || 
@@ -325,6 +335,26 @@ export default function AdminReports() {
     );
   };
 
+  // Dados para gráfico por filial
+  const getOrdersByBranch = () => {
+    const branchData = filteredOrders.reduce((acc: any, order: any) => {
+      // Determinar a filial do pedido baseado no vendedor
+      const vendor = vendors.find((v: any) => v.id === order.vendorId);
+      const branchName = vendor?.branchId ? 
+        (branches.find((b: any) => b.id === vendor.branchId)?.name || 'Matriz') : 
+        'Matriz';
+      
+      if (!acc[branchName]) {
+        acc[branchName] = { filial: branchName, pedidos: 0, valor: 0 };
+      }
+      acc[branchName].pedidos += 1;
+      acc[branchName].valor += parseFloat(order.totalValue);
+      return acc;
+    }, {});
+
+    return Object.values(branchData).sort((a: any, b: any) => b.valor - a.valor);
+  };
+
   const getOrdersByStatus = () => {
     const statusData = filteredOrders.reduce((acc: any, order: any) => {
       const status = order.status;
@@ -341,12 +371,24 @@ export default function AdminReports() {
 
   const getTopVendors = () => {
     const vendorData = filteredOrders.reduce((acc: any, order: any) => {
-      const vendorName = vendors.find((v: any) => v.id === order.vendorId)?.name || 'Sem Vendedor';
-      if (!acc[vendorName]) {
-        acc[vendorName] = { vendedor: vendorName, pedidos: 0, valor: 0 };
+      const vendor = vendors.find((v: any) => v.id === order.vendorId);
+      const vendorName = vendor?.name || 'Sem Vendedor';
+      const branchName = vendor?.branchId ? 
+        (branches.find((b: any) => b.id === vendor.branchId)?.name || 'Matriz') : 
+        'Matriz';
+      
+      const key = `${vendorName} (${branchName})`;
+      
+      if (!acc[key]) {
+        acc[key] = { 
+          vendedor: key, 
+          pedidos: 0, 
+          valor: 0,
+          branchId: vendor?.branchId || 'matriz'
+        };
       }
-      acc[vendorName].pedidos += 1;
-      acc[vendorName].valor += parseFloat(order.totalValue);
+      acc[key].pedidos += 1;
+      acc[key].valor += parseFloat(order.totalValue);
       return acc;
     }, {});
 
@@ -741,7 +783,7 @@ export default function AdminReports() {
           </div>
 
           {/* Filtros Específicos por Aba */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {(activeTab === 'overview' || activeTab === 'vendas') && (
               <>
                 <div>
@@ -780,17 +822,43 @@ export default function AdminReports() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Filial</label>
+                  <label className="text-sm font-medium mb-2 block">Matriz/Filial</label>
                   <Select value={branchFilter} onValueChange={setBranchFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Filial" />
+                      <SelectValue placeholder="Localização" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as Filiais</SelectItem>
-                      <SelectItem value="matriz">Matriz</SelectItem>
+                      <SelectItem value="all">Todas as Localizações</SelectItem>
+                      <SelectItem value="matriz">
+                        <div className="flex items-center">
+                          <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                          Matriz
+                        </div>
+                      </SelectItem>
                       {branches.map((branch: any) => (
                         <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name} - {branch.city}
+                          <div className="flex items-center">
+                            <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                            {branch.name} - {branch.city}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Produtor</label>
+                  <Select value={producerFilter} onValueChange={setProducerFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Produtor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Produtores</SelectItem>
+                      <SelectItem value="internal">Produção Interna</SelectItem>
+                      {producers.map((producer: any) => (
+                        <SelectItem key={producer.id} value={producer.id}>
+                          {producer.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -830,6 +898,32 @@ export default function AdminReports() {
                       <SelectItem value="paid">Pago</SelectItem>
                       <SelectItem value="overdue">Vencido</SelectItem>
                       <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Matriz/Filial</label>
+                  <Select value={branchFilter} onValueChange={setBranchFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Localização" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Localizações</SelectItem>
+                      <SelectItem value="matriz">
+                        <div className="flex items-center">
+                          <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                          Matriz
+                        </div>
+                      </SelectItem>
+                      {branches.map((branch: any) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          <div className="flex items-center">
+                            <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                            {branch.name} - {branch.city}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
