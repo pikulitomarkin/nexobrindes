@@ -180,7 +180,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
       {/* Sidebar with gradient */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 w-64 h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
@@ -208,7 +208,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-6">
+          <nav className="flex-1 p-6 overflow-y-auto">
             <ul className="space-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
