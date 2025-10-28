@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Users, ShoppingCart, Package, TrendingUp, TrendingDown, Factory, Eye, Edit, DollarSign, Calendar, ArrowUpRight, LogOut, Target, Award, Clock, Star, Briefcase, Receipt } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const setLocation = useLocation()[1];
 
   const { data: stats } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -97,6 +98,38 @@ export default function Dashboard() {
   };
 
   const quickActions = getQuickActions();
+
+  // Redirect based on user role
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case "admin":
+          setLocation("/admin/dashboard");
+          break;
+        case "vendor":
+          setLocation("/vendor/dashboard");
+          break;
+        case "client":
+          setLocation("/client/dashboard");
+          break;
+        case "producer":
+          setLocation("/producer/dashboard");
+          break;
+        case "partner":
+          setLocation("/partner/dashboard");
+          break;
+        case "finance":
+          setLocation("/finance");
+          break;
+        case "logistics":
+          setLocation("/logistics/dashboard");
+          break;
+        default:
+          setLocation("/admin/dashboard");
+      }
+    }
+  }, [user, setLocation]);
+
 
   // Show comprehensive dashboard for admin, partner, and finance
   if (user.role === "admin" || user.role === "partner" || user.role === "finance") {
@@ -226,21 +259,19 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {user.role === "partner" && (
-              <Card data-testid="card-partner-commissions">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
-                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                        R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            <Card data-testid="card-partner-commissions" className={user.role !== "partner" ? "hidden" : ""}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comissões Total</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                      R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Recent Orders & Quick Actions */}
