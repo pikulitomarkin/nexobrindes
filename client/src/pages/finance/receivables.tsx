@@ -557,12 +557,17 @@ export default function FinanceReceivables() {
                               className={`h-7 px-2 panel-button ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
                               onClick={() => {
                                 setSelectedReceivable(receivable);
-                                // Suggest minimum payment if not met, otherwise remaining amount
+                                // Calculate correctly considering what was already paid
                                 const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
                                 const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
-                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
-                                  minimumPayment.toString() : 
-                                  remainingAmount.toString();
+                                
+                                // Calculate what's missing from minimum payment (never negative)
+                                const missingOfMinimum = Math.max(0, parseFloat(receivable.minimumPayment || "0") - receivedSoFar);
+                                
+                                const suggestedAmount = (!isMinimumMet && parseFloat(receivable.minimumPayment || "0") > 0)
+                                  ? missingOfMinimum.toFixed(2)
+                                  : remainingAmount.toFixed(2);
+                                
                                 setPaymentData({
                                   ...paymentData,
                                   amount: suggestedAmount

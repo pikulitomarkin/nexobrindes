@@ -88,19 +88,36 @@ export default function AdminPartners() {
 
   const updatePartnerMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Partner> & { id: string }) => {
+      console.log("Updating partner with data:", data);
+      
+      // Usar o endpoint correto de partners
       const response = await fetch(`/api/partners/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          isActive: data.isActive !== undefined ? data.isActive : true
+        }),
       });
-      if (!response.ok) throw new Error("Failed to update partner");
-      return response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Erro ao atualizar sócio: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log("Update result:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsDialogOpen(false);
       setEditingPartner(null);
       resetForm();
@@ -109,10 +126,10 @@ export default function AdminPartners() {
         description: "Sócio atualizado com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao atualizar sócio",
+        description: `Erro ao atualizar sócio: ${error.message}`,
         variant: "destructive",
       });
     },
