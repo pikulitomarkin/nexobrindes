@@ -3201,6 +3201,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get quote requests by client
+  app.get("/api/quote-requests/client/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      console.log(`Fetching quote requests for client: ${clientId}`);
+
+      const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
+      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}`);
+
+      res.json(quoteRequests);
+    } catch (error) {
+      console.error("Error fetching quote requests by client:", error);
+      res.status(500).json({ error: "Failed to fetch quote requests for client" });
+    }
+  });
+
   // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
