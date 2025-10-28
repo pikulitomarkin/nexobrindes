@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { storage } from "./storage";
-import { db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db';
+import { db, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db'; // Assuming these are your database models and functions
 
 // Configure multer for file uploads
 const upload = multer({
@@ -305,10 +305,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching budgets for vendor: ${vendorId}`);
-
+      
       const budgets = await storage.getBudgetsByVendor(vendorId);
       console.log(`Found ${budgets.length} budgets for vendor ${vendorId}`);
-
+      
       res.json(budgets);
     } catch (error) {
       console.error("Error fetching budgets by vendor:", error);
@@ -400,6 +400,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics - Get paid orders ready for production
+  app.get("/api/logistics/paid-orders", async (req, res) => {
+    try {
+      console.log("Fetching paid orders ready for production...");
+      const paidOrders = await storage.getPaidOrdersReadyForProduction();
+
+      console.log(`Found ${paidOrders.length} paid orders ready for production`);
+
+      // Enrich with client names and producer information
+      const enrichedOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          // Always use contactName as primary client identifier
+          let clientName = order.contactName;
+
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          // If still no name, use a descriptive message
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          return {
+            ...order,
+            clientName: clientName
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching paid orders:", error);
+      res.status(500).json({ error: "Failed to fetch paid orders" });
+    }
+  });
 
   // Logistics dispatch order
   app.post("/api/logistics/dispatch-order", async (req, res) => {
@@ -421,8 +471,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
 
-      // Update main order shipping status (handles partial and complete shipping)
-      await storage.updateOrderShippingStatus(orderId);
+      // Update main order status to shipped if this was the last pending production order
+      const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
+      const allShipped = allProductionOrders.every(po => po.status === 'shipped' || po.status === 'delivered');
+
+      if (allShipped) {
+        await storage.updateOrderStatus(orderId, 'shipped');
+      }
 
       console.log(`Order ${orderId} dispatched with tracking: ${trackingCode}`);
 
@@ -619,26 +674,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
       }
 
-      // Only update order status to production if ALL producers have received their orders
+      // Update order status to production only if we created orders and it's not already in production
       if (createdOrders.length > 0 && order.status !== 'production') {
-        // Check if there are still producers without production orders
-        const allProductionOrders = await storage.getProductionOrdersByOrder(id);
-        const uniqueProducers = new Set();
-
-        // Count unique producers in the order items
-        allItems.forEach((item: any) => {
-          if (item.producerId && item.producerId !== 'internal') {
-            uniqueProducers.add(item.producerId);
-          }
-        });
-
-        // Count unique producers with production orders
-        const producersWithOrders = new Set(allProductionOrders.map(po => po.producerId));
-
-        // Only mark as production if all producers have been sent
-        if (uniqueProducers.size === producersWithOrders.size) {
-          await storage.updateOrder(id, { status: 'production' });
-        }
+        await storage.updateOrder(id, { status: 'production' });
       }
 
       const message = producerId
@@ -1307,7 +1345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get vendor's branch info
-      const vendor = await storage.getVendor(orderData.vendorId); // Changed from getUser to getVendor
+      const vendor = await storage.getVendor(orderData.vendorId);
       const vendorBranchId = vendor?.branchId || null;
 
       // Create order with contact name as primary identifier and proper items handling
@@ -1479,31 +1517,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      // Get production orders for shipping details
-      const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-      
-      // Get shipment details for partial/complete shipping
-      const shipmentDetails = await Promise.all(
-        productionOrders.map(async (po) => {
-          const producer = await storage.getUser(po.producerId);
-          
-          // Filter items for this specific producer
-          const producerItems = budgetItems.filter(item => item.producerId === po.producerId);
-          
-          return {
-            producerId: po.producerId,
-            producerName: producer?.name || 'Produtor Desconhecido',
-            status: po.status === 'delivered' ? 'shipped' : po.status, // Normalize delivered to shipped for client view
-            trackingCode: po.trackingCode || null,
-            shippedAt: ['shipped', 'delivered'].includes(po.status) ? (po.completedAt || po.updatedAt) : null,
-            items: producerItems.map(item => ({
-              ...item,
-              product: item.product || { name: item.productName },
-              productName: item.productName || item.product?.name
-            }))
-          };
-        })
-      );
+      // Get production order for tracking info
+      let productionOrder = null;
+      if (order.producerId) {
+        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+        productionOrder = productionOrders[0] || null;
+      }
 
       // Get payments for this order to calculate correct paid value
       const payments = await storage.getPaymentsByOrder(order.id);
@@ -1544,9 +1563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         producerName: producer?.name || null,
         budgetPhotos: budgetPhotos,
         budgetItems: budgetItems,
-        shipmentDetails: shipmentDetails,
-        trackingCode: order.trackingCode || productionOrders[0]?.trackingCode || null,
-        estimatedDelivery: productionOrders[0]?.deliveryDeadline || null,
+        trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
+        estimatedDelivery: productionOrder?.deliveryDeadline || null,
         payments: payments.filter(p => p.status === 'confirmed'),
         budgetInfo: originalBudgetInfo,
         paidValue: actualPaidValue.toFixed(2),
@@ -1650,12 +1668,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       const orders = await storage.getOrdersByVendor(vendorId);
-      console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
 
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          const client = await storage.getUser(order.clientId);
-          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          // Always use contactName as primary client name - it's required on order creation
+          let clientName = order.contactName;
+
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            console.log(`Contact name missing for order ${order.orderNumber}, looking for client name with ID: ${order.clientId}`);
+
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              console.log(`Found client record:`, clientRecord);
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                console.log(`Found client by userId:`, clientByUserId);
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  console.log(`Found user record:`, clientUser);
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          // If still no name, use a descriptive message instead of "Unknown"
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
 
           // Get budget photos and items if order was converted from budget
           let budgetPhotos = [];
@@ -1682,32 +1727,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-          // Check if there are unread production notes
-          let hasUnreadNotes = false;
-          let productionNotes = null;
-          let productionDeadline = null;
-          let lastNoteAt = null;
-          if (order.producerId) {
-            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
-            if (productionOrders.length > 0) {
-              const po = productionOrders[0];
-              hasUnreadNotes = po.hasUnreadNotes || false;
-              productionNotes = po.notes;
-              productionDeadline = po.deliveryDeadline;
-              lastNoteAt = po.lastNoteAt;
-            }
-          }
-
           return {
             ...order,
-            clientName: client?.name || 'Unknown',
-            producerName: producer?.name || null,
-            hasUnreadNotes: hasUnreadNotes,
+            clientName: clientName, // Never use fallback 'Unknown'
             budgetPhotos: budgetPhotos,
-            budgetItems: budgetItems,
-            productionNotes: productionNotes,
-            productionDeadline: productionDeadline,
-            lastNoteAt: lastNoteAt
+            budgetItems: budgetItems
           };
         })
       );
@@ -1839,7 +1863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Budget down payment if available, otherwise use calculated payments
+          // Use budget down payment if available, otherwise use calculated payments
           const actualPaidValue = budgetDownPayment > 0 ? budgetDownPayment : totalPaid;
           const totalValue = parseFloat(order.totalValue);
           const remainingBalance = Math.max(0, totalValue - actualPaidValue);
@@ -2481,7 +2505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendor/:userId/info", async (req, res) => {
     try {
       const { userId } = req.params;
-      const vendor = await storage.getVendor(userId); // Use getVendor to fetch vendor specific info
+      const vendor = await storage.getVendor(userId);
       const orders = await storage.getOrdersByVendor(userId);
       const commissions = await storage.getCommissionsByVendor(userId);
 
@@ -2498,13 +2522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .reduce((total, commission) => total + parseFloat(commission.amount), 0);
 
       res.json({
-        vendor: vendor ? { ...vendor, name: vendor.user?.name, email: vendor.user?.email, phone: vendor.user?.phone, address: vendor.user?.address, username: vendor.user?.username } : null,
+        vendor,
         monthlySales,
         totalCommissions,
         confirmedOrders: orders.filter(o => o.status !== 'pending').length
       });
     } catch (error) {
-      console.error("Error fetching vendor info:", error);
       res.status(500).json({ error: "Failed to fetch vendor info" });
     }
   });
@@ -2624,110 +2647,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all partners
   app.get("/api/partners", async (req, res) => {
     try {
-      const partners = await storage.getPartners();
+      const users = await storage.getUsers();
+      const partners = users.filter(user => user.role === 'partner');
 
-      // Enrich with commission totals
-      const enrichedPartners = await Promise.all(
-        partners.map(async (partner) => {
-          const commissions = await storage.getCommissionsByPartner(partner.id);
-          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+      const partnersWithDetails = await Promise.all(partners.map(async (partner) => {
+        const partnerProfile = await storage.getPartner(partner.id);
+        return {
+          id: partner.id,
+          name: partner.name,
+          email: partner.email || "",
+          accessCode: partner.username || "",
+          phone: partner.phone || "",
+          commissionRate: partnerProfile?.commissionRate || '5.00',
+          createdAt: partner.createdAt,
+          isActive: true
+        };
+      }));
 
-          return {
-            ...partner,
-            totalCommissions
-          };
-        })
-      );
-
-      console.log(`Found ${enrichedPartners.length} partners`);
-      res.json(enrichedPartners);
+      res.json(partnersWithDetails);
     } catch (error) {
       console.error("Error fetching partners:", error);
       res.status(500).json({ error: "Failed to fetch partners" });
     }
   });
 
-  // Update partner (admin only)
-  app.put("/api/partners/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const partnerData = req.body;
-      console.log("Updating partner:", id, partnerData);
-
-      // Update user information
-      const updatedUser = await storage.updateUser(id, {
-        name: partnerData.name,
-        email: partnerData.email,
-        phone: partnerData.phone,
-        isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
-      });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Sócio não encontrado" });
-      }
-
-      console.log("Partner updated successfully:", updatedUser.id);
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating partner:", error);
-      res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
-    }
-  });
-
-  // Delete partner (admin only)
-  app.delete("/api/partners/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      console.log("Deleting partner:", id);
-
-      // Update user to inactive instead of deleting
-      const updatedUser = await storage.updateUser(id, { isActive: false });
-
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Sócio não encontrado" });
-      }
-
-      console.log("Partner deleted successfully:", id);
-      res.json({ success: true, message: "Sócio removido com sucesso" });
-    } catch (error) {
-      console.error("Error deleting partner:", error);
-      res.status(500).json({ error: "Erro ao remover sócio: " + error.message });
-    }
-  });
-
-  // Create partner (admin only)
+  // Create partner (admin-level user)
   app.post("/api/partners", async (req, res) => {
+    const { name, email, phone, username, password } = req.body;
+
+    if (!name || !email || !username || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Create user first
+    const userId = generateId("partner");
+    const user = {
+      id: userId,
+      username,
+      password,
+      role: "partner",
+      name,
+      email,
+      phone: phone || "",
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
+    // Create partner profile
+    const partner = {
+      id: userId,
+      userId,
+      name,
+      email,
+      phone: phone || "",
+      username,
+      password, // Note: Storing password directly here is insecure for production.
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
     try {
-      const partnerData = req.body;
-      console.log("Creating partner:", partnerData);
-
-      // Validate required fields
-      if (!partnerData.name || !partnerData.username || !partnerData.password) {
-        return res.status(400).json({ error: "Nome, usuário e senha são obrigatórios" });
-      }
-
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(partnerData.username);
-      if (existingUser) {
-        return res.status(400).json({ error: "Nome de usuário já existe" });
-      }
-
-      // Create user with partner role
-      const newUser = await storage.createUser({
-        username: partnerData.username,
-        password: partnerData.password,
-        name: partnerData.name,
-        email: partnerData.email || null,
-        phone: partnerData.phone || null,
-        role: "partner",
-        isActive: true
-      });
-
-      console.log("Partner created successfully:", newUser.id);
-      res.json(newUser);
+      await storage.addUser(user); // Assuming addUser exists and handles user creation
+      await storage.addPartner(partner); // Assuming addPartner exists for partner-specific data
+      res.json(partner);
     } catch (error) {
       console.error("Error creating partner:", error);
-      res.status(500).json({ error: "Erro ao criar sócio: " + error.message });
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner commission:", error);
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
+  // Update partner name
+  app.put("/api/partners/:partnerId/name", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { name } = req.body;
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      const updatedUser = await storage.updateUser(partnerId, { name: name.trim() });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      res.json({ success: true, user: updatedUser });
+    } catch (error) {
+      console.error("Error updating partner name:", error);
+      res.status(500).json({ error: "Failed to update partner name" });
     }
   });
 
@@ -4394,8 +4414,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newBudget = await storage.createBudget(req.body);
 
+      // Remove duplicate items before processing
+      const seenItems = new Set();
+      const uniqueItems = req.body.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName || item.productId} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
+
       // Process budget items with ALL customization data
-      for (const item of req.body.items) {
+      for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : item.itemCustomizationValue || 0;
@@ -4403,7 +4437,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Calculate total price including all customizations
         let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {          totalPrice += (itemCustomizationValue * quantity);
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
         }
         if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
           totalPrice += (generalCustomizationValue * quantity);
@@ -4499,7 +4534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`Removing duplicate budget update item: ${item.productName} (${itemKey})`);
+          console.log(`Removing duplicate budget update item: ${item.productName || item.productId} (${itemKey})`);
           return false;
         }
         seenItems.add(itemKey);
@@ -5331,7 +5366,7 @@ Para mais detalhes, entre em contato conosco!`;
         return isPaid && isConfirmed && notInProduction && hasExternalItems;
       });
 
-      // Enrich with client information and producer names
+      // Enrich with client information
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
           let clientName = order.contactName || 'Cliente não identificado';
@@ -5369,35 +5404,19 @@ Para mais detalhes, entre em contato conosco!`;
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
-          // Enrich items with producer names (cache producers to avoid duplicate queries)
-          const producerCache = new Map();
-          const enrichedItems = await Promise.all(
-            (order.items || []).map(async (item: any) => {
-              if (item.producerId && item.producerId !== 'internal') {
-                // Check cache first
-                if (!producerCache.has(item.producerId)) {
-                  const producer = await storage.getUser(item.producerId);
-                  producerCache.set(item.producerId, producer?.name || null);
-                }
-
-                return {
-                  ...item,
-                  producerName: producerCache.get(item.producerId) || `Produtor ${item.producerId.slice(-6)}`
-                };
-              }
-              return item;
-            })
-          );
+          // Get payment information
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const lastPayment = payments
+            .filter(p => p.status === 'confirmed')
+            .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())[0];
 
           return {
             ...order,
-            items: enrichedItems,
             clientName: clientName,
             clientAddress: clientAddress || 'Endereço não informado',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
-            vendorName: vendor?.name || 'Vendedor',
-            producerName: producer?.name || null,
+            lastPaymentDate: lastPayment?.paidAt || lastPayment?.createdAt,
             shippingAddress: order.deliveryType === 'pickup'
               ? 'Sede Principal - Retirada no Local'
               : (clientAddress || 'Endereço não informado')
@@ -5576,7 +5595,7 @@ Para mais detalhes, entre em contato conosco!`;
       const methods = await storage.getAllPaymentMethods();
       res.json(methods);
     } catch (error) {
-      console.error("Error fetching paymentmethods:", error);
+      console.error("Error fetching payment methods:", error);
       res.status(500).json({ error: "Failed to fetch payment methods" });
     }
   });
