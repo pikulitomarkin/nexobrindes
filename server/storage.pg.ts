@@ -1440,6 +1440,13 @@ export class PgStorage implements IStorage {
     return true;
   }
 
+  // ==================== EXPENSES ====================
+  
+  async getExpenses(): Promise<any[]> {
+    // TODO: Implement expenses table and functionality
+    return [];
+  }
+
   async deleteVendor(id: string): Promise<boolean> {
     // Primeiro deletar registro da tabela vendors
     await pg.delete(schema.vendors).where(eq(schema.vendors.userId, id));
