@@ -1,0 +1,137 @@
+Sim — dá pra checar isso de três jeitos. O “arquivo certo” que define o que **deveria** existir é o `shared/schema.ts` (fonte da verdade). A seguir, como comparar com o que **existe** no Postgres:
+
+---
+
+## 1) Pelo Drizzle (mais simples)
+
+* Arquivo que “faz” a comparação: **`shared/schema.ts`** + **`drizzle.config.ts`** (ele aponta para a `DATABASE_URL`).
+* Comando que detecta e aplica o que falta:
+
+  ```bash
+  npx drizzle-kit generate
+  npx drizzle-kit push
+  ```
+
+  Isso compara o schema do código com o banco e cria/aplica as alterações (colunas, índices etc.). Se algo faltar (ex.: `reconciliation_status`), ele vai incluir.
+
+> Se você só quiser **ver** o que será feito, olhe o SQL gerado em `./drizzle` depois do `generate` (antes do `push`).
+
+---
+
+## 2) SQL direto no banco (listar colunas atuais)
+
+Rode no editor SQL (Neon/Supabase/psql) pra **ver as colunas reais**:
+
+```sql
+-- Liste colunas de uma tabela
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'payments'
+ORDER BY ordinal_position;
+
+-- Repita para outras:
+-- budgets, budget_items, accounts_receivable, payment_methods etc.
+```
+
+Aí você compara manualmente com o que está em `shared/schema.ts`.
+
+---
+
+## 3) Script de verificação (automático, roda no Replit)
+
+Se quiser um “diff” rápido, crie `scripts/check-schema.ts` e rode com `tsx`:
+
+```ts
+// scripts/check-schema.ts
+import "dotenv/config";
+import { neon } from "@neondatabase/serverless";
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL ausente no .env");
+}
+const sql = neon(process.env.DATABASE_URL);
+
+// mapeie só o essencial que você usa agora (adicione mais tabelas/colunas conforme precisar)
+const expected: Record<string, { name: string; nullable?: boolean }[]> = {
+  payments: [
+    { name: "id" },
+    { name: "order_id" },
+    { name: "amount" },
+    { name: "method" },
+    { name: "status" },
+    { name: "transaction_id", nullable: true },
+    { name: "paid_at", nullable: true },
+    { name: "created_at" },
+    { name: "reconciliation_status" },       // <- esta costuma faltar
+    { name: "bank_transaction_id", nullable: true },
+  ],
+  budgets: [
+    { name: "id" },
+    { name: "budget_number" },               // <- NOT NULL/UNIQUE no schema
+    { name: "client_id", nullable: true },
+    { name: "vendor_id" },
+    { name: "title" },
+    { name: "total_value" },
+    { name: "status" },
+    { name: "created_at" },
+    { name: "updated_at" },
+  ],
+  // adicione aqui: budget_items, accounts_receivable, payment_methods etc.
+};
+
+async function listColumns(table: string) {
+  const rows = await sql<
+    { column_name: string; is_nullable: "YES" | "NO" }[]
+  >`
+    SELECT column_name, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema='public' AND table_name=${table}
+  `;
+  return new Map(rows.map(r => [r.column_name, r.is_nullable]));
+}
+
+(async () => {
+  for (const table of Object.keys(expected)) {
+    const cols = await listColumns(table);
+    const missing = expected[table].filter(c => !cols.has(c.name));
+    const nullableMismatches = expected[table].filter(
+      c => cols.has(c.name) && (c.nullable ?? false) !== (cols.get(c.name) === "YES")
+    );
+
+    console.log(`\n[${table}]`);
+    if (missing.length === 0 && nullableMismatches.length === 0) {
+      console.log("  OK: nenhuma divergência básica encontrada.");
+    } else {
+      if (missing.length) {
+        console.log("  Faltando colunas:", missing.map(c => c.name).join(", "));
+      }
+      if (nullableMismatches.length) {
+        console.log("  Divergência de nulabilidade:", nullableMismatches.map(c => c.name).join(", "));
+      }
+    }
+  }
+  process.exit(0);
+})();
+```
+
+Rodar:
+
+```bash
+npx tsx scripts/check-schema.ts
+```
+
+Ele lista, por tabela, colunas **faltantes** e diferenças básicas de nulabilidade, com base no que você declarar em `expected`.
+
+---
+
+## Resumo
+
+* “Arquivo que faz a comparação”: **`shared/schema.ts`** (fonte), com **`drizzle.config.ts`** apontando a DB.
+* **`npx drizzle-kit generate && npx drizzle-kit push`** é o caminho oficial para aplicar o que está faltando.
+* Para **auditar** rapidamente, use o SQL do `information_schema` ou o script `scripts/check-schema.ts`.
+
+Se quiser, eu já te preparo o `expected` completo (payments, budgets, budget_items, accounts_receivable, payment_allocations, payment_methods, shipping_methods) conforme o teu `schema.ts` e te mando o arquivo pronto pra colar. Quer?
