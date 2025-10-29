@@ -23,7 +23,7 @@ async function seed() {
     // Criar usuário admin
     await pg.insert(users).values({
       username: "admin",
-      password: "admin123", // Em produção, usar hash de senha!
+      password: "123456",
       role: "admin",
       name: "Administrador",
       email: "admin@sistema.com",
@@ -32,7 +32,7 @@ async function seed() {
       isActive: true
     });
 
-    console.log("✅ Usuário admin criado (username: admin, password: admin123)");
+    console.log("✅ Usuário admin criado (username: admin, password: 123456)");
 
     // Criar branch matriz
     console.log("📝 Criando branch matriz...");
@@ -132,7 +132,7 @@ async function seed() {
     console.log("  - Configurações de comissão criadas");
     console.log("\n🔑 Credenciais de acesso:");
     console.log("  Usuário: admin");
-    console.log("  Senha: admin123");
+    console.log("  Senha: 123456");
 
   } catch (error) {
     console.error("❌ Erro ao executar seed:", error);
