@@ -886,18 +886,33 @@ export default function VendorOrders() {
                   <Label htmlFor="order-deliveryDeadline">Prazo de Entrega *</Label>
                   <Select
                     value={vendorOrderForm.deliveryDeadline ? (() => {
-                      const today = new Date();
-                      const deliveryDate = new Date(vendorOrderForm.deliveryDeadline);
-                      const diffTime = deliveryDate.getTime() - today.getTime();
-                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                      const validDays = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
-                      return validDays.find(d => d === diffDays)?.toString() || "";
+                      try {
+                        const today = new Date();
+                        const deliveryDate = new Date(vendorOrderForm.deliveryDeadline);
+                        if (isNaN(deliveryDate.getTime())) return "";
+                        const diffTime = deliveryDate.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const validDays = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+                        return validDays.find(d => d === diffDays)?.toString() || "";
+                      } catch (error) {
+                        return "";
+                      }
                     })() : ""}
                     onValueChange={(value) => {
-                      const today = new Date();
-                      const deliveryDate = new Date(today);
-                      deliveryDate.setDate(today.getDate() + parseInt(value));
-                      setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
+                      try {
+                        const days = parseInt(value);
+                        if (isNaN(days)) return;
+                        
+                        const today = new Date();
+                        const deliveryDate = new Date(today);
+                        deliveryDate.setDate(today.getDate() + days);
+                        
+                        if (isNaN(deliveryDate.getTime())) return;
+                        
+                        setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
+                      } catch (error) {
+                        console.error('Error setting delivery deadline:', error);
+                      }
                     }}
                     required
                   >
