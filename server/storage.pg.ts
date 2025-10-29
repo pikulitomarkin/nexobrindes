@@ -276,38 +276,18 @@ export class PgStorage implements IStorage {
 
   private async createAccountsReceivableForOrder(order: Order): Promise<void> {
     const paidValue = order.paidValue || "0.00";
-    let downPayment = order.downPayment || "0.00";
-    let shippingCost = order.shippingCost || "0.00";
-
-    // If order was converted from budget, get budget payment info
-    if (order.budgetId) {
-      try {
-        const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
-        if (budgetPaymentInfo) {
-          downPayment = budgetPaymentInfo.downPayment || downPayment;
-          shippingCost = budgetPaymentInfo.shippingCost || shippingCost;
-          console.log(`[ACCOUNTS_RECEIVABLE] Using budget payment info: downPayment=${downPayment}, shippingCost=${shippingCost}`);
-        }
-      } catch (error) {
-        console.log(`[ACCOUNTS_RECEIVABLE] Error getting budget payment info:`, error);
-      }
-    }
+    const downPayment = order.downPayment || "0.00";
+    const shippingCost = order.shippingCost || "0.00";
 
     const minimumPaymentValue = compareMoney(downPayment, "0") > 0 
       ? addMoney(downPayment, shippingCost) 
       : "0.00";
 
     let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'pending';
-    const totalValue = parseFloat(order.totalValue);
-    const paidValueNum = parseFloat(paidValue);
-    const minimumPaymentNum = parseFloat(minimumPaymentValue);
-
-    if (paidValueNum >= totalValue) {
+    if (compareMoney(paidValue, order.totalValue) >= 0) {
       status = 'paid';
-    } else if (paidValueNum >= minimumPaymentNum && minimumPaymentNum > 0) {
-      status = 'partial'; // Entrada + frete pagos
-    } else if (paidValueNum > 0) {
-      status = 'pending'; // Pagamento parcial mas não atingiu mínimo
+    } else if (compareMoney(paidValue, "0") > 0) {
+      status = 'partial';
     }
 
     // Ensure deadline is a Date object
@@ -315,8 +295,6 @@ export class PgStorage implements IStorage {
     if (order.deadline) {
       dueDate = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline;
     }
-
-    console.log(`[ACCOUNTS_RECEIVABLE] Creating for order ${order.orderNumber}: total=${order.totalValue}, paid=${paidValue}, minimum=${minimumPaymentValue}, status=${status}`);
 
     await pg.insert(schema.accountsReceivable).values({
       orderId: order.id,
@@ -452,34 +430,21 @@ export class PgStorage implements IStorage {
   // ==================== PAYMENTS ====================
   
   async getPayments(): Promise<Payment[]> {
-    return await pg.select({
-      id: schema.payments.id,
-      orderId: schema.payments.orderId,
-      amount: schema.payments.amount,
-      method: schema.payments.method,
-      status: schema.payments.status,
-      transactionId: schema.payments.transactionId,
-      paidAt: schema.payments.paidAt,
-      createdAt: schema.payments.createdAt,
-      reconciliationStatus: schema.payments.reconciliationStatus,
-      bankTransactionId: schema.payments.bankTransactionId
-    }).from(schema.payments).orderBy(desc(schema.payments.createdAt));
+    return await pg.select().from(schema.payments).orderBy(desc(schema.payments.createdAt));
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    // Defaults seguros: ao receber um pagamento, ele já está confirmado
-    const payload = {
+    const results = await pg.insert(schema.payments).values({
       ...payment,
-      status: payment.status ?? 'confirmed',   // <- confirmado ao receber
-      paidAt: payment.paidAt ?? new Date(),    // <- marca data de pagamento
       createdAt: new Date()
-    };
-
-    const results = await pg.insert(schema.payments).values(payload).returning();
+    }).returning();
+    
     const newPayment = results[0];
 
-    // Atualiza o valor pago do pedido
-    await this.updateOrderPaidValue(newPayment.orderId);
+    // Update order paidValue if status is confirmed
+    if (newPayment.status === 'confirmed') {
+      await this.updateOrderPaidValue(newPayment.orderId);
+    }
 
     return newPayment;
   }
@@ -502,48 +467,23 @@ export class PgStorage implements IStorage {
       .set({ paidValue: totalPaid.toFixed(2) })
       .where(eq(schema.orders.id, orderId));
 
-    // Get order to check if it's from budget
-    const order = await this.getOrder(orderId);
-    if (!order) return;
-
-    // Update accounts receivable status with proper minimum payment logic
+    // Update accounts receivable status
     const accountsReceivable = await pg.select().from(schema.accountsReceivable)
       .where(eq(schema.accountsReceivable.orderId, orderId));
 
     for (const ar of accountsReceivable) {
-      const totalAmount = parseFloat(ar.amount);
-      let minimumPayment = parseFloat(ar.minimumPayment || "0");
-
-      // Recalculate minimum payment if order is from budget
-      if (order.budgetId) {
-        try {
-          const budgetPaymentInfo = await this.getBudgetPaymentInfo(order.budgetId);
-          if (budgetPaymentInfo) {
-            const downPayment = parseFloat(budgetPaymentInfo.downPayment || "0");
-            const shippingCost = parseFloat(budgetPaymentInfo.shippingCost || "0");
-            minimumPayment = downPayment + shippingCost;
-          }
-        } catch (error) {
-          console.log("Error getting budget payment info:", error);
-        }
-      }
-
+      const amount = parseFloat(ar.amount);
       let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'open';
       
-      if (totalPaid >= totalAmount) {
+      if (totalPaid >= amount) {
         status = 'paid';
-      } else if (minimumPayment > 0 && totalPaid >= minimumPayment) {
-        status = 'partial'; // Entrada + frete pagos
       } else if (totalPaid > 0) {
-        status = 'pending'; // Pagamento parcial mas não atingiu mínimo
+        status = 'partial';
       }
-
-      console.log(`[UPDATE_PAID_VALUE] Order ${order.orderNumber}: paid=${totalPaid}, minimum=${minimumPayment}, status=${status}`);
 
       await pg.update(schema.accountsReceivable)
         .set({ 
           receivedAmount: totalPaid.toFixed(2),
-          minimumPayment: minimumPayment.toFixed(2), // Update minimum payment
           status: status,
           updatedAt: new Date()
         })
@@ -1247,6 +1187,10 @@ export class PgStorage implements IStorage {
 
   // ==================== EXPENSE NOTES ====================
   
+  async getExpenses(): Promise<ExpenseNote[]> {
+    return await this.getExpenseNotes();
+  }
+
   async getExpenseNotes(): Promise<ExpenseNote[]> {
     return await pg.select().from(schema.expenseNotes)
       .orderBy(desc(schema.expenseNotes.date));
@@ -1486,13 +1430,6 @@ export class PgStorage implements IStorage {
       .set({ isActive: false })
       .where(eq(schema.branches.id, id));
     return true;
-  }
-
-  // ==================== EXPENSES ====================
-  
-  async getExpenses(): Promise<any[]> {
-    // TODO: Implement expenses table and functionality
-    return [];
   }
 
   async deleteVendor(id: string): Promise<boolean> {
