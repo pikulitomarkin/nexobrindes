@@ -226,11 +226,39 @@ export class PgStorage implements IStorage {
   }
 
   async createOrder(orderData: InsertOrder): Promise<Order> {
+    // Generate unique order number using database sequence
+    async function getNextOrderNumber(): Promise<string> {
+      try {
+        // Try to get next value from sequence
+        const res: any = await pg.execute(sql`SELECT nextval('order_number_seq') AS next`);
+        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
+
+        // Format: PED-YYMM-000001
+        const now = new Date();
+        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        return `PED-${yymm}-${String(next).padStart(6, '0')}`;
+      } catch (e) {
+        // If sequence doesn't exist, create it and try again
+        await pg.execute(sql`CREATE SEQUENCE IF NOT EXISTS order_number_seq`);
+        const res: any = await pg.execute(sql`SELECT nextval('order_number_seq') AS next`);
+        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
+        const now = new Date();
+        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        return `PED-${yymm}-${String(next).padStart(6, '0')}`;
+      }
+    }
+
+    // Process order data and generate order number if not provided
+    const processedData: any = { ...orderData };
+    if (!processedData.orderNumber || processedData.orderNumber === null) {
+      processedData.orderNumber = await getNextOrderNumber();
+    }
+
     const results = await pg.insert(schema.orders).values({
-      ...orderData,
-      paidValue: orderData.paidValue || "0.00",
-      refundAmount: orderData.refundAmount || "0.00",
-      status: orderData.status || 'pending',
+      ...processedData,
+      paidValue: processedData.paidValue || "0.00",
+      refundAmount: processedData.refundAmount || "0.00",
+      status: processedData.status || 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
@@ -770,7 +798,7 @@ export class PgStorage implements IStorage {
 
   async createBudget(budgetData: InsertBudget): Promise<Budget> {
     // Convert string dates to Date objects if they exist
-    const processedData = { ...budgetData };
+    const processedData: any = { ...budgetData };
     
     if (processedData.validUntil && typeof processedData.validUntil === 'string') {
       processedData.validUntil = new Date(processedData.validUntil);
@@ -780,9 +808,31 @@ export class PgStorage implements IStorage {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
     }
 
-    // Generate budget number if not provided
-    if (!processedData.budgetNumber) {
-      processedData.budgetNumber = `ORC-${Date.now()}`;
+    // Generate unique budget number using database sequence
+    async function getNextBudgetNumber(): Promise<string> {
+      try {
+        // Try to get next value from sequence
+        const res: any = await pg.execute(sql`SELECT nextval('budget_number_seq') AS next`);
+        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
+
+        // Format: BUD-YYMM-000001
+        const now = new Date();
+        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        return `BUD-${yymm}-${String(next).padStart(6, '0')}`;
+      } catch (e) {
+        // If sequence doesn't exist, create it and try again
+        await pg.execute(sql`CREATE SEQUENCE IF NOT EXISTS budget_number_seq`);
+        const res: any = await pg.execute(sql`SELECT nextval('budget_number_seq') AS next`);
+        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
+        const now = new Date();
+        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+        return `BUD-${yymm}-${String(next).padStart(6, '0')}`;
+      }
+    }
+
+    // Generate budget number if not provided or is null
+    if (!processedData.budgetNumber || processedData.budgetNumber === null) {
+      processedData.budgetNumber = await getNextBudgetNumber();
     }
 
     const results = await pg.insert(schema.budgets).values({
