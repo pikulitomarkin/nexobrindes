@@ -4166,10 +4166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create bank import record
       const importRecord = await storage.createBankImport({
-        fileName: req.file.originalname,
-        fileSize: req.file.size.toString(),
-        transactionCount: transactions.length,
-        importedAt: new Date(),
+        filename: req.file.originalname,
+        uploadedBy: 'admin-1', // TODO: get from authenticated user
         status: 'completed'
       });
 
@@ -4294,12 +4292,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create bank import record for producer payments
       const importRecord = await storage.createBankImport({
-        fileName: req.file.originalname,
-        fileSize: req.file.size.toString(),
-        transactionCount: debitTransactions.length,
-        importedAt: new Date(),
-        status: 'completed',
-        importType: 'producer_payments'
+        filename: req.file.originalname,
+        uploadedBy: 'admin-1', // TODO: get from authenticated user
+        status: 'completed'
       });
 
       console.log(`Created producer payment import record: ${importRecord.id}`);
