@@ -847,8 +847,72 @@ export class PgStorage implements IStorage {
   }
 
   async importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }> {
-    const productsWithProducer = productsData.map(p => ({ ...p, producerId, type: 'external' }));
-    return await this.importProducts(productsWithProducer);
+    let imported = 0;
+    const errors: string[] = [];
+
+    // Clean numeric fields helper
+    const cleanNumericField = (value: any) => {
+      if (value === "" || value === undefined || value === null) return null;
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num.toString();
+    };
+
+    // Map common field names from different JSON formats
+    const mapProductFields = (item: any) => {
+      return {
+        name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
+        description: item.Descricao || item.description || item.Descricao || '',
+        category: item.WebTipo || item.category || item.Categoria || 'Geral',
+        basePrice: (item.PrecoVenda || item.basePrice || item.Preco || 0).toString(),
+        unit: item.unit || item.Unidade || 'un',
+        isActive: true,
+        producerId: producerId,
+        type: 'external',
+        
+        // Optional fields with mapping
+        externalId: item.IdProduto?.toString() || item.id?.toString(),
+        externalCode: item.CodigoXbz || item.code,
+        compositeCode: item.CodigoComposto,
+        friendlyCode: item.CodigoAmigavel,
+        siteLink: item.SiteLink,
+        imageLink: item.ImageLink || item.imageUrl,
+        mainColor: item.CorWebPrincipal || item.mainColor,
+        secondaryColor: item.CorWebSecundaria || item.secondaryColor,
+        weight: cleanNumericField(item.Peso || item.weight),
+        height: cleanNumericField(item.Altura || item.height),
+        width: cleanNumericField(item.Largura || item.width),
+        depth: cleanNumericField(item.Profundidade || item.depth),
+        availableQuantity: item.QuantidadeDisponivel || item.availableQuantity,
+        stockStatus: item.StatusConfiabilidade || item.stockStatus,
+        ncm: item.Ncm || item.ncm
+      };
+    };
+
+    for (const rawItem of productsData) {
+      try {
+        const productData = mapProductFields(rawItem);
+        
+        // Validate required fields
+        if (!productData.name || productData.name.trim() === '') {
+          errors.push(`Produto pulado: nome vazio ou inválido`);
+          continue;
+        }
+
+        if (!productData.basePrice || parseFloat(productData.basePrice) <= 0) {
+          errors.push(`Produto "${productData.name}" pulado: preço inválido (${productData.basePrice})`);
+          continue;
+        }
+
+        await this.createProduct(productData);
+        imported++;
+      } catch (error: any) {
+        const itemName = rawItem.Nome || rawItem.name || rawItem.NomeProduto || 'Produto sem nome';
+        errors.push(`Erro ao importar "${itemName}": ${error.message}`);
+      }
+    }
+
+    console.log(`Import for producer ${producerId} completed: ${imported} imported, ${errors.length} errors`);
+    return { imported, errors };
   }
 
   async searchProducts(query: string): Promise<Product[]> {

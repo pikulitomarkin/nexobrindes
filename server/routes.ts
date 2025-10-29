@@ -1395,6 +1395,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logistics products import route
+  app.post("/api/logistics/products/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const { producerId } = req.body;
+      if (!producerId) {
+        return res.status(400).json({ error: "Produtor é obrigatório para a importação" });
+      }
+
+      // Check file size
+      if (req.file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      let productsData;
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+
+      if (fileExtension === 'json') {
+        try {
+          const fileContent = req.file.buffer.toString('utf8');
+          productsData = JSON.parse(fileContent);
+        } catch (parseError) {
+          return res.status(400).json({
+            error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
+            details: (parseError as Error).message
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
+      }
+
+      if (!Array.isArray(productsData)) {
+        return res.status(400).json({
+          error: "O arquivo JSON deve conter um array de produtos",
+          example: "[{\"Nome\": \"Produto\", \"PrecoVenda\": 10.50}]"
+        });
+      }
+
+      if (productsData.length === 0) {
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio. Adicione pelo menos um produto."
+        });
+      }
+
+      if (productsData.length > 10000) {
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
+        });
+      }
+
+      console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
+
+      const result = await storage.importProductsForProducer(productsData, producerId);
+
+      console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
+
+      res.json({
+        message: `${result.imported} produtos importados com sucesso para o produtor!`,
+        imported: result.imported,
+        total: productsData.length,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('Logistics import error:', error);
+
+      if (error instanceof SyntaxError) {
+        return res.status(400).json({
+          error: "Formato JSON inválido. Verifique a sintaxe do arquivo.",
+          details: error.message
+        });
+      }
+
+      if ((error as any).code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      res.status(500).json({
+        error: "Erro interno do servidor ao processar importação",
+        details: (error as Error).message
+      });
+    }
+  });
+
   // Get shipping details for order (for partial shipping status)
   app.get("/api/orders/:id/shipping-details", async (req, res) => {
     try {
