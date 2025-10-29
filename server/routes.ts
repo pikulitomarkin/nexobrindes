@@ -5545,7 +5545,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process each item
       for (const itemData of uniqueItems) {
         try {
-          await storage.createBudgetItem(newBudget.id, itemData);
+          // Normalize empty strings to appropriate defaults for numeric fields
+          const normalizedItem = {
+            ...itemData,
+            productWidth: itemData.productWidth || null,
+            productHeight: itemData.productHeight || null,
+            productDepth: itemData.productDepth || null,
+            itemCustomizationValue: itemData.itemCustomizationValue || "0.00",
+            generalCustomizationValue: itemData.generalCustomizationValue || "0.00",
+            itemDiscountPercentage: itemData.itemDiscountPercentage || "0.00",
+            itemDiscountValue: itemData.itemDiscountValue || "0.00",
+            selectedCustomizationId: itemData.selectedCustomizationId || null,
+            itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+            customizationPhoto: itemData.customizationPhoto || null,
+            generalCustomizationName: itemData.generalCustomizationName || null,
+            additionalCustomizationNotes: itemData.additionalCustomizationNotes || null
+          };
+          await storage.createBudgetItem(newBudget.id, normalizedItem);
         } catch (error) {
           console.error(`Error creating budget item:`, error);
           // Continue with other items, don't fail the entire budget
