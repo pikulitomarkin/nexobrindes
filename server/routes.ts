@@ -4089,11 +4089,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
 
-        // Note: No need to manually update order.paidValue here as createPayment() with
-        // status='confirmed' already calls updateOrderPaidValue() which:
+        // IMPORTANT: Also update the receivedAmount in accounts_receivable for this order
+        // This ensures the UI shows the correct "already paid" amount
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + finalAmount;
+        const totalAmount = parseFloat(receivable.amount);
+        
+        await storage.updateAccountsReceivable(receivable.id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= totalAmount ? 'paid' : 'partial',
+          updatedAt: new Date()
+        });
+
+        console.log(`[RECEIVABLE PAYMENT] Updated receivedAmount from ${currentReceived} to ${newReceivedAmount.toFixed(2)} for receivable ${receivable.id}`);
+
+        // Note: createPayment() with status='confirmed' already calls updateOrderPaidValue() which:
         // 1. Sums all confirmed payments for the order
         // 2. Updates order.paidValue
-        // 3. Updates the corresponding accountsReceivable status/receivedAmount
       } else {
         // This is a manual receivable - update the receivable directly
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
