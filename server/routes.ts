@@ -1801,6 +1801,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderData = req.body;
       console.log("Received order data:", orderData);
 
+      // Fix branchId if it's "matriz" - replace with actual branch ID
+      if (orderData.branchId === 'matriz' || !orderData.branchId) {
+        const branches = await storage.getBranches();
+        if (branches && branches.length > 0) {
+          orderData.branchId = branches[0].id;
+          console.log(`[CREATE ORDER] Replaced branchId 'matriz' with real branch ID: ${orderData.branchId}`);
+        }
+      }
+
       // Validate required fields
       if (!orderData.contactName) {
         return res.status(400).json({ error: "Nome de contato é obrigatório" });
@@ -5370,6 +5379,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
+      // Fix branchId if it's "matriz" - replace with actual branch ID
+      if (req.body.branchId === 'matriz' || !req.body.branchId) {
+        const branches = await storage.getBranches();
+        if (branches && branches.length > 0) {
+          req.body.branchId = branches[0].id;
+          console.log(`[CREATE BUDGET] Replaced branchId 'matriz' with real branch ID: ${req.body.branchId}`);
+        }
+      }
+
       // Validar personalizações antes de criar o orçamento - apenas logar alertas
       let customizationWarnings = [];
 
