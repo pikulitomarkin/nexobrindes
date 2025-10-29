@@ -1343,6 +1343,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Production order ${id} status updated successfully to: ${status}`);
+
+      // When production order is marked as ready, create producer payment and update order status
+      if (status === 'ready' && updatedPO.producerValue && parseFloat(updatedPO.producerValue) > 0) {
+        // Check if payment already exists
+        const existingPayment = await storage.getProducerPaymentByProductionOrderId(id);
+        
+        if (!existingPayment) {
+          // Create producer payment
+          const payment = await storage.createProducerPayment({
+            productionOrderId: id,
+            producerId: updatedPO.producerId,
+            amount: updatedPO.producerValue,
+            status: 'pending',
+            notes: updatedPO.producerNotes || notes || null
+          });
+          console.log(`[READY STATUS] Created producer payment ${payment.id} for R$ ${updatedPO.producerValue}`);
+        } else {
+          console.log(`[READY STATUS] Producer payment already exists for production order ${id}`);
+        }
+
+        // Update order status to 'ready' when production order is ready
+        if (updatedPO.orderId) {
+          const order = await storage.getOrder(updatedPO.orderId);
+          if (order && order.status === 'production') {
+            await storage.updateOrder(updatedPO.orderId, { status: 'ready' });
+            console.log(`[READY STATUS] Updated order ${updatedPO.orderId} status to 'ready'`);
+          }
+        }
+      }
+
       res.json(updatedPO);
     } catch (error) {
       console.error("Error updating production order status:", error);
