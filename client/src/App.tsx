@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
 import Login from "@/pages/login";
+import ClientRegister from "@/pages/ClientRegister";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import MainLayout from "@/components/layout/main-layout";
 import NotFound from "@/pages/not-found";
@@ -141,8 +142,9 @@ function App() {
           </div>
         }>
           <Switch>
-            {/* Login Route */}
+            {/* Public Routes */}
             <Route path="/login" component={Login} />
+            <Route path="/clientes" component={ClientRegister} />
 
             {/* Protected Routes */}
             <ProtectedRoute>
