@@ -77,12 +77,20 @@ export default function ClientRegister() {
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterForm) => {
       const { confirmPassword, ...clientData } = data;
-      return await apiRequest("/api/clients", {
+      const response = await fetch("/api/clients", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao criar cliente");
+      }
+      
+      return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Cadastro realizado com sucesso!",
         description: `Seu código de usuário é: ${data.client.userCode}. Use-o para fazer login.`,
@@ -102,20 +110,28 @@ export default function ClientRegister() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
-      return await apiRequest("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: data.username,
           password: data.password,
           preferredRole: "client",
         }),
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao fazer login");
+      }
+      
+      return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       if (data.success) {
-        const token = btoa(`${data.user.id}:${data.user.username}:${Date.now()}`);
-        localStorage.setItem("authToken", token);
+        // Store user data and token from backend
         localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("token", data.token);
         
         toast({
           title: "Login realizado com sucesso!",
