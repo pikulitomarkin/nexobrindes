@@ -345,6 +345,8 @@ export const bankImports = pgTable("bank_imports", {
   status: text("status").notNull().default('parsed'), // 'parsed', 'reconciled', 'error'
   summary: text("summary"), // JSON string with import summary
   errorMessage: text("error_message"),
+  fileSize: integer("file_size"),
+  transactionCount: integer("transaction_count").default(0),
 });
 
 export const bankTransactions = pgTable("bank_transactions", {
@@ -369,6 +371,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   rawFitId: text("raw_fit_id"), // Original FITID from OFX for deduplication
   matchedEntityType: text("matched_entity_type"), // 'payment', 'producer_payment', 'receivable', null
   matchedEntityId: varchar("matched_entity_id"), // Generic FK to matched entity
+  memo: text("memo"), // Additional memo field from OFX
+  hasValidDate: boolean("has_valid_date").default(true), // Whether the transaction date is valid
 });
 
 export const expenseNotes = pgTable("expense_notes", {
