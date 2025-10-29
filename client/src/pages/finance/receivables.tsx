@@ -529,9 +529,13 @@ export default function FinanceReceivables() {
                         <span className={isMinimumMet ? 'text-green-600' : 'text-red-600'}>
                           R$ {minimumPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
-                        {minimumPayment > 0 && (
+                        {minimumPayment > 0 ? (
                           <div className="text-xs text-gray-500">
-                            {isMinimumMet ? '✓ Pago' : '⚠ Obrigatório'}
+                            {isMinimumMet ? '✓ Entrada paga' : '⚠ Entrada obrigatória'}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500">
+                            Sem entrada definida
                           </div>
                         )}
                       </td>
