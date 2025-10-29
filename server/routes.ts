@@ -3680,6 +3680,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recalculate commissions for all orders (migration fix)
+  app.post("/api/admin/recalculate-commissions", requireAuth, async (req, res) => {
+    try {
+      console.log("Starting commission recalculation...");
+      await storage.recalculateAllCommissions();
+      
+      res.json({
+        success: true,
+        message: "Comissões recalculadas com sucesso"
+      });
+    } catch (error) {
+      console.error("Error recalculating commissions:", error);
+      res.status(500).json({ error: "Erro ao recalcular comissões: " + error.message });
+    }
+  });
+
   // Get all accounts receivable (orders + manual)
   app.get("/api/finance/receivables", async (req, res) => {
     try {

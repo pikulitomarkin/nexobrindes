@@ -166,6 +166,8 @@ function App() {
                   <Route path="/admin/settings" component={AdminSettings} />
                   <Route path="/admin/commission-management" component={AdminCommissionManagement} />
                   <Route path="/admin/commission-settings" component={AdminCommissionSettings} />
+                  <Route path="/admin/fix-commissions" component={lazy(() => import("./pages/admin/fix-commissions"))} />
+                  <Route path="/admin/partners" component={AdminPartners} />
                   <Route path="/admin/users" component={AdminUsers} />
                   <Route path="/admin/reports" component={AdminReports} />
                   <Route path="/admin/producer-payments" component={AdminProducerPayments} />

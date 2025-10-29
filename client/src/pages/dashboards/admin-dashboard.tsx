@@ -34,6 +34,7 @@ export default function AdminDashboard() {
     { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
     { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
     { href: "/admin/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
+    { href: "/admin/fix-commissions", icon: TrendingUp, label: "Corrigir Comissões", color: "text-red-600" },
   ];
 
   const getStatusBadge = (status: string) => {

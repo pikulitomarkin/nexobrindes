@@ -23,8 +23,6 @@ import type {
   Product,
   InsertProduct,
   Budget,
-  InsertBudget,
-  BudgetItem,
   InsertBudgetItem,
   BudgetPhoto,
   InsertBudgetPhoto,
@@ -65,9 +63,9 @@ import type { IStorage } from "./storage";
  * Implements IStorage interface using Drizzle ORM + Neon PostgreSQL
  */
 export class PgStorage implements IStorage {
-  
+
   // ==================== USERS ====================
-  
+
   async getUsers(): Promise<User[]> {
     return await pg.select().from(schema.users);
   }
@@ -113,7 +111,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== VENDORS ====================
-  
+
   async getVendors(): Promise<User[]> {
     return await pg.select().from(schema.users).where(eq(schema.users.role, 'vendor'));
   }
@@ -156,7 +154,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== CLIENTS ====================
-  
+
   async getClients(): Promise<Client[]> {
     return await pg.select().from(schema.clients).orderBy(desc(schema.clients.createdAt));
   }
@@ -194,10 +192,10 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== ORDERS ====================
-  
+
   async getOrders(): Promise<Order[]> {
     const orders = await pg.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
-    
+
     // Enrich with budget items if budgetId exists
     const enrichedOrders = await Promise.all(orders.map(async (order) => {
       if (order.budgetId) {
@@ -213,7 +211,7 @@ export class PgStorage implements IStorage {
   async getOrder(id: string): Promise<Order | undefined> {
     const results = await pg.select().from(schema.orders).where(eq(schema.orders.id, id));
     const order = results[0];
-    
+
     if (!order) return undefined;
 
     // Enrich with budget items
@@ -221,7 +219,7 @@ export class PgStorage implements IStorage {
       const items = await this.getBudgetItems(order.budgetId);
       return { ...order, items } as any;
     }
-    
+
     return { ...order, items: [] } as any;
   }
 
@@ -262,7 +260,7 @@ export class PgStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    
+
     const order = results[0];
 
     // Create accounts receivable for this order
@@ -279,8 +277,8 @@ export class PgStorage implements IStorage {
     const downPayment = order.downPayment || "0.00";
     const shippingCost = order.shippingCost || "0.00";
 
-    const minimumPaymentValue = compareMoney(downPayment, "0") > 0 
-      ? addMoney(downPayment, shippingCost) 
+    const minimumPaymentValue = compareMoney(downPayment, "0") > 0
+      ? addMoney(downPayment, shippingCost)
       : "0.00";
 
     let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'pending';
@@ -310,27 +308,79 @@ export class PgStorage implements IStorage {
     });
   }
 
-  private async calculateCommissions(order: Order): Promise<void> {
-    // Get vendor commission settings
-    const vendor = await this.getVendor(order.vendorId);
-    const commissionSettings = await this.getCommissionSettings();
+  async calculateCommissions(order: Order): Promise<void> {
+    try {
+      console.log(`Calculating commissions for order ${order.orderNumber}`);
 
-    const vendorRate = vendor?.commissionRate || commissionSettings?.vendorCommissionRate || '10.00';
-    const vendorCommissionAmount = percentageOf(order.totalValue, vendorRate);
+      // Get vendor commission rate
+      const vendor = await pg
+        .select()
+        .from(schema.vendors)
+        .where(eq(schema.vendors.userId, order.vendorId))
+        .then(rows => rows[0]);
 
-    // Create vendor commission
-    await pg.insert(schema.commissions).values({
-      vendorId: order.vendorId,
-      partnerId: null,
-      orderId: order.id,
-      percentage: vendorRate,
-      amount: vendorCommissionAmount,
-      status: 'pending',
-      type: 'vendor',
-      orderValue: order.totalValue,
-      orderNumber: order.orderNumber,
-      createdAt: new Date()
-    });
+      const vendorRate = vendor?.commissionRate || '10.00';
+      const orderValue = parseFloat(order.totalValue);
+      const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
+
+      // Create vendor commission
+      await pg.insert(schema.commissions).values({
+        id: `commission-${order.id}-vendor`,
+        vendorId: order.vendorId,
+        partnerId: null,
+        orderId: order.id,
+        percentage: vendorRate,
+        amount: vendorCommissionAmount.toFixed(2),
+        status: 'pending',
+        type: 'vendor',
+        orderValue: order.totalValue,
+        orderNumber: order.orderNumber,
+        paidAt: null,
+        deductedAt: null,
+        createdAt: new Date()
+      });
+
+      console.log(`Created vendor commission: R$ ${vendorCommissionAmount.toFixed(2)} (${vendorRate}%) for order ${order.orderNumber}`);
+
+      // Get all partners for partner commissions
+      const allPartners = await pg
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.role, 'partner'));
+
+      if (allPartners.length > 0) {
+        // Create partner commissions - divide equally among all partners
+        const partnerRate = '15.00'; // Default partner commission rate
+        const totalPartnerCommission = (orderValue * parseFloat(partnerRate)) / 100;
+        const individualPartnerCommission = totalPartnerCommission / allPartners.length;
+
+        for (let i = 0; i < allPartners.length; i++) {
+          const partner = allPartners[i];
+          const individualPercentage = (parseFloat(partnerRate) / allPartners.length).toFixed(2);
+
+          await pg.insert(schema.commissions).values({
+            id: `commission-${order.id}-partner-${i + 1}`,
+            vendorId: null,
+            partnerId: partner.id,
+            orderId: order.id,
+            percentage: individualPercentage,
+            amount: individualPartnerCommission.toFixed(2),
+            status: 'confirmed', // Partners get confirmed immediately
+            type: 'partner',
+            orderValue: order.totalValue,
+            orderNumber: order.orderNumber,
+            paidAt: new Date(), // Paid immediately
+            deductedAt: null,
+            createdAt: new Date()
+          });
+        }
+
+        console.log(`Created ${allPartners.length} partner commissions: R$ ${individualPartnerCommission.toFixed(2)} each (total: R$ ${totalPartnerCommission.toFixed(2)}) for order ${order.orderNumber}`);
+      }
+
+    } catch (error) {
+      console.error('Error calculating commissions:', error);
+    }
   }
 
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
@@ -341,8 +391,38 @@ export class PgStorage implements IStorage {
     return results[0];
   }
 
-  async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
-    return await this.updateOrder(id, { status });
+  async updateOrderStatus(orderId: string, status: string): Promise<Order | undefined> {
+    await pg
+      .update(schema.orders)
+      .set({
+        status,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.orders.id, orderId));
+
+    console.log(`Order ${orderId} status updated to: ${status}`);
+
+    // Update vendor commission status when order is delivered
+    if (status === 'delivered') {
+      await pg
+        .update(schema.commissions)
+        .set({
+          status: 'confirmed',
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(schema.commissions.orderId, orderId),
+          eq(schema.commissions.type, 'vendor')
+        ));
+
+      console.log(`Vendor commission confirmed for delivered order ${orderId}`);
+    }
+
+    // Cancel commissions if order is cancelled
+    if (status === 'cancelled') {
+      await this.updateCommissionsByOrderStatus(orderId, 'cancelled');
+    }
+    return undefined;
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
@@ -358,7 +438,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PRODUCTION ORDERS ====================
-  
+
   async getProductionOrders(): Promise<ProductionOrder[]> {
     return await pg.select().from(schema.productionOrders).orderBy(desc(schema.productionOrders.id));
   }
@@ -428,7 +508,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PAYMENTS ====================
-  
+
   async getPayments(): Promise<Payment[]> {
     return await pg.select().from(schema.payments).orderBy(desc(schema.payments.createdAt));
   }
@@ -438,7 +518,7 @@ export class PgStorage implements IStorage {
       ...payment,
       createdAt: new Date()
     }).returning();
-    
+
     const newPayment = results[0];
 
     // Update order paidValue if status is confirmed
@@ -474,7 +554,7 @@ export class PgStorage implements IStorage {
     for (const ar of accountsReceivable) {
       const amount = parseFloat(ar.amount);
       let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'open';
-      
+
       if (totalPaid >= amount) {
         status = 'paid';
       } else if (totalPaid > 0) {
@@ -482,7 +562,7 @@ export class PgStorage implements IStorage {
       }
 
       await pg.update(schema.accountsReceivable)
-        .set({ 
+        .set({
           receivedAmount: totalPaid.toFixed(2),
           status: status,
           updatedAt: new Date()
@@ -498,7 +578,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== COMMISSIONS ====================
-  
+
   async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
     return await pg.select().from(schema.commissions)
       .where(eq(schema.commissions.vendorId, vendorId));
@@ -539,18 +619,58 @@ export class PgStorage implements IStorage {
     // This would update commission records for the partner
   }
 
-  async updateCommissionsByOrderStatus(orderId: string, orderStatus: string): Promise<void> {
-    // Update commissions based on order status changes
+  async updateCommissionsByOrderStatus(orderId: string, status: string): Promise<void> {
+    try {
+      await pg
+        .update(schema.commissions)
+        .set({
+          status: status,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.commissions.orderId, orderId));
+
+      console.log(`Updated commissions for order ${orderId} to status: ${status}`);
+    } catch (error) {
+      console.error('Error updating commissions by order status:', error);
+    }
+  }
+
+  async recalculateAllCommissions(): Promise<void> {
+    try {
+      console.log('Starting commission recalculation for existing orders...');
+
+      // Get all orders
+      const allOrders = await pg.select().from(schema.orders);
+      console.log(`Found ${allOrders.length} orders to check`);
+
+      // Get existing commissions
+      const existingCommissions = await pg.select().from(schema.commissions);
+      const orderIdsWithCommissions = new Set(existingCommissions.map(c => c.orderId));
+
+      let recalculatedCount = 0;
+
+      for (const order of allOrders) {
+        if (!orderIdsWithCommissions.has(order.id)) {
+          console.log(`Recalculating commissions for order ${order.orderNumber}`);
+          await this.calculateCommissions(order);
+          recalculatedCount++;
+        }
+      }
+
+      console.log(`Commission recalculation completed. Processed ${recalculatedCount} orders.`);
+    } catch (error) {
+      console.error('Error during commission recalculation:', error);
+    }
   }
 
   // ==================== PARTNERS ====================
-  
+
   async getPartners(): Promise<User[]> {
     const partners = await pg.select().from(schema.partners);
     const userIds = partners.map(p => p.userId);
-    
+
     if (userIds.length === 0) return [];
-    
+
     return await pg.select().from(schema.users).where(inArray(schema.users.id, userIds));
   }
 
@@ -591,7 +711,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== COMMISSION SETTINGS ====================
-  
+
   async getCommissionSettings(): Promise<CommissionSettings | undefined> {
     const results = await pg.select().from(schema.commissionSettings)
       .where(eq(schema.commissionSettings.isActive, true))
@@ -602,7 +722,7 @@ export class PgStorage implements IStorage {
   async updateCommissionSettings(settings: Partial<InsertCommissionSettings>): Promise<CommissionSettings> {
     // First try to update existing
     const existing = await this.getCommissionSettings();
-    
+
     if (existing) {
       const results = await pg.update(schema.commissionSettings)
         .set({ ...settings, updatedAt: new Date() })
@@ -620,7 +740,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PRODUCTS ====================
-  
+
   async getProducts(options?: {
     page?: number;
     limit?: number;
@@ -655,7 +775,7 @@ export class PgStorage implements IStorage {
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
-      
+
     const totalResults = await pg.select({ count: sql<number>`count(*)` }).from(schema.products);
     const total = Number(totalResults[0].count);
     const totalPages = Math.ceil(total / limit);
@@ -750,7 +870,7 @@ export class PgStorage implements IStorage {
   async getProductsGroupedByProducer(): Promise<{ [key: string]: Product[] }> {
     const products = await pg.select().from(schema.products)
       .where(eq(schema.products.isActive, true));
-    
+
     const grouped: { [key: string]: Product[] } = {};
     for (const product of products) {
       const producerId = product.producerId || 'internal';
@@ -764,7 +884,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BUDGETS ====================
-  
+
   async getBudgets(): Promise<Budget[]> {
     return await pg.select().from(schema.budgets).orderBy(desc(schema.budgets.createdAt));
   }
@@ -789,11 +909,11 @@ export class PgStorage implements IStorage {
   async createBudget(budgetData: InsertBudget): Promise<Budget> {
     // Convert string dates to Date objects if they exist
     const processedData: any = { ...budgetData };
-    
+
     if (processedData.validUntil && typeof processedData.validUntil === 'string') {
       processedData.validUntil = new Date(processedData.validUntil);
     }
-    
+
     if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
     }
@@ -836,11 +956,11 @@ export class PgStorage implements IStorage {
   async updateBudget(id: string, budgetData: Partial<InsertBudget>): Promise<Budget | undefined> {
     // Convert string dates to Date objects if they exist
     const processedData = { ...budgetData };
-    
+
     if (processedData.validUntil && typeof processedData.validUntil === 'string') {
       processedData.validUntil = new Date(processedData.validUntil);
     }
-    
+
     if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
     }
@@ -893,7 +1013,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BUDGET ITEMS ====================
-  
+
   async getBudgetItems(budgetId: string): Promise<BudgetItem[]> {
     return await pg.select().from(schema.budgetItems)
       .where(eq(schema.budgetItems.budgetId, budgetId));
@@ -926,7 +1046,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BUDGET PHOTOS ====================
-  
+
   async getBudgetPhotos(budgetId: string): Promise<BudgetPhoto[]> {
     return await pg.select().from(schema.budgetPhotos)
       .where(eq(schema.budgetPhotos.budgetId, budgetId));
@@ -947,7 +1067,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PAYMENT METHODS ====================
-  
+
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     return await pg.select().from(schema.paymentMethods)
       .where(eq(schema.paymentMethods.isActive, true));
@@ -982,7 +1102,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== SHIPPING METHODS ====================
-  
+
   async getShippingMethods(): Promise<ShippingMethod[]> {
     return await pg.select().from(schema.shippingMethods)
       .where(eq(schema.shippingMethods.isActive, true));
@@ -1017,7 +1137,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BUDGET PAYMENT INFO ====================
-  
+
   async getBudgetPaymentInfo(budgetId: string): Promise<BudgetPaymentInfo | undefined> {
     const results = await pg.select().from(schema.budgetPaymentInfo)
       .where(eq(schema.budgetPaymentInfo.budgetId, budgetId));
@@ -1034,7 +1154,7 @@ export class PgStorage implements IStorage {
 
   async updateBudgetPaymentInfo(budgetId: string, data: Partial<InsertBudgetPaymentInfo>): Promise<BudgetPaymentInfo> {
     const existing = await this.getBudgetPaymentInfo(budgetId);
-    
+
     if (existing) {
       const results = await pg.update(schema.budgetPaymentInfo)
         .set(data)
@@ -1047,7 +1167,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== ACCOUNTS RECEIVABLE ====================
-  
+
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
     return await pg.select().from(schema.accountsReceivable)
       .orderBy(desc(schema.accountsReceivable.createdAt));
@@ -1086,7 +1206,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PAYMENT ALLOCATIONS ====================
-  
+
   async getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]> {
     return await pg.select().from(schema.paymentAllocations)
       .where(eq(schema.paymentAllocations.paymentId, paymentId));
@@ -1110,7 +1230,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BANK IMPORTS & TRANSACTIONS ====================
-  
+
   async getBankImports(): Promise<BankImport[]> {
     return await pg.select().from(schema.bankImports)
       .orderBy(desc(schema.bankImports.uploadedAt));
@@ -1186,7 +1306,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== EXPENSE NOTES ====================
-  
+
   async getExpenses(): Promise<ExpenseNote[]> {
     return await this.getExpenseNotes();
   }
@@ -1223,7 +1343,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== COMMISSION PAYOUTS ====================
-  
+
   async getCommissionPayouts(): Promise<CommissionPayout[]> {
     return await pg.select().from(schema.commissionPayouts)
       .orderBy(desc(schema.commissionPayouts.createdAt));
@@ -1254,7 +1374,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== MANUAL RECEIVABLES/PAYABLES ====================
-  
+
   async createManualReceivable(data: any): Promise<any> {
     // Implementation depends on schema - placeholder
     return data;
@@ -1277,7 +1397,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== CUSTOMIZATION OPTIONS ====================
-  
+
   async createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption> {
     const results = await pg.insert(schema.customizationOptions).values({
       ...data,
@@ -1317,7 +1437,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== PRODUCER PAYMENTS ====================
-  
+
   async getProducerPayments(): Promise<ProducerPayment[]> {
     return await pg.select().from(schema.producerPayments)
       .orderBy(desc(schema.producerPayments.createdAt));
@@ -1358,7 +1478,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== QUOTE REQUESTS ====================
-  
+
   async createConsolidatedQuoteRequest(data: any): Promise<any> {
     return data;
   }
@@ -1396,7 +1516,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== BRANCHES ====================
-  
+
   async getBranches(): Promise<Branch[]> {
     return await pg.select().from(schema.branches)
       .where(eq(schema.branches.isActive, true));
@@ -1447,7 +1567,7 @@ export class PgStorage implements IStorage {
   }
 
   // ==================== SYSTEM LOGS ====================
-  
+
   async getSystemLogs(filters?: {
     search?: string;
     action?: string;
