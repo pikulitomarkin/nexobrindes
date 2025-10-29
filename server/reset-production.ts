@@ -47,10 +47,7 @@ async function resetDatabase() {
   }
   
   console.log("DATABASE_URL:", process.env.DATABASE_URL?.substring(0, 50) + "...\n");
-  console.log("Aguardando 5 segundos antes de continuar...");
-  console.log("Pressione Ctrl+C para cancelar.\n");
-  
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  console.log("Executando reset...\n");
 
   try {
     console.log("🗑️  Deletando todos os dados...\n");
@@ -91,6 +88,9 @@ async function resetDatabase() {
     
     console.log("  - Deletando contas a receber...");
     await pg.delete(accountsReceivable);
+    
+    console.log("  - Deletando comissões...");
+    await pg.delete(commissions);
     
     console.log("  - Deletando pedidos...");
     await pg.delete(orders);
