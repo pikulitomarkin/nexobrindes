@@ -129,6 +129,24 @@ The API structure includes endpoints for dashboard statistics, orders management
 ## Data Storage
 The system is configured to use **PostgreSQL** as the primary database with **Drizzle ORM** for database interactions and migrations. The database schema defines the core entities: users, orders, production orders, payments, commissions, and vendors with proper relationships and constraints.
 
+### Development vs Production Database Separation
+Replit automatically maintains separate databases for development and production:
+
+- **Development Database**: Used in the workspace/editor environment via `DATABASE_URL`
+- **Production Database**: Used in published deployments via separate production `DATABASE_URL`
+
+**Important**: 
+- Schema changes (structure) are synchronized automatically when publishing
+- Data is NOT synchronized automatically between environments
+- Use `npm run db:push` to sync schema changes to development
+- Use `npx tsx server/reset-production.ts` to reset production database
+- Use `npx tsx server/seed.ts` to populate empty databases with essential data
+
+Production database contains only clean data:
+- 1 admin user (username: admin, password: 123456)
+- Essential configuration tables (payment methods, shipping methods, etc.)
+- No test data from development environment
+
 Key tables include:
 - `users` - Multi-role user management (admin, vendor, client, producer, finance)
 - `orders` - Main order tracking with status workflow
