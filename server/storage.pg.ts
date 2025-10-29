@@ -439,6 +439,7 @@ export class PgStorage implements IStorage {
       transactionId: schema.payments.transactionId,
       paidAt: schema.payments.paidAt,
       createdAt: schema.payments.createdAt,
+      reconciliationStatus: schema.payments.reconciliationStatus,
       bankTransactionId: schema.payments.bankTransactionId
     }).from(schema.payments).orderBy(desc(schema.payments.createdAt));
   }
