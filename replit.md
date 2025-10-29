@@ -6,6 +6,27 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 29, 2025 - CLIENT SELF-REGISTRATION PORTAL**
+- **FEATURE: Public Client Registration Page** - Clientes podem se cadastrar sozinhos no sistema
+- **URL**: /clientes (rota pública, não requer autenticação)
+- **Funcionalidades**:
+  - Interface com tabs "Login" e "Cadastro"
+  - Formulário completo com dados do cliente (nome, email, telefone, whatsapp, CPF, endereço)
+  - Seleção obrigatória de vendedor (dropdown com todos vendedores ativos)
+  - Validação de senha com confirmação
+  - Geração automática de código de usuário após cadastro
+  - Auto-preenchimento do login após cadastro bem-sucedido
+  - Design responsivo com gradiente e componentes shadcn/ui
+- **Backend**: Reutiliza POST /api/clients existente com associação vendorId
+- **Impacto**: 
+  - Clientes podem se registrar sem intervenção do admin
+  - Associação automática cliente-vendedor
+  - Vendedor vê cliente em sua lista após registro
+  - Fluxo completo testado e validado end-to-end
+- **Files Modified**: 
+  - client/src/pages/ClientRegister.tsx (created)
+  - client/src/App.tsx (added public route)
+
 **October 29, 2025 - POST-MIGRATION BUG FIXES**
 - **FIXED: Producer Payment Auto-Creation** - Pagamentos de produtores não eram criados quando production order era marcado como 'ready'
 - **Root Cause**: Endpoint PATCH /api/production-orders/:id/status apenas atualizava status, não criava pagamento
