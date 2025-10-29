@@ -6,6 +6,37 @@ The application features vendor-specific sales links, automated client and order
 
 # Recent Changes
 
+**October 29, 2025 - POST-MIGRATION BUG FIXES**
+- **FIXED: Producer Payment Auto-Creation** - Pagamentos de produtores não eram criados quando production order era marcado como 'ready'
+- **Root Cause**: Endpoint PATCH /api/production-orders/:id/status apenas atualizava status, não criava pagamento
+- **Solution**: Adicionada lógica automática (linhas 1350-1392):
+  - Ao marcar como 'ready', verifica se já existe pagamento (evita duplicatas)
+  - Cria producer_payment com status 'pending' se não existir
+  - Verifica se TODOS os production orders estão prontos antes de atualizar pedido do cliente
+  - Guarda contra array vazio (evita marcar como 'ready' prematuramente)
+- **Files Modified**: server/routes.ts (added lines 1350-1392)
+- **Impact**: 
+  - Produtores agora veem o valor a receber no painel deles
+  - Admin vê o pagamento pendente no financeiro
+  - Cliente só vê pedido como 'ready' quando TODOS os produtores finalizaram
+  - Multi-produtor workflows agora funcionam corretamente
+
+**October 29, 2025 - BUDGET ITEMS INSERTION FIX**
+- **FIXED: Budget Items Not Saving** - Items não eram salvos no banco, causando pedidos vazios na logística
+- **Root Cause**: Frontend enviava strings vazias ("") para campos numéricos, causando "invalid input syntax for type numeric: ''" no PostgreSQL
+- **Solution**: Adicionada normalização em POST /api/budgets (linhas 5551-5566):
+  - Converte strings vazias para null em campos nullable (productWidth, productHeight, etc.)
+  - Converte strings vazias para "0.00" em campos decimal (customizationValue, discountValue, etc.)
+  - Converte strings vazias para null em campos text (customizationPhoto, etc.)
+- **Files Modified**: server/routes.ts (added normalization in budget creation)
+- **Impact**: Orçamentos agora salvam items corretamente e aparecem na logística após conversão e pagamento
+
+**October 29, 2025 - RECEIVABLES MINIMUM PAYMENT FIX**
+- **FIXED: Entrada Zerada** - Contas a receber mostravam R$ 0,00 para valor mínimo (entrada)
+- **Root Cause**: Campo minimum_payment estava zerado após migração para PostgreSQL
+- **Solution**: Executado SQL para recalcular minimum_payment de budget_payment_info (downPayment + shippingCost)
+- **Impact**: 4 receivables corrigidos com valores corretos (R$ 32, R$ 35, R$ 700, R$ 1.100)
+
 **October 27, 2025 - RECEIVABLES CARD PAYMENT UPDATE FIX**
 - **FIXED: Contas a Receber Card Not Updating After Payment** - Valor restante permanecia igual ao valor total do pedido após registrar entrada
 - **Root Cause**: Endpoint `/api/receivables/:id/payment` criava o pagamento MAS NÃO atualizava o `receivedAmount` no accountsReceivable para pedidos (apenas para receivables manuais)
