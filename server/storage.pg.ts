@@ -444,17 +444,19 @@ export class PgStorage implements IStorage {
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const results = await pg.insert(schema.payments).values({
+    // Defaults seguros: ao receber um pagamento, ele já está confirmado
+    const payload = {
       ...payment,
+      status: payment.status ?? 'confirmed',   // <- confirmado ao receber
+      paidAt: payment.paidAt ?? new Date(),    // <- marca data de pagamento
       createdAt: new Date()
-    }).returning();
-    
+    };
+
+    const results = await pg.insert(schema.payments).values(payload).returning();
     const newPayment = results[0];
 
-    // Update order paidValue if status is confirmed
-    if (newPayment.status === 'confirmed') {
-      await this.updateOrderPaidValue(newPayment.orderId);
-    }
+    // Atualiza o valor pago do pedido
+    await this.updateOrderPaidValue(newPayment.orderId);
 
     return newPayment;
   }
