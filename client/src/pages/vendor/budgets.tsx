@@ -682,20 +682,12 @@ export default function VendorBudgets() {
       return;
     }
 
-    // Date validation: validUntil and deliveryDeadline cannot be in the past
+    // Date validation: validUntil cannot be in the past
     const today = new Date().toISOString().split('T')[0];
     if (vendorBudgetForm.validUntil && vendorBudgetForm.validUntil < today) {
       toast({
         title: "Erro de Validação",
         description: "A data de 'Válido Até' não pode ser anterior a hoje.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (vendorBudgetForm.deliveryDeadline && vendorBudgetForm.deliveryDeadline < today) {
-      toast({
-        title: "Erro de Validação",
-        description: "A data de 'Prazo de Entrega' não pode ser anterior a hoje.",
         variant: "destructive"
       });
       return;
@@ -873,28 +865,34 @@ export default function VendorBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="budget-deliveryDeadline">Prazo de Entrega *</Label>
-                  <Input
-                    id="budget-deliveryDeadline"
-                    type="date"
+                  <Select
                     value={vendorBudgetForm.deliveryDeadline || ""}
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
-                      const today = new Date().toISOString().split('T')[0];
-
-                      if (selectedDate < today) {
-                        toast({
-                          title: "Data Inválida",
-                          description: "O prazo de entrega não pode ser anterior à data de hoje.",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-
-                      setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: selectedDate });
+                    onValueChange={(value) => {
+                      const today = new Date();
+                      const deliveryDate = new Date(today);
+                      deliveryDate.setDate(today.getDate() + parseInt(value));
+                      setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
                     }}
-                    min={new Date().toISOString().split('T')[0]}
                     required
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o prazo em dias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 dias</SelectItem>
+                      <SelectItem value="10">10 dias</SelectItem>
+                      <SelectItem value="15">15 dias</SelectItem>
+                      <SelectItem value="20">20 dias</SelectItem>
+                      <SelectItem value="25">25 dias</SelectItem>
+                      <SelectItem value="30">30 dias</SelectItem>
+                      <SelectItem value="35">35 dias</SelectItem>
+                      <SelectItem value="40">40 dias</SelectItem>
+                      <SelectItem value="45">45 dias</SelectItem>
+                      <SelectItem value="50">50 dias</SelectItem>
+                      <SelectItem value="55">55 dias</SelectItem>
+                      <SelectItem value="60">60 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="budget-delivery-type">Tipo de Entrega *</Label>

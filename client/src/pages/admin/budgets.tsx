@@ -406,15 +406,6 @@ export default function AdminBudgets() {
       return;
     }
 
-    if (adminBudgetForm.deliveryDeadline < today) {
-      toast({
-        title: "Erro",
-        description: "O prazo de entrega não pode ser anterior a hoje",
-        variant: "destructive"
-      });
-      return;
-    }
-
     createAdminBudgetMutation.mutate(adminBudgetForm);
   };
 
@@ -538,14 +529,41 @@ export default function AdminBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="admin-budget-deliveryDeadline">Prazo de Entrega *</Label>
-                  <Input
-                    id="admin-budget-deliveryDeadline"
-                    type="date"
-                    value={adminBudgetForm.deliveryDeadline || ""}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
+                  <Select
+                    value={adminBudgetForm.deliveryDeadline ? (() => {
+                      const today = new Date();
+                      const deliveryDate = new Date(adminBudgetForm.deliveryDeadline);
+                      const diffTime = deliveryDate.getTime() - today.getTime();
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      const validDays = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+                      return validDays.find(d => d === diffDays)?.toString() || "";
+                    })() : ""}
+                    onValueChange={(value) => {
+                      const today = new Date();
+                      const deliveryDate = new Date(today);
+                      deliveryDate.setDate(today.getDate() + parseInt(value));
+                      setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
+                    }}
                     required
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o prazo em dias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 dias</SelectItem>
+                      <SelectItem value="10">10 dias</SelectItem>
+                      <SelectItem value="15">15 dias</SelectItem>
+                      <SelectItem value="20">20 dias</SelectItem>
+                      <SelectItem value="25">25 dias</SelectItem>
+                      <SelectItem value="30">30 dias</SelectItem>
+                      <SelectItem value="35">35 dias</SelectItem>
+                      <SelectItem value="40">40 dias</SelectItem>
+                      <SelectItem value="45">45 dias</SelectItem>
+                      <SelectItem value="50">50 dias</SelectItem>
+                      <SelectItem value="55">55 dias</SelectItem>
+                      <SelectItem value="60">60 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega *</Label>
