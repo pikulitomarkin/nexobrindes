@@ -1363,12 +1363,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[READY STATUS] Producer payment already exists for production order ${id}`);
         }
 
-        // Update order status to 'ready' when production order is ready
+        // Update order status to 'ready' ONLY when ALL production orders are ready
         if (updatedPO.orderId) {
           const order = await storage.getOrder(updatedPO.orderId);
           if (order && order.status === 'production') {
-            await storage.updateOrder(updatedPO.orderId, { status: 'ready' });
-            console.log(`[READY STATUS] Updated order ${updatedPO.orderId} status to 'ready'`);
+            // Check if all production orders for this order are ready
+            const allProductionOrders = await storage.getProductionOrdersByOrder(updatedPO.orderId);
+            
+            // Guard: Must have at least one production order to mark as ready
+            if (allProductionOrders.length > 0) {
+              const allReady = allProductionOrders.every(po => po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered');
+              
+              if (allReady) {
+                await storage.updateOrder(updatedPO.orderId, { status: 'ready' });
+                console.log(`[READY STATUS] Updated order ${updatedPO.orderId} status to 'ready' - all ${allProductionOrders.length} production orders are ready`);
+              } else {
+                const readyCount = allProductionOrders.filter(po => po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered').length;
+                console.log(`[READY STATUS] Order ${updatedPO.orderId} still in production - ${readyCount}/${allProductionOrders.length} production orders ready`);
+              }
+            } else {
+              console.log(`[READY STATUS] Order ${updatedPO.orderId} has no production orders yet - skipping status update`);
+            }
           }
         }
       }
