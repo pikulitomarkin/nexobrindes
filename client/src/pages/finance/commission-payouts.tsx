@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, CreditCard, Calendar } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, CreditCard, Calendar, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -18,6 +19,8 @@ export default function FinanceCommissionPayouts() {
   const [branchFilter, setBranchFilter] = useState("all");
   const [selectedCommission, setSelectedCommission] = useState<any>(null);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [selectedCommissions, setSelectedCommissions] = useState<Set<string>>(new Set());
+  const [isBulkPayDialogOpen, setIsBulkPayDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Buscar todas as comissões do sistema
@@ -61,6 +64,50 @@ export default function FinanceCommissionPayouts() {
       toast({
         title: "Erro",
         description: "Não foi possível marcar como pago",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para pagamento em lote
+  const bulkMarkAsPaidMutation = useMutation({
+    mutationFn: async (commissionIds: string[]) => {
+      const promises = commissionIds.map(id => 
+        fetch(`/api/commissions/${id}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "paid" }),
+        })
+      );
+      
+      const responses = await Promise.all(promises);
+      const failedIds = [];
+      
+      for (let i = 0; i < responses.length; i++) {
+        if (!responses[i].ok) {
+          failedIds.push(commissionIds[i]);
+        }
+      }
+      
+      if (failedIds.length > 0) {
+        throw new Error(`Falha ao processar ${failedIds.length} pagamento(s)`);
+      }
+      
+      return { success: true, processed: commissionIds.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      setIsBulkPayDialogOpen(false);
+      setSelectedCommissions(new Set());
+      toast({
+        title: "Sucesso!",
+        description: `${data.processed} comissões marcadas como pagas`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -123,6 +170,39 @@ export default function FinanceCommissionPayouts() {
     if (selectedCommission) {
       markAsPaidMutation.mutate(selectedCommission.id);
     }
+  };
+
+  // Funções para seleção múltipla
+  const handleSelectCommission = (commissionId: string, checked: boolean) => {
+    const newSelected = new Set(selectedCommissions);
+    if (checked) {
+      newSelected.add(commissionId);
+    } else {
+      newSelected.delete(commissionId);
+    }
+    setSelectedCommissions(newSelected);
+  };
+
+  const handleSelectAll = (commissions: any[], checked: boolean) => {
+    if (checked) {
+      const eligibleIds = commissions
+        .filter(c => ['pending', 'confirmed'].includes(c.status))
+        .map(c => c.id);
+      setSelectedCommissions(new Set(eligibleIds));
+    } else {
+      setSelectedCommissions(new Set());
+    }
+  };
+
+  const handleBulkPayment = () => {
+    if (selectedCommissions.size > 0) {
+      setIsBulkPayDialogOpen(true);
+    }
+  };
+
+  const confirmBulkPayment = () => {
+    const commissionIds = Array.from(selectedCommissions);
+    bulkMarkAsPaidMutation.mutate(commissionIds);
   };
 
   // Calcular estatísticas
@@ -225,10 +305,10 @@ export default function FinanceCommissionPayouts() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Bulk Actions */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -281,6 +361,26 @@ export default function FinanceCommissionPayouts() {
               </Select>
             </div>
           </div>
+          
+          {/* Bulk Actions */}
+          {selectedCommissions.size > 0 && (
+            <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <div className="flex items-center space-x-2">
+                <Check className="h-5 w-5 text-blue-600" />
+                <span className="text-blue-700 font-medium">
+                  {selectedCommissions.size} comissão(ões) selecionada(s)
+                </span>
+              </div>
+              <Button
+                onClick={handleBulkPayment}
+                className="gradient-bg text-white"
+                disabled={bulkMarkAsPaidMutation.isPending}
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                {bulkMarkAsPaidMutation.isPending ? "Processando..." : "Pagar Selecionadas"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -299,6 +399,9 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            selectedCommissions={selectedCommissions}
+            onSelectCommission={handleSelectCommission}
+            onSelectAll={handleSelectAll}
           />
         </TabsContent>
 
@@ -309,6 +412,9 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            selectedCommissions={selectedCommissions}
+            onSelectCommission={handleSelectCommission}
+            onSelectAll={handleSelectAll}
           />
         </TabsContent>
 
@@ -319,6 +425,9 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            selectedCommissions={selectedCommissions}
+            onSelectCommission={handleSelectCommission}
+            onSelectAll={handleSelectAll}
           />
         </TabsContent>
       </Tabs>
@@ -356,6 +465,53 @@ export default function FinanceCommissionPayouts() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Payment Confirmation Dialog */}
+      <Dialog open={isBulkPayDialogOpen} onOpenChange={setIsBulkPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento em Lote</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja marcar {selectedCommissions.size} comissões como pagas?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <div className="text-yellow-600 mt-1">⚠️</div>
+                <div>
+                  <p className="text-yellow-800 font-medium">Atenção</p>
+                  <p className="text-yellow-700 text-sm">
+                    Esta ação marcará {selectedCommissions.size} comissões como pagas e não poderá ser desfeita.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p><strong>Total de comissões:</strong> {selectedCommissions.size}</p>
+              <p><strong>Valor total:</strong> R$ {
+                commissions?.filter((c: any) => selectedCommissions.has(c.id))
+                  .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0)
+                  .toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'
+              }</p>
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsBulkPayDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="gradient-bg text-white"
+                onClick={confirmBulkPayment}
+                disabled={bulkMarkAsPaidMutation.isPending}
+              >
+                {bulkMarkAsPaidMutation.isPending ? "Processando..." : "Confirmar Pagamentos"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -366,14 +522,24 @@ function CommissionsTable({
   getUserName,
   getStatusBadge,
   getTypeIcon,
-  onMarkAsPaid
+  onMarkAsPaid,
+  selectedCommissions,
+  onSelectCommission,
+  onSelectAll
 }: {
   commissions: any[];
   getUserName: (commission: any) => string;
   getStatusBadge: (status: string) => JSX.Element;
   getTypeIcon: (type: string) => JSX.Element;
   onMarkAsPaid: (commission: any) => void;
+  selectedCommissions: Set<string>;
+  onSelectCommission: (id: string, checked: boolean) => void;
+  onSelectAll: (commissions: any[], checked: boolean) => void;
 }) {
+  const eligibleCommissions = commissions?.filter(c => ['pending', 'confirmed'].includes(c.status)) || [];
+  const allEligibleSelected = eligibleCommissions.length > 0 && 
+    eligibleCommissions.every(c => selectedCommissions.has(c.id));
+
   return (
     <Card>
       <CardContent>
@@ -381,6 +547,16 @@ function CommissionsTable({
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={allEligibleSelected}
+                      onCheckedChange={(checked) => onSelectAll(eligibleCommissions, !!checked)}
+                      disabled={eligibleCommissions.length === 0}
+                    />
+                    <span>Selecionar</span>
+                  </div>
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tipo
                 </th>
@@ -408,16 +584,28 @@ function CommissionsTable({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {commissions?.map((commission: any) => (
-                <tr key={commission.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      {getTypeIcon(commission.type)}
-                      <span className="ml-2 capitalize">
-                        {commission.type === 'vendor' ? 'Vendedor' : 'Sócio'}
-                      </span>
-                    </div>
-                  </td>
+              {commissions?.map((commission: any) => {
+                const isEligible = ['pending', 'confirmed'].includes(commission.status);
+                return (
+                  <tr key={commission.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <Checkbox
+                        checked={selectedCommissions.has(commission.id)}
+                        onCheckedChange={(checked) => onSelectCommission(commission.id, !!checked)}
+                        disabled={!isEligible}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        {getTypeIcon(commission.type)}
+                        <span className="ml-2 capitalize">
+                          {commission.type === 'vendor' ? 'Vendedor' : 'Sócio'}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                     {getUserName(commission)}
                   </td>
