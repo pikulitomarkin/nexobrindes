@@ -27,9 +27,23 @@ const clientFormSchema = z.object({
   phone: z.string().min(10, "Telefone inválido").optional(),
   whatsapp: z.string().optional(),
   cpfCnpj: z.string().optional(),
-  address: z.string().optional(),
+  address: z.string().optional(), // Campo legado
   vendorId: z.string().optional(),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  // Novos campos comerciais
+  nomeFantasia: z.string().optional(),
+  razaoSocial: z.string().optional(),
+  inscricaoEstadual: z.string().optional(),
+  logradouro: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().optional(),
+  cep: z.string().optional(),
+  emailBoleto: z.string().email("Email inválido").optional().or(z.literal("")),
+  emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
+  nomeContato: z.string().optional(),
+  emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -85,6 +99,20 @@ export default function AdminClients() {
       address: "",
       vendorId: "",
       password: "",
+      // Novos campos comerciais
+      nomeFantasia: "",
+      razaoSocial: "",
+      inscricaoEstadual: "",
+      logradouro: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      cep: "",
+      emailBoleto: "",
+      emailNF: "",
+      nomeContato: "",
+      emailContato: "",
     },
   });
 
@@ -214,110 +242,300 @@ export default function AdminClients() {
                   </div>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Completo *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="João Silva" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Informações Básicas */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Informações Básicas</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome do Contato *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="João Silva" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Senha de Acesso *</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="Digite uma senha" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      <p className="text-xs text-gray-600">Senha que o cliente usará para acessar o sistema</p>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Senha de Acesso *</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Digite uma senha" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-gray-600">Senha que o cliente usará para acessar o sistema</p>
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="nomeFantasia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome Fantasia</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Empresa Ltda" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="razaoSocial"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome/Razão Social</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Empresa Comercial Ltda" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="cpfCnpj"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CPF/CNPJ</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123.456.789-00 ou 00.000.000/0001-00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="inscricaoEstadual"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Inscrição Estadual</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123.456.789.012 (se for Indústria ou Comércio)" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço Completo */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Endereço Completo</h3>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="logradouro"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Logradouro/Rua</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Rua das Flores" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="numero"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="complemento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apto 45, Bloco B" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="cidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input placeholder="São Paulo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="cep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP</FormLabel>
+                          <FormControl>
+                            <Input placeholder="01234-567" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Contato */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(11) 99999-9999" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="whatsapp"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>WhatsApp</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(11) 99999-9999" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="nomeContato"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome do Contato</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome da pessoa de contato" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="emailContato"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail do Contato</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="contato@empresa.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* E-mails Comerciais */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">E-mails Comerciais</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="emailBoleto"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail para Envio de Boleto</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="financeiro@empresa.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="emailNF"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail para Envio de NF</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="nf@empresa.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>E-mail Principal</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="joao@email.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Telefone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} />
+                          <Input type="email" placeholder="contato@empresa.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="whatsapp"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>WhatsApp</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="cpfCnpj"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CPF/CNPJ</FormLabel>
-                        <FormControl>
-                          <Input placeholder="123.456.789-00" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Endereço Completo</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Rua das Flores, 123, Centro, São Paulo, SP"
-                          rows={3}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -582,59 +800,133 @@ export default function AdminClients() {
                 if (!client) return null;
 
                 return (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-6">
+                    {/* Informações Básicas */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Nome:</label>
-                      <p className="text-sm text-gray-900">{client.name}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Informações Básicas</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
+                          <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {(() => {
+                              const code = client.userCode ?? 
+                                          client.code ?? 
+                                          client.loginCode ?? 
+                                          client.accessCode ?? 
+                                          null;
+                              return code ?? 'N/A';
+                            })()}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome Fantasia:</label>
+                          <p className="text-sm text-gray-900">{client.nomeFantasia || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Razão Social:</label>
+                          <p className="text-sm text-gray-900">{client.razaoSocial || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
+                          <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Inscrição Estadual:</label>
+                          <p className="text-sm text-gray-900">{client.inscricaoEstadual || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Endereço Completo */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
-                      <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {(() => {
-                          const code = client.userCode ?? 
-                                      client.code ?? 
-                                      client.loginCode ?? 
-                                      client.accessCode ?? 
-                                      null;
-                          return code ?? 'N/A';
-                        })()}
-                      </p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Completo</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.logradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.numero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.complemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.bairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.cidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.cep || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Contato */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Email:</label>
-                      <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Contato</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Telefone:</label>
+                          <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
+                          <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.nomeContato || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.emailContato || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* E-mails Comerciais */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Telefone:</label>
-                      <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">E-mails Comerciais</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail Principal:</label>
+                          <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail para Boleto:</label>
+                          <p className="text-sm text-gray-900">{client.emailBoleto || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail para NF:</label>
+                          <p className="text-sm text-gray-900">{client.emailNF || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Estatísticas */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
-                      <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
-                      <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium text-gray-600">Endereço:</label>
-                      <p className="text-sm text-gray-900">{client.address || 'N/A'}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
-                      <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
-                      <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Estatísticas</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
+                          <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
+                          <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

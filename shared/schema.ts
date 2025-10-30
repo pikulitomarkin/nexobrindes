@@ -21,14 +21,27 @@ export const users = pgTable("users", {
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
-  name: text("name").notNull(),
+  name: text("name").notNull(), // Nome de contato
   email: text("email"),
   phone: text("phone"),
   whatsapp: text("whatsapp"),
   cpfCnpj: text("cpf_cnpj"),
-  address: text("address"),
+  address: text("address"), // Campo legado - manter para compatibilidade
   vendorId: varchar("vendor_id").references(() => users.id), // Vendedor responsável
-  // branchId removido - filial vai no pedido/orçamento
+  // Novos campos comerciais
+  nomeFantasia: text("nome_fantasia"), // Nome Fantasia
+  razaoSocial: text("razao_social"), // Nome/Razão Social
+  inscricaoEstadual: text("inscricao_estadual"), // Inscrição Estadual
+  logradouro: text("logradouro"), // Logradouro/Rua
+  numero: text("numero"), // Número
+  complemento: text("complemento"), // Complemento
+  bairro: text("bairro"), // Bairro
+  cidade: text("cidade"), // Cidade
+  cep: text("cep"), // CEP
+  emailBoleto: text("email_boleto"), // E-Mail para Envio de Boleto
+  emailNF: text("email_nf"), // E-Mail para Envio de NF
+  nomeContato: text("nome_contato"), // Nome do contato
+  emailContato: text("email_contato"), // Endereço de e-mail do contato
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

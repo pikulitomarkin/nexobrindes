@@ -29,6 +29,20 @@ const clientFormSchema = z.object({
   cpfCnpj: z.string().optional(),
   address: z.string().optional(),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  // Novos campos comerciais
+  nomeFantasia: z.string().optional(),
+  razaoSocial: z.string().optional(),
+  inscricaoEstadual: z.string().optional(),
+  logradouro: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().optional(),
+  cep: z.string().optional(),
+  emailBoleto: z.string().email("Email inválido").optional().or(z.literal("")),
+  emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
+  nomeContato: z.string().optional(),
+  emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -85,6 +99,20 @@ export default function VendorClients() {
       cpfCnpj: "",
       address: "",
       password: "",
+      // Novos campos comerciais
+      nomeFantasia: "",
+      razaoSocial: "",
+      inscricaoEstadual: "",
+      logradouro: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      cep: "",
+      emailBoleto: "",
+      emailNF: "",
+      nomeContato: "",
+      emailContato: "",
     },
   });
 
