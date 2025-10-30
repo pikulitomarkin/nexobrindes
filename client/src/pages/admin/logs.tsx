@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
   Activity, 
   Search, 
@@ -19,10 +21,15 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Info
+  Info,
+  Archive,
+  Trash2,
+  FileSpreadsheet,
+  Database
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import * as XLSX from 'xlsx';
 
 export default function AdminLogs() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,6 +67,45 @@ export default function AdminLogs() {
     },
   });
 
+  // Buscar backups de logs
+  const { data: backups = [], isLoading: backupsLoading, refetch: refetchBackups } = useQuery({
+    queryKey: ["/api/admin/logs/backups"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/logs/backups");
+      if (!response.ok) throw new Error("Erro ao buscar backups");
+      return response.json();
+    },
+  });
+
+  // Criar backup manual
+  const createBackupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/logs/backup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) throw new Error("Erro ao criar backup");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs/backups"] });
+      refetch(); // Refresh logs
+      toast({
+        title: "Backup criado",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao criar backup",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Exportar logs
   const exportLogsMutation = useMutation({
     mutationFn: async () => {
@@ -71,7 +117,7 @@ export default function AdminLogs() {
         date: dateFilter,
         export: "true"
       });
-      const response = await fetch(`/api/admin/logs/export?${params}`);
+      const response = await fetch(`/api/admin/logs?${params}`);
       if (!response.ok) throw new Error("Erro ao exportar logs");
       
       const blob = await response.blob();
@@ -93,6 +139,74 @@ export default function AdminLogs() {
     onError: (error: any) => {
       toast({
         title: "Erro ao exportar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Baixar backup como Excel
+  const downloadBackupMutation = useMutation({
+    mutationFn: async (backupId: string) => {
+      const response = await fetch(`/api/admin/logs/backups/${backupId}/download`);
+      if (!response.ok) throw new Error("Erro ao baixar backup");
+      const data = await response.json();
+      
+      // Create Excel file
+      const ws = XLSX.utils.json_to_sheet(data.data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Logs");
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 20 }, // Data
+        { wch: 20 }, // Usuário
+        { wch: 15 }, // Ação
+        { wch: 10 }, // Nível
+        { wch: 50 }, // Descrição
+        { wch: 30 }, // Detalhes
+        { wch: 15 }, // IP
+        { wch: 30 }  // User Agent
+      ];
+      ws['!cols'] = colWidths;
+      
+      XLSX.writeFile(wb, data.fileName);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Backup baixado",
+        description: `Arquivo ${data.fileName} baixado com sucesso.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao baixar backup",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Excluir backup
+  const deleteBackupMutation = useMutation({
+    mutationFn: async (backupId: string) => {
+      const response = await fetch(`/api/admin/logs/backups/${backupId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Erro ao excluir backup");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/logs/backups"] });
+      toast({
+        title: "Backup excluído",
+        description: "O backup foi excluído com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao excluir backup",
         description: error.message,
         variant: "destructive",
       });
@@ -201,12 +315,16 @@ export default function AdminLogs() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Logs do Sistema</h1>
-          <p className="text-gray-600">Auditoria completa de todas as ações realizadas no sistema</p>
+          <p className="text-gray-600">Auditoria completa e backups automáticos dos logs do sistema</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
+          </Button>
+          <Button variant="outline" onClick={() => createBackupMutation.mutate()} disabled={createBackupMutation.isPending}>
+            <Archive className="h-4 w-4 mr-2" />
+            Criar Backup
           </Button>
           <Button onClick={() => exportLogsMutation.mutate()}>
             <Download className="h-4 w-4 mr-2" />
@@ -214,6 +332,20 @@ export default function AdminLogs() {
           </Button>
         </div>
       </div>
+
+      <Tabs defaultValue="logs" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="logs">
+            <Activity className="h-4 w-4 mr-2" />
+            Logs Atuais
+          </TabsTrigger>
+          <TabsTrigger value="backups">
+            <Database className="h-4 w-4 mr-2" />
+            Backups ({backups.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="logs" className="space-y-6">
 
       {/* Estatísticas Rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -365,65 +497,172 @@ export default function AdminLogs() {
       </Card>
 
       {/* Lista de Logs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Logs do Sistema ({filteredLogs.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredLogs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Nenhum log encontrado com os filtros aplicados.
-              </div>
-            ) : (
-              filteredLogs.map((log: any) => {
-                const { icon: LevelIcon, color: levelColor } = getLogLevelIcon(log.level);
-                
-                return (
-                  <div key={log.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-full ${levelColor}`}>
-                        <LevelIcon className="h-4 w-4" />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge className={getActionColor(log.action)}>
-                            {translateAction(log.action)}
-                          </Badge>
-                          <span className="text-sm text-gray-600">
-                            por <strong>{log.userName}</strong>
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {formatDate(log.createdAt)}
-                          </span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Logs do Sistema ({filteredLogs.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {filteredLogs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Nenhum log encontrado com os filtros aplicados.
+                </div>
+              ) : (
+                filteredLogs.map((log: any) => {
+                  const { icon: LevelIcon, color: levelColor } = getLogLevelIcon(log.level);
+                  
+                  return (
+                    <div key={log.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-full ${levelColor}`}>
+                          <LevelIcon className="h-4 w-4" />
                         </div>
                         
-                        <p className="text-gray-900 mb-1">{log.description}</p>
-                        
-                        {log.details && (
-                          <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded mt-2">
-                            <strong>Detalhes:</strong> {log.details}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className={getActionColor(log.action)}>
+                              {translateAction(log.action)}
+                            </Badge>
+                            <span className="text-sm text-gray-600">
+                              por <strong>{log.userName}</strong>
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {formatDate(log.createdAt)}
+                            </span>
                           </div>
-                        )}
-                        
-                        {log.ipAddress && (
-                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                            <span>IP: {log.ipAddress}</span>
-                            {log.userAgent && (
-                              <span>User Agent: {log.userAgent.substring(0, 50)}...</span>
-                            )}
-                          </div>
-                        )}
+                          
+                          <p className="text-gray-900 mb-1">{log.description}</p>
+                          
+                          {log.details && (
+                            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded mt-2">
+                              <strong>Detalhes:</strong> {log.details}
+                            </div>
+                          )}
+                          
+                          {log.ipAddress && (
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                              <span>IP: {log.ipAddress}</span>
+                              {log.userAgent && (
+                                <span>User Agent: {log.userAgent.substring(0, 50)}...</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        </TabsContent>
+
+        <TabsContent value="backups" className="space-y-6">
+          {/* Informações sobre Backups */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Backup Automático de Logs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Sistema de Backup Automático</p>
+                    <p>• Os logs são automaticamente arquivados a cada 7 dias</p>
+                    <p>• Logs antigos são removidos do sistema após o backup</p>
+                    <p>• Todos os backups ficam disponíveis para download em formato Excel</p>
+                    <p>• Use "Criar Backup" para gerar um backup manual dos logs atuais</p>
                   </div>
-                );
-              })
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Backups */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Arquivos de Backup ({backups.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {backupsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">Carregando backups...</p>
+                </div>
+              ) : backups.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Archive className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                  <p className="text-lg font-medium">Nenhum backup encontrado</p>
+                  <p className="text-sm">Os backups serão criados automaticamente a cada 7 dias</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {backups.map((backup: any) => (
+                    <div key={backup.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-green-50">
+                            <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-gray-900">
+                              Backup - {new Date(backup.backupDate).toLocaleDateString('pt-BR')}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {backup.logCount.toLocaleString()} logs • 
+                              Criado em {new Date(backup.createdAt).toLocaleString('pt-BR')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={backup.status === 'completed' ? 'default' : 'secondary'}>
+                            {backup.status === 'completed' ? 'Completo' : backup.status}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadBackupMutation.mutate(backup.id)}
+                            disabled={downloadBackupMutation.isPending}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Excel
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir Backup</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir este backup? Esta ação não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteBackupMutation.mutate(backup.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -102,7 +102,7 @@ export const productionOrders = pgTable("production_orders", {
   lastNoteAt: timestamp("last_note_at"),
   trackingCode: text("tracking_code"), // Código de rastreamento
   shippingAddress: text("shipping_address"), // Endereço de envio
-  
+
   // Campos financeiros para pagamento do produtor
   producerValue: decimal("producer_value", { precision: 10, scale: 2 }), // Valor que o produtor cobrará
   producerValueLocked: boolean("producer_value_locked").default(false), // Se true, valor não pode ser alterado
@@ -495,6 +495,16 @@ export const systemLogs = pgTable("system_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const logBackups = pgTable("log_backups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  backupDate: timestamp("backup_date").notNull(),
+  logCount: integer("log_count").notNull(),
+  excelData: text("excel_data").notNull(), // JSON string with Excel data
+  status: text("status").notNull().default("pending"), // pending, completed, failed
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id).default('system'),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -526,6 +536,7 @@ export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({
 export const insertQuoteRequestItemSchema = createInsertSchema(quoteRequestItems).omit({ id: true, createdAt: true });
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({ id: true, createdAt: true });
+export const insertLogBackupSchema = createInsertSchema(logBackups).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -586,3 +597,5 @@ export type Branch = typeof branches.$inferSelect;
 export type InsertBranch = z.infer<typeof insertBranchSchema>;
 export type SystemLog = typeof systemLogs.$inferSelect;
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
+export type LogBackup = typeof logBackups.$inferSelect;
+export type InsertLogBackup = z.infer<typeof insertLogBackupSchema>;

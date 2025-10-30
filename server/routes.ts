@@ -3786,6 +3786,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get system logs with filters
+  app.get("/api/admin/logs", async (req, res) => {
+    try {
+      const { search, action, user, level, date, export: isExport } = req.query as {
+        search?: string;
+        action?: string;
+        user?: string;
+        level?: string;
+        date?: string;
+        export?: string;
+      };
+
+      const logs = await storage.getSystemLogs({
+        search,
+        action: action === 'all' ? undefined : action,
+        userId: user === 'all' ? undefined : user,
+        level: level === 'all' ? undefined : level,
+        dateFilter: date === 'all' ? undefined : date
+      });
+
+      if (isExport === 'true') {
+        // Return CSV format for export
+        const csvHeaders = 'Data,Usuário,Ação,Nível,Descrição,Detalhes,IP,User Agent\n';
+        const csvData = logs.map((log: any) => {
+          const date = new Date(log.createdAt).toLocaleString('pt-BR');
+          const details = (log.details || '').replace(/"/g, '""');
+          const description = (log.description || '').replace(/"/g, '""');
+          const userAgent = (log.userAgent || '').replace(/"/g, '""');
+          
+          return `"${date}","${log.userName}","${log.action}","${log.level}","${description}","${details}","${log.ipAddress || ''}","${userAgent}"`;
+        }).join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=logs-sistema-${new Date().toISOString().split('T')[0]}.csv`);
+        res.send(csvHeaders + csvData);
+      } else {
+        res.json(logs);
+      }
+    } catch (error) {
+      console.error("Error fetching system logs:", error);
+      res.status(500).json({ error: "Failed to fetch system logs" });
+    }
+  });
+
+  // Create backup of logs
+  app.post("/api/admin/logs/backup", async (req, res) => {
+    try {
+      console.log("Creating logs backup...");
+
+      // Get all logs from the last 7 days
+      const logs = await storage.getSystemLogs({
+        dateFilter: 'week'
+      });
+
+      if (logs.length === 0) {
+        return res.json({
+          success: true,
+          message: "Nenhum log encontrado para backup",
+          backupId: null
+        });
+      }
+
+      // Create backup record
+      const backupDate = new Date();
+      const backupId = `backup-${backupDate.getTime()}`;
+      
+      // Generate Excel data
+      const excelData = logs.map((log: any) => ({
+        'Data': new Date(log.createdAt).toLocaleString('pt-BR'),
+        'Usuário': log.userName,
+        'Ação': log.action,
+        'Nível': log.level,
+        'Descrição': log.description || '',
+        'Detalhes': log.details || '',
+        'IP': log.ipAddress || '',
+        'User Agent': log.userAgent || ''
+      }));
+
+      // Store backup info
+      const backup = await storage.createLogBackup({
+        id: backupId,
+        backupDate: backupDate,
+        logCount: logs.length,
+        excelData: JSON.stringify(excelData),
+        status: 'completed'
+      });
+
+      // Clean old logs (older than 7 days)
+      await storage.cleanOldLogs(7);
+
+      console.log(`Backup created: ${backupId} with ${logs.length} logs`);
+
+      res.json({
+        success: true,
+        backup: backup,
+        message: `Backup criado com sucesso! ${logs.length} logs arquivados.`
+      });
+    } catch (error) {
+      console.error("Error creating logs backup:", error);
+      res.status(500).json({ error: "Erro ao criar backup de logs: " + error.message });
+    }
+  });
+
+  // Get log backups list
+  app.get("/api/admin/logs/backups", async (req, res) => {
+    try {
+      const backups = await storage.getLogBackups();
+      res.json(backups);
+    } catch (error) {
+      console.error("Error fetching log backups:", error);
+      res.status(500).json({ error: "Failed to fetch log backups" });
+    }
+  });
+
+  // Download log backup as Excel
+  app.get("/api/admin/logs/backups/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const backup = await storage.getLogBackup(id);
+
+      if (!backup) {
+        return res.status(404).json({ error: "Backup não encontrado" });
+      }
+
+      const excelData = JSON.parse(backup.excelData);
+      
+      // Set headers for Excel download
+      const fileName = `logs-backup-${new Date(backup.backupDate).toISOString().split('T')[0]}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Send Excel data as JSON (frontend will handle Excel generation)
+      res.json({
+        success: true,
+        data: excelData,
+        fileName: fileName,
+        backupInfo: {
+          date: backup.backupDate,
+          logCount: backup.logCount
+        }
+      });
+    } catch (error) {
+      console.error("Error downloading log backup:", error);
+      res.status(500).json({ error: "Erro ao baixar backup: " + error.message });
+    }
+  });
+
+  // Delete log backup
+  app.delete("/api/admin/logs/backups/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteLogBackup(id);
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Backup não encontrado" });
+      }
+
+      res.json({ success: true, message: "Backup excluído com sucesso" });
+    } catch (error) {
+      console.error("Error deleting log backup:", error);
+      res.status(500).json({ error: "Erro ao excluir backup: " + error.message });
+    }
+  });
+
   // Get all accounts receivable (orders + manual)
   app.get("/api/finance/receivables", async (req, res) => {
     try {
