@@ -23,9 +23,27 @@ const requireAuth = async (req: any, res: any, next: any) => {
   // For now, we'll just log and proceed to simulate authentication success.
   console.log("Simulating authentication check...");
 
-  // Mock req.user for routes that need it
-  // This should be populated based on the actual authenticated user
-  req.user = { id: 'mock-user-id', role: 'admin' }; // Example user
+  // Try to get user from token if available
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    try {
+      const decoded = Buffer.from(token, 'base64').toString();
+      const [userId] = decoded.split(':');
+      if (userId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          req.user = user;
+        }
+      }
+    } catch (e) {
+      // If token parsing fails, continue without user context
+    }
+  }
+
+  // Fallback: Mock req.user for routes that need it if no valid user found
+  if (!req.user) {
+    req.user = null; // Set to null instead of mock data
+  }
 
   // Example: If you have a token verification middleware, it would look something like this:
   /*
@@ -2820,23 +2838,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log producer creation
-      await storage.logUserAction(
-        req.user?.id || 'admin-1',
-        req.user?.name || 'Administrador',
-        req.user?.role || 'admin',
-        'CREATE',
-        'users',
-        user.id,
-        `Produtor criado: ${user.name} - Usuário: ${user.username}`,
-        'success',
-        {
-          userName: user.name,
-          username: user.username,
-          role: user.role,
-          specialty: user.specialty
+      // Log producer creation - only if we have a valid user
+      if (req.user?.id) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Sistema',
+            req.user.role || 'system',
+            'CREATE',
+            'users',
+            user.id,
+            `Produtor criado: ${user.name} - Usuário: ${user.username}`,
+            'success',
+            {
+              userName: user.name,
+              username: user.username,
+              role: user.role,
+              specialty: user.specialty
+            }
+          );
+        } catch (logError) {
+          console.log('Warning: Could not log producer creation:', logError.message);
+          // Continue without failing the producer creation
         }
-      );
+      }
 
       console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
 
