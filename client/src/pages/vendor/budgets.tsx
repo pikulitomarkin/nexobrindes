@@ -497,16 +497,17 @@ export default function VendorBudgets() {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
   const [convertClientId, setConvertClientId] = useState("");
-  const [convertProducerId, setConvertProducerId] = useState("");
+  const [convertProducerId, setConvertProducerId] = useState(""); // This state is not used in the current logic, but kept for potential future use.
+  const [convertDeliveryDate, setConvertDeliveryDate] = useState(""); // State for delivery date input
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
   const [budgetToView, setBudgetToView] = useState<any>(null);
 
   const convertToOrderMutation = useMutation({
-    mutationFn: async ({ budgetId, clientId, producerId }: { budgetId: string; clientId: string; producerId: string }) => {
+    mutationFn: async ({ budgetId, clientId, deliveryDate }: { budgetId: string; clientId: string; deliveryDate: string }) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ clientId, deliveryDate }), // Include deliveryDate
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -524,7 +525,8 @@ export default function VendorBudgets() {
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
       setConvertClientId("");
-      setConvertProducerId("");
+      setConvertProducerId(""); // Reset producerId as well
+      setConvertDeliveryDate(""); // Reset delivery date
       toast({
         title: "Sucesso!",
         description: "Orçamento convertido em pedido com sucesso",
@@ -566,11 +568,11 @@ export default function VendorBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert && convertClientId) {
+    if (budgetToConvert && convertClientId && convertDeliveryDate) { // Added convertDeliveryDate validation
       convertToOrderMutation.mutate({
         budgetId: budgetToConvert,
         clientId: convertClientId,
-        producerId: '' // Empty since producers are already defined in budget items
+        deliveryDate: convertDeliveryDate, // Pass deliveryDate
       });
     }
   };
@@ -2576,7 +2578,7 @@ export default function VendorBudgets() {
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Para converter em pedido, é necessário associar um cliente cadastrado. Os produtores já estão definidos pelos produtos do orçamento.
+              Para converter em pedido, é necessário associar um cliente cadastrado e definir a data de entrega.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2592,6 +2594,18 @@ export default function VendorBudgets() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            {/* Input for Delivery Date */}            
+            <div>
+              <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
+              <Input
+                id="convert-delivery-date"
+                type="date"
+                value={convertDeliveryDate}
+                onChange={(e) => setConvertDeliveryDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+              />
             </div>
 
             {/* Show producers involved in this budget */}            
@@ -2636,7 +2650,8 @@ export default function VendorBudgets() {
                 setConvertDialogOpen(false);
                 setBudgetToConvert(null);
                 setConvertClientId("");
-                setConvertProducerId("");
+                setConvertProducerId(""); // Reset producerId as well
+                setConvertDeliveryDate(""); // Reset delivery date
               }}
               className="flex-1"
             >
@@ -2644,10 +2659,10 @@ export default function VendorBudgets() {
             </Button>
             <Button
               onClick={handleConfirmConvert}
-              disabled={convertToOrderMutation.isPending || !convertClientId}
-              className="flex-1"
+              disabled={convertToOrderMutation.isPending || !convertClientId || !convertDeliveryDate} // Added convertDeliveryDate validation
+              className="flex-1 gradient-bg text-white"
             >
-              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter e Enviar'}
+              {convertToOrderMutation.isPending ? "Convertendo..." : "Converter em Pedido"}
             </Button>
           </div>
         </DialogContent>

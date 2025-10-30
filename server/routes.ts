@@ -3850,7 +3850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const details = (log.details || '').replace(/"/g, '""');
           const description = (log.description || '').replace(/"/g, '""');
           const userAgent = (log.userAgent || '').replace(/"/g, '""');
-          
+
           return `"${date}","${log.userName}","${log.action}","${log.level}","${description}","${details}","${log.ipAddress || ''}","${userAgent}"`;
         }).join('\n');
 
@@ -3887,7 +3887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create backup record
       const backupDate = new Date();
       const backupId = `backup-${backupDate.getTime()}`;
-      
+
       // Generate Excel data
       const excelData = logs.map((log: any) => ({
         'Data': new Date(log.createdAt).toLocaleString('pt-BR'),
@@ -3947,7 +3947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const excelData = JSON.parse(backup.excelData);
-      
+
       // Set headers for Excel download
       const fileName = `logs-backup-${new Date(backup.backupDate).toISOString().split('T')[0]}.xlsx`;
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -6154,19 +6154,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
       const { id } = req.params;
-      const { producerId } = req.body;
+      const { clientId, deliveryDate } = req.body;
 
-      console.log(`Converting budget ${id} to order for client ${req.body.clientId}`);
-
-      const order = await storage.convertBudgetToOrder(id, producerId);
-      if (!order) {
-        return res.status(404).json({ error: "Orçamento não encontrado" });
+      if (!clientId) {
+        return res.status(400).json({ error: "Cliente é obrigatório para conversão" });
       }
 
+      if (!deliveryDate) {
+        return res.status(400).json({ error: "Prazo de entrega é obrigatório para conversão" });
+      }
+
+      console.log(`Converting budget ${id} to order with client: ${clientId} and delivery date: ${deliveryDate}`);
+
+      const order = await storage.convertBudgetToOrder(id, clientId, deliveryDate);
+
+      // Update budget status
+      await storage.updateBudget(id, { status: 'converted' });
+
+      console.log(`Budget ${id} converted to order: ${order.id}`);
       res.json(order);
     } catch (error) {
-      console.error("Error converting budget to order:", error.message);
-      res.status(500).json({ error: "Erro ao converter orçamento em pedido: " + (error?.message || 'Erro desconhecido') });
+      console.error("Error converting budget to order:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

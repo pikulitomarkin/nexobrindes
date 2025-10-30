@@ -246,6 +246,10 @@ export default function AdminBudgets() {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
   const [selectedProducer, setSelectedProducer] = useState<string>("");
+  const [convertClientId, setConvertClientId] = useState("");
+  const [convertDeliveryDate, setConvertDeliveryDate] = useState("");
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+
 
   const { data: producers } = useQuery({
     queryKey: ["/api/producers"],
@@ -257,11 +261,11 @@ export default function AdminBudgets() {
   });
 
   const convertToOrderMutation = useMutation({
-    mutationFn: async ({ budgetId, producerId }: { budgetId: string; producerId: string }) => {
+    mutationFn: async ({ budgetId, clientId, deliveryDate }: { budgetId: string; clientId: string; deliveryDate: string }) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ producerId }),
+        body: JSON.stringify({ producerId: selectedProducer, clientId, deliveryDate }),
       });
       if (!response.ok) throw new Error("Erro ao converter para pedido");
       return response.json();
@@ -271,6 +275,9 @@ export default function AdminBudgets() {
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
       setSelectedProducer("");
+      setConvertClientId("");
+      setConvertDeliveryDate("");
+      setClientSearchTerm("");
       toast({
         title: "Sucesso!",
         description: "Orçamento convertido em pedido e enviado para o produtor",
@@ -348,14 +355,14 @@ export default function AdminBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert && selectedProducer) {
-      convertToOrderMutation.mutate({ budgetId: budgetToConvert, producerId: selectedProducer });
+    if (budgetToConvert && selectedProducer && convertClientId && convertDeliveryDate) {
+      convertToOrderMutation.mutate({ budgetId: budgetToConvert, clientId: convertClientId, deliveryDate: convertDeliveryDate });
     }
   };
 
   const handleAdminBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validar produtos obrigatórios
     if (adminBudgetForm.items.length === 0) {
       toast({
@@ -547,13 +554,13 @@ export default function AdminBudgets() {
                       try {
                         const days = parseInt(value);
                         if (isNaN(days)) return;
-                        
+
                         const today = new Date();
                         const deliveryDate = new Date(today);
                         deliveryDate.setDate(today.getDate() + days);
-                        
+
                         if (isNaN(deliveryDate.getTime())) return;
-                        
+
                         setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
                       } catch (error) {
                         console.error('Error setting delivery deadline:', error);
@@ -1454,10 +1461,52 @@ export default function AdminBudgets() {
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Selecione o produtor que receberá este pedido para produção.
+              Selecione o cliente e o prazo de entrega para o pedido.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="client-search">Buscar Cliente</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  id="client-search"
+                  placeholder="Digite o nome do cliente para buscar..."
+                  value={clientSearchTerm}
+                  onChange={(e) => setClientSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <Select value={convertClientId} onValueChange={setConvertClientId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients
+                  ?.filter((client: any) =>
+                    client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                  )
+                  .map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            <div>
+              <Label htmlFor="delivery-date">Prazo de Entrega *</Label>
+              <Input
+                id="delivery-date"
+                type="date"
+                value={convertDeliveryDate}
+                onChange={(e) => setConvertDeliveryDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                required
+              />
+            </div>
+
             <div>
               <Label htmlFor="producer-select">Produtor Responsável</Label>
               <Select value={selectedProducer} onValueChange={setSelectedProducer}>
@@ -1474,26 +1523,26 @@ export default function AdminBudgets() {
               </Select>
             </div>
           </div>
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setConvertDialogOpen(false);
-                setBudgetToConvert(null);
-                setSelectedProducer("");
-              }}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmConvert}
-              disabled={convertToOrderMutation.isPending || !selectedProducer}
-              className="flex-1"
-            >
-              {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter e Enviar'}
-            </Button>
-          </div>
+          <div className="flex justify-end space-x-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setConvertDialogOpen(false);
+                  setBudgetToConvert(null);
+                  setConvertClientId("");
+                  setConvertDeliveryDate("");
+                  setClientSearchTerm("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleConfirmConvert}
+                disabled={!convertClientId || !convertDeliveryDate || !selectedProducer || convertToOrderMutation.isPending}
+              >
+                {convertToOrderMutation.isPending ? "Convertendo..." : "Converter"}
+              </Button>
+            </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -167,7 +167,7 @@ export interface IStorage {
   createBudget(budgetData: any): Promise<any>;
   updateBudget(id: string, budgetData: any): Promise<any>;
   deleteBudget(id: string): Promise<boolean>;
-  convertBudgetToOrder(budgetId: string, producerId?: string): Promise<any>;
+  convertBudgetToOrder(budgetId: string, clientId?: string, deliveryDate?: string): Promise<any>;
 
   // Budget Items
   getBudgetItems(budgetId: string): Promise<any[]>;
@@ -3097,7 +3097,7 @@ export class MemStorage implements IStorage {
     return this.budgets.delete(id);
   }
 
-  async convertBudgetToOrder(budgetId: string, clientId?: string): Promise<Order> {
+  async convertBudgetToOrder(budgetId: string, clientId?: string, deliveryDate?: string): Promise<Order> {
     const budget = this.budgets.get(budgetId);
     if (!budget) {
       throw new Error("Orçamento não encontrado");
@@ -3221,13 +3221,16 @@ export class MemStorage implements IStorage {
       description: budget.description || '',
       totalValue: finalTotalValue,
       status: 'confirmed',
-      deadline: budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null,
+      deadline: deliveryDate ? new Date(deliveryDate) : (budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null),
 
       // Contact info from budget
       contactName: budget.contactName,
-      contactPhone: budget.contactPhone || '',
-      contactEmail: budget.contactEmail || '',
+      contactPhone: budget.contactPhone,
+      contactEmail: budget.contactEmail,
+
+      // Delivery info from budget with official delivery date
       deliveryType: budget.deliveryType || 'delivery',
+      deliveryDeadline: deliveryDate ? new Date(deliveryDate) : (budget.deliveryDeadline ? new Date(budget.deliveryDeadline) : null),
 
       // Payment info from budget
       paymentMethodId: budgetPaymentInfo?.paymentMethodId || '',
