@@ -970,16 +970,26 @@ export class PgStorage implements IStorage {
       .orderBy(desc(schema.budgets.createdAt));
   }
 
-  async createBudget(budgetData: InsertBudget): Promise<Budget> {
+  async createBudget(budgetData: any): Promise<Budget> {
     // Convert string dates to Date objects if they exist
     const processedData: any = { ...budgetData };
 
-    if (processedData.validUntil && typeof processedData.validUntil === 'string') {
-      processedData.validUntil = new Date(processedData.validUntil);
+    // Handle validUntil
+    if (processedData.validUntil) {
+      if (typeof processedData.validUntil === 'string') {
+        processedData.validUntil = new Date(processedData.validUntil);
+      } else if (!(processedData.validUntil instanceof Date)) {
+        processedData.validUntil = new Date(processedData.validUntil);
+      }
     }
 
-    if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
-      processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    // Handle deliveryDeadline  
+    if (processedData.deliveryDeadline) {
+      if (typeof processedData.deliveryDeadline === 'string') {
+        processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+      } else if (!(processedData.deliveryDeadline instanceof Date)) {
+        processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+      }
     }
 
     // Generate unique budget number using database sequence

@@ -889,6 +889,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create budget endpoint
+  app.post("/api/budgets", async (req, res) => {
+    try {
+      const budgetData = req.body;
+      console.log("[CREATE BUDGET] Received budget data:", JSON.stringify(budgetData, null, 2));
+
+      // Validate required fields
+      if (!budgetData.contactName) {
+        return res.status(400).json({ error: "Nome de contato é obrigatório" });
+      }
+
+      if (!budgetData.vendorId) {
+        return res.status(400).json({ error: "Vendedor é obrigatório" });
+      }
+
+      if (!budgetData.title) {
+        return res.status(400).json({ error: "Título é obrigatório" });
+      }
+
+      // Fix branchId if it's "matriz" - replace with actual branch ID
+      if (budgetData.branchId === 'matriz' || !budgetData.branchId) {
+        const branches = await storage.getBranches();
+        if (branches && branches.length > 0) {
+          budgetData.branchId = branches[0].id;
+          console.log(`[CREATE BUDGET] Replaced branchId 'matriz' with real branch ID: ${budgetData.branchId}`);
+        }
+      }
+
+      // Validate and process items
+      let processedItems = [];
+      if (budgetData.items && Array.isArray(budgetData.items)) {
+        console.log(`[CREATE BUDGET] Received ${budgetData.items.length} items from frontend`);
+        
+        // Validar personalizações antes de criar o orçamento
+        console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(budgetData.items, null, 2));
+
+        for (const item of budgetData.items) {
+          console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
+
+          if (item.hasItemCustomization && item.selectedCustomizationId) {
+            const customizations = await storage.getCustomizationOptions();
+            const customization = customizations.find(c => c.id === item.selectedCustomizationId);
+
+            if (customization) {
+              const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+              const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
+
+              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+
+              if (itemQty < minQty) {
+                return res.status(400).json({
+                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item "${item.productName}" tem apenas ${itemQty} unidades.`
+                });
+              }
+            }
+          }
+        }
+
+        // Process items for creation
+        processedItems = budgetData.items.map((item: any) => ({
+          productId: item.productId,
+          productName: item.productName,
+          producerId: item.producerId || 'internal',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || null,
+          itemCustomizationValue: item.itemCustomizationValue || 0,
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          additionalCustomizationNotes: item.additionalCustomizationNotes || null,
+          customizationPhoto: item.customizationPhoto || null,
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || null,
+          generalCustomizationValue: item.generalCustomizationValue || 0,
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || 'percentage',
+          itemDiscountPercentage: item.itemDiscountPercentage || 0,
+          itemDiscountValue: item.itemDiscountValue || 0,
+          productWidth: item.productWidth || null,
+          productHeight: item.productHeight || null,
+          productDepth: item.productDepth || null
+        }));
+
+        console.log(`[CREATE BUDGET] Items received:`, processedItems.map(item => ({
+          productId: item.productId,
+          producerId: item.producerId,
+          quantity: item.quantity,
+          hasGeneralCustomization: item.hasGeneralCustomization,
+          generalCustomizationName: item.generalCustomizationName
+        })));
+      }
+
+      // Create budget with processed data
+      const newBudget = await storage.createBudget({
+        ...budgetData,
+        items: processedItems,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      console.log("[CREATE BUDGET] Budget created successfully:", newBudget.id);
+
+      res.json(newBudget);
+    } catch (error) {
+      console.error("Error creating budget:", error);
+      res.status(500).json({ error: "Failed to create budget" });
+    }
+  });
+
   // Send order to production - creates separate production orders for each producer
   app.post("/api/orders/:id/send-to-production", async (req, res) => {
     try {
