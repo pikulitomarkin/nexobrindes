@@ -21,10 +21,24 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   cpfCnpj: z.string().optional(),
-  address: z.string().optional(),
+  address: z.string().optional(), // Campo legado
   vendorId: z.string().min(1, "Selecione um vendedor"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  confirmPassword: z.string()
+  confirmPassword: z.string(),
+  // Novos campos comerciais
+  nomeFantasia: z.string().optional(),
+  razaoSocial: z.string().optional(),
+  inscricaoEstadual: z.string().optional(),
+  logradouro: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().optional(),
+  cep: z.string().optional(),
+  emailBoleto: z.string().email("Email inválido").optional().or(z.literal("")),
+  emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
+  nomeContato: z.string().optional(),
+  emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "As senhas não coincidem",
   path: ["confirmPassword"],
@@ -61,6 +75,20 @@ export default function ClientRegister() {
       vendorId: "",
       password: "",
       confirmPassword: "",
+      // Novos campos comerciais
+      nomeFantasia: "",
+      razaoSocial: "",
+      inscricaoEstadual: "",
+      logradouro: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      cep: "",
+      emailBoleto: "",
+      emailNF: "",
+      nomeContato: "",
+      emailContato: "",
     },
   });
 
@@ -241,17 +269,21 @@ export default function ClientRegister() {
             {/* Register Tab */}
             <TabsContent value="register" className="space-y-4">
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-6">
+                  
+                  {/* Informações Básicas */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Informações Básicas</h3>
+                    
                     <FormField
                       control={registerForm.control}
                       name="name"
                       render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Nome Completo *</FormLabel>
+                        <FormItem>
+                          <FormLabel>Nome do Contato *</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Seu nome completo" 
+                              placeholder="João Silva" 
                               {...field} 
                               data-testid="input-name"
                             />
@@ -265,7 +297,7 @@ export default function ClientRegister() {
                       control={registerForm.control}
                       name="vendorId"
                       render={({ field }) => (
-                        <FormItem className="md:col-span-2">
+                        <FormItem>
                           <FormLabel>Vendedor Responsável *</FormLabel>
                           <Select 
                             onValueChange={field.onChange} 
@@ -290,16 +322,275 @@ export default function ClientRegister() {
                       )}
                     />
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="nomeFantasia"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome Fantasia</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Empresa Ltda" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="razaoSocial"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome/Razão Social</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Empresa Comercial Ltda" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="cpfCnpj"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CPF/CNPJ</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="123.456.789-00 ou 00.000.000/0001-00" 
+                                {...field} 
+                                data-testid="input-cpf"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="inscricaoEstadual"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Inscrição Estadual</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123.456.789.012 (se for Indústria ou Comércio)" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Endereço Completo */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Endereço Completo</h3>
+                    
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="logradouro"
+                        render={({ field }) => (
+                          <FormItem className="col-span-2">
+                            <FormLabel>Logradouro/Rua</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Rua das Flores" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="numero"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Número</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="complemento"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Complemento</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Apto 45, Bloco B" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="bairro"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bairro</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Centro" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="cidade"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cidade</FormLabel>
+                            <FormControl>
+                              <Input placeholder="São Paulo" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="cep"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CEP</FormLabel>
+                            <FormControl>
+                              <Input placeholder="01234-567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contato */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="(11) 99999-9999" 
+                                {...field} 
+                                data-testid="input-phone"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="whatsapp"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>WhatsApp</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="(11) 99999-9999" 
+                                {...field} 
+                                data-testid="input-whatsapp"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="nomeContato"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome do Contato</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Nome da pessoa de contato" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="emailContato"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>E-mail do Contato</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="contato@empresa.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* E-mails Comerciais */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900">E-mails Comerciais</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="emailBoleto"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>E-mail para Envio de Boleto</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="financeiro@empresa.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="emailNF"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>E-mail para Envio de NF</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="nf@empresa.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <FormField
                       control={registerForm.control}
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel>E-mail Principal</FormLabel>
                           <FormControl>
                             <Input 
                               type="email" 
-                              placeholder="seu@email.com" 
+                              placeholder="contato@empresa.com" 
                               {...field} 
                               data-testid="input-email"
                             />
@@ -308,116 +599,51 @@ export default function ClientRegister() {
                         </FormItem>
                       )}
                     />
+                  </div>
 
-                    <FormField
-                      control={registerForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="(00) 00000-0000" 
-                              {...field} 
-                              data-testid="input-phone"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  {/* Senha */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Senha de Acesso</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Senha *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password" 
+                                placeholder="Mínimo 6 caracteres" 
+                                {...field} 
+                                data-testid="input-register-password"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={registerForm.control}
-                      name="whatsapp"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>WhatsApp</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="(00) 00000-0000" 
-                              {...field} 
-                              data-testid="input-whatsapp"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={registerForm.control}
-                      name="cpfCnpj"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>CPF/CNPJ</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="000.000.000-00" 
-                              {...field} 
-                              data-testid="input-cpf"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={registerForm.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Endereço</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Rua, número, bairro, cidade" 
-                              {...field} 
-                              data-testid="input-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Senha *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password" 
-                              placeholder="Mínimo 6 caracteres" 
-                              {...field} 
-                              data-testid="input-register-password"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={registerForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirmar Senha *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password" 
-                              placeholder="Digite a senha novamente" 
-                              {...field} 
-                              data-testid="input-confirm-password"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={registerForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirmar Senha *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password" 
+                                placeholder="Digite a senha novamente" 
+                                {...field} 
+                                data-testid="input-confirm-password"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   <Button 
