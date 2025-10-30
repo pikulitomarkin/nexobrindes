@@ -225,12 +225,10 @@ export default function ClientProducts() {
         productId: item.productId,
         productName: item.productName,
         quantity: Math.max(1, item.quantity), // Garantir que quantidade seja pelo menos 1
-        basePrice: item.basePrice,
         category: item.category,
         imageLink: item.imageLink,
         observations: item.observations.trim()
-      })),
-      totalEstimatedValue: getTotalValue()
+      }))
     };
 
     console.log("Submitting consolidated quote:", consolidatedQuote);
