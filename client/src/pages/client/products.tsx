@@ -480,9 +480,6 @@ export default function ClientProducts() {
                       Categoria
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Preço Base
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ações
                     </th>
                   </tr>
@@ -516,9 +513,6 @@ export default function ClientProducts() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {product.category || 'Não informada'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Button
@@ -566,12 +560,6 @@ export default function ClientProducts() {
                     <div>
                       <span className="text-sm text-gray-500">Categoria:</span>
                       <p className="font-medium">{product.category || 'Não informada'}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm text-gray-500">Preço base:</span>
-                      <p className="text-lg font-bold text-green-600">
-                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
                     </div>
                   </div>
 
