@@ -789,7 +789,7 @@ export default function AdminClients() {
           setSelectedClientId(null);
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Cliente</DialogTitle>
           </DialogHeader>
@@ -824,19 +824,19 @@ export default function AdminClients() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">Nome Fantasia:</label>
-                          <p className="text-sm text-gray-900">{client.nomeFantasia || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.nome_fantasia || client.nomeFantasia || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">Razão Social:</label>
-                          <p className="text-sm text-gray-900">{client.razaoSocial || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.razao_social || client.razaoSocial || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
-                          <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.cpfCnpj || client.cpf_cnpj || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">Inscrição Estadual:</label>
-                          <p className="text-sm text-gray-900">{client.inscricaoEstadual || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.inscricao_estadual || client.inscricaoEstadual || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
@@ -844,7 +844,7 @@ export default function AdminClients() {
                     {/* Endereço Completo */}
                     <div>
                       <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Completo</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-600">Logradouro:</label>
                           <p className="text-sm text-gray-900">{client.logradouro || 'N/A'}</p>
@@ -886,11 +886,11 @@ export default function AdminClients() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">Nome do Contato:</label>
-                          <p className="text-sm text-gray-900">{client.nomeContato || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.nome_contato || client.nomeContato || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">E-mail do Contato:</label>
-                          <p className="text-sm text-gray-900">{client.emailContato || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.email_contato || client.emailContato || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
@@ -905,11 +905,11 @@ export default function AdminClients() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">E-mail para Boleto:</label>
-                          <p className="text-sm text-gray-900">{client.emailBoleto || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.email_boleto || client.emailBoleto || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">E-mail para NF:</label>
-                          <p className="text-sm text-gray-900">{client.emailNF || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{client.email_nf || client.emailNF || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
