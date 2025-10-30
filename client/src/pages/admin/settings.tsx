@@ -824,8 +824,8 @@ export default function AdminSettings() {
                     <p className="font-medium">{method.name}</p>
                     <p className="text-sm text-gray-500">{getShippingTypeLabel(method.type)}</p>
                     <div className="text-xs text-gray-400">
-                      {method.type === "fixed" && `R$ ${method.basePrice?.toFixed(2)} • `}
-                      {method.freeShippingThreshold > 0 && `Grátis acima de R$ ${method.freeShippingThreshold?.toFixed(2)} • `}
+                      {method.type === "fixed" && `R$ ${parseFloat(method.basePrice || "0").toFixed(2)} • `}
+                      {parseFloat(method.freeShippingThreshold || "0") > 0 && `Grátis acima de R$ ${parseFloat(method.freeShippingThreshold || "0").toFixed(2)} • `}
                       {method.estimatedDays} dias
                     </div>
                   </div>
