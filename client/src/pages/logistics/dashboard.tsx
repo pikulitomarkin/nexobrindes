@@ -9,10 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Package, Send, Eye, Search, Truck, Clock, CheckCircle, AlertTriangle, ShoppingCart, DollarSign, Factory } from "lucide-react";
+import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Package, Send, Eye, Search, Truck, Clock, CheckCircle, AlertTriangle, ShoppingCart, DollarSign, Factory, Filter, Calendar, Zap, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "react-router-dom"; // Import useLocation
+import { DateRange } from "react-day-picker";
 
 // Isolated component for individual producer buttons
 function SendToProducerButton({ orderId, producerId, label, uniqueKey }: {
@@ -95,6 +98,13 @@ export default function LogisticsDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showSendToProductionModal, setShowSendToProductionModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+  // Advanced filters
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState("all"); // all, urgent, warning, normal, overdue
+  const [sortBy, setSortBy] = useState("priority"); // priority, date, status
 
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
@@ -338,6 +348,29 @@ export default function LogisticsDashboard() {
     );
   };
 
+  const getPriorityBadge = (priority: any) => {
+    const priorityClasses = {
+      overdue: "bg-red-100 text-red-800 border-red-300",
+      urgent: "bg-orange-100 text-orange-800 border-orange-300",
+      warning: "bg-yellow-100 text-yellow-800 border-yellow-300",
+      normal: "bg-gray-100 text-gray-700 border-gray-300"
+    };
+
+    const priorityIcons = {
+      overdue: <AlertTriangle className="h-3 w-3" />,
+      urgent: <Zap className="h-3 w-3" />,
+      warning: <Clock className="h-3 w-3" />,
+      normal: <CheckCircle className="h-3 w-3" />
+    };
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${priorityClasses[priority.level]}`}>
+        {priorityIcons[priority.level]}
+        {priority.label}
+      </span>
+    );
+  };
+
   // Expandir pedidos pagos por produtor - cada produtor vira uma linha separada
   // FILTRA produtores que já têm production order
   const expandPaidOrdersByProducer = (orders: any[], existingProductionOrders: any[]) => {
@@ -405,19 +438,76 @@ export default function LogisticsDashboard() {
     return expandedOrders;
   };
 
+  // Função para calcular prioridade baseada no prazo
+  const calculatePriority = (order: any) => {
+    const deadline = order.deadline || order.deliveryDeadline;
+    if (!deadline) return { level: 'normal', daysRemaining: null, label: 'Sem prazo' };
+
+    const deadlineDate = new Date(deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+
+    const daysRemaining = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysRemaining < 0) {
+      return { level: 'overdue', daysRemaining, label: `Atrasado ${Math.abs(daysRemaining)} dias` };
+    } else if (daysRemaining <= 1) {
+      return { level: 'urgent', daysRemaining, label: daysRemaining === 0 ? 'Vence hoje' : 'Vence amanhã' };
+    } else if (daysRemaining <= 3) {
+      return { level: 'warning', daysRemaining, label: `${daysRemaining} dias restantes` };
+    } else {
+      return { level: 'normal', daysRemaining, label: `${daysRemaining} dias restantes` };
+    }
+  };
+
   // Aplicar a expansão por produtor nos pedidos pagos
   // Passa productionOrders para filtrar produtores que já receberam
   const expandedPaidOrders = expandPaidOrdersByProducer(paidOrders || [], productionOrders || []);
 
-  // Filtrar pedidos pagos expandidos
-  const filteredPaidOrders = expandedPaidOrders?.filter((order: any) => {
-    const matchesSearch = searchTerm === "" ||
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.currentProducerName?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Filtrar pedidos pagos expandidos com filtros avançados
+  const filteredPaidOrders = useMemo(() => {
+    return expandedPaidOrders?.filter((order: any) => {
+      // Search filter
+      const matchesSearch = searchTerm === "" ||
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.currentProducerName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Date range filter
+      let matchesDateRange = true;
+      if (dateRange?.from || dateRange?.to) {
+        const orderDate = new Date(order.lastPaymentDate || order.createdAt);
+        if (dateRange.from && orderDate < dateRange.from) matchesDateRange = false;
+        if (dateRange.to && orderDate > dateRange.to) matchesDateRange = false;
+      }
+
+      // Status filter (multiple selection)
+      const matchesSelectedStatuses = selectedStatuses.length === 0 || selectedStatuses.includes(order.status);
+
+      // Priority filter
+      let matchesPriority = true;
+      if (priorityFilter !== "all") {
+        const priority = calculatePriority(order);
+        matchesPriority = priority.level === priorityFilter;
+      }
+
+      return matchesSearch && matchesDateRange && matchesSelectedStatuses && matchesPriority;
+    }).sort((a: any, b: any) => {
+      if (sortBy === "priority") {
+        const priorityOrder = { overdue: 0, urgent: 1, warning: 2, normal: 3 };
+        const aPriority = calculatePriority(a);
+        const bPriority = calculatePriority(b);
+        return priorityOrder[aPriority.level] - priorityOrder[bPriority.level];
+      } else if (sortBy === "date") {
+        const aDate = new Date(a.lastPaymentDate || a.createdAt);
+        const bDate = new Date(b.lastPaymentDate || b.createdAt);
+        return bDate.getTime() - aDate.getTime(); // Most recent first
+      }
+      return 0;
+    });
+  }, [expandedPaidOrders, searchTerm, dateRange, selectedStatuses, priorityFilter, sortBy]);
 
   // Expandir pedidos em produção por produtor, similar aos pedidos pagos
   const expandProductionOrdersByProducer = (orders: any[]) => {
@@ -455,17 +545,50 @@ export default function LogisticsDashboard() {
 
   const expandedProductionOrders = expandProductionOrdersByProducer(productionOrders || []);
 
-  // Filtrar pedidos em produção expandidos
-  const filteredProductionOrders = expandedProductionOrders?.filter((order: any) => {
-    const matchesSearch = searchTerm === "" ||
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.producerName?.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filtrar pedidos em produção expandidos com filtros avançados
+  const filteredProductionOrders = useMemo(() => {
+    return expandedProductionOrders?.filter((order: any) => {
+      // Search filter
+      const matchesSearch = searchTerm === "" ||
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.producerName?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+      // Date range filter
+      let matchesDateRange = true;
+      if (dateRange?.from || dateRange?.to) {
+        const orderDate = new Date(order.createdAt);
+        if (dateRange.from && orderDate < dateRange.from) matchesDateRange = false;
+        if (dateRange.to && orderDate > dateRange.to) matchesDateRange = false;
+      }
+
+      // Status filter (multiple selection)
+      const matchesSelectedStatuses = selectedStatuses.length === 0 || selectedStatuses.includes(order.status);
+      const matchesLegacyStatus = statusFilter === "all" || order.status === statusFilter;
+
+      // Priority filter
+      let matchesPriority = true;
+      if (priorityFilter !== "all") {
+        const priority = calculatePriority(order);
+        matchesPriority = priority.level === priorityFilter;
+      }
+
+      return matchesSearch && matchesDateRange && (matchesSelectedStatuses || matchesLegacyStatus) && matchesPriority;
+    }).sort((a: any, b: any) => {
+      if (sortBy === "priority") {
+        const priorityOrder = { overdue: 0, urgent: 1, warning: 2, normal: 3 };
+        const aPriority = calculatePriority(a);
+        const bPriority = calculatePriority(b);
+        return priorityOrder[aPriority.level] - priorityOrder[bPriority.level];
+      } else if (sortBy === "date") {
+        const aDate = new Date(a.createdAt);
+        const bDate = new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime(); // Most recent first
+      }
+      return 0;
+    });
+  }, [expandedProductionOrders, searchTerm, dateRange, selectedStatuses, statusFilter, priorityFilter, sortBy]);
 
   if (isLoadingPaidOrders || isLoadingProductionOrders) {
     return (
@@ -625,40 +748,203 @@ export default function LogisticsDashboard() {
         </div>
       )}
 
-      {/* Search and Filters - Rendered only when relevant */}
-      {(currentSection === 'dashboard' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por número, cliente ou produto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              {(currentSection === 'dashboard' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Filtrar por status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="accepted">Aceito</SelectItem>
-                    <SelectItem value="production">Em Produção</SelectItem>
-                    <SelectItem value="ready">Pronto para Despacho</SelectItem>
-                    <SelectItem value="shipped">Despachado</SelectItem>
-                    <SelectItem value="delivered">Entregue</SelectItem>
-                  </SelectContent>
-                </Select>
+      {/* Advanced Search and Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          {/* Basic Search Row */}
+          <div className="flex flex-col lg:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar por número, cliente, produto ou produtor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={showAdvancedFilters ? "default" : "outline"}
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="whitespace-nowrap"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros Avançados
+              </Button>
+              {(dateRange || selectedStatuses.length > 0 || priorityFilter !== "all") && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDateRange(undefined);
+                    setSelectedStatuses([]);
+                    setPriorityFilter("all");
+                    setSortBy("priority");
+                  }}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpar
+                </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {/* Advanced Filters */}
+          {showAdvancedFilters && (
+            <div className="border-t pt-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Date Range Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Período</Label>
+                  <DatePickerWithRange
+                    date={dateRange}
+                    onDateChange={setDateRange}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Priority Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Prioridade</Label>
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas as prioridades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as prioridades</SelectItem>
+                      <SelectItem value="overdue">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                          Atrasados
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="urgent">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-orange-600" />
+                          Urgente (≤ 1 dia)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="warning">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-yellow-600" />
+                          Atenção (2-3 dias)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="normal">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-gray-600" />
+                          Normal (>3 dias)
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sort By */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Ordenar por</Label>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="priority">Prioridade</SelectItem>
+                      <SelectItem value="date">Data</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Legacy Status Filter (for backward compatibility) */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Status Rápido</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filtrar por status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="accepted">Aceito</SelectItem>
+                      <SelectItem value="production">Em Produção</SelectItem>
+                      <SelectItem value="ready">Pronto para Despacho</SelectItem>
+                      <SelectItem value="shipped">Despachado</SelectItem>
+                      <SelectItem value="delivered">Entregue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Multiple Status Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Status Detalhado (múltipla seleção)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'paid', label: 'Pago', color: 'bg-green-100 text-green-700' },
+                    { value: 'confirmed', label: 'Confirmado', color: 'bg-blue-100 text-blue-700' },
+                    { value: 'production', label: 'Em Produção', color: 'bg-purple-100 text-purple-700' },
+                    { value: 'pending', label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
+                    { value: 'accepted', label: 'Aceito', color: 'bg-blue-100 text-blue-700' },
+                    { value: 'ready', label: 'Pronto', color: 'bg-orange-100 text-orange-700' },
+                    { value: 'shipped', label: 'Despachado', color: 'bg-cyan-100 text-cyan-700' },
+                    { value: 'delivered', label: 'Entregue', color: 'bg-green-100 text-green-700' }
+                  ].map((status) => {
+                    const isSelected = selectedStatuses.includes(status.value);
+                    return (
+                      <div key={status.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`status-${status.value}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStatuses([...selectedStatuses, status.value]);
+                            } else {
+                              setSelectedStatuses(selectedStatuses.filter(s => s !== status.value));
+                            }
+                          }}
+                        />
+                        <Label 
+                          htmlFor={`status-${status.value}`}
+                          className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${
+                            isSelected ? status.color : 'text-gray-600'
+                          }`}
+                        >
+                          {status.label}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Filters Summary */}
+              {(dateRange || selectedStatuses.length > 0 || priorityFilter !== "all") && (
+                <div className="border-t pt-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-sm text-gray-600">Filtros ativos:</span>
+                    {dateRange && (
+                      <Badge variant="secondary">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {dateRange.from?.toLocaleDateString('pt-BR')} - {dateRange.to?.toLocaleDateString('pt-BR')}
+                      </Badge>
+                    )}
+                    {selectedStatuses.length > 0 && (
+                      <Badge variant="secondary">
+                        Status: {selectedStatuses.length} selecionados
+                      </Badge>
+                    )}
+                    {priorityFilter !== "all" && (
+                      <Badge variant="secondary">
+                        Prioridade: {priorityFilter}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pedidos Pagos - Aguardando Envio para Produção */}
       {(currentSection === 'dashboard' || currentSection === 'paid-orders') && (
@@ -680,6 +966,7 @@ export default function LogisticsDashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pedido</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Entrega</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Pagamento</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
@@ -743,6 +1030,9 @@ export default function LogisticsDashboard() {
                               {order.producerItems.length} itens deste produtor
                             </div>
                           )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getPriorityBadge(calculatePriority(order))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
@@ -822,6 +1112,7 @@ export default function LogisticsDashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produtor</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                   </tr>
@@ -877,6 +1168,9 @@ export default function LogisticsDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(order.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getPriorityBadge(calculatePriority(order))}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
