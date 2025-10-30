@@ -603,69 +603,67 @@ function CommissionsTable({
                         </span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {getUserName(commission)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {commission.orderNumber || commission.orderId?.slice(-6) || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {commission.percentage}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                      R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(commission.status)}
+                      {commission.type === 'vendor' && commission.status !== 'paid' && (
+                        <span className="text-sm text-gray-500">
+                          Aguardando entrega do pedido
+                        </span>
+                      )}
+                      {commission.type !== 'vendor' && commission.status !== 'paid' && (
+                        <span className="text-sm text-gray-500">
+                          Aguardando confirmação do pedido
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                        {['pending', 'confirmed'].includes(commission.status) && commission.type === 'vendor' && (
+                           <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onMarkAsPaid(commission)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
+                         {['pending', 'confirmed'].includes(commission.status) && commission.type !== 'vendor' && (
+                           <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onMarkAsPaid(commission)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pagar
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                    {getUserName(commission)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {commission.orderNumber || commission.orderId?.slice(-6) || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {commission.percentage}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                    R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(commission.status)}
-                    {commission.type === 'vendor' && commission.status !== 'paid' && (
-                      <span className="text-sm text-gray-500">
-                        Aguardando entrega do pedido
-                      </span>
-                    )}
-                    {commission.type !== 'vendor' && commission.status !== 'paid' && (
-                      <span className="text-sm text-gray-500">
-                        Aguardando confirmação do pedido
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver
-                      </Button>
-                      {['pending', 'confirmed'].includes(commission.status) && commission.type === 'vendor' && (
-                         <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onMarkAsPaid(commission)}
-                          className="text-green-600 hover:text-green-700"
-                        >
-                          <CreditCard className="h-4 w-4 mr-1" />
-                          Pagar
-                        </Button>
-                      )}
-                       {['pending', 'confirmed'].includes(commission.status) && commission.type !== 'vendor' && (
-                         <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onMarkAsPaid(commission)}
-                          className="text-green-600 hover:text-green-700"
-                        >
-                          <CreditCard className="h-4 w-4 mr-1" />
-                          Pagar
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
           {(!commissions || commissions.length === 0) && (
