@@ -4860,7 +4860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Found ${manualPayables.length} manual payables:`, manualPayables.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
       const manualPayablesAmount = manualPayables
         .filter(payable => payable.status === 'pending')
-        .reduce((total,            payable => total + parseFloat(payable.amount || '0'), 0);
+        .reduce((total, payable) => total + parseFloat(payable.amount || '0'), 0);
 
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
