@@ -543,7 +543,7 @@ export default function VendorClients() {
           setSelectedClientId(null);
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Cliente</DialogTitle>
           </DialogHeader>
@@ -552,54 +552,128 @@ export default function VendorClients() {
               {(() => {
                 const client = clients?.find((c: any) => c.id === selectedClientId);
                 if (!client) return null;
-                
+
                 return (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-6">
+                    {/* Informações Básicas */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Nome:</label>
-                      <p className="text-sm text-gray-900">{client.name}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Informações Básicas</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
+                          <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {client.userCode || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome Fantasia:</label>
+                          <p className="text-sm text-gray-900">{client.nome_fantasia || client.nomeFantasia || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Razão Social:</label>
+                          <p className="text-sm text-gray-900">{client.razao_social || client.razaoSocial || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
+                          <p className="text-sm text-gray-900">{client.cpfCnpj || client.cpf_cnpj || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Inscrição Estadual:</label>
+                          <p className="text-sm text-gray-900">{client.inscricao_estadual || client.inscricaoEstadual || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
-                    
+
+                    {/* Endereço Completo */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
-                      <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {client.userCode || 'N/A'}
-                      </p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Completo</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.logradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.numero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.complemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.bairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.cidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.cep || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
-                    
+
+                    {/* Contato */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Email:</label>
-                      <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Contato</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Telefone:</label>
+                          <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
+                          <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Nome do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.nome_contato || client.nomeContato || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail do Contato:</label>
+                          <p className="text-sm text-gray-900">{client.email_contato || client.emailContato || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
-                    
+
+                    {/* E-mails Comerciais */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Telefone:</label>
-                      <p className="text-sm text-gray-900">{client.phone || 'N/A'}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">E-mails Comerciais</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail Principal:</label>
+                          <p className="text-sm text-gray-900">{client.email || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail para Boleto:</label>
+                          <p className="text-sm text-gray-900">{client.email_boleto || client.emailBoleto || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">E-mail para NF:</label>
+                          <p className="text-sm text-gray-900">{client.email_nf || client.emailNF || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
-                    
+
+                    {/* Estatísticas */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">WhatsApp:</label>
-                      <p className="text-sm text-gray-900">{client.whatsapp || 'N/A'}</p>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
-                      <p className="text-sm text-gray-900">{client.cpfCnpj || 'N/A'}</p>
-                    </div>
-                    
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium text-gray-600">Endereço:</label>
-                      <p className="text-sm text-gray-900">{client.address || 'N/A'}</p>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
-                      <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
-                      <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Estatísticas</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Total de Pedidos:</label>
+                          <p className="text-sm text-gray-900">{client.ordersCount || 0}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Total Gasto:</label>
+                          <p className="text-sm text-gray-900">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
