@@ -10,18 +10,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, CreditCard, Truck, Settings, Palette } from "lucide-react";
+import { Plus, Edit, Trash2, CreditCard, Truck, Settings, Palette, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function AdminSettings() {
   const { toast } = useToast();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [paymentMethodDialogOpen, setPaymentMethodDialogOpen] = useState(false);
   const [shippingMethodDialogOpen, setShippingMethodDialogOpen] = useState(false);
   const [customizationOptionDialogOpen, setCustomizationOptionDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<any>(null);
   const [editingShippingMethod, setEditingShippingMethod] = useState<any>(null);
   const [editingCustomizationOption, setEditingCustomizationOption] = useState<any>(null);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Payment method form
   const [paymentMethodForm, setPaymentMethodForm] = useState({
@@ -50,6 +55,13 @@ export default function AdminSettings() {
     minQuantity: 1,
     price: 0,
     isActive: true
+  });
+
+  // Password form
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
   });
 
   const { data: paymentMethods } = useQuery({
@@ -257,6 +269,33 @@ export default function AdminSettings() {
     },
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const response = await fetch(`/api/users/${user?.id}/change-password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao alterar senha");
+      return response.json();
+    },
+    onSuccess: () => {
+      setPasswordDialogOpen(false);
+      resetPasswordForm();
+      toast({
+        title: "Sucesso!",
+        description: "Senha alterada com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar senha. Verifique a senha atual.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetPaymentMethodForm = () => {
     setPaymentMethodForm({
       name: "",
@@ -290,6 +329,41 @@ export default function AdminSettings() {
       isActive: true
     });
     setEditingCustomizationOption(null);
+  };
+
+  const resetPasswordForm = () => {
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: ""
+    });
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "A nova senha e a confirmação não coincidem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A nova senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    changePasswordMutation.mutate({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
+    });
   };
 
   const handleEditPaymentMethod = (method: any) => {
@@ -383,9 +457,128 @@ export default function AdminSettings() {
         <p className="text-gray-600">Configure formas de pagamento e métodos de frete do sistema</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Admin Security Section */}
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Lock className="h-5 w-5 mr-2" />
+              Segurança do Administrador
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <h3 className="font-medium">Alterar Senha do Admin</h3>
+                <p className="text-sm text-gray-500">Atualize sua senha para manter sua conta segura</p>
+              </div>
+              <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Lock className="h-4 w-4 mr-2" />
+                    Alterar Senha
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Alterar Senha do Administrador</DialogTitle>
+                    <DialogDescription>
+                      Digite sua senha atual e a nova senha
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                    <div>
+                      <Label htmlFor="current-password">Senha Atual</Label>
+                      <div className="relative">
+                        <Input
+                          id="current-password"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                          placeholder="Digite sua senha atual"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        >
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="new-password">Nova Senha</Label>
+                      <div className="relative">
+                        <Input
+                          id="new-password"
+                          type={showNewPassword ? "text" : "password"}
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                          placeholder="Digite sua nova senha"
+                          required
+                          minLength={6}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Mínimo de 6 caracteres</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirm-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                          placeholder="Confirme sua nova senha"
+                          required
+                          minLength={6}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={changePasswordMutation.isPending}
+                        className="gradient-bg text-white"
+                      >
+                        {changePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
         {/* Payment Methods */}
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center">
@@ -517,7 +710,7 @@ export default function AdminSettings() {
         </Card>
 
         {/* Shipping Methods */}
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center">
@@ -657,7 +850,7 @@ export default function AdminSettings() {
         </Card>
 
         {/* Customization Options Section */}
-        <Card>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center">

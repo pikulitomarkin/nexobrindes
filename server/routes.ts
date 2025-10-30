@@ -711,6 +711,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change user password
+  app.put("/api/users/:id/change-password", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: "Nova senha deve ter pelo menos 6 caracteres" });
+      }
+
+      // Get user
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      // Verify current password
+      if (user.password !== currentPassword) {
+        return res.status(400).json({ error: "Senha atual incorreta" });
+      }
+
+      // Update password
+      await storage.updateUser(id, { password: newPassword });
+
+      console.log(`Password changed for user: ${user.username}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     const { username, password, preferredRole } = req.body;
