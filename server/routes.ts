@@ -4981,17 +4981,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/clients/profile/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const { name, email, phone, address } = req.body;
+      const { 
+        name, email, phone, whatsapp, address,
+        // Novos campos comerciais
+        nomeFantasia, razaoSocial, inscricaoEstadual,
+        logradouro, numero, complemento, bairro, cidade, cep,
+        emailBoleto, emailNF, nomeContato, emailContato
+      } = req.body;
 
-      // Update user record
+      // Update user record (apenas campos básicos)
       await storage.updateUser(userId, { name, email, phone, address });
 
-      // Update client record if exists
+      // Update client record if exists (todos os campos)
       const clientRecord = await storage.getClientByUserId(userId);
       if (clientRecord) {
-        await storage.updateClient(clientRecord.id, { name, email, phone, address });
+        await storage.updateClient(clientRecord.id, { 
+          name, email, phone, whatsapp, address,
+          // Novos campos comerciais
+          nomeFantasia, razaoSocial, inscricaoEstadual,
+          logradouro, numero, complemento, bairro, cidade, cep,
+          emailBoleto, emailNF, nomeContato, emailContato
+        });
       }
 
+      console.log(`Client profile updated for user ${userId}: ${name}`);
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating client profile:", error);
