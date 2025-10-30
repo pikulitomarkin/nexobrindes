@@ -1348,7 +1348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'ready' && updatedPO.producerValue && parseFloat(updatedPO.producerValue) > 0) {
         // Check if payment already exists
         const existingPayment = await storage.getProducerPaymentByProductionOrderId(id);
-        
+
         if (!existingPayment) {
           // Create producer payment
           const payment = await storage.createProducerPayment({
@@ -1369,11 +1369,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (order && order.status === 'production') {
             // Check if all production orders for this order are ready
             const allProductionOrders = await storage.getProductionOrdersByOrder(updatedPO.orderId);
-            
+
             // Guard: Must have at least one production order to mark as ready
             if (allProductionOrders.length > 0) {
               const allReady = allProductionOrders.every(po => po.status === 'ready' || po.status === 'shipped' || po.status === 'delivered');
-              
+
               if (allReady) {
                 await storage.updateOrder(updatedPO.orderId, { status: 'ready' });
                 console.log(`[READY STATUS] Updated order ${updatedPO.orderId} status to 'ready' - all ${allProductionOrders.length} production orders are ready`);
@@ -3775,7 +3775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Starting commission recalculation...");
       await storage.recalculateAllCommissions();
-      
+
       res.json({
         success: true,
         message: "Comissões recalculadas com sucesso"
@@ -4696,7 +4696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Found ${manualPayables.length} manual payables:`, manualPayables.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
       const manualPayablesAmount = manualPayables
         .filter(payable => payable.status === 'pending')
-        .reduce((total, payable) => total + parseFloat(payable.amount || '0'), 0);
+        .reduce((total,            payable => total + parseFloat(payable.amount || '0'), 0);
 
       console.log(`Manual payables total: ${manualPayablesAmount}`);
 
@@ -4981,31 +4981,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/clients/profile/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const { 
-        name, email, phone, whatsapp, address,
-        // Novos campos comerciais
-        nomeFantasia, razaoSocial, inscricaoEstadual,
-        logradouro, numero, complemento, bairro, cidade, cep,
-        emailBoleto, emailNF, nomeContato, emailContato
-      } = req.body;
+      const updateData = req.body;
 
-      // Update user record (apenas campos básicos)
-      await storage.updateUser(userId, { name, email, phone, address });
+      console.log(`Updating profile for user: ${userId}`, updateData);
 
-      // Update client record if exists (todos os campos)
+      // Update user record first
+      const updatedUser = await storage.updateUser(userId, {
+        name: updateData.name,
+        email: updateData.email,
+        phone: updateData.phone,
+        address: updateData.address
+      });
+
+      // Update or create client record
       const clientRecord = await storage.getClientByUserId(userId);
       if (clientRecord) {
-        await storage.updateClient(clientRecord.id, { 
-          name, email, phone, whatsapp, address,
-          // Novos campos comerciais
-          nomeFantasia, razaoSocial, inscricaoEstadual,
-          logradouro, numero, complemento, bairro, cidade, cep,
-          emailBoleto, emailNF, nomeContato, emailContato
+        // Update existing client record with all commercial fields
+        await storage.updateClient(clientRecord.id, {
+          name: updateData.name,
+          email: updateData.email,
+          phone: updateData.phone,
+          whatsapp: updateData.whatsapp,
+          cpfCnpj: updateData.cpfCnpj,
+          address: updateData.address,
+          // Commercial fields
+          nomeFantasia: updateData.nomeFantasia,
+          razaoSocial: updateData.razaoSocial,
+          inscricaoEstadual: updateData.inscricaoEstadual,
+          logradouro: updateData.logradouro,
+          numero: updateData.numero,
+          complemento: updateData.complemento,
+          bairro: updateData.bairro,
+          cidade: updateData.cidade,
+          cep: updateData.cep,
+          emailBoleto: updateData.emailBoleto,
+          emailNF: updateData.emailNF,
+          nomeContato: updateData.nomeContato,
+          emailContato: updateData.emailContato
         });
       }
 
-      console.log(`Client profile updated for user ${userId}: ${name}`);
-      res.json({ success: true });
+      // Get updated data
+      const updatedData = await storage.getClientByUserId(userId);
+      const vendor = updatedData?.vendorId ? await storage.getUser(updatedData.vendorId) : null;
+
+      res.json({
+        ...updatedData,
+        vendorName: vendor?.name || null
+      });
     } catch (error) {
       console.error("Error updating client profile:", error);
       res.status(500).json({ error: "Failed to update client profile" });
@@ -6078,6 +6101,10 @@ Para mais detalhes, entre em contato conosco!`;
           hasCustomization: budget.hasCustomization,
           customizationPercentage: budget.customizationPercentage,
           customizationDescription: budget.customizationDescription,
+          hasDiscount: budget.hasDiscount,
+          discountType: budget.discountType,
+          discountPercentage: budget.discountPercentage,
+          discountValue: budget.discountValue,
           createdAt: budget.createdAt,
           photos: photoUrls,
           paymentMethodId: paymentInfo?.paymentMethodId || null,
