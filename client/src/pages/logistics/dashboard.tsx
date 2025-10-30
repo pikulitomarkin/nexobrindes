@@ -833,7 +833,7 @@ export default function LogisticsDashboard() {
                       <SelectItem value="normal">
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-gray-600" />
-                          Normal (>3 dias)
+                          Normal ({'>'}3 dias)
                         </div>
                       </SelectItem>
                     </SelectContent>
