@@ -974,22 +974,42 @@ export class PgStorage implements IStorage {
     // Convert string dates to Date objects if they exist
     const processedData: any = { ...budgetData };
 
-    // Handle validUntil
+    // Handle validUntil - ensure it's a proper Date object or null
     if (processedData.validUntil) {
-      if (typeof processedData.validUntil === 'string') {
-        processedData.validUntil = new Date(processedData.validUntil);
-      } else if (!(processedData.validUntil instanceof Date)) {
-        processedData.validUntil = new Date(processedData.validUntil);
+      try {
+        if (typeof processedData.validUntil === 'string') {
+          processedData.validUntil = new Date(processedData.validUntil);
+        } else if (!(processedData.validUntil instanceof Date)) {
+          processedData.validUntil = new Date(processedData.validUntil);
+        }
+        // Validate the date
+        if (isNaN(processedData.validUntil.getTime())) {
+          processedData.validUntil = null;
+        }
+      } catch (e) {
+        processedData.validUntil = null;
       }
+    } else {
+      processedData.validUntil = null;
     }
 
-    // Handle deliveryDeadline  
+    // Handle deliveryDeadline - ensure it's a proper Date object or null  
     if (processedData.deliveryDeadline) {
-      if (typeof processedData.deliveryDeadline === 'string') {
-        processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
-      } else if (!(processedData.deliveryDeadline instanceof Date)) {
-        processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+      try {
+        if (typeof processedData.deliveryDeadline === 'string') {
+          processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+        } else if (!(processedData.deliveryDeadline instanceof Date)) {
+          processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+        }
+        // Validate the date
+        if (isNaN(processedData.deliveryDeadline.getTime())) {
+          processedData.deliveryDeadline = null;
+        }
+      } catch (e) {
+        processedData.deliveryDeadline = null;
       }
+    } else {
+      processedData.deliveryDeadline = null;
     }
 
     // Generate unique budget number using database sequence
@@ -1024,7 +1044,82 @@ export class PgStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    return results[0];
+    
+    const newBudget = results[0];
+
+    // Create budget items if provided
+    if (budgetData.items && Array.isArray(budgetData.items) && budgetData.items.length > 0) {
+      console.log(`[PG CREATE BUDGET] Processing ${budgetData.items.length} items`);
+      
+      // Remove duplicates based on productId, producerId, quantity, and unitPrice
+      const seenItems = new Set();
+      const uniqueItems = budgetData.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`[PG CREATE BUDGET] Removing duplicate item: ${item.productName} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`[PG CREATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
+
+      // Create budget items
+      for (const itemData of uniqueItems) {
+        try {
+          await pg.insert(schema.budgetItems).values({
+            budgetId: newBudget.id,
+            productId: itemData.productId,
+            productName: itemData.productName || 'Produto',
+            producerId: itemData.producerId || 'internal',
+            quantity: itemData.quantity || 1,
+            unitPrice: (itemData.unitPrice || 0).toString(),
+            totalPrice: (itemData.totalPrice || 0).toString(),
+            hasItemCustomization: itemData.hasItemCustomization || false,
+            selectedCustomizationId: itemData.selectedCustomizationId || null,
+            itemCustomizationValue: (itemData.itemCustomizationValue || 0).toString(),
+            itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+            additionalCustomizationNotes: itemData.additionalCustomizationNotes || null,
+            customizationPhoto: itemData.customizationPhoto || null,
+            hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+            generalCustomizationName: itemData.generalCustomizationName || null,
+            generalCustomizationValue: (itemData.generalCustomizationValue || 0).toString(),
+            hasItemDiscount: itemData.hasItemDiscount || false,
+            itemDiscountType: itemData.itemDiscountType || 'percentage',
+            itemDiscountPercentage: (itemData.itemDiscountPercentage || 0).toString(),
+            itemDiscountValue: (itemData.itemDiscountValue || 0).toString(),
+            productWidth: itemData.productWidth || null,
+            productHeight: itemData.productHeight || null,
+            productDepth: itemData.productDepth || null
+          });
+        } catch (itemError) {
+          console.error(`[PG CREATE BUDGET] Error creating item:`, itemError);
+          // Continue with other items
+        }
+      }
+    }
+
+    // Create budget payment info if provided
+    if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
+      try {
+        await pg.insert(schema.budgetPaymentInfo).values({
+          budgetId: newBudget.id,
+          paymentMethodId: budgetData.paymentMethodId || null,
+          shippingMethodId: budgetData.shippingMethodId || null,
+          installments: budgetData.installments || 1,
+          downPayment: (budgetData.downPayment || 0).toString(),
+          remainingAmount: (budgetData.remainingAmount || 0).toString(),
+          shippingCost: (budgetData.shippingCost || 0).toString(),
+          createdAt: new Date()
+        });
+      } catch (paymentError) {
+        console.error(`[PG CREATE BUDGET] Error creating payment info:`, paymentError);
+      }
+    }
+
+    console.log(`[PG CREATE BUDGET] Budget ${newBudget.id} created successfully`);
+    return newBudget;
   }
 
   async updateBudget(id: string, budgetData: Partial<InsertBudget>): Promise<Budget | undefined> {
