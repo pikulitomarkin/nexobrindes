@@ -2998,24 +2998,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log partner creation - use the created user's ID for logging
+      // Log partner creation - use current admin user ID for logging  
       try {
-        await storage.logUserAction(
-          user.id, // Use the newly created partner's ID
-          user.name,
-          user.role,
-          'CREATE',
-          'users',
-          user.id,
-          `Sócio criado: ${user.name} - Usuário: ${user.username}`,
-          'success',
-          {
-            userName: user.name,
-            username: user.username,
-            role: user.role,
-            createdBy: req.user?.id || 'system'
+        if (req.user?.id) {
+          // Verify the logging user exists before attempting to log
+          const logUser = await storage.getUser(req.user.id);
+          if (logUser) {
+            await storage.logUserAction(
+              req.user.id, // Use the current logged-in admin's ID
+              req.user.name || logUser.name,
+              req.user.role || logUser.role,
+              'CREATE',
+              'users', 
+              user.id,
+              `Sócio criado: ${user.name} - Usuário: ${user.username}`,
+              'success',
+              {
+                userName: user.name,
+                username: user.username,
+                role: user.role,
+                createdByUserId: req.user.id,
+                createdByName: req.user.name || logUser.name
+              }
+            );
+          } else {
+            console.log('Warning: Logging user not found, skipping log');
           }
-        );
+        } else {
+          console.log('Warning: No authenticated user for logging, skipping log');
+        }
       } catch (logError) {
         console.log('Warning: Could not log partner creation:', logError.message);
         // Continue without failing the partner creation
