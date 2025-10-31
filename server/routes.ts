@@ -2700,7 +2700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const enrichedOrders = await Promise.all(
         uniqueOrders.map(async (order) => {
-          // Always use contactName as primary client identifier
+          // Always use contactName as primary client name
           let clientName = order.contactName;
 
           // Only if contactName is missing, try to get from client record
@@ -5590,7 +5590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+        return res.status(400).json({ error:"Valor deve ser maior que zero" });
       }
 
       // Verify order exists
@@ -7077,7 +7077,7 @@ Para mais detalhes, entre em contato conosco!`;
           let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          // Always use contactName as primary client identifier
+          // Always use contactName as primary client name
           let clientName = order?.contactName;
           let clientAddress = null;
           let clientPhone = order?.contactPhone;
@@ -7153,7 +7153,7 @@ Para mais detalhes, entre em contato conosco!`;
   // Expedition routes
   app.get("/api/expedition/orders", async (req, res) => {
     try {
-      // Get orders that are readyfor expedition (completed, ready for shipping)
+      // Get orders that are ready for expedition (completed, ready for shipping)
       const orders = await storage.getOrders();
       const expeditionOrders = orders.filter(order =>
         ['ready', 'shipped'].includes(order.status)

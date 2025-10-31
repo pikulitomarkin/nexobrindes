@@ -82,9 +82,14 @@ export default function AdminPartners() {
     },
     onSuccess: (data) => {
       console.log('Partner created successfully:', data);
+      
+      // Force refresh the partners list
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
+      queryClient.refetchQueries({ queryKey: ["/api/partners"] });
+      
       setIsDialogOpen(false);
       resetForm();
+      
       toast({
         title: "Sucesso",
         description: "Sócio criado com sucesso!",
