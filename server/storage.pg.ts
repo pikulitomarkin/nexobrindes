@@ -1764,6 +1764,12 @@ export class PgStorage implements IStorage {
     return true;
   }
 
+  async deleteUser(id: string): Promise<boolean> {
+    // Deletar usuário genérico
+    await pg.delete(schema.users).where(eq(schema.users.id, id));
+    return true;
+  }
+
   // ==================== SYSTEM LOGS ====================
 
   async getSystemLogs(filters?: {

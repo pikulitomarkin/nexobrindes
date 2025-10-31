@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
 
 
@@ -41,6 +41,7 @@ interface Partner {
   phone?: string;
   createdAt: string;
   isActive: boolean;
+  userCode?: string;
 }
 
 const partnerFormSchema = z.object({
@@ -64,7 +65,7 @@ export default function AdminPartners() {
   });
 
   const createPartnerMutation = useMutation({
-    mutationFn: async (partnerData: typeof partnerForm.getValues) => {
+    mutationFn: async (partnerData: PartnerFormValues) => {
       console.log('=== CREATING PARTNER ===');
       console.log('Sending partner data:', partnerData);
 
@@ -274,8 +275,9 @@ export default function AdminPartners() {
                 {editingPartner ? "Editar Sócio" : "Novo Sócio"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <FormField
+            <Form {...form}>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
@@ -340,23 +342,24 @@ export default function AdminPartners() {
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  className="gradient-bg text-white"
-                  disabled={createPartnerMutation.isPending || updatePartnerMutation.isPending}
-                >
-                  {editingPartner ? "Atualizar" : "Criar"}
-                </Button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="gradient-bg text-white"
+                    disabled={createPartnerMutation.isPending || updatePartnerMutation.isPending}
+                  >
+                    {editingPartner ? "Atualizar" : "Criar"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>

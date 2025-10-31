@@ -80,6 +80,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   getUsersByRole(role: string): Promise<User[]>;
   authenticateUser(username: string, password: string): Promise<User | null>; // Added for authentication
 
