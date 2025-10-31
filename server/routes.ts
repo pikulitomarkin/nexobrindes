@@ -2193,7 +2193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               if (itemQty < minQty) {
                 console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando pedido mesmo assim`);
-                orderWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
+                orderWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item "${item.productName}" tem ${itemQty} unidades.`);
               } else {
                 console.log(`APROVADO: ${itemQty} >= ${minQty}`);
               }
@@ -2998,35 +2998,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log partner creation - use current admin user ID for logging
-      if (req.user?.id) {
+      // Log partner creation - only if user is authenticated
+      if (req.user && req.user.id) {
         try {
-          // Verify the logging user exists before attempting to log
-          const logUser = await storage.getUser(req.user.id);
-          if (logUser) {
-            await storage.logUserAction(
-              req.user.id, // Use the current logged-in admin's ID
-              req.user.name || logUser.name,
-              req.user.role || logUser.role,
-              'CREATE',
-              'users',
-              user.id,
-              `Sócio criado: ${user.name} - Usuário: ${user.username}`,
-              'success',
-              {
-                userName: user.name,
-                username: user.username,
-                role: user.role,
-                createdByUserId: req.user.id,
-                createdByName: req.user.name || logUser.name
-              }
-            );
-          } else {
-            console.log('Warning: Logging user not found, skipping log');
-          }
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Admin',
+            req.user.role || 'admin',
+            'CREATE',
+            'partners', // Note: This logs as 'partners' even for producer creation, could be a bug
+            user.id,
+            `Produtor criado: ${user.name} - Username: ${user.username}`,
+            'success',
+            {
+              producerName: user.name,
+              username: user.username,
+              email: user.email
+            }
+          );
         } catch (logError) {
-          console.log('Warning: Could not log partner creation:', logError.message);
-          // Continue without failing the partner creation
+          console.error('Error logging producer creation:', logError);
+          // Continue execution even if logging fails
         }
       } else {
         console.log('Warning: No authenticated user for logging, skipping log');
@@ -5127,7 +5119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Comissões Pendentes
       const pendingCommissions = allCommissions
-        .filter(c => c.status === 'pending' || c.status === 'confirmed')
+        .filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt)
         .reduce((total, c) => total + parseFloat(c.amount), 0);
 
       // Receita Total do Mês
@@ -5339,7 +5331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newProduct = await storage.createProduct(productData);
       res.json(newProduct);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create product" });
+      res.status(500).json({ error: "Failed to createproduct" });
     }
   });
 
@@ -5902,7 +5894,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
 
-      // Import products with producer assignment
       const result = await storage.importProductsForProducer(productsData, producerId);
 
       console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
@@ -5926,9 +5917,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/budgets", async (req, res) => {
     try {
       const budgets = await storage.getBudgets();
-      res.json(budgets);
+      console.log(`Found ${budgets.length} budgets in database`);
+
+      // Enrich budgets with vendor names and item counts
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          try {
+            // Get vendor name
+            let vendorName = 'Vendedor não encontrado';
+            if (budget.vendorId) {
+              const vendor = await storage.getUser(budget.vendorId);
+              vendorName = vendor?.name || vendorName;
+            }
+
+            // Get client name (prioritize contactName, fallback to client record)
+            let clientName = budget.contactName || 'Cliente não informado';
+            if (!clientName && budget.clientId) {
+              const client = await storage.getClient(budget.clientId);
+              if (client) {
+                clientName = client.name;
+              }
+            }
+
+            // Get items count
+            const items = await storage.getBudgetItems(budget.id);
+            const itemCount = items.length;
+
+            // Get photos count
+            const photos = await storage.getBudgetPhotos(budget.id);
+            const photoCount = photos.length;
+
+            // Ensure all required fields are present
+            return {
+              ...budget,
+              id: budget.id,
+              budgetNumber: budget.budgetNumber || 'N/A',
+              title: budget.title || 'Sem título',
+              status: budget.status || 'draft',
+              totalValue: budget.totalValue || '0.00',
+              vendorName,
+              clientName,
+              itemCount,
+              photoCount,
+              createdAt: budget.createdAt || new Date(),
+              validUntil: budget.validUntil,
+              deliveryDeadline: budget.deliveryDeadline
+            };
+          } catch (budgetError) {
+            console.error(`Error enriching budget ${budget.id}:`, budgetError);
+            // Return basic budget data if enrichment fails
+            return {
+              ...budget,
+              vendorName: 'Erro ao carregar',
+              clientName: budget.contactName || 'Cliente não informado',
+              itemCount: 0,
+              photoCount: 0
+            };
+          }
+        })
+      );
+
+      console.log(`Returning ${enrichedBudgets.length} enriched budgets`);
+      res.json(enrichedBudgets);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch budgets" });
+      console.error("Error fetching all budgets:", error);
+      res.status(500).json({ error: "Failed to fetch budgets: " + error.message });
     }
   });
 
@@ -5958,99 +6011,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       console.log(`Fetching budgets for client: ${clientId}`);
 
-      let budgets = [];
+      const budgets = await storage.getBudgetsByClient(clientId);
+      console.log(`Found ${budgets.length} budgets for client ${clientId}`);
 
-      // Get all budgets to search through
-      const allBudgets = await storage.getBudgets();
-      console.log(`Total budgets in system: ${allBudgets.length}`);
-
-      // Find budgets that match this client ID in various ways
-      for (const budget of allBudgets) {
-        let shouldInclude = false;
-
-        // Direct match with clientId
-        if (budget.clientId === clientId) {
-          shouldInclude = true;
-        }
-
-        // Check if clientId refers to a user, and find client record
-        if (!shouldInclude) {
-          try {
-            const clientRecord = await storage.getClientByUserId(clientId);
-            if (clientRecord && budget.clientId === clientRecord.id) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        // Check if budget.clientId is a client record, and see if its userId matches
-        if (!shouldInclude) {
-          try {
-            const budgetClientRecord = await storage.getClient(budget.clientId);
-            if (budgetClientRecord && budgetClientRecord.userId === clientId) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        // Also check if contactName matches user info (fallback for orders created from budgets)
-        if (!shouldInclude && budget.contactName) {
-          try {
-            const user = await storage.getUser(clientId);
-            if (user && user.name === budget.contactName) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        if (shouldInclude) {
-          budgets.push(budget);
-        }
-      }
-
-      // Remove duplicates
-      const uniqueBudgets = budgets.filter((budget, index, self) =>
-        index === self.findIndex(b => b.id === budget.id)
-      );
-
-      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
-
-      // Enrich with vendor names and items
+      // Enrich budgets with vendor names and photos
       const enrichedBudgets = await Promise.all(
-        uniqueBudgets.map(async (budget) => {
-          const vendor = await storage.getUser(budget.vendorId);
-          const items = await storage.getBudgetItems(budget.id);
-          const photos = await storage.getBudgetPhotos(budget.id);
+        budgets.map(async (budget) => {
+          try {
+            const vendor = await storage.getUser(budget.vendorId);
+            const photos = await storage.getBudgetPhotos(budget.id);
+            const items = await storage.getBudgetItems(budget.id);
 
-          // Enrich items with product details
-          const enrichedItems = await Promise.all(
-            items.map(async (item) => {
-              const product = await storage.getProduct(item.productId);
-              return {
-                ...item,
-                productName: product?.name || 'Produto não encontrado'
-              };
-            })
-          );
+            const enrichedItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  productName: product?.name || item.productName || 'Produto não encontrado'
+                };
+              })
+            );
 
-          // Get payment data
-          const paymentData = await storage.getBudgetPaymentInfo(budget.id);
+            // Get payment data
+            const paymentData = await storage.getBudgetPaymentInfo(budget.id);
 
-          // Ensure all budget fields are properly set
-          return {
-            ...budget,
-            status: budget.status || 'draft', // Ensure status is always present
-            vendorName: vendor?.name || 'Vendedor',
-            photos: photos,
-            items: enrichedItems,
-            paymentData
-          };
+            // Ensure all budget fields are properly set
+            return {
+              ...budget,
+              id: budget.id,
+              budgetNumber: budget.budgetNumber || 'N/A',
+              status: budget.status || 'draft',
+              vendorName: vendor?.name || 'Vendedor',
+              photos: photos.map(p => p.photoUrl || p.imageUrl),
+              items: enrichedItems,
+              paymentData,
+              createdAt: budget.createdAt || new Date()
+            };
+          } catch (enrichError) {
+            console.error(`Error enriching client budget ${budget.id}:`, enrichError);
+            return {
+              ...budget,
+              vendorName: 'Erro ao carregar',
+              photos: [],
+              items: [],
+              paymentData: null
+            };
+          }
         })
       );
 
@@ -6059,10 +6065,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
 
+      console.log(`Returning ${enrichedBudgets.length} enriched budgets for client ${clientId}`);
       res.json(enrichedBudgets);
     } catch (error) {
       console.error("Error fetching client budgets:", error);
-      res.status(500).json({ error: "Failed to fetch client budgets" });
+      res.status(500).json({ error: "Failed to fetch client budgets: " + error.message });
     }
   });
 
@@ -7400,7 +7407,6 @@ Para mais detalhes, entre em contato conosco!`;
           // Ensure all budget fields are properly set
           return {
             ...budget,
-            status: budget.status || 'draft', // Ensure status is always present
             vendorName: vendor?.name || 'Vendedor',
             photos: photos,
             items: enrichedItems,
