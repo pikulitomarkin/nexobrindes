@@ -391,14 +391,23 @@ export class PgStorage implements IStorage {
     return results[0];
   }
 
-  async updateOrderStatus(orderId: string, status: string): Promise<Order | undefined> {
-    await pg
-      .update(schema.orders)
-      .set({
-        status,
-        updatedAt: new Date()
-      })
-      .where(eq(schema.orders.id, orderId));
+  async updateOrderStatus(
+    orderId: string,
+    status: string,
+    notes?: string,
+    deliveryDate?: string,
+    trackingCode?: string
+  ): Promise<Order | undefined> {
+    const updates: any = { status };
+    if (notes) updates.notes = notes;
+    if (deliveryDate) updates.deliveryDeadline = new Date(deliveryDate);
+    if (trackingCode) updates.trackingCode = trackingCode;
+
+    const results = await pg.update(schema.orders)
+      .set(updates)
+      .where(eq(schema.orders.id, orderId))
+      .returning();
+    const updatedOrder = results[0];
 
     console.log(`Order ${orderId} status updated to: ${status}`);
 
@@ -422,7 +431,7 @@ export class PgStorage implements IStorage {
     if (status === 'cancelled') {
       await this.updateCommissionsByOrderStatus(orderId, 'cancelled');
     }
-    return undefined;
+    return updatedOrder;
   }
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
@@ -704,35 +713,30 @@ export class PgStorage implements IStorage {
     return newUser;
   }
 
-  async createPartner(partnerData: any): Promise<User> {
-    // Create user first
-    const newUser = await this.createUser({
-      username: partnerData.username,
-      password: partnerData.password || "123456",
-      role: 'partner',
-      name: partnerData.name,
-      email: partnerData.email || null,
-      phone: partnerData.phone || null,
-      vendorId: null,
-      isActive: true
-    });
+  async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
+    console.log(`Updating partner commission: ${userId} to ${commissionRate}%`);
 
-    // Create partner profile
-    await pg.insert(schema.partners).values({
-      userId: newUser.id,
-      commissionRate: partnerData.commissionRate || "15.00",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-
-    return newUser;
+    await pg.update(schema.partners)
+      .set({
+        commissionRate: commissionRate,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.partners.userId, userId));
   }
 
-  async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
-    await pg.update(schema.partners)
-      .set({ commissionRate, updatedAt: new Date() })
-      .where(eq(schema.partners.userId, userId));
+  async deletePartner(userId: string): Promise<boolean> {
+    try {
+      console.log(`Deleting partner profile for user: ${userId}`);
+
+      const result = await pg.delete(schema.partners)
+        .where(eq(schema.partners.userId, userId))
+        .returning();
+
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting partner profile for user ${userId}:`, error);
+      return false;
+    }
   }
 
   // ==================== COMMISSION SETTINGS ====================
@@ -893,7 +897,7 @@ export class PgStorage implements IStorage {
         isActive: true,
         producerId: producerId,
         type: 'external',
-        
+
         // Optional fields with mapping
         externalId: item.IdProduto?.toString() || item.id?.toString(),
         externalCode: item.CodigoXbz || item.code,
@@ -916,7 +920,7 @@ export class PgStorage implements IStorage {
     for (const rawItem of productsData) {
       try {
         const productData = mapProductFields(rawItem);
-        
+
         // Validate required fields
         if (!productData.name || productData.name.trim() === '') {
           errors.push(`Produto pulado: nome vazio ou inválido`);
@@ -1069,13 +1073,13 @@ export class PgStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    
+
     const newBudget = results[0];
 
     // Create budget items if provided
     if (budgetData.items && Array.isArray(budgetData.items) && budgetData.items.length > 0) {
       console.log(`[PG CREATE BUDGET] Processing ${budgetData.items.length} items`);
-      
+
       // Remove duplicates based on productId, producerId, quantity, and unitPrice
       const seenItems = new Set();
       const uniqueItems = budgetData.items.filter(item => {

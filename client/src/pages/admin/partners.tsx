@@ -147,26 +147,37 @@ export default function AdminPartners() {
 
   const deletePartnerMutation = useMutation({
     mutationFn: async (id: string) => {
+      console.log(`Attempting to delete partner: ${id}`);
       const response = await fetch(`/api/partners/${id}`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json"
         }
       });
-      if (!response.ok) throw new Error("Failed to delete partner");
-      return response.json();
+      
+      const responseData = await response.json();
+      console.log('Delete response:', responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to delete partner");
+      }
+      
+      return responseData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
+      queryClient.refetchQueries({ queryKey: ["/api/partners"] });
       toast({
         title: "Sucesso",
         description: "Sócio removido com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      console.error('Error deleting partner:', error);
       toast({
         title: "Erro",
-        description: "Erro ao remover sócio",
+        description: error.message || "Erro ao remover sócio",
         variant: "destructive",
       });
     },

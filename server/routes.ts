@@ -3991,25 +3991,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/partners/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log(`Attempting to delete partner: ${id}`);
 
       // Check if partner has commissions
       const commissions = await storage.getCommissionsByPartner(id);
       if (commissions.length > 0) {
+        console.log(`Partner ${id} has ${commissions.length} commissions, cannot delete`);
         return res.status(400).json({
           error: "Não é possível excluir este sócio pois existem comissões associadas"
         });
       }
 
-      // Delete partner profile
-      await pg.delete(schema.partners).where(eq(schema.partners.userId, id));
+      // Delete partner profile first
+      try {
+        await storage.deletePartner(id);
+        console.log(`Partner profile deleted for user: ${id}`);
+      } catch (partnerError) {
+        console.log(`No partner profile found for user ${id}, continuing with user deletion`);
+      }
 
       // Delete user
-      await storage.deleteUser(id);
+      const userDeleted = await storage.deleteUser(id);
+      if (!userDeleted) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
 
-      res.json({ success: true });
+      console.log(`Partner and user ${id} deleted successfully`);
+      res.json({ success: true, message: "Sócio excluído com sucesso" });
     } catch (error) {
       console.error("Error deleting partner:", error);
-      res.status(500).json({ error: "Failed to delete partner" });
+      res.status(500).json({ error: "Erro ao excluir sócio: " + error.message });
     }
   });
 
