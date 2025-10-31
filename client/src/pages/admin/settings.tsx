@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, CreditCard, Truck, Settings, Palette, Lock, Eye, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, CreditCard, Truck, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -341,7 +338,7 @@ export default function AdminSettings() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
         title: "Erro",
@@ -844,146 +841,6 @@ export default function AdminSettings() {
               ))}
               {!shippingMethods?.length && (
                 <p className="text-center text-gray-500 py-8">Nenhum método de frete cadastrado</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Customization Options Section */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center">
-                <Palette className="h-5 w-5 mr-2" />
-                Opções de Personalização
-              </CardTitle>
-              <Dialog open={customizationOptionDialogOpen} onOpenChange={(open) => {
-                setCustomizationOptionDialogOpen(open);
-                if (!open) resetCustomizationOptionForm();
-              }}>
-                <DialogTrigger asChild>
-                  <Button className="gradient-bg text-white" data-testid="button-add-customization-option">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Opção
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingCustomizationOption ? "Editar Opção de Personalização" : "Nova Opção de Personalização"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      Configure as opções de personalização disponíveis para os produtos.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCustomizationOptionSubmit} className="space-y-4">
-                    <div>
-                      <Label htmlFor="customization-name">Nome</Label>
-                      <Input
-                        id="customization-name"
-                        placeholder="Ex: Serigrafia 1 cor"
-                        value={customizationOptionForm.name}
-                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, name: e.target.value })}
-                        required
-                        data-testid="input-customization-name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="customization-description">Descrição</Label>
-                      <Textarea
-                        id="customization-description"
-                        placeholder="Descrição adicional da personalização"
-                        value={customizationOptionForm.description}
-                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, description: e.target.value })}
-                        data-testid="input-customization-description"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="customization-category">Categoria</Label>
-                      <Input
-                        id="customization-category"
-                        placeholder="Ex: mochila, móveis, camiseta"
-                        value={customizationOptionForm.category}
-                        onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, category: e.target.value })}
-                        required
-                        data-testid="input-customization-category"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="customization-min-quantity">Quantidade Mínima</Label>
-                        <Input
-                          id="customization-min-quantity"
-                          type="number"
-                          min="1"
-                          value={customizationOptionForm.minQuantity}
-                          onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, minQuantity: parseInt(e.target.value) })}
-                          required
-                          data-testid="input-customization-min-quantity"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="customization-price">Preço (R$)</Label>
-                        <Input
-                          id="customization-price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={customizationOptionForm.price}
-                          onChange={(e) => setCustomizationOptionForm({ ...customizationOptionForm, price: parseFloat(e.target.value) })}
-                          required
-                          data-testid="input-customization-price"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={customizationOptionForm.isActive}
-                        onCheckedChange={(checked) => setCustomizationOptionForm({ ...customizationOptionForm, isActive: checked })}
-                        data-testid="switch-customization-active"
-                      />
-                      <Label>Ativo</Label>
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Button type="button" variant="outline" onClick={() => setCustomizationOptionDialogOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button type="submit" data-testid="button-save-customization-option">
-                        {editingCustomizationOption ? "Atualizar" : "Criar"}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {customizationOptions?.map((option: any) => (
-                <div key={option.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`card-customization-option-${option.id}`}>
-                  <div>
-                    <p className="font-medium">{option.name}</p>
-                    <p className="text-sm text-gray-500">{option.category} • Qty min: {option.minQuantity}</p>
-                    <div className="text-xs text-gray-400">
-                      R$ {parseFloat(option.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      {option.description && ` • ${option.description}`}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${option.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {option.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={() => handleEditCustomizationOption(option)} data-testid={`button-edit-customization-option-${option.id}`}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteCustomizationOptionMutation.mutate(option.id)} data-testid={`button-delete-customization-option-${option.id}`}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {!customizationOptions?.length && (
-                <p className="text-center text-gray-500 py-8">Nenhuma opção de personalização cadastrada</p>
               )}
             </div>
           </CardContent>
