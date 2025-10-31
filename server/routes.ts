@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/orders/:id/cancel", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       console.log(`Cancelling order: ${id}`);
 
       // Get order to validate it exists
@@ -752,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update order status to cancelled
-      await storage.updateOrder(id, { 
+      await storage.updateOrder(id, {
         status: 'cancelled',
         updatedAt: new Date()
       });
@@ -768,8 +768,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Order ${id} cancelled successfully`);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Pedido cancelado com sucesso",
         order: { ...order, status: 'cancelled' }
       });
@@ -971,7 +971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let processedItems = [];
       if (budgetData.items && Array.isArray(budgetData.items)) {
         console.log(`[CREATE BUDGET] Received ${budgetData.items.length} items from frontend`);
-        
+
         // Validar personalizações antes de criar o orçamento
         console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(budgetData.items, null, 2));
 
@@ -2998,9 +2998,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log partner creation - use current admin user ID for logging  
-      try {
-        if (req.user?.id) {
+      // Log partner creation - use current admin user ID for logging
+      if (req.user?.id) {
+        try {
           // Verify the logging user exists before attempting to log
           const logUser = await storage.getUser(req.user.id);
           if (logUser) {
@@ -3009,7 +3009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               req.user.name || logUser.name,
               req.user.role || logUser.role,
               'CREATE',
-              'users', 
+              'users',
               user.id,
               `Sócio criado: ${user.name} - Usuário: ${user.username}`,
               'success',
@@ -3024,12 +3024,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             console.log('Warning: Logging user not found, skipping log');
           }
-        } else {
-          console.log('Warning: No authenticated user for logging, skipping log');
+        } catch (logError) {
+          console.log('Warning: Could not log partner creation:', logError.message);
+          // Continue without failing the partner creation
         }
-      } catch (logError) {
-        console.log('Warning: Could not log partner creation:', logError.message);
-        // Continue without failing the partner creation
+      } else {
+        console.log('Warning: No authenticated user for logging, skipping log');
       }
 
       console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
@@ -3992,21 +3992,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/partners/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       // Check if partner has commissions
       const commissions = await storage.getCommissionsByPartner(id);
       if (commissions.length > 0) {
-        return res.status(400).json({ 
-          error: "Não é possível excluir este sócio pois existem comissões associadas" 
+        return res.status(400).json({
+          error: "Não é possível excluir este sócio pois existem comissões associadas"
         });
       }
 
       // Delete partner profile
       await pg.delete(schema.partners).where(eq(schema.partners.userId, id));
-      
+
       // Delete user
       await storage.deleteUser(id);
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting partner:", error);
@@ -4321,7 +4321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // 3. Are confirmed (not just drafts)
         const shouldInclude = order.status !== 'cancelled' &&
                              remainingValue > 0.01 &&
-                             (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
+                             (order.status === 'confirmed' || order.status === 'production' || order.status ==='pending');
 
         if (shouldInclude) {
           console.log(`Including order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Remaining=${remainingValue}, Status=${order.status}`);
@@ -4333,7 +4333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with client names and additional info
       const enrichedOrders = await Promise.all(
         pendingOrders.map(async (order) => {
-          // Always use contactName as primary client identifier
+          // Always use contactName as primary client name
           let clientName = order.contactName;
 
           // Only if contactName is missing, try to get from client record
@@ -6077,10 +6077,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Validar personalizações antes de criar o orçamento - apenas logar alertas
-      let customizationWarnings = [];
+      // Validate and process items
+      let processedItems = [];
+      if (req.body.items && Array.isArray(req.body.items)) {
+        console.log(`[CREATE BUDGET] Received ${req.body.items.length} items from frontend`);
 
-      if (req.body.items && req.body.items.length > 0) {
+        // Validar personalizações antes de criar o orçamento
         console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
 
         for (const item of req.body.items) {
@@ -6097,118 +6099,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
 
               if (itemQty < minQty) {
-                console.log(`ALERTA: ${itemQty} < ${minQty} - Salvando orçamento mesmo assim`);
-                customizationWarnings.push(`A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item tem ${itemQty} unidades.`);
-              } else {
-                console.log(`APROVADO: ${itemQty} >= ${minQty}`);
+                return res.status(400).json({
+                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item "${item.productName}" tem apenas ${itemQty} unidades.`
+                });
               }
             }
           }
         }
+
+        // Process items for creation
+        processedItems = req.body.items.map((item: any) => ({
+          productId: item.productId,
+          productName: item.productName,
+          producerId: item.producerId || 'internal',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || null,
+          itemCustomizationValue: item.itemCustomizationValue || 0,
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          additionalCustomizationNotes: item.additionalCustomizationNotes || null,
+          customizationPhoto: item.customizationPhoto || null,
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || null,
+          generalCustomizationValue: item.generalCustomizationValue || 0,
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || 'percentage',
+          itemDiscountPercentage: item.itemDiscountPercentage || 0,
+          itemDiscountValue: item.itemDiscountValue || 0,
+          productWidth: item.productWidth || null,
+          productHeight: item.productHeight || null,
+          productDepth: item.productDepth || null
+        }));
+
+        console.log(`[CREATE BUDGET] Items received:`, processedItems.map(item => ({
+          productId: item.productId,
+          producerId: item.producerId,
+          quantity: item.quantity,
+          hasGeneralCustomization: item.hasGeneralCustomization,
+          generalCustomizationName: item.generalCustomizationName
+        })));
       }
 
-      // Validate that contactName is provided
-      if (!req.body.contactName) {
-        return res.status(400).json({ error: "Nome de contato é obrigatório" });
-      }
-
-      console.log(`[CREATE BUDGET] Received ${req.body.items.length} items from frontend`);
-      console.log('[CREATE BUDGET] Items received:', JSON.stringify(req.body.items.map(i => ({
-        productId: i.productId,
-        producerId: i.producerId,
-        quantity: i.quantity,
-        hasGeneralCustomization: i.hasGeneralCustomization,
-        generalCustomizationName: i.generalCustomizationName
-      }))));
-
-      const newBudget = await storage.createBudget(req.body);
-
-      // Remove duplicate items before processing
-      const seenItems = new Set();
-      const uniqueItems = req.body.items.filter(item => {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-        if (seenItems.has(itemKey)) {
-          console.log(`[CREATE BUDGET] Removing duplicate budget item: ${item.productName} (${itemKey})`);
-          return false;
-        }
-        seenItems.add(itemKey);
-        return true;
+      // Create budget with processed data
+      const newBudget = await storage.createBudget({
+        ...req.body,
+        items: processedItems,
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
 
-      console.log(`[CREATE BUDGET] Processing ${uniqueItems.length} unique budget items (filtered from ${req.body.items.length})`);
+      console.log("[CREATE BUDGET] Budget created successfully:", newBudget.id);
 
-      // Process each item
-      for (const itemData of uniqueItems) {
-        try {
-          // Normalize empty strings to appropriate defaults for numeric fields
-          const normalizedItem = {
-            ...itemData,
-            productWidth: itemData.productWidth || null,
-            productHeight: itemData.productHeight || null,
-            productDepth: itemData.productDepth || null,
-            itemCustomizationValue: itemData.itemCustomizationValue || "0.00",
-            generalCustomizationValue: itemData.generalCustomizationValue || "0.00",
-            itemDiscountPercentage: itemData.itemDiscountPercentage || "0.00",
-            itemDiscountValue: itemData.itemDiscountValue || "0.00",
-            selectedCustomizationId: itemData.selectedCustomizationId || null,
-            itemCustomizationDescription: itemData.itemCustomizationDescription || null,
-            customizationPhoto: itemData.customizationPhoto || null,
-            generalCustomizationName: itemData.generalCustomizationName || null,
-            additionalCustomizationNotes: itemData.additionalCustomizationNotes || null
-          };
-          await storage.createBudgetItem(newBudget.id, normalizedItem);
-        } catch (error) {
-          console.error(`Error creating budget item:`, error);
-          // Continue with other items, don't fail the entire budget
-        }
-      }
-
-      // Save payment and shipping information
-      if (req.body.paymentMethodId || req.body.shippingMethodId) {
-        await storage.createBudgetPaymentInfo({
-          budgetId: newBudget.id,
-          paymentMethodId: req.body.paymentMethodId || null,
-          shippingMethodId: req.body.shippingMethodId || null,
-          installments: req.body.installments || 1,
-          downPayment: req.body.downPayment?.toString() || "0.00",
-          remainingAmount: req.body.remainingAmount?.toString() || "0.00",
-          shippingCost: req.body.shippingCost?.toString() || "0.00"
-        });
-      }
-
-      // Process budget photos
-      console.log(`[CREATE BUDGET] Processing ${req.body.photos?.length || 0} photos from request`);
-      if (req.body.photos && Array.isArray(req.body.photos)) {
-        for (const photoUrl of req.body.photos) {
-          await storage.createBudgetPhoto(newBudget.id, { photoUrl });
-        }
-      }
-
-      // Log budget creation
-      await storage.logUserAction(
-        req.body.vendorId,
-        req.body.vendorName || 'Vendedor',
-        'vendor',
-        'CREATE',
-        'budgets',
-        newBudget.id,
-        `Orçamento criado: ${newBudget.budgetNumber} - Cliente: ${newBudget.contactName} - Valor: R$ ${newBudget.totalValue}`,
-        'success',
-        {
-          budgetNumber: newBudget.budgetNumber,
-          clientName: newBudget.contactName,
-          totalValue: newBudget.totalValue,
-          itemCount: req.body.items?.length || 0
-        }
-      );
-
-      // Incluir alertas na resposta se existirem
-      const response = {
-        ...newBudget,
-        warnings: customizationWarnings.length > 0 ? customizationWarnings : undefined
-      };
-
-      res.json(response);
+      res.json(newBudget);
     } catch (error) {
       console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
@@ -6237,6 +6181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
 
+      // Process each item
       for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
@@ -6718,100 +6663,6 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
-  // Settings Routes - Payment Methods
-  app.get("/api/settings/payment-methods", async (req, res) => {
-    try {
-      const paymentMethods = await storage.getAllPaymentMethods();
-      res.json(paymentMethods);
-    } catch (error) {
-      console.error("Error fetching payment methods:", error);
-      res.status(500).json({ error: "Failed to fetch payment methods" });
-    }
-  });
-
-  app.post("/api/settings/payment-methods", async (req, res) => {
-    try {
-      const paymentMethod = await storage.createPaymentMethod(req.body);
-      res.json(paymentMethod);
-    } catch (error) {
-      console.error("Error creating payment method:", error);
-      res.status(500).json({ error: "Failed to create payment method" });
-    }
-  });
-
-  app.put("/api/settings/payment-methods/:id", async (req, res) => {
-    try {
-      const paymentMethod = await storage.updatePaymentMethod(req.params.id, req.body);
-      if (!paymentMethod) {
-        return res.status(404).json({ error: "Payment method not found" });
-      }
-      res.json(paymentMethod);
-    } catch (error) {
-      console.error("Error updating payment method:", error);
-      res.status(500).json({ error: "Failed to update payment method" });
-    }
-  });
-
-  app.delete("/api/settings/payment-methods/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deletePaymentMethod(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Payment method not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting payment method:", error);
-      res.status(500).json({ error: "Failed to delete payment method" });
-    }
-  });
-
-  // Settings Routes - Shipping Methods
-  app.get("/api/settings/shipping-methods", async (req, res) => {
-    try {
-      const shippingMethods = await storage.getAllShippingMethods();
-      res.json(shippingMethods);
-    } catch (error) {
-      console.error("Error fetching shipping methods:", error);
-      res.status(500).json({ error: "Failed to fetch shipping methods" });
-    }
-  });
-
-  app.post("/api/settings/shipping-methods", async (req, res) => {
-    try {
-      const shippingMethod = await storage.createShippingMethod(req.body);
-      res.json(shippingMethod);
-    } catch (error) {
-      console.error("Error creating shipping method:", error);
-      res.status(500).json({ error: "Failed to create shipping method" });
-    }
-  });
-
-  app.put("/api/settings/shipping-methods/:id", async (req, res) => {
-    try {
-      const shippingMethod = await storage.updateShippingMethod(req.params.id, req.body);
-      if (!shippingMethod) {
-        return res.status(404).json({ error: "Shipping method not found" });
-      }
-      res.json(shippingMethod);
-    } catch (error) {
-      console.error("Error updating shipping method:", error);
-      res.status(500).json({ error: "Failed to update shipping method" });
-    }
-  });
-
-  app.delete("/api/settings/shipping-methods/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deleteShippingMethod(req.params.id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Shipping method not found" });
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting shipping method:", error);
-      res.status(500).json({ error: "Failed to delete shipping method" });
-    }
-  });
-
   // Settings Routes - Customization Options
   app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
     try {
@@ -6998,7 +6849,7 @@ Para mais detalhes, entre em contato conosco!`;
 
           return {
             ...payment,
-            producerName: producer?.name || 'Unknown',
+            producerName: producer?.name || 'Produtor não encontrado',
             productionOrder,
             order,
             // Add clientName, orderNumber, product from order if available
