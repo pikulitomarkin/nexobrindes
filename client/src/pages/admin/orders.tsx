@@ -124,10 +124,9 @@ export default function AdminOrders() {
 
   const cancelOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: "PUT",
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "cancelled" }),
       });
       if (!response.ok) {
         const errorData = await response.json();

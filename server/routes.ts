@@ -729,6 +729,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel order endpoint
+  app.patch("/api/orders/:id/cancel", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      console.log(`Cancelling order: ${id}`);
+
+      // Get order to validate it exists
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Check if order can be cancelled
+      if (order.status === 'cancelled') {
+        return res.status(400).json({ error: "Pedido já está cancelado" });
+      }
+
+      if (order.status === 'delivered' || order.status === 'completed') {
+        return res.status(400).json({ error: "Não é possível cancelar um pedido que já foi entregue" });
+      }
+
+      // Update order status to cancelled
+      await storage.updateOrder(id, { 
+        status: 'cancelled',
+        updatedAt: new Date()
+      });
+
+      // Cancel related commissions
+      await storage.updateCommissionsByOrderStatus(id, 'cancelled');
+
+      // If order has production orders, cancel them too
+      const productionOrders = await storage.getProductionOrdersByOrder(id);
+      for (const po of productionOrders) {
+        await storage.updateProductionOrderStatus(po.id, 'cancelled', 'Pedido cancelado');
+      }
+
+      console.log(`Order ${id} cancelled successfully`);
+
+      res.json({ 
+        success: true, 
+        message: "Pedido cancelado com sucesso",
+        order: { ...order, status: 'cancelled' }
+      });
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      res.status(500).json({ error: "Erro ao cancelar pedido: " + error.message });
+    }
+  });
+
   // Change user password
   app.put("/api/users/:id/change-password", async (req, res) => {
     try {
