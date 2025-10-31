@@ -704,6 +704,31 @@ export class PgStorage implements IStorage {
     return newUser;
   }
 
+  async createPartner(partnerData: any): Promise<User> {
+    // Create user first
+    const newUser = await this.createUser({
+      username: partnerData.username,
+      password: partnerData.password || "123456",
+      role: 'partner',
+      name: partnerData.name,
+      email: partnerData.email || null,
+      phone: partnerData.phone || null,
+      vendorId: null,
+      isActive: true
+    });
+
+    // Create partner profile
+    await pg.insert(schema.partners).values({
+      userId: newUser.id,
+      commissionRate: partnerData.commissionRate || "15.00",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    return newUser;
+  }
+
   async updatePartnerCommission(userId: string, commissionRate: string): Promise<void> {
     await pg.update(schema.partners)
       .set({ commissionRate, updatedAt: new Date() })

@@ -3767,6 +3767,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await storage.getUsers();
       const partners = users.filter(user => user.role === 'partner');
 
+      console.log(`Found ${partners.length} partners in users table`);
+
       const partnersWithDetails = await Promise.all(partners.map(async (partner) => {
         const partnerProfile = await storage.getPartner(partner.id);
         return {
@@ -3794,7 +3796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, email, phone, username, password } = req.body;
 
-      console.log('Creating partner with request data:', { name, email, phone, username: username, hasPassword: !!password });
+      console.log('Creating partner with request data:', { name, email, phone, username, hasPassword: !!password });
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -3825,24 +3827,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: password,
         commissionRate: '15.00' // Default commission rate for partners
       });
-
-      // Log partner creation
-      await storage.logUserAction(
-        req.user?.id || 'admin-1',
-        req.user?.name || 'Administrador',
-        req.user?.role || 'admin',
-        'CREATE',
-        'users',
-        newPartner.id,
-        `Sócio criado: ${newPartner.name} - Usuário: ${newPartner.username}`,
-        'success',
-        {
-          userName: newPartner.name,
-          username: newPartner.username,
-          role: newPartner.role,
-          email: newPartner.email
-        }
-      );
 
       console.log('Partner created successfully:', { id: newPartner.id, username: newPartner.username, name: newPartner.name });
 
@@ -3960,6 +3944,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const partnerData = req.body;
 
+      console.log(`Updating partner ${id} with data:`, partnerData);
+
       // Validate required fields
       if (!partnerData.name || partnerData.name.trim().length === 0) {
         return res.status(400).json({ error: "Nome é obrigatório" });
@@ -3977,6 +3963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Sócio não encontrado" });
       }
 
+      console.log('Partner updated successfully:', updatedUser.name);
+
       // Return updated user without password
       const { password: _, ...userWithoutPassword } = updatedUser;
 
@@ -3988,6 +3976,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating partner:", error);
       res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
+    }
+  });
+
+  // Delete partner
+  app.delete("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if partner has commissions
+      const commissions = await storage.getCommissionsByPartner(id);
+      if (commissions.length > 0) {
+        return res.status(400).json({ 
+          error: "Não é possível excluir este sócio pois existem comissões associadas" 
+        });
+      }
+
+      // Delete partner profile
+      await pg.delete(schema.partners).where(eq(schema.partners.userId, id));
+      
+      // Delete user
+      await storage.deleteUser(id);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting partner:", error);
+      res.status(500).json({ error: "Failed to delete partner" });
     }
   });
 

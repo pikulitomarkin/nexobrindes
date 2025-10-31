@@ -57,7 +57,9 @@ export default function AdminPartners() {
 
   const createPartnerMutation = useMutation({
     mutationFn: async (partnerData: typeof partnerForm) => {
+      console.log('=== CREATING PARTNER ===');
       console.log('Sending partner data:', partnerData);
+      
       const response = await fetch("/api/partners", {
         method: "POST",
         headers: {
@@ -67,12 +69,16 @@ export default function AdminPartners() {
         body: JSON.stringify(partnerData),
       });
       
+      console.log('Response status:', response.status);
+      
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create partner");
+        throw new Error(responseData.error || "Failed to create partner");
       }
       
-      return response.json();
+      return responseData;
     },
     onSuccess: (data) => {
       console.log('Partner created successfully:', data);
@@ -178,6 +184,8 @@ export default function AdminPartners() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Form submitted with data:', partnerForm);
+    
     // Validate required fields
     if (!partnerForm.name || partnerForm.name.trim().length === 0) {
       toast({
@@ -197,7 +205,7 @@ export default function AdminPartners() {
       return;
     }
 
-    if (!partnerForm.password || partnerForm.password.length < 6) {
+    if (!editingPartner && (!partnerForm.password || partnerForm.password.length < 6)) {
       toast({
         title: "Erro",
         description: "Senha deve ter pelo menos 6 caracteres",
