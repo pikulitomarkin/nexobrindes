@@ -2998,32 +2998,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log partner creation - only if we have a valid user
-      if (req.user?.id) {
-        try {
-          // Verify user exists before logging
-          const logUser = await storage.getUser(req.user.id);
-          if (logUser) {
-            await storage.logUserAction(
-              req.user.id,
-              req.user.name || logUser.name || 'Sistema',
-              req.user.role || logUser.role || 'system',
-              'CREATE',
-              'users',
-              user.id,
-              `Sócio criado: ${user.name} - Usuário: ${user.username}`,
-              'success',
-              {
-                userName: user.name,
-                username: user.username,
-                role: user.role
-              }
-            );
+      // Log partner creation - use the created user's ID for logging
+      try {
+        await storage.logUserAction(
+          user.id, // Use the newly created partner's ID
+          user.name,
+          user.role,
+          'CREATE',
+          'users',
+          user.id,
+          `Sócio criado: ${user.name} - Usuário: ${user.username}`,
+          'success',
+          {
+            userName: user.name,
+            username: user.username,
+            role: user.role,
+            createdBy: req.user?.id || 'system'
           }
-        } catch (logError) {
-          console.log('Warning: Could not log partner creation:', logError.message);
-          // Continue without failing the partner creation
-        }
+        );
+      } catch (logError) {
+        console.log('Warning: Could not log partner creation:', logError.message);
+        // Continue without failing the partner creation
       }
 
       console.log('Producer created successfully:', { id: user.id, username: user.username, name: user.name });
