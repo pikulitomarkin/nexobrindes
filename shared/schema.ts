@@ -481,7 +481,7 @@ export const quoteRequestItems = pgTable("quote_request_items", {
 
 export const systemLogs = pgTable("system_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // Nullable para permitir logs de sistema
   userName: text("user_name").notNull(), // Nome do usuário para facilitar consultas
   userRole: text("user_role").notNull(), // Role do usuário
   action: text("action").notNull(), // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
