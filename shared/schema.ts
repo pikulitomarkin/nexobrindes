@@ -42,6 +42,20 @@ export const clients = pgTable("clients", {
   emailNF: text("email_nf"), // E-Mail para Envio de NF
   nomeContato: text("nome_contato"), // Nome do contato
   emailContato: text("email_contato"), // Endereço de e-mail do contato
+  // Endereço de Faturamento
+  enderecoFaturamentoLogradouro: text("endereco_faturamento_logradouro"),
+  enderecoFaturamentoNumero: text("endereco_faturamento_numero"),
+  enderecoFaturamentoComplemento: text("endereco_faturamento_complemento"),
+  enderecoFaturamentoBairro: text("endereco_faturamento_bairro"),
+  enderecoFaturamentoCidade: text("endereco_faturamento_cidade"),
+  enderecoFaturamentoCep: text("endereco_faturamento_cep"),
+  // Endereço de Entrega
+  enderecoEntregaLogradouro: text("endereco_entrega_logradouro"),
+  enderecoEntregaNumero: text("endereco_entrega_numero"),
+  enderecoEntregaComplemento: text("endereco_entrega_complemento"),
+  enderecoEntregaBairro: text("endereco_entrega_bairro"),
+  enderecoEntregaCidade: text("endereco_entrega_cidade"),
+  enderecoEntregaCep: text("endereco_entrega_cep"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

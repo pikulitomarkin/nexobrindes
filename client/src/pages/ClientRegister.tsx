@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { UserPlus, LogIn, Store } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Schemas
 const registerSchema = z.object({
@@ -39,6 +40,20 @@ const registerSchema = z.object({
   emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
   nomeContato: z.string().optional(),
   emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
+  // Endereço de Faturamento
+  enderecoFaturamentoLogradouro: z.string().optional(),
+  enderecoFaturamentoNumero: z.string().optional(),
+  enderecoFaturamentoComplemento: z.string().optional(),
+  enderecoFaturamentoBairro: z.string().optional(),
+  enderecoFaturamentoCidade: z.string().optional(),
+  enderecoFaturamentoCep: z.string().optional(),
+  // Endereço de Entrega
+  enderecoEntregaLogradouro: z.string().optional(),
+  enderecoEntregaNumero: z.string().optional(),
+  enderecoEntregaComplemento: z.string().optional(),
+  enderecoEntregaBairro: z.string().optional(),
+  enderecoEntregaCidade: z.string().optional(),
+  enderecoEntregaCep: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "As senhas não coincidem",
   path: ["confirmPassword"],
@@ -56,6 +71,7 @@ export default function ClientRegister() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"login" | "register">("register");
+  const [useSameAddress, setUseSameAddress] = useState(true);
 
   // Fetch vendors
   const { data: vendors = [], isLoading: loadingVendors } = useQuery<any[]>({
@@ -89,6 +105,20 @@ export default function ClientRegister() {
       emailNF: "",
       nomeContato: "",
       emailContato: "",
+      // Endereço de Faturamento
+      enderecoFaturamentoLogradouro: "",
+      enderecoFaturamentoNumero: "",
+      enderecoFaturamentoComplemento: "",
+      enderecoFaturamentoBairro: "",
+      enderecoFaturamentoCidade: "",
+      enderecoFaturamentoCep: "",
+      // Endereço de Entrega
+      enderecoEntregaLogradouro: "",
+      enderecoEntregaNumero: "",
+      enderecoEntregaComplemento: "",
+      enderecoEntregaBairro: "",
+      enderecoEntregaCidade: "",
+      enderecoEntregaCep: "",
     },
   });
 
@@ -110,12 +140,12 @@ export default function ClientRegister() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Erro ao criar cliente");
       }
-      
+
       return await response.json();
     },
     onSuccess: (data: any) => {
@@ -147,12 +177,12 @@ export default function ClientRegister() {
           preferredRole: "client",
         }),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Erro ao fazer login");
       }
-      
+
       return await response.json();
     },
     onSuccess: (data: any) => {
@@ -160,12 +190,12 @@ export default function ClientRegister() {
         // Store user data and token from backend
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.token);
-        
+
         toast({
           title: "Login realizado com sucesso!",
           description: `Bem-vindo, ${data.user.name}!`,
         });
-        
+
         setLocation("/");
       }
     },
@@ -224,9 +254,9 @@ export default function ClientRegister() {
                       <FormItem>
                         <FormLabel>Código de Usuário</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="Digite seu código de usuário" 
-                            {...field} 
+                          <Input
+                            placeholder="Digite seu código de usuário"
+                            {...field}
                             data-testid="input-username"
                           />
                         </FormControl>
@@ -242,10 +272,10 @@ export default function ClientRegister() {
                       <FormItem>
                         <FormLabel>Senha</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Digite sua senha" 
-                            {...field} 
+                          <Input
+                            type="password"
+                            placeholder="Digite sua senha"
+                            {...field}
                             data-testid="input-password"
                           />
                         </FormControl>
@@ -254,9 +284,9 @@ export default function ClientRegister() {
                     )}
                   />
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={loginMutation.isPending}
                     data-testid="button-login"
                   >
@@ -270,11 +300,11 @@ export default function ClientRegister() {
             <TabsContent value="register" className="space-y-4">
               <Form {...registerForm}>
                 <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-6">
-                  
+
                   {/* Informações Básicas */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-900">Informações Básicas</h3>
-                    
+
                     <FormField
                       control={registerForm.control}
                       name="name"
@@ -282,9 +312,9 @@ export default function ClientRegister() {
                         <FormItem>
                           <FormLabel>Nome do Contato *</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="João Silva" 
-                              {...field} 
+                            <Input
+                              placeholder="João Silva"
+                              {...field}
                               data-testid="input-name"
                             />
                           </FormControl>
@@ -299,8 +329,8 @@ export default function ClientRegister() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Vendedor Responsável *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
+                          <Select
+                            onValueChange={field.onChange}
                             defaultValue={field.value}
                             disabled={loadingVendors}
                           >
@@ -359,9 +389,9 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>CPF/CNPJ</FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="123.456.789-00 ou 00.000.000/0001-00" 
-                                {...field} 
+                              <Input
+                                placeholder="123.456.789-00 ou 00.000.000/0001-00"
+                                {...field}
                                 data-testid="input-cpf"
                               />
                             </FormControl>
@@ -385,10 +415,10 @@ export default function ClientRegister() {
                     </div>
                   </div>
 
-                  {/* Endereço Completo */}
+                  {/* Endereço Principal */}
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Endereço Completo</h3>
-                    
+                    <h3 className="text-lg font-semibold text-gray-900">Endereço Principal</h3>
+
                     <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={registerForm.control}
@@ -477,10 +507,226 @@ export default function ClientRegister() {
                     </div>
                   </div>
 
+                  {/* Endereço de Faturamento */}
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="useSameAddress"
+                        checked={useSameAddress}
+                        onCheckedChange={setUseSameAddress}
+                      />
+                      <label
+                        htmlFor="useSameAddress"
+                        className="text-lg font-semibold text-gray-900 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Endereço de Faturamento
+                      </label>
+                    </div>
+
+                    {!useSameAddress && (
+                      <>
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoLogradouro"
+                            render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel>Logradouro/Rua</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Rua das Flores" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoNumero"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Número</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="123" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoComplemento"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Complemento</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Apto 45, Bloco B" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoBairro"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Bairro</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Centro" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoCidade"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Cidade</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="São Paulo" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoFaturamentoCep"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>CEP</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="01234-567" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Endereço de Entrega */}
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="useSameAddressForDelivery"
+                        checked={useSameAddress}
+                        onCheckedChange={setUseSameAddress}
+                      />
+                      <label
+                        htmlFor="useSameAddressForDelivery"
+                        className="text-lg font-semibold text-gray-900 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Endereço de Entrega
+                      </label>
+                    </div>
+
+                    {!useSameAddress && (
+                      <>
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaLogradouro"
+                            render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel>Logradouro/Rua</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Rua das Flores" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaNumero"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Número</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="123" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaComplemento"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Complemento</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Apto 45, Bloco B" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaBairro"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Bairro</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Centro" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaCidade"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Cidade</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="São Paulo" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={registerForm.control}
+                            name="enderecoEntregaCep"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>CEP</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="01234-567" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   {/* Contato */}
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={registerForm.control}
@@ -489,9 +735,9 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>Telefone</FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="(11) 99999-9999" 
-                                {...field} 
+                              <Input
+                                placeholder="(11) 99999-9999"
+                                {...field}
                                 data-testid="input-phone"
                               />
                             </FormControl>
@@ -506,9 +752,9 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>WhatsApp</FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="(11) 99999-9999" 
-                                {...field} 
+                              <Input
+                                placeholder="(11) 99999-9999"
+                                {...field}
                                 data-testid="input-whatsapp"
                               />
                             </FormControl>
@@ -551,7 +797,7 @@ export default function ClientRegister() {
                   {/* E-mails Comerciais */}
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="text-lg font-semibold text-gray-900">E-mails Comerciais</h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={registerForm.control}
@@ -588,10 +834,10 @@ export default function ClientRegister() {
                         <FormItem>
                           <FormLabel>E-mail Principal</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="email" 
-                              placeholder="contato@empresa.com" 
-                              {...field} 
+                            <Input
+                              type="email"
+                              placeholder="contato@empresa.com"
+                              {...field}
                               data-testid="input-email"
                             />
                           </FormControl>
@@ -604,7 +850,7 @@ export default function ClientRegister() {
                   {/* Senha */}
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="text-lg font-semibold text-gray-900">Senha de Acesso</h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={registerForm.control}
@@ -613,10 +859,10 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>Senha *</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="password" 
-                                placeholder="Mínimo 6 caracteres" 
-                                {...field} 
+                              <Input
+                                type="password"
+                                placeholder="Mínimo 6 caracteres"
+                                {...field}
                                 data-testid="input-register-password"
                               />
                             </FormControl>
@@ -632,10 +878,10 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>Confirmar Senha *</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="password" 
-                                placeholder="Digite a senha novamente" 
-                                {...field} 
+                              <Input
+                                type="password"
+                                placeholder="Digite a senha novamente"
+                                {...field}
                                 data-testid="input-confirm-password"
                               />
                             </FormControl>
@@ -646,9 +892,9 @@ export default function ClientRegister() {
                     </div>
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={registerMutation.isPending}
                     data-testid="button-register"
                   >

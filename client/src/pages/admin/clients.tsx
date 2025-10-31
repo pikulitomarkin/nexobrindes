@@ -44,6 +44,20 @@ const clientFormSchema = z.object({
   emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
   nomeContato: z.string().optional(),
   emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
+  // Endereço de Faturamento
+  enderecoFaturamentoLogradouro: z.string().optional(),
+  enderecoFaturamentoNumero: z.string().optional(),
+  enderecoFaturamentoComplemento: z.string().optional(),
+  enderecoFaturamentoBairro: z.string().optional(),
+  enderecoFaturamentoCidade: z.string().optional(),
+  enderecoFaturamentoCep: z.string().optional(),
+  // Endereço de Entrega
+  enderecoEntregaLogradouro: z.string().optional(),
+  enderecoEntregaNumero: z.string().optional(),
+  enderecoEntregaComplemento: z.string().optional(),
+  enderecoEntregaBairro: z.string().optional(),
+  enderecoEntregaCidade: z.string().optional(),
+  enderecoEntregaCep: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -113,6 +127,20 @@ export default function AdminClients() {
       emailNF: "",
       nomeContato: "",
       emailContato: "",
+      // Endereço de Faturamento
+      enderecoFaturamentoLogradouro: "",
+      enderecoFaturamentoNumero: "",
+      enderecoFaturamentoComplemento: "",
+      enderecoFaturamentoBairro: "",
+      enderecoFaturamentoCidade: "",
+      enderecoFaturamentoCep: "",
+      // Endereço de Entrega
+      enderecoEntregaLogradouro: "",
+      enderecoEntregaNumero: "",
+      enderecoEntregaComplemento: "",
+      enderecoEntregaBairro: "",
+      enderecoEntregaCidade: "",
+      enderecoEntregaCep: "",
     },
   });
 
@@ -245,7 +273,7 @@ export default function AdminClients() {
                 {/* Informações Básicas */}
                 <div className="space-y-4 border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Informações Básicas</h3>
-                  
+
                   <FormField
                     control={form.control}
                     name="name"
@@ -334,10 +362,10 @@ export default function AdminClients() {
                   </div>
                 </div>
 
-                {/* Endereço Completo */}
+                {/* Endereço Principal */}
                 <div className="space-y-4 border-b pb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Endereço Completo</h3>
-                  
+                  <h3 className="text-lg font-semibold text-gray-900">Endereço Principal</h3>
+
                   <div className="grid grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
@@ -426,10 +454,194 @@ export default function AdminClients() {
                   </div>
                 </div>
 
+                {/* Endereço de Faturamento */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Endereço de Faturamento</h3>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoLogradouro"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Logradouro/Rua</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Rua das Flores" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoNumero"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoComplemento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apto 45, Bloco B" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoBairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoCidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input placeholder="São Paulo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoCep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP</FormLabel>
+                          <FormControl>
+                            <Input placeholder="01234-567" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço de Entrega */}
+                <div className="space-y-4 border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Endereço de Entrega</h3>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaLogradouro"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Logradouro/Rua</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Rua das Flores" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaNumero"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaComplemento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apto 45, Bloco B" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaBairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaCidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input placeholder="São Paulo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaCep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP</FormLabel>
+                          <FormControl>
+                            <Input placeholder="01234-567" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
                 {/* Contato */}
                 <div className="space-y-4 border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -492,7 +704,7 @@ export default function AdminClients() {
                 {/* E-mails Comerciais */}
                 <div className="space-y-4 border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900">E-mails Comerciais</h3>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -841,9 +1053,9 @@ export default function AdminClients() {
                       </div>
                     </div>
 
-                    {/* Endereço Completo */}
+                    {/* Endereço Principal */}
                     <div>
-                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Completo</h4>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Principal</h4>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-600">Logradouro:</label>
@@ -868,6 +1080,68 @@ export default function AdminClients() {
                         <div>
                           <label className="text-sm font-medium text-gray-600">CEP:</label>
                           <p className="text-sm text-gray-900">{client.cep || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Endereço de Faturamento */}
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço de Faturamento</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoLogradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoNumero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoComplemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoBairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoCidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoCep || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Endereço de Entrega */}
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço de Entrega</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaLogradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaNumero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaComplemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaBairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaCidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaCep || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
