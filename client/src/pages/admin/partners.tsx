@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,12 @@ import {
 import { Users, Plus, Edit, Trash2, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { z } from "zod";
+
+
 interface Partner {
   id: string;
   name: string;
@@ -38,16 +43,19 @@ interface Partner {
   isActive: boolean;
 }
 
+const partnerFormSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório"),
+  email: z.string().email("Email inválido"),
+  phone: z.string().optional(),
+  username: z.string().min(1, "Nome de usuário é obrigatório"),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+});
+
+type PartnerFormValues = z.infer<typeof partnerFormSchema>;
+
 export default function AdminPartners() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
-  const [partnerForm, setPartnerForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    username: "",
-    password: ""
-  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -56,10 +64,10 @@ export default function AdminPartners() {
   });
 
   const createPartnerMutation = useMutation({
-    mutationFn: async (partnerData: typeof partnerForm) => {
+    mutationFn: async (partnerData: typeof partnerForm.getValues) => {
       console.log('=== CREATING PARTNER ===');
       console.log('Sending partner data:', partnerData);
-      
+
       const response = await fetch("/api/partners", {
         method: "POST",
         headers: {
@@ -68,28 +76,28 @@ export default function AdminPartners() {
         },
         body: JSON.stringify(partnerData),
       });
-      
+
       console.log('Response status:', response.status);
-      
+
       const responseData = await response.json();
       console.log('Response data:', responseData);
-      
+
       if (!response.ok) {
         throw new Error(responseData.error || "Failed to create partner");
       }
-      
+
       return responseData;
     },
     onSuccess: (data) => {
       console.log('Partner created successfully:', data);
-      
+
       // Force refresh the partners list
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
       queryClient.refetchQueries({ queryKey: ["/api/partners"] });
-      
+
       setIsDialogOpen(false);
-      resetForm();
-      
+      form.reset();
+
       toast({
         title: "Sucesso",
         description: "Sócio criado com sucesso!",
@@ -106,7 +114,7 @@ export default function AdminPartners() {
   });
 
   const updatePartnerMutation = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<Partner> & { id: string }) => {
+    mutationFn: async ({ id, ...data }: Partial<PartnerFormValues> & { id: string }) => {
       const response = await fetch(`/api/partners/${id}`, {
         method: "PUT",
         headers: {
@@ -122,7 +130,7 @@ export default function AdminPartners() {
       queryClient.invalidateQueries({ queryKey: ["/api/partners"] });
       setIsDialogOpen(false);
       setEditingPartner(null);
-      resetForm();
+      form.reset();
       toast({
         title: "Sucesso",
         description: "Sócio atualizado com sucesso!",
@@ -164,71 +172,53 @@ export default function AdminPartners() {
     },
   });
 
-  const resetForm = () => {
-    setPartnerForm({
+  const form = useForm<PartnerFormValues>({
+    resolver: zodResolver(partnerFormSchema),
+    defaultValues: {
       name: "",
       email: "",
       phone: "",
       username: "",
-      password: ""
-    });
-  };
+      password: "",
+    },
+  });
+
+  // Auto-generate username from name
+  const watchedName = form.watch("name");
+  useEffect(() => {
+    if (watchedName) {
+      const username = watchedName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+      form.setValue("username", username);
+    }
+  }, [watchedName, form]);
 
   const handleEdit = (partner: Partner) => {
     setEditingPartner(partner);
-    setPartnerForm({
+    form.reset({
       name: partner.name,
       email: partner.email,
       phone: partner.phone || "",
       username: partner.username,
-      password: ""
+      password: "",
     });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('Form submitted with data:', partnerForm);
-    
-    // Validate required fields
-    if (!partnerForm.name || partnerForm.name.trim().length === 0) {
-      toast({
-        title: "Erro",
-        description: "Nome é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
+    form.handleSubmit(() => {
+      const values = form.getValues();
+      console.log('Submitting partner form:', values);
 
-    if (!partnerForm.username || partnerForm.username.trim().length === 0) {
-      toast({
-        title: "Erro",
-        description: "Nome de usuário é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!editingPartner && (!partnerForm.password || partnerForm.password.length < 6)) {
-      toast({
-        title: "Erro",
-        description: "Senha deve ter pelo menos 6 caracteres",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('Submitting partner form:', partnerForm);
-
-    if (editingPartner) {
-      updatePartnerMutation.mutate({
-        id: editingPartner.id,
-        ...partnerForm
-      });
-    } else {
-      createPartnerMutation.mutate(partnerForm);
-    }
+      if (editingPartner) {
+        updatePartnerMutation.mutate({
+          id: editingPartner.id,
+          ...values
+        });
+      } else {
+        createPartnerMutation.mutate(values);
+      }
+    })();
   };
 
   if (isLoading) {
@@ -253,14 +243,14 @@ export default function AdminPartners() {
             Gerencie os sócios da empresa
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               className="gradient-bg text-white"
               onClick={() => {
                 setEditingPartner(null);
-                resetForm();
+                form.reset();
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -274,59 +264,71 @@ export default function AdminPartners() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nome *</Label>
-                <Input
-                  id="name"
-                  value={partnerForm.name}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
-                  placeholder="Nome completo"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={partnerForm.email}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, email: e.target.value })}
-                  placeholder="email@exemplo.com"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Telefone</Label>
-                <Input
-                  id="phone"
-                  value={partnerForm.phone}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, phone: e.target.value })}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div>
-                <Label htmlFor="username">Código de Acesso *</Label>
-                <Input
-                  id="username"
-                  value={partnerForm.username}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, username: e.target.value })}
-                  placeholder="Será gerado automaticamente se não informado"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Se não informado, será gerado automaticamente (ex: SOC123456)
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="password">Senha *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={partnerForm.password}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, password: e.target.value })}
-                  placeholder="Senha para acesso"
-                  required
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@exemplo.com" type="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(11) 99999-9999" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome de usuário *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome sem espaços" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Senha para acesso" type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-end gap-2 pt-4">
                 <Button
                   type="button"
