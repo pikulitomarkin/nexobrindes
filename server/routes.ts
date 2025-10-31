@@ -2998,28 +2998,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
-      // Log producer creation - only if we have a valid user
+      // Log partner creation - only if we have a valid user
       if (req.user?.id) {
         try {
-          await storage.logUserAction(
-            req.user.id,
-            req.user.name || 'Sistema',
-            req.user.role || 'system',
-            'CREATE',
-            'users',
-            user.id,
-            `Produtor criado: ${user.name} - Usuário: ${user.username}`,
-            'success',
-            {
-              userName: user.name,
-              username: user.username,
-              role: user.role,
-              specialty: user.specialty
-            }
-          );
+          // Verify user exists before logging
+          const logUser = await storage.getUser(req.user.id);
+          if (logUser) {
+            await storage.logUserAction(
+              req.user.id,
+              req.user.name || logUser.name || 'Sistema',
+              req.user.role || logUser.role || 'system',
+              'CREATE',
+              'users',
+              user.id,
+              `Sócio criado: ${user.name} - Usuário: ${user.username}`,
+              'success',
+              {
+                userName: user.name,
+                username: user.username,
+                role: user.role
+              }
+            );
+          }
         } catch (logError) {
-          console.log('Warning: Could not log producer creation:', logError.message);
-          // Continue without failing the producer creation
+          console.log('Warning: Could not log partner creation:', logError.message);
+          // Continue without failing the partner creation
         }
       }
 
