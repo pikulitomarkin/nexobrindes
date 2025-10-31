@@ -1360,23 +1360,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const product = await storage.createProduct(newProduct);
 
-      // Log product creation
-      await storage.logUserAction(
-        req.user?.id || 'system',
-        req.user?.name || 'Sistema',
-        req.user?.role || 'system',
-        'CREATE',
-        'products',
-        product.id,
-        `Produto criado: ${product.name} - Preço: R$ ${product.basePrice}`,
-        'success',
-        {
-          productName: product.name,
-          category: product.category,
-          basePrice: product.basePrice,
-          producerId: product.producerId
+      // Log product creation only if user is properly authenticated
+      if (req.user && req.user.id) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'CREATE',
+            'products',
+            product.id,
+            `Produto criado: ${product.name} - Preço: R$ ${product.basePrice}`,
+            'success',
+            {
+              productName: product.name,
+              category: product.category,
+              basePrice: product.basePrice,
+              producerId: product.producerId
+            }
+          );
+        } catch (logError) {
+          console.error('Error logging product creation:', logError);
+          // Continue execution even if logging fails
         }
-      );
+      }
 
       console.log("Logistics product created successfully:", product.id);
 
