@@ -623,6 +623,21 @@ export class PgStorage implements IStorage {
     return results[0];
   }
 
+  async deleteCommission(id: string): Promise<boolean> {
+    try {
+      console.log(`Deleting commission: ${id}`);
+      
+      await pg.delete(schema.commissions)
+        .where(eq(schema.commissions.id, id));
+      
+      console.log(`Commission ${id} deleted successfully`);
+      return true;
+    } catch (error) {
+      console.error(`Error deleting commission ${id}:`, error);
+      return false;
+    }
+  }
+
   async deductPartnerCommission(partnerId: string, amount: string): Promise<void> {
     // Implementation for partner commission deduction
     // This would update commission records for the partner

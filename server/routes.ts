@@ -3868,6 +3868,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete commission
+  app.delete("/api/commissions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Deleting commission: ${id}`);
+
+      const deleted = await storage.deleteCommission(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Comissão não encontrada" });
+      }
+
+      // Log commission deletion
+      if (req.user && req.user.id) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'DELETE',
+            'commissions',
+            id,
+            `Comissão excluída`,
+            'warning',
+            {
+              commissionId: id
+            }
+          );
+        } catch (logError) {
+          console.error('Error logging commission deletion:', logError);
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting commission:", error);
+      res.status(500).json({ error: "Erro ao excluir comissão: " + error.message });
+    }
+  });
+
   // Update partner name
   app.put("/api/partners/:partnerId/name", async (req, res) => {
     try {

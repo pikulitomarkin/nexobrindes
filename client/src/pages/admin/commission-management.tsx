@@ -191,6 +191,23 @@ export default function CommissionManagement() {
     },
   });
 
+  const deleteCommissionMutation = useMutation({
+    mutationFn: async (commissionId: string) => {
+      const response = await fetch(`/api/commissions/${commissionId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Erro ao excluir comissão");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      toast({ title: "Sucesso!", description: "Comissão excluída com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível excluir a comissão", variant: "destructive" });
+    },
+  });
+
   // Handlers
   const handleEditVendorCommission = (vendor: any) => {
     setEditingVendor(vendor.id);
@@ -615,23 +632,37 @@ export default function CommissionManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {commission.status === 'confirmed' && (
+                          <div className="flex items-center space-x-2">
+                            {commission.status === 'confirmed' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateCommissionStatusMutation.mutate({
+                                  commissionId: commission.id,
+                                  status: 'paid'
+                                })}
+                              >
+                                Marcar como Paga
+                              </Button>
+                            )}
+                            {commission.status === 'pending' && (
+                              <span className="text-sm text-gray-500">
+                                {commission.type === 'vendor' ? 'Aguardando entrega do pedido' : 'Aguardando confirmação do pedido'}
+                              </span>
+                            )}
                             <Button
                               size="sm"
-                              variant="outline"
-                              onClick={() => updateCommissionStatusMutation.mutate({
-                                commissionId: commission.id,
-                                status: 'paid'
-                              })}
+                              variant="destructive"
+                              onClick={() => {
+                                if (confirm('Tem certeza que deseja excluir esta comissão? Esta ação não pode ser desfeita.')) {
+                                  deleteCommissionMutation.mutate(commission.id);
+                                }
+                              }}
+                              className="ml-2"
                             >
-                              Marcar como Paga
+                              Excluir
                             </Button>
-                          )}
-                          {commission.status === 'pending' && (
-                            <span className="text-sm text-gray-500">
-                              {commission.type === 'vendor' ? 'Aguardando entrega do pedido' : 'Aguardando confirmação do pedido'}
-                            </span>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
