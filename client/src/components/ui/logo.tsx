@@ -25,7 +25,7 @@ export function Logo({ className = '', variant = 'full', size = 'md' }: LogoProp
     >
       {/* Círculo externo com gradiente */}
       <circle cx="50" cy="50" r="45" fill="url(#bgGradient)" />
-      
+
       {/* Letra N estilizada formando uma conexão */}
       <path 
         d="M30 35 L30 65 L42 50 L42 65 M42 35 L54 50 L54 35 M54 65 L66 50 L66 65 L66 35" 
@@ -35,12 +35,12 @@ export function Logo({ className = '', variant = 'full', size = 'md' }: LogoProp
         strokeLinejoin="round"
         fill="none"
       />
-      
+
       {/* Pontos de conexão (representando "nexo") */}
       <circle cx="30" cy="35" r="4" fill="#FCD34D" />
       <circle cx="54" cy="50" r="4" fill="#FCD34D" />
       <circle cx="66" cy="35" r="4" fill="#FCD34D" />
-      
+
       <defs>
         <linearGradient id="bgGradient" x1="5" y1="5" x2="95" y2="95" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#2563EB" />

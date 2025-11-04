@@ -182,36 +182,36 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {/* Sidebar with gradient */}
       <div className={`
         w-64 bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl flex-shrink-0
-        fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/20 bg-white flex-shrink-0">
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/20 bg-white flex-shrink-0">
             <Logo size="sm" variant="full" />
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden text-gray-600 hover:bg-gray-100"
+              className="lg:hidden text-gray-600 hover:bg-gray-100 p-1"
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </div>
 
           {/* User Info */}
-          <div className="p-6 border-b border-white/20 flex-shrink-0">
-            <div className="text-sm font-medium text-white/90">
+          <div className="p-4 sm:p-6 border-b border-white/20 flex-shrink-0">
+            <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
               {user.name || "Usuário"}
             </div>
-            <div className="text-xs text-white/70">
+            <div className="text-xs text-white/70 truncate">
               {roleLabels[currentRole as keyof typeof roleLabels] || "Usuário"}
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-6">
-            <ul className="space-y-2">
+          <nav className="flex-1 p-4 sm:p-6 overflow-y-auto">
+            <ul className="space-y-1 sm:space-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location === item.href;
@@ -221,16 +221,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     <Link href={item.href}>
                       <div
                         className={`
-                          flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer
+                          flex items-center px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer
                           ${isActive
-                            ? 'bg-white text-blue-600 shadow-lg transform scale-105'
-                            : 'text-white/90 hover:bg-white/10 hover:text-white hover:transform hover:scale-105'
+                            ? 'bg-white text-blue-600 shadow-lg'
+                            : 'text-white/90 hover:bg-white/10 hover:text-white'
                           }
                         `}
                         onClick={() => setSidebarOpen(false)}
                       >
-                        <Icon className="h-5 w-5 mr-3" />
-                        {item.label}
+                        <Icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
+                        <span className="truncate text-xs sm:text-sm">{item.label}</span>
                       </div>
                     </Link>
                   </li>
@@ -251,36 +251,43 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white shadow-sm border-b px-6 py-4">
+        <header className="bg-white shadow-sm border-b px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden p-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+              </Button>
+              <div className="lg:hidden">
+                <Logo size="sm" variant="icon" />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">
                 {roleOptions.find(role => role.value === currentRole)?.label}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="flex items-center gap-2 text-gray-600 hover:text-red-600 hover:border-red-300"
+                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-red-600 hover:border-red-300 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm"
               >
-                <LogOut className="h-4 w-4" />
-                Sair
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Sair</span>
               </Button>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
-          {children}
+        <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
+          <div className="max-w-full overflow-x-auto">
+            {children}
+          </div>
         </main>
       </div>
     </div>
