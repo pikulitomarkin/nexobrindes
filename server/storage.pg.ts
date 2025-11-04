@@ -1774,9 +1774,32 @@ export class PgStorage implements IStorage {
   }
 
   async deleteProducer(id: string): Promise<boolean> {
-    // Deletar produtor (usuário com role producer)
-    await pg.delete(schema.users).where(eq(schema.users.id, id));
-    return true;
+    try {
+      console.log(`Deleting producer: ${id}`);
+      
+      // Verificar se o usuário existe e é um produtor
+      const user = await pg.select().from(schema.users)
+        .where(and(eq(schema.users.id, id), eq(schema.users.role, 'producer')));
+      
+      if (user.length === 0) {
+        console.log(`Producer not found or not a producer: ${id}`);
+        return false;
+      }
+
+      // Desativar produtos do produtor em vez de deletá-los (para manter histórico)
+      await pg.update(schema.products)
+        .set({ isActive: false })
+        .where(eq(schema.products.producerId, id));
+
+      // Deletar o usuário produtor
+      const result = await pg.delete(schema.users).where(eq(schema.users.id, id)).returning();
+      
+      console.log(`Producer ${id} deleted successfully`);
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting producer ${id}:`, error);
+      return false;
+    }
   }
 
   async deleteUser(id: string): Promise<boolean> {

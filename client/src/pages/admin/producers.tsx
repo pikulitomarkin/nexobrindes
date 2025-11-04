@@ -175,7 +175,9 @@ export default function AdminProducers() {
   });
 
   const handleDeleteProducer = (producerId: string, producerName: string) => {
-    if (confirm(`Tem certeza que deseja excluir o produtor "${producerName}"?`)) {
+    const confirmMessage = `Tem certeza que deseja excluir o produtor "${producerName}"?\n\nEsta ação não pode ser desfeita e irá:\n- Desativar todos os produtos associados\n- Remover o acesso do produtor ao sistema\n\nSomente produtores sem pedidos de produção ou pagamentos pendentes podem ser excluídos.`;
+    
+    if (confirm(confirmMessage)) {
       deleteProducerMutation.mutate(producerId);
     }
   };
@@ -430,6 +432,7 @@ export default function AdminProducers() {
                         title="Excluir produtor"
                         onClick={() => handleDeleteProducer(producer.id, producer.name)}
                         disabled={deleteProducerMutation.isPending}
+                        className="hover:bg-red-50 hover:border-red-200"
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>

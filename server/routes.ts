@@ -3321,12 +3321,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Validar se produtor tem produtos associados
+      const products = await storage.getProductsByProducer(id);
+      if (products.length > 0) {
+        return res.status(400).json({
+          error: "Não é possível excluir este produtor pois existem produtos associados a ele"
+        });
+      }
+
+      // Validar se produtor tem pagamentos pendentes
+      const producerPayments = await storage.getProducerPaymentsByProducer(id);
+      const pendingPayments = producerPayments.filter(payment => payment.status === 'pending' || payment.status === 'approved');
+      
+      if (pendingPayments.length > 0) {
+        return res.status(400).json({
+          error: "Não é possível excluir este produtor pois existem pagamentos pendentes associados a ele"
+        });
+      }
+
       // Excluir produtor
-      await storage.deleteProducer(id);
-      res.json({ success: true });
+      const deleted = await storage.deleteProducer(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Produtor não encontrado" });
+      }
+
+      // Log producer deletion
+      if (req.user && req.user.id) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'DELETE',
+            'producers',
+            id,
+            `Produtor excluído`,
+            'warning',
+            {
+              producerId: id
+            }
+          );
+        } catch (logError) {
+          console.error('Error logging producer deletion:', logError);
+        }
+      }
+
+      res.json({ success: true, message: "Produtor excluído com sucesso" });
     } catch (error) {
       console.error('Error deleting producer:', error);
-      res.status(500).json({ error: "Failed to delete producer" });
+      res.status(500).json({ error: "Erro ao excluir produtor: " + error.message });
     }
   });
 
