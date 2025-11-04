@@ -3917,6 +3917,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       console.log(`Deleting commission: ${id}`);
 
+      // Get commission details before deletion for logging
+      const commissions = await storage.getAllCommissions();
+      const commission = commissions.find(c => c.id === id);
+
       const deleted = await storage.deleteCommission(id);
       if (!deleted) {
         return res.status(404).json({ error: "Comissão não encontrada" });
@@ -3932,10 +3936,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'DELETE',
             'commissions',
             id,
-            `Comissão excluída`,
+            `Comissão excluída: R$ ${commission?.amount || '0.00'} - ${commission?.type || 'Unknown'} - Pedido: ${commission?.orderNumber || 'N/A'}`,
             'warning',
             {
-              commissionId: id
+              commissionId: id,
+              amount: commission?.amount,
+              type: commission?.type,
+              orderNumber: commission?.orderNumber
             }
           );
         } catch (logError) {
@@ -3943,7 +3950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ success: true });
+      res.json({ success: true, message: "Comissão excluída com sucesso" });
     } catch (error) {
       console.error("Error deleting commission:", error);
       res.status(500).json({ error: "Erro ao excluir comissão: " + error.message });

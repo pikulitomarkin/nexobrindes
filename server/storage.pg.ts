@@ -627,8 +627,14 @@ export class PgStorage implements IStorage {
     try {
       console.log(`Deleting commission: ${id}`);
       
-      await pg.delete(schema.commissions)
-        .where(eq(schema.commissions.id, id));
+      const result = await pg.delete(schema.commissions)
+        .where(eq(schema.commissions.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        console.log(`Commission not found: ${id}`);
+        return false;
+      }
       
       console.log(`Commission ${id} deleted successfully`);
       return true;
