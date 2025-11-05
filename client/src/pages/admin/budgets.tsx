@@ -43,6 +43,11 @@ export default function AdminBudgets() {
     discountPercentage: 0,
     discountValue: 0,
     shippingCost: 0,
+    paymentMethodId: "", // Added
+    shippingMethodId: "", // Added
+    installments: 1, // Added
+    downPayment: 0, // Added
+    remainingAmount: 0, // Added
   });
 
   const { data: budgets, isLoading } = useQuery({
@@ -83,8 +88,32 @@ export default function AdminBudgets() {
     },
   });
 
+  const { data: paymentMethods } = useQuery({
+    queryKey: ["/api/payment-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/payment-methods');
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      return response.json();
+    },
+  });
+
+  const { data: shippingMethods } = useQuery({
+    queryKey: ["/api/shipping-methods"],
+    queryFn: async () => {
+      const response = await fetch('/api/shipping-methods');
+      if (!response.ok) throw new Error('Failed to fetch shipping methods');
+      return response.json();
+    },
+  });
+
+
   const products = productsData?.products || [];
-  const categories = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+  const categories: string[] = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+
+  // Helper variables for selected payment and shipping methods - Admin
+  const selectedAdminPaymentMethod = paymentMethods?.find((pm: any) => pm.id === adminBudgetForm.paymentMethodId);
+  const selectedAdminShippingMethod = shippingMethods?.find((sm: any) => sm.id === adminBudgetForm.shippingMethodId);
+
 
   // Admin budget functions
   const addProductToAdminBudget = (product: any) => {
@@ -213,6 +242,11 @@ export default function AdminBudgets() {
       discountPercentage: 0,
       discountValue: 0,
       shippingCost: 0,
+      paymentMethodId: "", // Reset
+      shippingMethodId: "", // Reset
+      installments: 1, // Reset
+      downPayment: 0, // Reset
+      remainingAmount: 0, // Reset
     });
   };
 
@@ -220,7 +254,13 @@ export default function AdminBudgets() {
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateAdminTotalWithShipping().toFixed(2)
+        totalValue: calculateAdminTotalWithShipping().toFixed(2),
+        // Ensure downPayment and remainingAmount are included if they exist
+        downPayment: data.downPayment || 0,
+        remainingAmount: data.remainingAmount || 0,
+        paymentMethodId: data.paymentMethodId || null,
+        shippingMethodId: data.shippingMethodId || null,
+        installments: data.installments || 1,
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -392,11 +432,40 @@ export default function AdminBudgets() {
       return;
     }
 
+    // Validar payment and shipping methods
+    if (!adminBudgetForm.paymentMethodId) {
+      toast({
+        title: "Erro",
+        description: "A forma de pagamento é obrigatória",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (adminBudgetForm.deliveryType === "delivery" && !adminBudgetForm.shippingMethodId) {
+      toast({
+        title: "Erro",
+        description: "O método de frete é obrigatório quando há entrega",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Validar frete quando delivery
     if (adminBudgetForm.deliveryType === "delivery" && adminBudgetForm.shippingCost <= 0) {
       toast({
         title: "Erro",
         description: "O valor do frete é obrigatório quando há entrega",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar valor de entrada
+    if (adminBudgetForm.downPayment <= 0) {
+      toast({
+        title: "Erro",
+        description: "O valor de entrada é obrigatório",
         variant: "destructive"
       });
       return;
@@ -591,7 +660,35 @@ export default function AdminBudgets() {
                   <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega *</Label>
                   <Select
                     value={adminBudgetForm.deliveryType}
-                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value })}
+                    onValueChange={(value) => {
+                      setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value });
+                      // Reset shipping cost and potentially down payment if switching to pickup
+                      if (value === 'pickup') {
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          shippingCost: 0,
+                          shippingMethodId: "", // Clear shipping method
+                          downPayment: 0, // Reset down payment as it might be tied to shipping
+                          remainingAmount: calculateAdminBudgetTotal() // Recalculate remaining based on no shipping
+                        }));
+                      } else {
+                        // If switching back to delivery, ensure a shipping method is selected if available
+                        // and recalculate down payment and remaining amount.
+                        if (selectedAdminShippingMethod) {
+                          setAdminBudgetForm(prev => ({
+                            ...prev,
+                            shippingMethodId: selectedAdminShippingMethod.id,
+                            shippingCost: prev.shippingCost || 0, // Keep existing cost or set to 0 if not present
+                          }));
+                        }
+                        const total = calculateAdminTotalWithShipping();
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          downPayment: prev.downPayment || 0, // Keep existing down payment or set to 0
+                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
+                        }));
+                      }
+                    }}
                     required
                   >
                     <SelectTrigger>
@@ -1058,7 +1155,221 @@ export default function AdminBudgets() {
                 </Card>
               </div>
 
-              {/* Discount Section */}
+              {/* Payment and Shipping Configuration */}              
+              <Separator />
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Pagamento e Frete</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="admin-payment-method">Forma de Pagamento *</Label>
+                    <Select value={adminBudgetForm.paymentMethodId || ""} onValueChange={(value) => {
+                      setAdminBudgetForm({ ...adminBudgetForm, paymentMethodId: value });
+                      // Reset installments and down payment if payment method changes
+                      const selectedMethod = paymentMethods?.find((pm: any) => pm.id === value);
+                      if (selectedMethod && selectedMethod.type === "credit_card") {
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          installments: 1, // Reset to 1 installment
+                          downPayment: 0, // Reset down payment
+                          remainingAmount: calculateAdminBudgetTotal() // Recalculate remaining amount
+                        }));
+                      } else {
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          installments: 1,
+                          downPayment: 0, // Reset down payment for non-credit card methods
+                          remainingAmount: calculateAdminBudgetTotal()
+                        }));
+                      }
+                    }} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a forma de pagamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="admin-shipping-method">Método de Frete *</Label>
+                    <Select value={adminBudgetForm.shippingMethodId || ""} onValueChange={(value) => {
+                      setAdminBudgetForm({ ...adminBudgetForm, shippingMethodId: value });
+                      const selectedMethod = shippingMethods?.find((sm: any) => sm.id === value);
+                      // If switching to a method with a defined cost, use it. Otherwise, clear.
+                      if (selectedMethod && selectedMethod.cost !== undefined) {
+                        const shippingCost = parseFloat(selectedMethod.cost);
+                        const total = calculateAdminBudgetTotal() + shippingCost;
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          shippingCost: shippingCost,
+                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
+                        }));
+                      } else if (selectedMethod) {
+                        // If method exists but cost is not defined, clear cost
+                        const total = calculateAdminBudgetTotal() + 0; // Assume 0 if no cost defined
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          shippingCost: 0,
+                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
+                        }));
+                      } else {
+                        // If no method selected, clear cost
+                        const total = calculateAdminBudgetTotal() + 0;
+                        setAdminBudgetForm(prev => ({
+                          ...prev,
+                          shippingCost: 0,
+                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
+                        }));
+                      }
+                    }} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o método de frete" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shippingMethods?.map((method: any) => (
+                          <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Payment Configuration */}                
+                {selectedAdminPaymentMethod && (
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Pagamento</h4>
+
+                    {selectedAdminPaymentMethod.type === "credit_card" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="admin-installments">Número de Parcelas *</Label>
+                          <Select value={adminBudgetForm.installments?.toString() || "1"} onValueChange={(value) => {
+                            const installments = parseInt(value);
+                            setAdminBudgetForm({ ...adminBudgetForm, installments });
+                            // Recalculate remaining amount based on new installments if applicable
+                            const total = calculateAdminTotalWithShipping();
+                            const downPayment = adminBudgetForm.downPayment || 0;
+                            setAdminBudgetForm(prev => ({
+                              ...prev,
+                              remainingAmount: Math.max(0, total - downPayment)
+                            }));
+                          }} required>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: selectedAdminPaymentMethod.maxInstallments }, (_, i) => i + 1).map(num => (
+                                <SelectItem key={num} value={num.toString()}>
+                                  {num}x {num > 1 && selectedAdminPaymentMethod.installmentInterest > 0 && `(${selectedAdminPaymentMethod.installmentInterest}% a.m.)`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="admin-down-payment">Valor de Entrada (R$) *</Label>
+                        <Input
+                          id="admin-down-payment"
+                          value={adminBudgetForm.downPayment > 0 ? currencyMask(adminBudgetForm.downPayment.toString().replace('.', ',')) : ''}
+                          onChange={(e) => {
+                            const downPayment = parseCurrencyValue(e.target.value);
+                            const total = calculateAdminTotalWithShipping();
+                            setAdminBudgetForm({
+                              ...adminBudgetForm,
+                              downPayment,
+                              remainingAmount: Math.max(0, total - downPayment)
+                            });
+                          }}
+                          placeholder="R$ 0,00"
+                          required
+                        />
+                        <div className="text-xs text-gray-600 mt-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Subtotal dos Produtos:</span>
+                            <span>R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                          </div>
+                          {adminBudgetForm.deliveryType !== "pickup" && adminBudgetForm.shippingCost > 0 && (
+                            <div className="flex justify-between">
+                              <span>Frete:</span>
+                              <span>R$ {adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-medium text-green-700 pt-1 border-t">
+                            <span>Entrada para Iniciar:</span>
+                            <span>R$ {(adminBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                          </div>
+                          {adminBudgetForm.downPayment > 0 && adminBudgetForm.deliveryType !== "pickup" && adminBudgetForm.shippingCost > 0 && (
+                            <p className="text-blue-600 font-medium text-sm">
+                              * Valor inclui frete de R$ {adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="admin-remaining-amount">Valor Restante (R$)</Label>
+                        <Input
+                          id="admin-remaining-amount"
+                          value={`R$ ${(adminBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
+                          disabled
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Valor a pagar após início da produção
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Shipping Configuration */}                
+                {adminBudgetForm.deliveryType === "pickup" ? (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800">Retirada no Local</h4>
+                    <p className="text-sm text-blue-700 mt-2">
+                      O cliente irá retirar o pedido no local. Não há cobrança de frete.
+                    </p>
+                  </div>
+                ) : selectedAdminShippingMethod && (
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium">Configuração de Frete</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="admin-shipping-cost">Valor do Frete (R$) *</Label>
+                        <Input
+                          id="admin-shipping-cost"
+                          value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
+                          onChange={(e) => {
+                            const shippingCost = parseCurrencyValue(e.target.value);
+                            const total = calculateAdminBudgetTotal() + shippingCost;
+                            setAdminBudgetForm({
+                              ...adminBudgetForm,
+                              shippingCost,
+                              remainingAmount: Math.max(0, total - (adminBudgetForm.downPayment || 0))
+                            });
+                          }}
+                          placeholder="R$ 0,00"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do orçamento</p>
+                      </div>
+                      <div>
+                        <Label>Prazo Estimado</Label>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {selectedAdminShippingMethod.estimatedDays} dias úteis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Discount Section */}              
               <Separator />
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -1141,30 +1452,6 @@ export default function AdminBudgets() {
                 )}
               </div>
 
-              {/* Shipping Cost */}
-              {adminBudgetForm.deliveryType === "pickup" ? (
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-800">Retirada no Local</h4>
-                  <p className="text-sm text-blue-700 mt-2">
-                    O cliente irá retirar o pedido no local. Não há cobrança de frete.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="admin-shipping-cost">Custo do Frete</Label>
-                  <Input
-                    id="admin-shipping-cost"
-                    value={adminBudgetForm.shippingCost > 0 ? `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
-                      const shippingCost = parseFloat(value) || 0;
-                      setAdminBudgetForm({ ...adminBudgetForm, shippingCost });
-                    }}
-                    placeholder="R$ 0,00"
-                  />
-                </div>
-              )}
-
               {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="space-y-2">
@@ -1203,7 +1490,7 @@ export default function AdminBudgets() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor da Entrada:</span>
-                    <span>R$ 0,00</span>
+                    <span>R$ {(adminBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor do Frete:</span>
@@ -1215,8 +1502,8 @@ export default function AdminBudgets() {
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(adminBudgetForm.deliveryType === "pickup" ? 0 : adminBudgetForm.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Valor Restante para Pagamento:</span>
+                    <span>R$ {(adminBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
@@ -1241,7 +1528,7 @@ export default function AdminBudgets() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createAdminBudgetMutation.isPending || adminBudgetForm.items.length === 0}
+                  disabled={createAdminBudgetMutation.isPending || adminBudgetForm.items.length === 0 || !adminBudgetForm.paymentMethodId || (adminBudgetForm.deliveryType === "delivery" && !adminBudgetForm.shippingMethodId) || adminBudgetForm.downPayment <= 0}
                 >
                   {createAdminBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
                 </Button>
