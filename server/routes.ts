@@ -968,15 +968,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: client.isActive !== false
       }));
       
-      // Merge users and clients, avoiding duplicates
+      // Merge users and clients, avoiding duplicates by ID
       const allUsers = [...users];
       clientUsers.forEach(clientUser => {
-        if (!allUsers.find(u => u.id === clientUser.id)) {
+        // Check if this client ID already exists as a user
+        const existingUser = allUsers.find(u => u.id === clientUser.id);
+        if (!existingUser) {
           allUsers.push(clientUser);
+        } else {
+          // If user exists but has client role, update with client info
+          if (existingUser.role === 'client') {
+            Object.assign(existingUser, clientUser);
+          }
         }
       });
       
       console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clientUsers.length} from clients table)`);
+      console.log(`Client users:`, clientUsers.map(c => ({ id: c.id, name: c.name })));
       res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -1161,6 +1169,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!budgetData.title) {
         return res.status(400).json({ error: "Título é obrigatório" });
+      }
+
+      // Validate clientId if provided
+      if (budgetData.clientId) {
+        try {
+          const client = await storage.getClient(budgetData.clientId);
+          if (!client) {
+            console.log(`[CREATE BUDGET] Client ID ${budgetData.clientId} not found, setting to null`);
+            budgetData.clientId = null;
+          } else {
+            console.log(`[CREATE BUDGET] Client validated: ${client.name}`);
+          }
+        } catch (error) {
+          console.log(`[CREATE BUDGET] Error validating client ID ${budgetData.clientId}, setting to null:`, error);
+          budgetData.clientId = null;
+        }
       }
 
       // Fix branchId if it's "matriz" - replace with actual branch ID

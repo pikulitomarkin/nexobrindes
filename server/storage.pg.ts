@@ -1084,19 +1084,7 @@ export class PgStorage implements IStorage {
       processedData.deliveryDeadline = null;
     }
 
-    // Validate client ID if provided - if it doesn't exist in clients table, set to null
-    if (processedData.clientId) {
-      try {
-        const client = await this.getClient(processedData.clientId);
-        if (!client) {
-          console.log(`Client ID ${processedData.clientId} not found, setting to null`);
-          processedData.clientId = null;
-        }
-      } catch (error) {
-        console.log(`Error validating client ID ${processedData.clientId}, setting to null:`, error);
-        processedData.clientId = null;
-      }
-    }
+    // Note: Client ID validation is now handled in the routes layer to provide better error messages
 
     // Generate unique budget number with retry mechanism
     async function getNextBudgetNumber(): Promise<string> {
