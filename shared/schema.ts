@@ -402,6 +402,37 @@ export const bankTransactions = pgTable("bank_transactions", {
   hasValidDate: boolean("has_valid_date").default(true), // Whether the transaction date is valid
 });
 
+export const manualReceivables = pgTable("manual_receivables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientName: text("client_name").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  receivedAmount: decimal("received_amount", { precision: 10, scale: 2 }).default('0.00'),
+  dueDate: timestamp("due_date").notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'partial', 'paid', 'overdue', 'cancelled'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const manualPayables = pgTable("manual_payables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  beneficiary: text("beneficiary").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  category: text("category").notNull().default('Outros'),
+  status: text("status").notNull().default('pending'), // 'pending', 'paid', 'cancelled'
+  paidBy: varchar("paid_by").references(() => users.id),
+  paidAt: timestamp("paid_at"),
+  paymentMethod: text("payment_method"),
+  paymentNotes: text("payment_notes"),
+  transactionId: text("transaction_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const expenseNotes = pgTable("expense_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   date: timestamp("date").notNull(),
@@ -544,6 +575,8 @@ export const insertBankImportSchema = createInsertSchema(bankImports).omit({ id:
 export const insertBankTransactionSchema = createInsertSchema(bankTransactions).omit({ id: true, createdAt: true });
 export const insertExpenseNoteSchema = createInsertSchema(expenseNotes).omit({ id: true, createdAt: true });
 export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({ id: true, createdAt: true });
+export const insertManualReceivableSchema = createInsertSchema(manualReceivables).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertManualPayableSchema = createInsertSchema(manualPayables).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCustomizationOptionSchema = createInsertSchema(customizationOptions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProducerPaymentSchema = createInsertSchema(producerPayments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertQuoteRequestSchema = createInsertSchema(quoteRequests).omit({ id: true, createdAt: true, updatedAt: true });
@@ -599,6 +632,10 @@ export type ExpenseNote = typeof expenseNotes.$inferSelect;
 export type InsertExpenseNote = z.infer<typeof insertExpenseNoteSchema>;
 export type CommissionPayout = typeof commissionPayouts.$inferSelect;
 export type InsertCommissionPayout = z.infer<typeof insertCommissionPayoutSchema>;
+export type ManualReceivable = typeof manualReceivables.$inferSelect;
+export type InsertManualReceivable = z.infer<typeof insertManualReceivableSchema>;
+export type ManualPayable = typeof manualPayables.$inferSelect;
+export type InsertManualPayable = z.infer<typeof insertManualPayableSchema>;
 export type CustomizationOption = typeof customizationOptions.$inferSelect;
 export type InsertCustomizationOption = z.infer<typeof insertCustomizationOptionSchema>;
 export type ProducerPayment = typeof producerPayments.$inferSelect;

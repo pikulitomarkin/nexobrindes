@@ -1660,25 +1660,32 @@ export class PgStorage implements IStorage {
 
   // ==================== MANUAL RECEIVABLES/PAYABLES ====================
 
-  async createManualReceivable(data: any): Promise<any> {
-    // Implementation depends on schema - placeholder
-    return data;
+  async createManualReceivable(data: InsertManualReceivable): Promise<ManualReceivable> {
+    const results = await pg.insert(schema.manualReceivables).values(data).returning();
+    return results[0];
   }
 
-  async getManualReceivables(): Promise<any[]> {
-    return [];
+  async getManualReceivables(): Promise<ManualReceivable[]> {
+    return await pg.select().from(schema.manualReceivables)
+      .orderBy(desc(schema.manualReceivables.createdAt));
   }
 
-  async createManualPayable(data: any): Promise<any> {
-    return data;
+  async createManualPayable(data: InsertManualPayable): Promise<ManualPayable> {
+    const results = await pg.insert(schema.manualPayables).values(data).returning();
+    return results[0];
   }
 
-  async getManualPayables(): Promise<any[]> {
-    return [];
+  async getManualPayables(): Promise<ManualPayable[]> {
+    return await pg.select().from(schema.manualPayables)
+      .orderBy(desc(schema.manualPayables.createdAt));
   }
 
-  async updateManualPayable(id: string, updates: any): Promise<any> {
-    return updates;
+  async updateManualPayable(id: string, updates: Partial<InsertManualPayable>): Promise<ManualPayable | undefined> {
+    const results = await pg.update(schema.manualPayables)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.manualPayables.id, id))
+      .returning();
+    return results[0];
   }
 
   // ==================== CUSTOMIZATION OPTIONS ====================

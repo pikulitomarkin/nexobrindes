@@ -242,13 +242,13 @@ export interface IStorage {
   updateCommissionPayout(id: string, data: Partial<InsertCommissionPayout>): Promise<CommissionPayout | undefined>;
 
   // Manual Receivables
-  createManualReceivable(data: any): Promise<any>;
-  getManualReceivables(): Promise<any[]>;
+  createManualReceivable(data: InsertManualReceivable): Promise<ManualReceivable>;
+  getManualReceivables(): Promise<ManualReceivable[]>;
 
   // Manual Payables
-  createManualPayable(data: any): Promise<any>;
-  getManualPayables(): Promise<any[]>;
-  updateManualPayable(id: string, updates: any): Promise<any>;
+  createManualPayable(data: InsertManualPayable): Promise<ManualPayable>;
+  getManualPayables(): Promise<ManualPayable[]>;
+  updateManualPayable(id: string, updates: Partial<InsertManualPayable>): Promise<ManualPayable | undefined>;
 
   // Customization Options
   createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption>;
