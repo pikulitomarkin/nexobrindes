@@ -103,15 +103,33 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
     accountType: undefined as string | undefined
   };
 
-  // Parse OFX using node-ofx-parser (synchronous, no await needed but doesn't hurt)
-  const ofxData = Ofx.parse(ofxContent);
+  console.log(`Parsing OFX content: ${ofxContent.length} characters, ${stats.totalLines} lines`);
+
+  let ofxData;
+  try {
+    // Parse OFX using node-ofx-parser
+    ofxData = Ofx.parse(ofxContent);
+    console.log('OFX parsing successful, structure:', JSON.stringify(ofxData, null, 2).substring(0, 500) + '...');
+  } catch (parseError) {
+    console.error('OFX parsing failed:', parseError);
+    throw new Error(`Erro ao analisar arquivo OFX: ${parseError.message}`);
+  }
 
   const transactions: ParsedOFXTransaction[] = [];
 
-  // Normalize STMTTRNRS to array (node-ofx-parser may return single object or array)
-  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS;
+  // Check for different OFX structures
+  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS || 
+                       ofxData?.BANKMSGSRSV1?.STMTTRNRS ||
+                       ofxData?.OFX?.STMTTRNRS;
+                       
   if (!stmtTrnRsList) {
-    console.warn('No STMTTRNRS found in OFX file');
+    console.warn('No STMTTRNRS found in OFX file. Available keys:', Object.keys(ofxData || {}));
+    if (ofxData?.OFX) {
+      console.warn('OFX keys:', Object.keys(ofxData.OFX));
+      if (ofxData.OFX.BANKMSGSRSV1) {
+        console.warn('BANKMSGSRSV1 keys:', Object.keys(ofxData.OFX.BANKMSGSRSV1));
+      }
+    }
     return { transactions, stats };
   }
 
@@ -5083,8 +5101,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create bank import record
       const importRecord = await storage.createBankImport({
         filename: req.file.originalname,
-        uploadedBy: 'admin-1', // TODO: get from authenticated user
-        status: 'completed'
+        uploadedBy: req.user?.id || 'admin-1',
+        status: 'processing',
+        fileSize: req.file.size.toString(),
+        transactionCount: transactions.length
       });
 
       console.log(`Created import record: ${importRecord.id}`);
@@ -5104,30 +5124,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Create new transaction with proper validation
-          if (!transaction.fitId || !transaction.amount) {
-            console.log(`Skipping invalid transaction:`, transaction);
-            errors.push(`Transação inválida: faltam dados essenciais`);
+          // Validate essential fields
+          if (!transaction.fitId) {
+            console.log(`Skipping transaction without fitId:`, transaction);
+            errors.push(`Transação sem ID único (FITID)`);
             continue;
+          }
+
+          if (!transaction.amount || transaction.amount === '0' || transaction.amount === '0.00') {
+            console.log(`Skipping zero amount transaction:`, transaction);
+            errors.push(`Transação com valor zero: ${transaction.fitId}`);
+            continue;
+          }
+
+          // Ensure date is properly formatted
+          let transactionDate = transaction.date;
+          if (!transactionDate || !transaction.hasValidDate) {
+            transactionDate = new Date(); // Use current date as fallback
+            console.warn(`Using current date for transaction ${transaction.fitId} - original date invalid`);
           }
 
           const newTransaction = await storage.createBankTransaction({
             importId: importRecord.id,
             fitId: transaction.fitId,
-            date: transaction.date,
-            hasValidDate: transaction.hasValidDate,
+            date: transactionDate,
+            hasValidDate: transaction.hasValidDate || false,
             amount: transaction.amount,
-            description: transaction.description,
-            bankRef: transaction.bankRef,
-            type: transaction.type,
-            status: 'unmatched'
+            description: transaction.description || 'Transação bancária',
+            memo: transaction.description || '',
+            bankRef: transaction.bankRef || '',
+            originalType: transaction.originalType || '',
+            type: transaction.type || 'other',
+            status: 'unmatched',
+            notes: ''
           });
 
-          console.log(`Created transaction: ${newTransaction.id} - ${transaction.description} - ${transaction.amount}`);
+          console.log(`Created transaction: ${newTransaction.id} - ${transaction.description} - R$ ${transaction.amount}`);
           importedCount++;
         } catch (error) {
           console.error("Error saving transaction:", error);
-          errors.push(`Erro ao salvar transação ${transaction.fitId}: ${error.message}`);
+          errors.push(`Erro ao salvar transação ${transaction.fitId || 'sem ID'}: ${error.message}`);
         }
       }
 
@@ -5209,8 +5245,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create bank import record for producer payments
       const importRecord = await storage.createBankImport({
         filename: req.file.originalname,
-        uploadedBy: 'admin-1', // TODO: get from authenticated user
-        status: 'completed'
+        uploadedBy: req.user?.id || 'admin-1',
+        status: 'processing',
+        fileSize: req.file.size.toString(),
+        transactionCount: debitTransactions.length
       });
 
       console.log(`Created producer payment import record: ${importRecord.id}`);
@@ -5231,22 +5269,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Create new transaction with absolute amount for display
+          // Validate essential fields
+          if (!transaction.fitId) {
+            console.log(`Skipping debit transaction without fitId:`, transaction);
+            errors.push(`Transação de débito sem ID único (FITID)`);
+            continue;
+          }
+
+          // Ensure date is properly formatted
+          let transactionDate = transaction.date;
+          if (!transactionDate || !transaction.hasValidDate) {
+            transactionDate = new Date(); // Use current date as fallback
+            console.warn(`Using current date for debit transaction ${transaction.fitId}`);
+          }
+
+          // Create new transaction
           await storage.createBankTransaction({
             importId: importRecord.id,
             fitId: transaction.fitId,
-            date: new Date(transaction.date), // Ensure date is a Date object
+            date: transactionDate,
+            hasValidDate: transaction.hasValidDate || false,
             amount: transaction.amount, // Keep original negative value
-            description: transaction.description,
-            bankRef: transaction.bankRef,
-            type: transaction.type,
-            status: 'unmatched'
+            description: transaction.description || 'Pagamento bancário',
+            memo: transaction.description || '',
+            bankRef: transaction.bankRef || '',
+            originalType: transaction.originalType || '',
+            type: transaction.type || 'debit',
+            status: 'unmatched',
+            notes: ''
           });
 
+          console.log(`Created debit transaction: ${transaction.fitId} - ${transaction.description} - R$ ${transaction.amount}`);
           importedCount++;
         } catch (transactionError) {
           console.error(`Error importing producer payment transaction ${transaction.fitId}:`, transactionError);
-          errors.push(`Erro ao importar transação ${transaction.fitId}: ${transactionError.message}`);
+          errors.push(`Erro ao importar transação ${transaction.fitId || 'sem ID'}: ${transactionError.message}`);
         }
       }
 

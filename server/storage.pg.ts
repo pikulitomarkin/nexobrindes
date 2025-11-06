@@ -630,16 +630,16 @@ export class PgStorage implements IStorage {
   async deleteCommission(id: string): Promise<boolean> {
     try {
       console.log(`Deleting commission: ${id}`);
-      
+
       const result = await pg.delete(schema.commissions)
         .where(eq(schema.commissions.id, id))
         .returning();
-      
+
       if (result.length === 0) {
         console.log(`Commission not found: ${id}`);
         return false;
       }
-      
+
       console.log(`Commission ${id} deleted successfully`);
       return true;
     } catch (error) {
@@ -865,7 +865,7 @@ export class PgStorage implements IStorage {
   async updateProduct(id: string, productData: Partial<InsertProduct>): Promise<Product | undefined> {
     // Remove campos de timestamp se eles existirem no productData para evitar conflitos
     const { createdAt, updatedAt, ...cleanProductData } = productData as any;
-    
+
     const results = await pg.update(schema.products)
       .set({ ...cleanProductData, updatedAt: new Date() })
       .where(eq(schema.products.id, id))
@@ -1501,20 +1501,68 @@ export class PgStorage implements IStorage {
   }
 
   async getBankTransactions(): Promise<BankTransaction[]> {
-    return await pg.select().from(schema.bankTransactions)
-      .orderBy(desc(schema.bankTransactions.date));
+    try {
+      const result = await pg.select().from(schema.bankTransactions).orderBy(desc(schema.bankTransactions.date));
+
+      return result.map(row => ({
+        id: row.id,
+        importId: row.importId,
+        fitId: row.fitId || '',
+        date: row.date,
+        hasValidDate: row.hasValidDate || false,
+        amount: row.amount,
+        description: row.description || '',
+        memo: row.memo || '',
+        bankRef: row.bankRef || '',
+        originalType: row.originalType || '',
+        type: row.type || 'other',
+        status: row.status || 'unmatched',
+        matchedOrderId: row.matchedOrderId || null,
+        matchedPaymentId: row.matchedPaymentId || null,
+        matchedAt: row.matchedAt || null,
+        notes: row.notes || '',
+        matchedEntityType: row.matchedEntityType || null,
+        matchedEntityId: row.matchedEntityId || null
+      }));
+    } catch (error) {
+      console.error('Error fetching bank transactions:', error);
+      return [];
+    }
   }
 
-  async getBankTransaction(id: string): Promise<BankTransaction | undefined> {
-    const results = await pg.select().from(schema.bankTransactions)
-      .where(eq(schema.bankTransactions.id, id));
-    return results[0];
-  }
+  async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | null> {
+    try {
+      const result = await pg.select().from(schema.bankTransactions).where(eq(schema.bankTransactions.fitId, fitId)).limit(1);
 
-  async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | undefined> {
-    const results = await pg.select().from(schema.bankTransactions)
-      .where(eq(schema.bankTransactions.fitId, fitId));
-    return results[0];
+      if (result.length === 0) {
+        return null;
+      }
+
+      const row = result[0];
+      return {
+        id: row.id,
+        importId: row.importId,
+        fitId: row.fitId || '',
+        date: row.date,
+        hasValidDate: row.hasValidDate || false,
+        amount: row.amount,
+        description: row.description || '',
+        memo: row.memo || '',
+        bankRef: row.bankRef || '',
+        originalType: row.originalType || '',
+        type: row.type || 'other',
+        status: row.status || 'unmatched',
+        matchedOrderId: row.matchedOrderId || null,
+        matchedPaymentId: row.matchedPaymentId || null,
+        matchedAt: row.matchedAt || null,
+        notes: row.notes || '',
+        matchedEntityType: row.matchedEntityType || null,
+        matchedEntityId: row.matchedEntityId || null
+      };
+    } catch (error) {
+      console.error('Error fetching bank transaction by fitId:', error);
+      return null;
+    }
   }
 
   async createBankTransaction(data: InsertBankTransaction): Promise<BankTransaction> {
@@ -1637,7 +1685,7 @@ export class PgStorage implements IStorage {
 
   async createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption> {
     console.log('Creating customization option with data:', data);
-    
+
     const results = await pg.insert(schema.customizationOptions).values({
       name: data.name,
       description: data.description || null,
@@ -1649,7 +1697,7 @@ export class PgStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    
+
     console.log('Created customization option:', results[0]);
     return results[0];
   }
@@ -1688,14 +1736,14 @@ export class PgStorage implements IStorage {
       category: schema.customizationOptions.category
     }).from(schema.customizationOptions)
       .where(eq(schema.customizationOptions.isActive, true));
-    
+
     const categorySet = new Set<string>();
     customizations.forEach(customization => {
       if (customization.category && typeof customization.category === 'string') {
         categorySet.add(customization.category);
       }
     });
-    
+
     return Array.from(categorySet).sort();
   }
 
@@ -1832,11 +1880,11 @@ export class PgStorage implements IStorage {
   async deleteProducer(id: string): Promise<boolean> {
     try {
       console.log(`Deleting producer: ${id}`);
-      
+
       // Verificar se o usuário existe e é um produtor
       const user = await pg.select().from(schema.users)
         .where(and(eq(schema.users.id, id), eq(schema.users.role, 'producer')));
-      
+
       if (user.length === 0) {
         console.log(`Producer not found or not a producer: ${id}`);
         return false;
@@ -1849,7 +1897,7 @@ export class PgStorage implements IStorage {
 
       // Deletar o usuário produtor
       const result = await pg.delete(schema.users).where(eq(schema.users.id, id)).returning();
-      
+
       console.log(`Producer ${id} deleted successfully`);
       return result.length > 0;
     } catch (error) {
