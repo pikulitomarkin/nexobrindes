@@ -70,61 +70,25 @@ export default function AdminBudgets() {
     },
   });
 
-  const { data: clients, isLoading: clientsLoading, error: clientsError } = useQuery({
+  const { data: clients, isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
     queryFn: async () => {
-      console.log('[DEBUG] Fetching clients...');
-      try {
-        const response = await fetch('/api/users');
-        console.log('[DEBUG] Clients response status:', response.status);
-        if (!response.ok) {
-          console.error('[DEBUG] Clients fetch failed:', response.status);
-          throw new Error('Failed to fetch users');
-        }
-        const users = await response.json();
-        console.log('[DEBUG] Total users fetched:', users.length);
-        const clientsFiltered = users.filter((u: any) => u.role === 'client');
-        console.log('[DEBUG] Clients fetched:', clientsFiltered.length, clientsFiltered);
-        return clientsFiltered;
-      } catch (error) {
-        console.error('[DEBUG] Clients fetch error:', error);
-        throw error;
-      }
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'client');
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: false,
   });
 
-  const { data: vendors, isLoading: vendorsLoading, error: vendorsError } = useQuery({
+  const { data: vendors, isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/vendors"],
     queryFn: async () => {
-      console.log('[DEBUG] Fetching vendors...');
-      try {
-        const response = await fetch('/api/users');
-        console.log('[DEBUG] Vendors response status:', response.status);
-        if (!response.ok) {
-          console.error('[DEBUG] Vendors fetch failed:', response.status);
-          throw new Error('Failed to fetch users');
-        }
-        const users = await response.json();
-        console.log('[DEBUG] Total users for vendors:', users.length);
-        const vendorsFiltered = users.filter((u: any) => u.role === 'vendor');
-        console.log('[DEBUG] Vendors fetched:', vendorsFiltered.length, vendorsFiltered);
-        return vendorsFiltered;
-      } catch (error) {
-        console.error('[DEBUG] Vendors fetch error:', error);
-        throw error;
-      }
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const users = await response.json();
+      return users.filter((u: any) => u.role === 'vendor');
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
-    retry: false,
   });
-
-  console.log('[DEBUG] Current state - clients:', clients?.length, 'vendors:', vendors?.length, 'clientsLoading:', clientsLoading, 'vendorsLoading:', vendorsLoading);
-  if (clientsError) console.error('[DEBUG] Clients error:', clientsError);
-  if (vendorsError) console.error('[DEBUG] Vendors error:', vendorsError);
 
   const { data: productsData } = useQuery({
     queryKey: ["/api/products/admin", { limit: 9999 }],

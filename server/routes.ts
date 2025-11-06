@@ -949,6 +949,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Erro ao buscar usuários" });
+    }
+  });
+
   // Change user password
   app.put("/api/users/:id/change-password", async (req, res) => {
     try {
