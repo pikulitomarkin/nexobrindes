@@ -29,7 +29,7 @@ export function CustomizationSelector({
 }: CustomizationSelectorProps) {
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const { data: customizations = [], isLoading } = useQuery({
+  const { data: customizations = [], isLoading, refetch } = useQuery({
     queryKey: ["/api/settings/customization-options"],
     queryFn: async () => {
       const response = await fetch('/api/settings/customization-options');
@@ -40,6 +40,7 @@ export function CustomizationSelector({
         c.isActive
       );
     },
+    refetchInterval: 30000, // Refetch a cada 30 segundos para garantir dados atualizados
   });
 
   // Filtra personalizações pela categoria digitada E pela quantidade mínima

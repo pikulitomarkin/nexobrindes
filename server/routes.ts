@@ -407,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         minQuantity: parseInt(minQuantity),
         price: parseFloat(price).toFixed(2),
         isActive: isActive !== undefined ? isActive : true,
-        createdBy: req.user?.id || 'admin'
+        createdBy: req.user?.id || '6baf169c-0086-4452-b923-7541ab59ae39'
       });
 
       res.json(newOption);
@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             minQuantity: parseInt(customization.minQuantity),
             price: parseFloat(customization.price).toFixed(2),
             isActive: customization.isActive !== undefined ? customization.isActive : true,
-            createdBy: req.user?.id || 'admin'
+            createdBy: req.user?.id || '6baf169c-0086-4452-b923-7541ab59ae39'
           });
           imported++;
         } catch (error) {

@@ -83,6 +83,8 @@ export default function AdminCustomizations() {
       toast({ title: "Sucesso", description: "Personalização criada com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
+      // Force refetch das categorias imediatamente
+      categoriesQuery.refetch();
       resetForm();
       setIsDialogOpen(false);
     },
@@ -106,6 +108,8 @@ export default function AdminCustomizations() {
       toast({ title: "Sucesso", description: "Personalização atualizada com sucesso!" });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
+      // Force refetch das categorias imediatamente
+      categoriesQuery.refetch();
       resetForm();
       setEditingCustomization(null);
       setIsDialogOpen(false);
@@ -145,6 +149,8 @@ export default function AdminCustomizations() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customization-options"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customization-categories"] });
+      // Force refetch das categorias imediatamente
+      categoriesQuery.refetch();
       setIsImportDialogOpen(false);
       setSelectedFile(null);
       setImportPreview([]);
@@ -578,6 +584,11 @@ export default function AdminCustomizations() {
                             onClick={() => {
                               if (newCategory.trim()) {
                                 setIsCreatingCategory(false);
+                                // Adicionar temporariamente na lista local para aparecer imediatamente
+                                const currentCategories = categoriesQuery.data || [];
+                                if (!currentCategories.includes(newCategory)) {
+                                  queryClient.setQueryData(["/api/customization-categories"], [...currentCategories, newCategory]);
+                                }
                                 toast({ 
                                   title: "Categoria criada", 
                                   description: `A categoria "${newCategory}" será criada junto com a personalização.` 
