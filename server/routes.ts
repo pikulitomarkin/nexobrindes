@@ -3918,7 +3918,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/commissions/vendor/:vendorId", async (req, res) => {
     try {
       const { vendorId } = req.params;
+      console.log(`Fetching commissions for vendor: ${vendorId}`);
+      
       const commissions = await storage.getCommissionsByVendor(vendorId);
+      console.log(`Found ${commissions.length} commissions for vendor ${vendorId}`);
 
       // Enrich with order data
       const enrichedCommissions = await Promise.all(
@@ -3937,6 +3940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
+      console.log(`Returning ${enrichedCommissions.length} enriched commissions for vendor ${vendorId}`);
       res.json(enrichedCommissions);
     } catch (error) {
       console.error("Error fetching vendor commissions:", error);

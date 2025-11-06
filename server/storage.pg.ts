@@ -589,8 +589,12 @@ export class PgStorage implements IStorage {
   // ==================== COMMISSIONS ====================
 
   async getCommissionsByVendor(vendorId: string): Promise<Commission[]> {
-    return await pg.select().from(schema.commissions)
-      .where(eq(schema.commissions.vendorId, vendorId));
+    console.log(`[PG STORAGE] Getting commissions for vendor: ${vendorId}`);
+    const commissions = await pg.select().from(schema.commissions)
+      .where(eq(schema.commissions.vendorId, vendorId))
+      .orderBy(desc(schema.commissions.createdAt));
+    console.log(`[PG STORAGE] Found ${commissions.length} commissions for vendor ${vendorId}`);
+    return commissions;
   }
 
   async getCommissionsByPartner(partnerId: string): Promise<Commission[]> {

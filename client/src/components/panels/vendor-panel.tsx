@@ -19,6 +19,12 @@ export default function VendorPanel() {
     queryKey: ["/api/orders/vendor", vendorId],
   });
 
+  // Buscar comissões do vendedor
+  const { data: vendorCommissions, isLoading: commissionsLoading } = useQuery({
+    queryKey: ["/api/commissions/vendor", vendorId],
+    enabled: !!vendorId,
+  });
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -59,7 +65,7 @@ export default function VendorPanel() {
     );
   };
 
-  if (vendorLoading || ordersLoading) {
+  if (vendorLoading || ordersLoading || commissionsLoading) {
     return (
       <div className="p-8">
         <div className="animate-pulse">
@@ -97,10 +103,10 @@ export default function VendorPanel() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Comissões</h3>
             <p className="text-3xl font-bold gradient-text">
-              R$ {((vendorInfo as any)?.totalCommissions || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(vendorCommissions?.filter((c: any) => ['confirmed', 'paid'].includes(c.status)).reduce((sum: number, c: any) => sum + parseFloat(c.amount || '0'), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-sm text-blue-600 mt-1">
-              {(vendorInfo as any)?.confirmedOrders || 0} pedidos confirmados
+              {vendorCommissions?.filter((c: any) => c.status === 'confirmed').length || 0} comissões confirmadas
             </p>
           </CardContent>
         </Card>
@@ -242,7 +248,9 @@ export default function VendorPanel() {
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {(parseFloat(order.totalValue) * 0.1).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(vendorCommissions?.find((c: any) => c.orderId === order.id)?.amount ? 
+                        parseFloat(vendorCommissions.find((c: any) => c.orderId === order.id).amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : 
+                        '0,00')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(order.status)}
