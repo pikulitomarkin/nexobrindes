@@ -1032,16 +1032,25 @@ export default function LogisticsDashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getPriorityBadge(calculatePriority(order))}
+                          <div className="space-y-1">
+                            {getPriorityBadge(calculatePriority(order))}
+                            {(order.deadline || order.deliveryDeadline) && (
+                              <div className="text-xs text-gray-600">
+                                Prazo: {new Date(order.deadline || order.deliveryDeadline).toLocaleDateString('pt-BR')}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
                             {order.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'}
                           </div>
-
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {order.lastPaymentDate ? new Date(order.lastPaymentDate).toLocaleDateString('pt-BR') : 'N/A'}
+                          {(order.lastPaymentDate || order.paidAt || order.createdAt) ? 
+                            new Date(order.lastPaymentDate || order.paidAt || order.createdAt).toLocaleDateString('pt-BR') : 
+                            'N/A'
+                          }
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2 flex-wrap gap-1">
@@ -1170,10 +1179,20 @@ export default function LogisticsDashboard() {
                           {getStatusBadge(order.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getPriorityBadge(calculatePriority(order))}
+                          <div className="space-y-1">
+                            {getPriorityBadge(calculatePriority(order))}
+                            {(order.deadline || order.deliveryDeadline) && (
+                              <div className="text-xs text-gray-600">
+                                Prazo: {new Date(order.deadline || order.deliveryDeadline).toLocaleDateString('pt-BR')}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}
+                          {(order.deadline || order.deliveryDeadline) ? 
+                            new Date(order.deadline || order.deliveryDeadline).toLocaleDateString('pt-BR') : 
+                            'N/A'
+                          }
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
