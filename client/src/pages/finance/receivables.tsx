@@ -119,6 +119,9 @@ export default function FinanceReceivables() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/overview'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       setIsReceiveDialogOpen(false);
       setSelectedReceivable(null);
       setPaymentData({
@@ -170,6 +173,8 @@ export default function FinanceReceivables() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/finance/receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/overview'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       setIsCreateDialogOpen(false);
       setNewReceivableData({
         clientName: "",

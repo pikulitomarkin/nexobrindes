@@ -445,6 +445,10 @@ export default function AdminBudgets() {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/receivables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
 
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
