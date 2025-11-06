@@ -70,7 +70,7 @@ export default function AdminBudgets() {
     },
   });
 
-  const { data: clients } = useQuery({
+  const { data: clients, isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
     queryFn: async () => {
       const response = await fetch('/api/users');
@@ -78,9 +78,11 @@ export default function AdminBudgets() {
       const users = await response.json();
       return users.filter((u: any) => u.role === 'client');
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
-  const { data: vendors } = useQuery({
+  const { data: vendors, isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/vendors"],
     queryFn: async () => {
       const response = await fetch('/api/users');
@@ -88,6 +90,8 @@ export default function AdminBudgets() {
       const users = await response.json();
       return users.filter((u: any) => u.role === 'vendor');
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: productsData } = useQuery({
@@ -1012,9 +1016,10 @@ export default function AdminBudgets() {
                   <Select
                     value={adminBudgetForm.clientId || "none"}
                     onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, clientId: value === "none" ? "" : value })}
+                    disabled={clientsLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um cliente cadastrado (opcional)" />
+                      <SelectValue placeholder={clientsLoading ? "Carregando clientes..." : "Selecione um cliente cadastrado (opcional)"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum cliente selecionado</SelectItem>
@@ -1026,9 +1031,13 @@ export default function AdminBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="admin-budget-vendor">Vendedor</Label>
-                  <Select value={adminBudgetForm.vendorId} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, vendorId: value })}>
+                  <Select 
+                    value={adminBudgetForm.vendorId} 
+                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, vendorId: value })}
+                    disabled={vendorsLoading}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um vendedor" />
+                      <SelectValue placeholder={vendorsLoading ? "Carregando vendedores..." : "Selecione um vendedor"} />
                     </SelectTrigger>
                     <SelectContent>
                       {vendors?.map((vendor: any) => (
@@ -2461,9 +2470,13 @@ export default function AdminBudgets() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="convert-client">Cliente *</Label>
-              <Select value={convertClientId} onValueChange={setConvertClientId}>
+              <Select 
+                value={convertClientId} 
+                onValueChange={setConvertClientId}
+                disabled={clientsLoading}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cliente" />
+                  <SelectValue placeholder={clientsLoading ? "Carregando clientes..." : "Selecione o cliente"} />
                 </SelectTrigger>
                 <SelectContent>
                   {clients?.map((client: any) => (
