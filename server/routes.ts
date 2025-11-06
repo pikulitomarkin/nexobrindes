@@ -1697,29 +1697,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create expense
-  app.post("/api/finance/expenses", async (req, res) => {
-    try {
-      const expenseData = req.body;
-      console.log("Creating expense:", expenseData);
-
-      const expense = await storage.createExpense({
-        ...expenseData,
-        amount: parseFloat(expenseData.amount).toFixed(2),
-        date: new Date(expenseData.date),
-        status: expenseData.status || 'pending',
-        createdBy: expenseData.createdBy || 'system',
-        createdAt: new Date()
-      });
-
-      console.log("Expense created successfully:", expense.id);
-      res.json(expense);
-    } catch (error) {
-      console.error("Error creating expense:", error);
-      res.status(500).json({ error: "Failed to create expense" });
-    }
-  });
-
   // Update production order status
   app.patch("/api/production-orders/:id/status", async (req, res) => {
     try {
@@ -4671,6 +4648,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
       }
 
+      // Get admin user ID if createdBy not provided
+      let effectiveCreatedBy = createdBy || req.user?.id;
+      if (!effectiveCreatedBy) {
+        const adminUser = await storage.getUserByUsername('admin');
+        effectiveCreatedBy = adminUser?.id;
+        if (!effectiveCreatedBy) {
+          console.error("Cannot create expense note: admin user not found in system");
+          return res.status(500).json({ error: "Usuário admin não encontrado no sistema" });
+        }
+      }
+
       // Create expense note
       const expense = await storage.createExpenseNote({
         date: new Date(date),
@@ -4683,7 +4671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: status || 'recorded',
         approvedBy: null,
         approvedAt: null,
-        createdBy: createdBy || 'admin-1'
+        createdBy: effectiveCreatedBy
       });
 
       res.json(expense);
@@ -5098,10 +5086,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
       }
 
+      // Get admin user ID if req.user not available
+      let uploadedById = req.user?.id;
+      if (!uploadedById) {
+        const adminUser = await storage.getUserByUsername('admin');
+        uploadedById = adminUser?.id;
+        if (!uploadedById) {
+          return res.status(500).json({ error: 'Usuário admin não encontrado no sistema' });
+        }
+      }
+
       // Create bank import record
       const importRecord = await storage.createBankImport({
         filename: req.file.originalname,
-        uploadedBy: req.user?.id || 'admin-1',
+        uploadedBy: uploadedById,
         status: 'processing',
         fileSize: req.file.size.toString(),
         transactionCount: transactions.length
@@ -5242,10 +5240,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get admin user ID if req.user not available
+      let uploadedById = req.user?.id;
+      if (!uploadedById) {
+        const adminUser = await storage.getUserByUsername('admin');
+        uploadedById = adminUser?.id;
+        if (!uploadedById) {
+          return res.status(500).json({ error: 'Usuário admin não encontrado no sistema' });
+        }
+      }
+
       // Create bank import record for producer payments
       const importRecord = await storage.createBankImport({
         filename: req.file.originalname,
-        uploadedBy: req.user?.id || 'admin-1',
+        uploadedBy: uploadedById,
         status: 'processing',
         fileSize: req.file.size.toString(),
         transactionCount: debitTransactions.length
