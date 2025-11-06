@@ -506,6 +506,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Categories endpoints for customization options
+  app.get("/api/customization-categories", async (req, res) => {
+    try {
+      const categories = await storage.getCustomizationCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching customization categories:', error);
+      res.status(500).json({ error: "Erro ao buscar categorias de personalização" });
+    }
+  });
+
+  app.post("/api/customization-categories", requireAuth, async (req, res) => {
+    try {
+      const { name } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ error: "Nome da categoria é obrigatório" });
+      }
+
+      const category = await storage.createCustomizationCategory(name.trim());
+      res.json(category);
+    } catch (error) {
+      console.error('Error creating customization category:', error);
+      res.status(500).json({ error: "Erro ao criar categoria de personalização" });
+    }
+  });
+
   // Get budget PDF data with all images
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {

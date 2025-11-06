@@ -1679,6 +1679,28 @@ export class PgStorage implements IStorage {
     return true;
   }
 
+  async getCustomizationCategories(): Promise<string[]> {
+    const customizations = await pg.select({
+      category: schema.customizationOptions.category
+    }).from(schema.customizationOptions)
+      .where(eq(schema.customizationOptions.isActive, true));
+    
+    const categorySet = new Set<string>();
+    customizations.forEach(customization => {
+      if (customization.category && typeof customization.category === 'string') {
+        categorySet.add(customization.category);
+      }
+    });
+    
+    return Array.from(categorySet).sort();
+  }
+
+  async createCustomizationCategory(name: string): Promise<{ name: string }> {
+    // Por enquanto, retornar a categoria diretamente
+    // Em implementações futuras, poderia ser salva em uma tabela separada
+    return { name };
+  }
+
   // ==================== PRODUCER PAYMENTS ====================
 
   async getProducerPayments(): Promise<ProducerPayment[]> {

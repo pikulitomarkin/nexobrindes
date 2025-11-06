@@ -51,16 +51,9 @@ export default function AdminCustomizations() {
   const categoriesQuery = useQuery({
     queryKey: ["/api/customization-categories"],
     queryFn: async () => {
-      const response = await fetch('/api/settings/customization-options');
-      if (!response.ok) throw new Error('Failed to fetch customization options');
-      const customizations = await response.json();
-      const categorySet = new Set<string>();
-      customizations.forEach((customization: any) => {
-        if (customization.category && typeof customization.category === 'string') {
-          categorySet.add(customization.category);
-        }
-      });
-      return Array.from(categorySet).sort();
+      const response = await fetch('/api/customization-categories');
+      if (!response.ok) throw new Error('Failed to fetch customization categories');
+      return response.json();
     },
   });
 
