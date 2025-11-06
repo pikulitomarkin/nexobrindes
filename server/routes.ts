@@ -7268,8 +7268,23 @@ Para mais detalhes, entre em contato conosco!`;
         return isValid;
       });
 
-      console.log(`Found ${paidOrders.length} paid orders ready for production`);
-      res.json(paidOrders);
+      // Enrich with payment dates
+      const enrichedPaidOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const lastPayment = payments.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          
+          return {
+            ...order,
+            lastPaymentDate: lastPayment?.createdAt || null
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedPaidOrders.length} paid orders ready for production`);
+      res.json(enrichedPaidOrders);
     } catch (error) {
       console.error("Error fetching paid orders for logistics:", error);
       res.status(500).json({ error: "Failed to fetch paid orders" });
@@ -7333,6 +7348,7 @@ Para mais detalhes, entre em contato conosco!`;
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
+            deadline: order?.deliveryDeadline || po.deadline || null, // Use deliveryDeadline from order first
             order: order ? {
               ...order,
               clientName: clientName,
