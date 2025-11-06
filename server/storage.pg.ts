@@ -70,6 +70,10 @@ export class PgStorage implements IStorage {
     return await pg.select().from(schema.users);
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await pg.select().from(schema.users);
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const results = await pg.select().from(schema.users).where(eq(schema.users.id, id));
     return results[0];

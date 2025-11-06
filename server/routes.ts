@@ -952,7 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all users
   app.get("/api/users", async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const users = await storage.getUsers();
       res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);

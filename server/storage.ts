@@ -75,6 +75,7 @@ let mockBudgetPhotos: any[] = [];
 export interface IStorage {
   // Users
   getUsers(): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -1299,6 +1300,10 @@ export class MemStorage implements IStorage {
 
   // User methods
   async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async getAllUsers(): Promise<User[]> {
     return Array.from(this.users.values());
   }
 
