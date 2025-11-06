@@ -1084,26 +1084,64 @@ export class PgStorage implements IStorage {
       processedData.deliveryDeadline = null;
     }
 
-    // Generate unique budget number using database sequence
-    async function getNextBudgetNumber(): Promise<string> {
+    // Validate client ID if provided - if it doesn't exist in clients table, set to null
+    if (processedData.clientId) {
       try {
-        // Try to get next value from sequence
-        const res: any = await pg.execute(sql`SELECT nextval('budget_number_seq') AS next`);
-        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
-
-        // Format: BUD-YYMM-000001
-        const now = new Date();
-        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
-        return `BUD-${yymm}-${String(next).padStart(6, '0')}`;
-      } catch (e) {
-        // If sequence doesn't exist, create it and try again
-        await pg.execute(sql`CREATE SEQUENCE IF NOT EXISTS budget_number_seq`);
-        const res: any = await pg.execute(sql`SELECT nextval('budget_number_seq') AS next`);
-        const next = (Array.isArray(res) ? res[0]?.next : (res.rows?.[0]?.next)) ?? 1;
-        const now = new Date();
-        const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
-        return `BUD-${yymm}-${String(next).padStart(6, '0')}`;
+        const client = await this.getClient(processedData.clientId);
+        if (!client) {
+          console.log(`Client ID ${processedData.clientId} not found, setting to null`);
+          processedData.clientId = null;
+        }
+      } catch (error) {
+        console.log(`Error validating client ID ${processedData.clientId}, setting to null:`, error);
+        processedData.clientId = null;
       }
+    }
+
+    // Generate unique budget number with retry mechanism
+    async function getNextBudgetNumber(): Promise<string> {
+      const maxRetries = 10;
+      let attempt = 0;
+      
+      while (attempt < maxRetries) {
+        try {
+          // Generate a unique number with timestamp to avoid collisions
+          const timestamp = Date.now();
+          const random = Math.floor(Math.random() * 1000);
+          const uniqueId = `${timestamp}${random}`;
+          
+          // Format: BUD-YYMM-UNIQUEID
+          const now = new Date();
+          const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const budgetNumber = `BUD-${yymm}-${uniqueId.slice(-6)}`;
+          
+          // Check if this number already exists
+          const existing = await pg.select().from(schema.budgets)
+            .where(eq(schema.budgets.budgetNumber, budgetNumber))
+            .limit(1);
+            
+          if (existing.length === 0) {
+            return budgetNumber;
+          }
+          
+          attempt++;
+          console.log(`Budget number ${budgetNumber} exists, retrying... (attempt ${attempt})`);
+          
+          // Add a small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (e) {
+          console.error('Error generating budget number:', e);
+          attempt++;
+          if (attempt >= maxRetries) {
+            throw e;
+          }
+        }
+      }
+      
+      // Fallback: use timestamp + random as backup
+      const fallbackId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      return `BUD-FALLBACK-${fallbackId.slice(-10)}`;
     }
 
     // Generate budget number if not provided or is null

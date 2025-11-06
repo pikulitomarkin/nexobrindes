@@ -953,7 +953,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     try {
       const users = await storage.getUsers();
-      res.json(users);
+      
+      // Also get clients from the clients table and merge them
+      const clients = await storage.getClients();
+      
+      // Create user objects from clients for backward compatibility
+      const clientUsers = clients.map(client => ({
+        id: client.id,
+        username: client.email || client.name.toLowerCase().replace(/\s+/g, ''),
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        role: 'client',
+        isActive: client.isActive !== false
+      }));
+      
+      // Merge users and clients, avoiding duplicates
+      const allUsers = [...users];
+      clientUsers.forEach(clientUser => {
+        if (!allUsers.find(u => u.id === clientUser.id)) {
+          allUsers.push(clientUser);
+        }
+      });
+      
+      console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clientUsers.length} from clients table)`);
+      res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Erro ao buscar usuários" });
