@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +10,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2 } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+// Import Badge component
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminBudgets() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -22,7 +25,14 @@ export default function AdminBudgets() {
   const [searchTerm, setSearchTerm] = useState("");
   const [budgetProductSearch, setBudgetProductSearch] = useState("");
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
+  const [budgetToView, setBudgetToView] = useState<any>(null);
   const { toast } = useToast();
+
+  // State for selected producer in product selection
+  const [selectedProducerId, setSelectedProducerId] = useState<string>("");
 
   // Admin budget form state - independent from vendor
   const [adminBudgetForm, setAdminBudgetForm] = useState({
@@ -33,6 +43,7 @@ export default function AdminBudgets() {
     contactPhone: "",
     contactEmail: "",
     vendorId: "",
+    branchId: "matriz", // Definir matriz como padrão
     validUntil: "",
     deliveryDeadline: "",
     deliveryType: "delivery",
@@ -88,6 +99,15 @@ export default function AdminBudgets() {
     },
   });
 
+  const { data: producers } = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
+      return response.json();
+    },
+  });
+
   const { data: paymentMethods } = useQuery({
     queryKey: ["/api/payment-methods"],
     queryFn: async () => {
@@ -106,20 +126,102 @@ export default function AdminBudgets() {
     },
   });
 
+  const { data: branches } = useQuery({
+    queryKey: ["/api/branches"],
+    queryFn: async () => {
+      const response = await fetch('/api/branches');
+      if (!response.ok) throw new Error('Failed to fetch branches');
+      return response.json();
+    },
+  });
 
   const products = productsData?.products || [];
   const categories: string[] = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+
+  // Group products by producer
+  const productsByProducer = products.reduce((acc, product) => {
+    const producerId = product.producerId || 'internal'; // Default to 'internal' if no producer assigned
+    if (!acc[producerId]) {
+      acc[producerId] = [];
+    }
+    acc[producerId].push(product);
+    return acc;
+  }, {} as Record<string, any[]>);
 
   // Helper variables for selected payment and shipping methods - Admin
   const selectedAdminPaymentMethod = paymentMethods?.find((pm: any) => pm.id === adminBudgetForm.paymentMethodId);
   const selectedAdminShippingMethod = shippingMethods?.find((sm: any) => sm.id === adminBudgetForm.shippingMethodId);
 
+  // Calculate shipping cost based on selected method and delivery type
+  const calculateAdminShippingCost = () => {
+    // If pickup, no shipping cost
+    if (adminBudgetForm.deliveryType === "pickup") return 0;
+
+    if (!selectedAdminShippingMethod) return 0;
+
+    const subtotal = calculateAdminBudgetTotal();
+
+    if (selectedAdminShippingMethod.type === "free") return 0;
+    if (selectedAdminShippingMethod.freeShippingThreshold > 0 && subtotal >= selectedAdminShippingMethod.freeShippingThreshold) return 0;
+    if (selectedAdminShippingMethod.type === "fixed") return parseFloat(selectedAdminShippingMethod.basePrice);
+
+    // For calculated, return base price as placeholder (could integrate with shipping API)
+    return parseFloat(selectedAdminShippingMethod.basePrice || "0");
+  };
+
+  // Image upload functions for individual products
+  const handleAdminProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, itemIndex: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        title: "Erro",
+        description: "Imagem deve ter até 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'product-customizations');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+
+      const { url } = await response.json();
+
+      updateAdminBudgetItem(itemIndex, 'customizationPhoto', url);
+
+      toast({
+        title: "Sucesso!",
+        description: "Imagem enviada com sucesso"
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar imagem",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const removeAdminProductImage = (itemIndex: number) => {
+    updateAdminBudgetItem(itemIndex, 'customizationPhoto', '');
+  };
 
   // Admin budget functions
-  const addProductToAdminBudget = (product: any) => {
+  const addProductToAdminBudget = (product: any, producerId?: string) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
+      producerId: producerId || product.producerId || 'internal', // Ensure producerId is captured
       quantity: 1,
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
@@ -128,14 +230,18 @@ export default function AdminBudgets() {
       itemCustomizationValue: 0,
       itemCustomizationDescription: "",
       additionalCustomizationNotes: "",
-      hasGeneralCustomization: false,
-      generalCustomizationName: "",
-      generalCustomizationValue: 0,
+      customizationPhoto: "",
       productWidth: "",
       productHeight: "",
       productDepth: "",
-      customizationPhoto: null,
-      producerId: product.producerId || null,
+      hasItemDiscount: false,
+      itemDiscountType: "percentage",
+      itemDiscountPercentage: 0,
+      itemDiscountValue: 0,
+      // General Customization Fields
+      hasGeneralCustomization: false,
+      generalCustomizationName: "",
+      generalCustomizationValue: 0,
     };
     setAdminBudgetForm(prev => ({
       ...prev,
@@ -151,29 +257,23 @@ export default function AdminBudgets() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
-        item.totalPrice = item.unitPrice * quantity;
-      } else if (field === 'itemCustomizationValue') {
+        // Recalculate totalPrice based on all components
+        item.totalPrice = calculateAdminItemTotal({ ...item, quantity });
+      } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
-      } else if (field === 'generalCustomizationValue') {
-        item[field] = parseFloat(value) || 0;
+        // Recalculate totalPrice when customization values change
+        item.totalPrice = calculateAdminItemTotal({ ...item, [field]: parseFloat(value) || 0 });
       } else if (field === 'hasItemCustomization' || field === 'hasGeneralCustomization') {
-        item[field] = value;
-        // Reset related fields when toggling customization
-        if (!value) {
-          if (field === 'hasItemCustomization') {
-            item.selectedCustomizationId = "";
-            item.itemCustomizationValue = 0;
-            item.itemCustomizationDescription = "";
-            item.additionalCustomizationNotes = "";
-            item.customizationPhoto = null;
-          }
-          if (field === 'hasGeneralCustomization') {
-            item.generalCustomizationName = "";
-            item.generalCustomizationValue = 0;
-          }
-        }
+        item[field] = Boolean(value);
+        // Recalculate totalPrice when customization flags change
+        item.totalPrice = calculateAdminItemTotal({ ...item, [field]: Boolean(value) });
       } else {
         item[field] = value;
+
+        // If it's a discount-related field, recalculate totalPrice
+        if (field.includes('Discount') || field.includes('discount')) {
+          item.totalPrice = calculateAdminItemTotal({ ...item, [field]: value });
+        }
       }
 
       newItems[index] = item;
@@ -190,36 +290,50 @@ export default function AdminBudgets() {
 
   const calculateAdminBudgetTotal = () => {
     const subtotal = adminBudgetForm.items.reduce((total, item) => {
-      const basePrice = item.unitPrice * item.quantity;
-      const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-      const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
-      return total + basePrice + customizationValue + generalCustomizationValue;
+      return total + calculateAdminItemTotal(item);
     }, 0);
 
-    // Apply discount
-    let discountedSubtotal = subtotal;
+    // Apply general discount
     if (adminBudgetForm.hasDiscount) {
       if (adminBudgetForm.discountType === 'percentage') {
         const discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
-        discountedSubtotal = Math.max(0, subtotal - discountAmount);
+        return Math.max(0, subtotal - discountAmount);
       } else if (adminBudgetForm.discountType === 'value') {
-        discountedSubtotal = Math.max(0, subtotal - adminBudgetForm.discountValue);
+        return Math.max(0, subtotal - adminBudgetForm.discountValue);
       }
     }
 
-    return discountedSubtotal;
+    return subtotal;
   };
 
   const calculateAdminItemTotal = (item: any) => {
     const basePrice = item.unitPrice * item.quantity;
-    const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
-    return basePrice + customizationValue + generalCustomizationValue;
+
+    // Item customization (valor por unidade personalizada)
+    const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+
+    // General customization (valor por unidade aplicado à quantidade total)
+    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+
+    let subtotal = basePrice + itemCustomizationValue + generalCustomizationValue;
+
+    // Aplicar desconto do item (sobre o preço base apenas)
+    if (item.hasItemDiscount) {
+      if (item.itemDiscountType === 'percentage') {
+        const discountAmount = (basePrice * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
+        subtotal = subtotal - discountAmount;
+      } else if (item.itemDiscountType === 'value') {
+        subtotal = subtotal - (parseFloat(item.itemDiscountValue) || 0);
+      }
+    }
+
+    return Math.max(0, subtotal);
   };
 
+  // Calculate the total including shipping cost
   const calculateAdminTotalWithShipping = () => {
     const subtotal = calculateAdminBudgetTotal();
-    const shipping = adminBudgetForm.deliveryType === "pickup" ? 0 : (adminBudgetForm.shippingCost || 0);
+    const shipping = parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost();
     return subtotal + shipping;
   };
 
@@ -232,6 +346,7 @@ export default function AdminBudgets() {
       contactPhone: "",
       contactEmail: "",
       vendorId: "",
+      branchId: "matriz", // Manter matriz como padrão no reset
       validUntil: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -248,19 +363,16 @@ export default function AdminBudgets() {
       downPayment: 0, // Reset
       remainingAmount: 0, // Reset
     });
+    setIsEditMode(false);
+    setEditingBudgetId(null);
+    setSelectedProducerId("");
   };
 
   const createAdminBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
       const budgetData = {
         ...data,
-        totalValue: calculateAdminTotalWithShipping().toFixed(2),
-        // Ensure downPayment and remainingAmount are included if they exist
-        downPayment: data.downPayment || 0,
-        remainingAmount: data.remainingAmount || 0,
-        paymentMethodId: data.paymentMethodId || null,
-        shippingMethodId: data.shippingMethodId || null,
-        installments: data.installments || 1,
+        totalValue: calculateAdminTotalWithShipping().toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -283,44 +395,71 @@ export default function AdminBudgets() {
     },
   });
 
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
-  const [selectedProducer, setSelectedProducer] = useState<string>("");
-  const [convertClientId, setConvertClientId] = useState("");
-  const [convertDeliveryDate, setConvertDeliveryDate] = useState("");
-  const [clientSearchTerm, setClientSearchTerm] = useState("");
-
-
-  const { data: producers } = useQuery({
-    queryKey: ["/api/producers"],
-    queryFn: async () => {
-      const response = await fetch('/api/producers');
-      if (!response.ok) throw new Error('Failed to fetch producers');
+  const updateAdminBudgetMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const budgetData = {
+        ...data,
+        totalValue: calculateAdminTotalWithShipping().toFixed(2)
+      };
+      const response = await fetch(`/api/budgets/${editingBudgetId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(budgetData),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar orçamento");
       return response.json();
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      setIsCreateDialogOpen(false);
+      resetAdminBudgetForm();
+      setBudgetProductSearch("");
+      setBudgetCategoryFilter("all");
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento atualizado com sucesso",
+      });
+    },
   });
+
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
+  const [convertClientId, setConvertClientId] = useState("");
+  const [convertDeliveryDate, setConvertDeliveryDate] = useState("");
 
   const convertToOrderMutation = useMutation({
     mutationFn: async ({ budgetId, clientId, deliveryDate }: { budgetId: string; clientId: string; deliveryDate: string }) => {
       const response = await fetch(`/api/budgets/${budgetId}/convert-to-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ producerId: selectedProducer, clientId, deliveryDate }),
+        body: JSON.stringify({ clientId, deliveryDate }),
       });
-      if (!response.ok) throw new Error("Erro ao converter para pedido");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro ao converter orçamento: ${errorText}`);
+      }
       return response.json();
     },
     onSuccess: () => {
+      // Invalidar múltiplas queries para garantir atualização
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
+
       setConvertDialogOpen(false);
       setBudgetToConvert(null);
-      setSelectedProducer("");
       setConvertClientId("");
       setConvertDeliveryDate("");
-      setClientSearchTerm("");
       toast({
         title: "Sucesso!",
-        description: "Orçamento convertido em pedido e enviado para o produtor",
+        description: "Orçamento convertido em pedido com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao converter orçamento",
+        variant: "destructive",
       });
     },
   });
@@ -348,12 +487,39 @@ export default function AdminBudgets() {
 
   const generatePDFMutation = useMutation({
     mutationFn: async (budgetId: string) => {
+      console.log('Starting PDF generation for budget:', budgetId);
       const response = await fetch(`/api/budgets/${budgetId}/pdf-data`);
-      if (!response.ok) throw new Error("Erro ao buscar dados do orçamento");
-      return response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PDF data fetch failed:', response.status, errorText);
+        throw new Error(`Erro ${response.status}: ${errorText}`);
+      }
+      const data = await response.json();
+      console.log('PDF data received successfully:', {
+        budgetId: data.budget?.id,
+        budgetNumber: data.budget?.budgetNumber,
+        itemCount: data.items?.length || 0,
+        hasClient: !!data.client,
+        hasVendor: !!data.vendor
+      });
+      return data;
     },
     onSuccess: async (data) => {
       try {
+        console.log('Processing PDF generation...');
+
+        // Validate essential data only
+        if (!data) {
+          throw new Error('Nenhum dado retornado da API');
+        }
+
+        if (!data.budget) {
+          throw new Error('Dados do orçamento não encontrados na resposta da API');
+        }
+
+        // Items validation is now optional - PDF can be generated without items
+        console.log(`Generating PDF for budget ${data.budget.budgetNumber} with ${data.items?.length || 0} items`);
+
         const pdfGenerator = new PDFGenerator();
         const pdfBlob = await pdfGenerator.generateBudgetPDF(data);
 
@@ -361,7 +527,7 @@ export default function AdminBudgets() {
         const url = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `orcamento-${data.budget.budgetNumber}.pdf`;
+        link.download = `orcamento-${data.budget.budgetNumber || 'sem-numero'}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -373,17 +539,23 @@ export default function AdminBudgets() {
         });
       } catch (error) {
         console.error('Error generating PDF:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          data: data
+        });
         toast({
-          title: "Erro",
-          description: "Erro ao gerar PDF. Tente novamente.",
+          title: "Erro ao gerar PDF",
+          description: `${error.message}. Verifique o console para mais detalhes.`,
           variant: "destructive"
         });
       }
     },
     onError: (error) => {
+      console.error('PDF generation mutation error:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao buscar dados do orçamento.",
+        title: "Erro na requisição",
+        description: `Erro ao buscar dados do orçamento: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -395,9 +567,111 @@ export default function AdminBudgets() {
   };
 
   const handleConfirmConvert = () => {
-    if (budgetToConvert && selectedProducer && convertClientId && convertDeliveryDate) {
-      convertToOrderMutation.mutate({ budgetId: budgetToConvert, clientId: convertClientId, deliveryDate: convertDeliveryDate });
+    if (budgetToConvert && convertClientId && convertDeliveryDate) {
+      convertToOrderMutation.mutate({
+        budgetId: budgetToConvert,
+        clientId: convertClientId,
+        deliveryDate: convertDeliveryDate,
+      });
     }
+  };
+
+  const handleViewBudget = (budget: any) => {
+    setBudgetToView(budget);
+    setViewBudgetDialogOpen(true);
+  };
+
+  const handleGeneratePDF = (budget: any) => {
+    generatePDFMutation.mutate(budget.id);
+  };
+
+  const handleEditBudget = (budget: any) => {
+    console.log('Editing budget:', budget);
+    console.log('Budget items:', budget.items);
+
+    // Pre-populate form with existing budget data
+    setAdminBudgetForm({
+      title: budget.title,
+      description: budget.description || "",
+      clientId: budget.clientId || "",
+      contactName: budget.contactName || "",
+      contactPhone: budget.contactPhone || "",
+      contactEmail: budget.contactEmail || "",
+      vendorId: budget.vendorId || "",
+      branchId: budget.branchId || "matriz",
+      validUntil: budget.validUntil || "",
+      deliveryDeadline: budget.deliveryDeadline || "",
+      deliveryType: budget.deliveryType || "delivery",
+      items: (budget.items || []).map((item: any) => {
+        // Ensure producerId is correctly mapped
+        let producerId = item.producerId;
+
+        // If producerId is missing, try to find it from the product
+        if (!producerId && item.productId) {
+          const product = products.find((p: any) => p.id === item.productId);
+          producerId = product?.producerId || 'internal';
+        }
+
+        // Default to 'internal' if still not found
+        if (!producerId) {
+          producerId = 'internal';
+        }
+
+        console.log(`Mapping budget item ${item.productName}: producerId=${producerId}`, {
+          hasItemCustomization: item.hasItemCustomization,
+          selectedCustomizationId: item.selectedCustomizationId,
+          itemCustomizationValue: item.itemCustomizationValue,
+          itemCustomizationDescription: item.itemCustomizationDescription,
+          hasGeneralCustomization: item.hasGeneralCustomization,
+          generalCustomizationName: item.generalCustomizationName,
+          generalCustomizationValue: item.generalCustomizationValue
+        });
+
+        return {
+          productId: item.productId,
+          productName: item.productName || item.product?.name,
+          producerId: producerId,
+          quantity: parseInt(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          totalPrice: parseFloat(item.totalPrice) || 0,
+          // Item Customization - use exact saved values without fallback logic
+          hasItemCustomization: Boolean(item.hasItemCustomization),
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: parseFloat(item.itemCustomizationValue) || 0,
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+          customizationPhoto: item.customizationPhoto || "",
+          // Product dimensions
+          productWidth: item.productWidth ? item.productWidth.toString() : "",
+          productHeight: item.productHeight ? item.productHeight.toString() : "",
+          productDepth: item.productDepth ? item.productDepth.toString() : "",
+          // Item discount
+          hasItemDiscount: Boolean(item.hasItemDiscount),
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage) || 0,
+          itemDiscountValue: parseFloat(item.itemDiscountValue) || 0,
+          // General Customization - use exact saved values without fallback logic
+          hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
+        };
+      }),
+      photos: budget.photos || [],
+      paymentMethodId: budget.paymentMethodId || "",
+      shippingMethodId: budget.shippingMethodId || "",
+      installments: budget.installments || 1,
+      downPayment: parseFloat(budget.downPayment || 0),
+      remainingAmount: parseFloat(budget.remainingAmount || 0),
+      shippingCost: parseFloat(budget.shippingCost || 0),
+      hasDiscount: Boolean(budget.hasDiscount),
+      discountType: budget.discountType || "percentage",
+      discountPercentage: parseFloat(budget.discountPercentage || 0),
+      discountValue: parseFloat(budget.discountValue || 0)
+    });
+
+    setIsEditMode(true);
+    setEditingBudgetId(budget.id);
+    setIsCreateDialogOpen(true);
   };
 
   const handleAdminBudgetSubmit = (e: React.FormEvent) => {
@@ -413,76 +687,52 @@ export default function AdminBudgets() {
       return;
     }
 
-    // Validar datas obrigatórias
-    if (!adminBudgetForm.validUntil) {
-      toast({
-        title: "Erro",
-        description: "A data 'Válido Até' é obrigatória",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!adminBudgetForm.deliveryDeadline) {
-      toast({
-        title: "Erro",
-        description: "O prazo de entrega é obrigatório",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar payment and shipping methods
-    if (!adminBudgetForm.paymentMethodId) {
-      toast({
-        title: "Erro",
-        description: "A forma de pagamento é obrigatória",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (adminBudgetForm.deliveryType === "delivery" && !adminBudgetForm.shippingMethodId) {
-      toast({
-        title: "Erro",
-        description: "O método de frete é obrigatório quando há entrega",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar frete quando delivery
-    if (adminBudgetForm.deliveryType === "delivery" && adminBudgetForm.shippingCost <= 0) {
-      toast({
-        title: "Erro",
-        description: "O valor do frete é obrigatório quando há entrega",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar valor de entrada
-    if (adminBudgetForm.downPayment <= 0) {
-      toast({
-        title: "Erro",
-        description: "O valor de entrada é obrigatório",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar datas não podem ser no passado
+    // Date validation: validUntil cannot be in the past
     const today = new Date().toISOString().split('T')[0];
-    if (adminBudgetForm.validUntil < today) {
+    if (adminBudgetForm.validUntil && adminBudgetForm.validUntil < today) {
       toast({
-        title: "Erro",
-        description: "A data 'Válido Até' não pode ser anterior a hoje",
+        title: "Erro de Validação",
+        description: "A data de 'Válido Até' não pode ser anterior a hoje.",
         variant: "destructive"
       });
       return;
     }
 
-    createAdminBudgetMutation.mutate(adminBudgetForm);
+    // Mandatory fields validation
+    if (!adminBudgetForm.title) {
+      toast({ title: "Erro", description: "O título do orçamento é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!adminBudgetForm.contactName) {
+      toast({ title: "Erro", description: "O nome de contato é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!adminBudgetForm.paymentMethodId) {
+      toast({ title: "Erro", description: "A forma de pagamento é obrigatória.", variant: "destructive" });
+      return;
+    }
+    if (adminBudgetForm.installments < 1) {
+      toast({ title: "Erro", description: "O número de parcelas deve ser pelo menos 1.", variant: "destructive" });
+      return;
+    }
+    if (adminBudgetForm.downPayment <= 0) {
+      toast({ title: "Erro", description: "O valor de entrada é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (adminBudgetForm.deliveryType !== 'pickup' && !adminBudgetForm.shippingMethodId) {
+      toast({ title: "Erro", description: "O método de frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
+      return;
+    }
+    if (adminBudgetForm.deliveryType !== 'pickup' && adminBudgetForm.shippingCost <= 0) {
+      toast({ title: "Erro", description: "O custo do frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
+      return;
+    }
+
+    if (isEditMode) {
+      updateAdminBudgetMutation.mutate(adminBudgetForm);
+    } else {
+      createAdminBudgetMutation.mutate(adminBudgetForm);
+    }
   };
 
   // Filter products for admin budget creation
@@ -542,24 +792,6 @@ export default function AdminBudgets() {
     );
   }
 
-  // Helper function to handle product image uploads
-  const handleAdminProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updateAdminBudgetItem(index, 'customizationPhoto', reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Helper function to remove product image
-  const removeAdminProductImage = (index: number) => {
-    updateAdminBudgetItem(index, 'customizationPhoto', null);
-  };
-
-
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
@@ -567,18 +799,36 @@ export default function AdminBudgets() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Orçamentos - Admin</h1>
           <p className="text-gray-600">Crie e gerencie orçamentos para todos os vendedores e clientes</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (open && !isEditMode) {
+            // Reset form when opening for new budget
+            resetAdminBudgetForm();
+            setBudgetProductSearch("");
+            setBudgetCategoryFilter("all");
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="gradient-bg text-white">
+            <Button
+              className="gradient-bg text-white"
+              onClick={() => {
+                // Ensure we're in create mode when clicking new budget
+                setIsEditMode(false);
+                setEditingBudgetId(null);
+                resetAdminBudgetForm();
+                setBudgetProductSearch("");
+                setBudgetCategoryFilter("all");
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Orçamento
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Criar Novo Orçamento</DialogTitle>
+              <DialogTitle>{isEditMode ? "Editar Orçamento" : "Criar Novo Orçamento"}</DialogTitle>
               <DialogDescription>
-                Crie um orçamento personalizado com produtos do catálogo
+                {isEditMode ? "Modifique os dados do orçamento existente" : "Crie um orçamento personalizado com produtos do catálogo"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAdminBudgetSubmit} className="space-y-6">
@@ -598,7 +848,21 @@ export default function AdminBudgets() {
                     id="admin-budget-validUntil"
                     type="date"
                     value={adminBudgetForm.validUntil}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, validUntil: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      const today = new Date().toISOString().split('T')[0];
+
+                      if (selectedDate < today) {
+                        toast({
+                          title: "Data Inválida",
+                          description: "A data 'Válido Até' não pode ser anterior à data de hoje.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      setAdminBudgetForm({ ...adminBudgetForm, validUntil: selectedDate });
+                    }}
                     min={new Date().toISOString().split('T')[0]}
                     required
                   />
@@ -660,35 +924,7 @@ export default function AdminBudgets() {
                   <Label htmlFor="admin-budget-delivery-type">Tipo de Entrega *</Label>
                   <Select
                     value={adminBudgetForm.deliveryType}
-                    onValueChange={(value) => {
-                      setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value });
-                      // Reset shipping cost and potentially down payment if switching to pickup
-                      if (value === 'pickup') {
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          shippingCost: 0,
-                          shippingMethodId: "", // Clear shipping method
-                          downPayment: 0, // Reset down payment as it might be tied to shipping
-                          remainingAmount: calculateAdminBudgetTotal() // Recalculate remaining based on no shipping
-                        }));
-                      } else {
-                        // If switching back to delivery, ensure a shipping method is selected if available
-                        // and recalculate down payment and remaining amount.
-                        if (selectedAdminShippingMethod) {
-                          setAdminBudgetForm(prev => ({
-                            ...prev,
-                            shippingMethodId: selectedAdminShippingMethod.id,
-                            shippingCost: prev.shippingCost || 0, // Keep existing cost or set to 0 if not present
-                          }));
-                        }
-                        const total = calculateAdminTotalWithShipping();
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          downPayment: prev.downPayment || 0, // Keep existing down payment or set to 0
-                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
-                        }));
-                      }
-                    }}
+                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, deliveryType: value })}
                     required
                   >
                     <SelectTrigger>
@@ -697,6 +933,31 @@ export default function AdminBudgets() {
                     <SelectContent>
                       <SelectItem value="delivery">Entrega com Frete</SelectItem>
                       <SelectItem value="pickup">Retirada no Local</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Seleção de Filial */}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label htmlFor="admin-budget-branch">Filial do Orçamento *</Label>
+                  <Select
+                    value={adminBudgetForm.branchId || "matriz"}
+                    onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, branchId: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a filial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="matriz">Matriz (Padrão)</SelectItem>
+                      {branches?.map((branch: any) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.city}
+                          {branch.isHeadquarters && " (Matriz)"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -782,13 +1043,24 @@ export default function AdminBudgets() {
 
               {/* Product Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Produtos do Orçamento</h3>
+                <h3 className="text-lg font-medium">Produtos do Orçamento *</h3>
 
                 {/* Selected Products */}
                 {adminBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
                     {adminBudgetForm.items.map((item, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
+                      <div key={index} className={`p-4 border rounded-lg ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                        {/* Producer Name Header */}
+                        <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <Factory className="h-4 w-4 text-gray-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                                producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
+                            </span>
+                          </div>
+                        </div>
+
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
                           <Button
@@ -803,13 +1075,14 @@ export default function AdminBudgets() {
 
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
-                            <Label htmlFor={`admin-quantity-${index}`}>Quantidade</Label>
+                            <Label htmlFor={`admin-quantity-${index}`}>Quantidade *</Label>
                             <Input
                               id={`admin-quantity-${index}`}
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateAdminBudgetItem(index, 'quantity', e.target.value)}
+                              required
                             />
                           </div>
                           <div>
@@ -928,11 +1201,12 @@ export default function AdminBudgets() {
                               />
                             </div>
 
+                            {/* Image Upload for Product Customization */}
                             <div>
                               <Label>
                                 Imagem da Personalização - {item.productName}
                                 <span className="text-xs text-gray-500 ml-2">
-                                  ({item.producerId === 'internal' ? 'Produto Interno' :
+                                  ({item.producerId === 'internal' ? 'Produto Interno' : 
                                     producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
                                 </span>
                               </Label>
@@ -1036,30 +1310,6 @@ export default function AdminBudgets() {
                           </div>
                         )}
 
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Switch
-                                id={`admin-general-customization-standalone-${index}`}
-                                checked={item.hasGeneralCustomization && !item.hasItemCustomization}
-                                onCheckedChange={(checked) => {
-                                  updateAdminBudgetItem(index, 'hasGeneralCustomization', checked);
-                                  if (checked && !item.hasItemCustomization) {
-                                    // If enabling general customization and item customization is off,
-                                    // ensure general customization is treated as the primary customization.
-                                    updateAdminBudgetItem(index, 'hasItemCustomization', true);
-                                  } else if (!checked && item.hasItemCustomization) {
-                                    // If disabling general customization, but item customization is on,
-                                    // keep item customization enabled.
-                                  } else if (!checked && !item.hasItemCustomization) {
-                                    // If both are off, do nothing.
-                                  }
-                                }}
-                              />
-                          <Label htmlFor={`admin-general-customization-standalone-${index}`} className="flex items-center gap-2">
-                            <Percent className="h-4 w-4" />
-                            Personalização Geral (como Item Principal)
-                          </Label>
-                        </div>
-
                         <div className="flex justify-between items-center text-sm">
                           <span>Subtotal:</span>
                           <span className="font-medium">
@@ -1074,88 +1324,213 @@ export default function AdminBudgets() {
                 {/* Add Products */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Adicionar Produtos</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Adicionar Produtos ao Orçamento *
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {/* Admin Budget Product Search */}
-                    <div className="mb-4 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Buscar produtos..."
-                            value={budgetProductSearch}
-                            onChange={(e) => setBudgetProductSearch(e.target.value)}
-                            className="pl-9"
-                          />
+                    {!selectedProducerId ? (
+                      <div className="text-center py-8">
+                        <Button
+                          type="button"
+                          className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white"
+                          onClick={() => setSelectedProducerId("select")}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Adicionar Produto
+                        </Button>
+                        <p className="text-sm text-gray-500 mt-2">Clique para escolher um produto</p>
+                      </div>
+                    ) : selectedProducerId === "select" ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label>Selecionar Produtor *</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedProducerId("select")}
+                          >
+                            Trocar Produtor
+                          </Button>
                         </div>
-                        <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
+                        <Select 
+                          value="" 
+                          onValueChange={(value) => setSelectedProducerId(value)}
+                        >
                           <SelectTrigger>
-                            <SelectValue placeholder="Categoria" />
+                            <SelectValue placeholder="Escolha um produtor para ver seus produtos" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category === "all" ? "Todas as Categorias" : category}
+                            <SelectItem value="internal">Produtos Internos</SelectItem>
+                            {producers?.map((producer: any) => (
+                              <SelectItem key={producer.id} value={producer.id}>
+                                {producer.name} - {producer.specialty}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{filteredAdminBudgetProducts.length} produtos encontrados</span>
-                        {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="flex items-center gap-2">
+                            <Factory className="h-4 w-4" />
+                            Selecionado: {selectedProducerId === 'internal' ? 'Produtos Internos' : 
+                              producers?.find((p: any) => p.id === selectedProducerId)?.name || 'Produtor não encontrado'}
+                          </Label>
                           <Button
-                            variant="ghost"
+                            type="button"
+                            variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setBudgetProductSearch("");
-                              setBudgetCategoryFilter("all");
-                            }}
+                            onClick={() => setSelectedProducerId("select")}
                           >
-                            Limpar filtros
+                            Trocar Produtor
                           </Button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {filteredAdminBudgetProducts.length === 0 ? (
-                        <div className="col-span-full text-center py-8">
-                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500">
-                            {budgetProductSearch || budgetCategoryFilter !== "all" ?
-                              "Nenhum produto encontrado com os filtros aplicados" :
-                              "Nenhum produto disponível"}
-                          </p>
                         </div>
-                      ) : (
-                        filteredAdminBudgetProducts.map((product: any) => (
-                          <div key={product.id} className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                               onClick={() => addProductToAdminBudget(product)}>
-                            <div className="flex items-center gap-2">
-                              {product.imageLink ? (
-                                <img src={product.imageLink} alt={product.name} className="w-8 h-8 object-cover rounded" />
-                              ) : (
-                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                  <Package className="h-4 w-4 text-gray-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{product.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
-                              </div>
-                            </div>
+
+                        {/* Product Search and Filter */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                            <Input
+                              placeholder="Buscar produtos..."
+                              value={budgetProductSearch}
+                              onChange={(e) => setBudgetProductSearch(e.target.value)}
+                              className="pl-9"
+                            />
                           </div>
-                        ))
-                      )}
-                    </div>
+                          <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category === "all" ? "Todas as Categorias" : category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Product List */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                          {(() => {
+                            const producerProducts = productsByProducer[selectedProducerId] || [];
+                            const filteredProducts = producerProducts.filter((product: any) => {
+                              const matchesSearch = !budgetProductSearch ||
+                                product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
+
+                              const matchesCategory = budgetCategoryFilter === "all" ||
+                                product.category === budgetCategoryFilter;
+
+                              return matchesSearch && matchesCategory;
+                            });
+
+                            if (filteredProducts.length === 0) {
+                              return (
+                                <div className="col-span-full text-center py-8">
+                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                  <p className="text-gray-500">
+                                    {budgetProductSearch || budgetCategoryFilter !== "all" ?
+                                      "Nenhum produto encontrado com os filtros aplicados" :
+                                      `Nenhum produto disponível para ${selectedProducerId === 'internal' ? 'Produtos Internos' : 'este produtor'}`
+                                    }
+                                  </p>
+                                  {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setBudgetProductSearch("");
+                                        setBudgetCategoryFilter("all");
+                                      }}
+                                      className="mt-2"
+                                    >
+                                      Limpar filtros
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return filteredProducts.map((product: any) => (
+                              <div 
+                                key={product.id} 
+                                className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => addProductToAdminBudget(product, selectedProducerId)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {product.imageLink ? (
+                                    <img 
+                                      src={product.imageLink} 
+                                      alt={product.name} 
+                                      className="w-8 h-8 object-cover rounded" 
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                      <Package className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{product.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    {product.category && (
+                                      <p className="text-xs text-blue-600">{product.category}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                          <span>
+                            {(() => {
+                              const producerProducts = productsByProducer[selectedProducerId] || [];
+                              const filteredProducts = producerProducts.filter((product: any) => {
+                                const matchesSearch = !budgetProductSearch ||
+                                  product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                  product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                                  product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
+
+                                const matchesCategory = budgetCategoryFilter === "all" ||
+                                  product.category === budgetCategoryFilter;
+
+                                return matchesSearch && matchesCategory;
+                              });
+                              return `${filteredProducts.length} produtos encontrados`;
+                            })()}
+                          </span>
+                          {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setBudgetProductSearch("");
+                                setBudgetCategoryFilter("all");
+                              }}
+                            >
+                              Limpar filtros
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Payment and Shipping Configuration */}              
+              {/* Payment and Shipping Configuration */}
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Pagamento e Frete</h3>
@@ -1163,26 +1538,7 @@ export default function AdminBudgets() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="admin-payment-method">Forma de Pagamento *</Label>
-                    <Select value={adminBudgetForm.paymentMethodId || ""} onValueChange={(value) => {
-                      setAdminBudgetForm({ ...adminBudgetForm, paymentMethodId: value });
-                      // Reset installments and down payment if payment method changes
-                      const selectedMethod = paymentMethods?.find((pm: any) => pm.id === value);
-                      if (selectedMethod && selectedMethod.type === "credit_card") {
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          installments: 1, // Reset to 1 installment
-                          downPayment: 0, // Reset down payment
-                          remainingAmount: calculateAdminBudgetTotal() // Recalculate remaining amount
-                        }));
-                      } else {
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          installments: 1,
-                          downPayment: 0, // Reset down payment for non-credit card methods
-                          remainingAmount: calculateAdminBudgetTotal()
-                        }));
-                      }
-                    }} required>
+                    <Select value={adminBudgetForm.paymentMethodId || ""} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, paymentMethodId: value }) } required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a forma de pagamento" />
                       </SelectTrigger>
@@ -1195,36 +1551,7 @@ export default function AdminBudgets() {
                   </div>
                   <div>
                     <Label htmlFor="admin-shipping-method">Método de Frete *</Label>
-                    <Select value={adminBudgetForm.shippingMethodId || ""} onValueChange={(value) => {
-                      setAdminBudgetForm({ ...adminBudgetForm, shippingMethodId: value });
-                      const selectedMethod = shippingMethods?.find((sm: any) => sm.id === value);
-                      // If switching to a method with a defined cost, use it. Otherwise, clear.
-                      if (selectedMethod && selectedMethod.cost !== undefined) {
-                        const shippingCost = parseFloat(selectedMethod.cost);
-                        const total = calculateAdminBudgetTotal() + shippingCost;
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          shippingCost: shippingCost,
-                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
-                        }));
-                      } else if (selectedMethod) {
-                        // If method exists but cost is not defined, clear cost
-                        const total = calculateAdminBudgetTotal() + 0; // Assume 0 if no cost defined
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          shippingCost: 0,
-                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
-                        }));
-                      } else {
-                        // If no method selected, clear cost
-                        const total = calculateAdminBudgetTotal() + 0;
-                        setAdminBudgetForm(prev => ({
-                          ...prev,
-                          shippingCost: 0,
-                          remainingAmount: Math.max(0, total - (prev.downPayment || 0))
-                        }));
-                      }
-                    }} required>
+                    <Select value={adminBudgetForm.shippingMethodId || ""} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, shippingMethodId: value }) } required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o método de frete" />
                       </SelectTrigger>
@@ -1237,7 +1564,7 @@ export default function AdminBudgets() {
                   </div>
                 </div>
 
-                {/* Payment Configuration */}                
+                {/* Payment Configuration */}
                 {selectedAdminPaymentMethod && (
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Pagamento</h4>
@@ -1246,17 +1573,7 @@ export default function AdminBudgets() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor="admin-installments">Número de Parcelas *</Label>
-                          <Select value={adminBudgetForm.installments?.toString() || "1"} onValueChange={(value) => {
-                            const installments = parseInt(value);
-                            setAdminBudgetForm({ ...adminBudgetForm, installments });
-                            // Recalculate remaining amount based on new installments if applicable
-                            const total = calculateAdminTotalWithShipping();
-                            const downPayment = adminBudgetForm.downPayment || 0;
-                            setAdminBudgetForm(prev => ({
-                              ...prev,
-                              remainingAmount: Math.max(0, total - downPayment)
-                            }));
-                          }} required>
+                          <Select value={adminBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, installments: parseInt(value) }) } required>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -1327,7 +1644,7 @@ export default function AdminBudgets() {
                   </div>
                 )}
 
-                {/* Shipping Configuration */}                
+                {/* Shipping Configuration */}
                 {adminBudgetForm.deliveryType === "pickup" ? (
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h4 className="font-medium text-blue-800">Retirada no Local</h4>
@@ -1369,7 +1686,7 @@ export default function AdminBudgets() {
                 )}
               </div>
 
-              {/* Discount Section */}              
+              {/* Discount Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -1434,15 +1751,17 @@ export default function AdminBudgets() {
                         <p className="text-lg font-semibold text-orange-600 mt-2">
                           R$ {(() => {
                             const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
-                              const basePrice = item.unitPrice * item.quantity;
-                              const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-                              return total + basePrice + customizationValue;
+                              const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                              const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                              const generalCustomizationValue = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                              return total + basePrice + customizationValue + generalCustomizationValue;
                             }, 0);
 
                             if (adminBudgetForm.discountType === 'percentage') {
-                              return ((itemsSubtotal * adminBudgetForm.discountPercentage) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              const discountAmount = (itemsSubtotal * (parseFloat(adminBudgetForm.discountPercentage) || 0)) / 100;
+                              return discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             } else {
-                              return adminBudgetForm.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                              return (parseFloat(adminBudgetForm.discountValue) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                             }
                           })()}
                         </p>
@@ -1460,8 +1779,9 @@ export default function AdminBudgets() {
                     <span>R$ {(() => {
                       const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
                         const basePrice = item.unitPrice * item.quantity;
-                        const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-                        return total + basePrice + customizationValue;
+                        const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                        const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+                        return total + basePrice + itemCustomizationValue + generalCustomizationValue;
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     })()}</span>
@@ -1472,8 +1792,9 @@ export default function AdminBudgets() {
                       <span>- R$ {(() => {
                         const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
                           const basePrice = item.unitPrice * item.quantity;
-                          const customizationValue = item.hasItemCustomization ? (item.itemCustomizationValue || 0) : 0;
-                          return total + basePrice + customizationValue;
+                          const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
+                          const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
+                          return total + basePrice + itemCustomizationValue + generalCustomizationValue;
                         }, 0);
 
                         if (adminBudgetForm.discountType === 'percentage') {
@@ -1486,30 +1807,30 @@ export default function AdminBudgets() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span>Subtotal com Desconto:</span>
-                    <span>R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {calculateAdminBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor da Entrada:</span>
-                    <span>R$ {(adminBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>R$ {adminBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor do Frete:</span>
                     <span>
-                      {adminBudgetForm.deliveryType === "pickup" ?
-                        "R$ 0,00" :
-                        `R$ ${adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      {adminBudgetForm.deliveryType === "pickup" ? 
+                        "R$ 0,00" : 
+                        `R$ ${(parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
                       }
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    <span>Valor Restante para Pagamento:</span>
-                    <span>R$ {(adminBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span>Entrada + Frete (para financeiro):</span>
+                    <span>R$ {(adminBudgetForm.downPayment + (adminBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
-                      R$ {calculateAdminTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {calculateAdminTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                     </span>
                   </div>
                 </div>
@@ -1522,15 +1843,20 @@ export default function AdminBudgets() {
                   onClick={() => {
                     setIsCreateDialogOpen(false);
                     resetAdminBudgetForm();
+                    setBudgetProductSearch("");
+                    setBudgetCategoryFilter("all");
                   }}
                 >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createAdminBudgetMutation.isPending || adminBudgetForm.items.length === 0 || !adminBudgetForm.paymentMethodId || (adminBudgetForm.deliveryType === "delivery" && !adminBudgetForm.shippingMethodId) || adminBudgetForm.downPayment <= 0}
+                  disabled={(isEditMode ? updateAdminBudgetMutation.isPending : createAdminBudgetMutation.isPending) || adminBudgetForm.items.length === 0}
                 >
-                  {createAdminBudgetMutation.isPending ? "Criando..." : "Criar Orçamento"}
+                  {isEditMode
+                    ? (updateAdminBudgetMutation.isPending ? "Atualizando..." : "Atualizar Orçamento")
+                    : (createAdminBudgetMutation.isPending ? "Criando..." : "Criar Orçamento")
+                  }
                 </Button>
               </div>
             </form>
@@ -1606,38 +1932,70 @@ export default function AdminBudgets() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por número, título ou cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="draft">Rascunho</SelectItem>
+              <SelectItem value="sent">Enviado</SelectItem>
+              <SelectItem value="approved">Aprovado</SelectItem>
+              <SelectItem value="rejected">Rejeitado</SelectItem>
+              <SelectItem value="converted">Convertido</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por título, descrição ou cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
+      {budgets?.filter((budget: any) => budget.status === 'approved').length > 0 && (
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            🔔 Solicitações Pendentes - Orçamentos Aprovados pelo Cliente
+          </h3>
+          <div className="space-y-2">
+            {budgets.filter((budget: any) => budget.status === 'approved').map((budget: any) => (
+              <div key={budget.id} className="bg-white p-3 rounded border flex justify-between items-center">
+                <div>
+                  <p className="font-medium">{budget.title}</p>
+                  <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                  <p className="text-sm text-green-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleViewBudget(budget)}
+                  >
+                    Ver Detalhes
+                  </Button>
+                  <Button 
+                    size="sm"
+                    className="gradient-bg text-white"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleConvertClick(budget.id);
+                    }}
+                  >
+                    🏷️ Converter em Pedido
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="draft">Rascunho</SelectItem>
-                  <SelectItem value="sent">Enviado</SelectItem>
-                  <SelectItem value="approved">Aprovado</SelectItem>
-                  <SelectItem value="rejected">Rejeitado</SelectItem>
-                  <SelectItem value="converted">Convertido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       {/* Budgets Table */}
       <Card>
@@ -1674,36 +2032,71 @@ export default function AdminBudgets() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredBudgets?.map((budget: any) => (
-                  <tr key={budget.id}>
+                  <tr key={budget.id} className={budget.hasVendorNotification ? 'bg-blue-50' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {budget.budgetNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {budget.title}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <div className="flex items-center gap-2">
+                        {budget.title}
+                        {budget.hasVendorNotification && (
+                          <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            Nova Resposta!
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {budget.clientName}
+                      {budget.contactName || budget.clientName || 'Nome não informado'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {budget.vendorName}
+                      {budget.vendorName || 'Admin'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(budget.status)}
+                      <div className="space-y-2">
+                        {getStatusBadge(budget.status)}
+                        {budget.clientObservations && (
+                          <div className={`text-xs p-1 rounded ${
+                            budget.status === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {budget.clientObservations}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
+                      <div className="flex flex-wrap gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => generatePDFMutation.mutate(budget.id)}
-                          disabled={generatePDFMutation.isPending}
+                          onClick={() => handleViewBudget(budget)}
+                          data-testid={`button-view-${budget.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                        {(budget.status === 'draft' || budget.status === 'sent') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditBudget(budget)}
+                            data-testid={`button-edit-${budget.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleGeneratePDF(budget)}
+                          data-testid={`button-pdf-${budget.id}`}
                         >
                           <FileText className="h-4 w-4 mr-1" />
                           PDF
@@ -1715,21 +2108,23 @@ export default function AdminBudgets() {
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => sendToWhatsAppMutation.mutate(budget.id)}
                             disabled={sendToWhatsAppMutation.isPending}
+                            data-testid={`button-send-${budget.id}`}
                           >
                             <Send className="h-4 w-4 mr-1" />
-                            {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar'}
+                            Enviar
                           </Button>
                         )}
-                        {(budget.status === 'sent' || budget.status === 'approved') && (
+                        {budget.status !== 'converted' && (
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-600 hover:text-green-900"
-                            onClick={() => handleConvertClick(budget.id)}
-                            disabled={convertToOrderMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              setViewBudgetDialogOpen(false);
+                              handleConvertClick(budget.id);
+                            }}
+                            data-testid={`button-convert-${budget.id}`}
                           >
-                            <ShoppingCart className="h-4 w-4 mr-1" />
-                            {convertToOrderMutation.isPending ? 'Convertendo...' : 'Converter'}
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Converter
                           </Button>
                         )}
                       </div>
@@ -1742,94 +2137,410 @@ export default function AdminBudgets() {
         </CardContent>
       </Card>
 
+      {/* View Budget Dialog */}
+      <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Orçamento</DialogTitle>
+            <DialogDescription>
+              Visualização completa do orçamento {budgetToView?.budgetNumber}
+            </DialogDescription>
+          </DialogHeader>
+
+          {budgetToView && (
+            <div className="space-y-6">
+              {/* Budget Header */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <Label className="font-semibold">Número do Orçamento</Label>
+                  <p className="text-lg">{budgetToView.budgetNumber}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Status</Label>
+                  <div className="mt-1">{getStatusBadge(budgetToView.status)}</div>
+                </div>
+                <div>
+                  <Label className="font-semibold">Nome de Contato</Label>
+                  <p>{budgetToView.contactName}</p>
+                </div>
+                {budgetToView.contactPhone && (
+                  <div>
+                    <Label className="font-semibold">Telefone</Label>
+                    <p>{budgetToView.contactPhone}</p>
+                  </div>
+                )}
+                {budgetToView.contactEmail && (
+                  <div>
+                    <Label className="font-semibold">Email</Label>
+                    <p>{budgetToView.contactEmail}</p>
+                  </div>
+                )}
+                {budgetToView.clientName && (
+                  <div>
+                    <Label className="font-semibold">Cliente Cadastrado</Label>
+                    <p>{budgetToView.clientName}</p>
+                  </div>
+                )}
+                <div>
+                  <Label className="font-semibold">Data de Criação</Label>
+                  <p>{new Date(budgetToView.createdAt).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Válido Até</Label>
+                  <p>{budgetToView.validUntil ? new Date(budgetToView.validUntil).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Prazo de Entrega</Label>
+                  <p>{budgetToView.deliveryDeadline ? new Date(budgetToView.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Tipo de Entrega</Label>
+                  <p className={budgetToView.deliveryType === 'pickup' ? 'text-blue-600 font-medium' : 'text-green-600 font-medium'}>
+                    {budgetToView.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega com Frete'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Valor Total</Label>
+                  <p className="text-lg font-bold text-green-600">
+                    R$ {parseFloat(budgetToView.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Budget Items */}
+              {budgetToView.items && budgetToView.items.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Itens do Orçamento ({budgetToView.items.length})</h3>
+                  <div className="space-y-3">
+                    {budgetToView.items.map((item: any, index: number) => (
+                      <div key={index} className="p-4 rounded-lg border bg-gray-50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Package className="h-4 w-4 text-gray-500" />
+                              <span className="font-medium">{item.productName}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-500">Quantidade:</span>
+                                <p className="font-medium">{item.quantity}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Valor Unit.:</span>
+                                <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Dimensões:</span>
+                                <p className="font-medium">
+                                  {item.productWidth && item.productHeight && item.productDepth ? 
+                                    `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                                    'Não informado'
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Personalização do Item */}
+                        {item.hasItemCustomization && (
+                          <div className="bg-blue-50 p-3 rounded mb-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-blue-700 font-medium">🎨 Personalização do Item</span>
+                            </div>
+                            <p className="text-blue-600 font-medium">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                            {item.itemCustomizationValue > 0 && (
+                              <p className="text-sm text-blue-500">
+                                Valor: +R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
+                            )}
+                            {item.additionalCustomizationNotes && (
+                              <p className="text-sm text-blue-500 mt-1">
+                                <strong>Observações:</strong> {item.additionalCustomizationNotes}
+                              </p>
+                            )}
+                            {item.customizationPhoto && (
+                              <div className="mt-2">
+                                <span className="text-xs text-blue-600 block mb-1">Imagem de referência:</span>
+                                <img 
+                                  src={item.customizationPhoto} 
+                                  alt="Personalização do produto" 
+                                  className="w-20 h-20 object-cover rounded border cursor-pointer"
+                                  onClick={() => window.open(item.customizationPhoto, '_blank')}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Personalização Geral */}
+                        {item.hasGeneralCustomization && (
+                          <div className="bg-green-50 p-3 rounded">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-green-700 font-medium">✨ Personalização Geral</span>
+                            </div>
+                            <p className="text-green-600 font-medium">{item.generalCustomizationName || 'Personalização geral'}</p>
+                            {item.generalCustomizationValue > 0 && (
+                              <p className="text-sm text-green-500">
+                                Valor: +R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Budget Details */}
+              <div>
+                <Label className="font-semibold">Título</Label>
+                <p className="mt-1">{budgetToView.title}</p>
+              </div>
+
+              {budgetToView.description && (
+                <div>
+                  <Label className="font-semibold">Descrição</Label>
+                  <p className="mt-1">{budgetToView.description}</p>
+                </div>
+              )}
+
+              {/* Payment and Shipping Information */}
+              {(budgetToView.paymentMethodId || budgetToView.shippingMethodId) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Informações de Pagamento e Frete</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                    {budgetToView.paymentMethodId && (
+                      <div>
+                        <Label className="font-semibold">Forma de Pagamento</Label>
+                        <p>{paymentMethods?.find((pm: any) => pm.id === budgetToView.paymentMethodId)?.name || 'Não especificado'}</p>
+                        {budgetToView.installments > 1 && (
+                          <p className="text-sm text-gray-600">{budgetToView.installments}x</p>
+                        )}
+                        {budgetToView.downPayment > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {budgetToView.shippingMethodId && (
+                      <div>
+                        <Label className="font-semibold">Método de Frete</Label>
+                        <p>{shippingMethods?.find((sm: any) => sm.id === budgetToView.shippingMethodId)?.name || 'Não especificado'}</p>
+                        <p className="text-sm text-gray-600">
+                          R$ {parseFloat(budgetToView.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Discount Details */}
+              {budgetToView.hasDiscount && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Desconto Aplicado</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-medium">Tipo de Desconto</Label>
+                      <p>{budgetToView.discountType === 'percentage' ? 'Porcentagem' : 'Valor Fixo'}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Valor do Desconto</Label>
+                      <p className="text-orange-600 font-semibold">
+                        {budgetToView.discountType === 'percentage'
+                          ? `${budgetToView.discountPercentage}%`
+                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Product Customization Images */}
+              {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {budgetToView.items?.filter((item: any) => item.customizationPhoto).map((item: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <h4 className="font-medium text-lg mb-3">{item.productName}</h4>
+                        <div className="flex flex-col items-center">
+                          <img
+                            src={item.customizationPhoto}
+                            alt={`Personalização ${item.productName}`}
+                            className="w-full max-w-sm h-64 object-contain rounded-lg border"
+                            onError={(e) => {
+                              console.error('Erro ao carregar imagem:', item.customizationPhoto);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          {item.itemCustomizationDescription && (
+                            <p className="text-sm text-gray-600 mt-3 text-center">{item.itemCustomizationDescription}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => generatePDFMutation.mutate(budgetToView.id)}
+                  disabled={generatePDFMutation.isPending}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {generatePDFMutation.isPending ? 'Gerando...' : 'Baixar PDF'}
+                </Button>
+
+                {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
+                  <Button
+                    variant="outline"
+                    className="text-blue-600 hover:text-blue-900"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      sendToWhatsAppMutation.mutate(budgetToView.id);
+                    }}
+                    disabled={sendToWhatsAppMutation.isPending}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar WhatsApp'}
+                  </Button>
+                )}
+
+                {budgetToView.status !== 'converted' && (
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleConvertClick(budgetToView.id);
+                    }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Converter
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewBudgetDialogOpen(false);
+                    setBudgetToView(null);
+                  }}
+                  className="ml-auto"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Convert to Order Confirmation Dialog */}
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Converter Orçamento em Pedido</DialogTitle>
             <DialogDescription>
-              Selecione o cliente e o prazo de entrega para o pedido.
+              Para converter em pedido, é necessário associar um cliente cadastrado e definir a data de entrega.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="client-search">Buscar Cliente</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  id="client-search"
-                  placeholder="Digite o nome do cliente para buscar..."
-                  value={clientSearchTerm}
-                  onChange={(e) => setClientSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <Select value={convertClientId} onValueChange={setConvertClientId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients
-                  ?.filter((client: any) =>
-                    client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
-                  )
-                  .map((client: any) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-
-            <div>
-              <Label htmlFor="delivery-date">Prazo de Entrega *</Label>
-              <Input
-                id="delivery-date"
-                type="date"
-                value={convertDeliveryDate}
-                onChange={(e) => setConvertDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="producer-select">Produtor Responsável</Label>
-              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
+              <Label htmlFor="convert-client">Cliente *</Label>
+              <Select value={convertClientId} onValueChange={setConvertClientId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produtor" />
+                  <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {producers?.map((producer: any) => (
-                    <SelectItem key={producer.id} value={producer.id}>
-                      {producer.name} - {producer.specialty}
-                    </SelectItem>
+                  {clients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setConvertDialogOpen(false);
-                  setBudgetToConvert(null);
-                  setConvertClientId("");
-                  setConvertDeliveryDate("");
-                  setClientSearchTerm("");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleConfirmConvert}
-                disabled={!convertClientId || !convertDeliveryDate || !selectedProducer || convertToOrderMutation.isPending}
-              >
-                {convertToOrderMutation.isPending ? "Convertendo..." : "Converter"}
-              </Button>
+            
+            {/* Input for Delivery Date */}
+            <div>
+              <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
+              <Input
+                id="convert-delivery-date"
+                type="date"
+                value={convertDeliveryDate}
+                onChange={(e) => setConvertDeliveryDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+              />
             </div>
+
+            {/* Show producers involved in this budget */}
+            {budgetToConvert && (() => {
+              const budget = budgets?.find((b: any) => b.id === budgetToConvert);
+              if (!budget?.items) return null;
+
+              const producersInvolved = new Set();
+              budget.items.forEach((item: any) => {
+                if (item.producerId && item.producerId !== 'internal') {
+                  const producer = producers?.find((p: any) => p.id === item.producerId);
+                  if (producer) {
+                    producersInvolved.add(`${producer.name} - ${producer.specialty}`);
+                  }
+                } else if (item.producerId === 'internal') {
+                  producersInvolved.add('Produtos Internos');
+                }
+              });
+
+              if (producersInvolved.size > 0) {
+                return (
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <Label className="text-sm font-medium text-blue-800">Produtores Envolvidos:</Label>
+                    <ul className="text-sm text-blue-700 mt-1">
+                      {Array.from(producersInvolved).map((producer: string, index: number) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <span className="w-1 h-1 bg-blue-600 rounded-full"></span>
+                          {producer}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConvertDialogOpen(false);
+                setBudgetToConvert(null);
+                setConvertClientId("");
+                setConvertDeliveryDate("");
+              }}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmConvert}
+              disabled={convertToOrderMutation.isPending || !convertClientId || !convertDeliveryDate}
+              className="flex-1 gradient-bg text-white"
+            >
+              {convertToOrderMutation.isPending ? "Convertendo..." : "Converter em Pedido"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
