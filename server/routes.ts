@@ -5350,7 +5350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return total + refundAmount;
         }, 0);
 
-      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0).length}, total: ${refunds}`);
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();
