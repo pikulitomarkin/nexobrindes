@@ -4446,9 +4446,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/receivables", async (req, res) => {
     try {
       const accountsReceivable = await storage.getAccountsReceivable();
+      const manualReceivables = await storage.getManualReceivables();
       const orders = await storage.getOrders();
 
-      // Enrich receivables with order and client data
+      // Enrich order-based receivables with order and client data
       const enrichedReceivables = await Promise.all(
         accountsReceivable.map(async (receivable) => {
           try {
@@ -4541,9 +4542,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Filter out null values
-      const validReceivables = enrichedReceivables.filter(r => r !== null);
+      const validOrderReceivables = enrichedReceivables.filter(r => r !== null);
 
-      res.json(validReceivables);
+      // Add manual receivables (already in correct format from DB)
+      const allReceivables = [
+        ...validOrderReceivables,
+        ...manualReceivables
+      ];
+
+      res.json(allReceivables);
     } catch (error) {
       console.error("Error fetching receivables:", error);
       res.status(500).json({ error: "Failed to fetch receivables" });

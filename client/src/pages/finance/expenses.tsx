@@ -44,8 +44,7 @@ export default function FinanceExpenses() {
           category: data.category,
           date: data.date,
           description: data.description || '',
-          status: 'recorded',
-          createdBy: 'admin-1'
+          status: 'recorded'
         }),
       });
       if (!response.ok) throw new Error("Erro ao criar despesa");
