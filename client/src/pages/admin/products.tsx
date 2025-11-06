@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Plus, Upload, Search, Edit, Trash2, Package
+  Plus, Upload, Search, Edit, Trash2, Package, Factory
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -22,6 +23,7 @@ export default function AdminProducts() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedProducer, setSelectedProducer] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
@@ -29,6 +31,7 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState(0);
+  const [selectedProducerForImport, setSelectedProducerForImport] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Product form state
@@ -45,28 +48,43 @@ export default function AdminProducts() {
     depth: "",
     imageLink: "",
     mainColor: "",
-    secondaryColor: ""
+    secondaryColor: "",
+    producerId: "internal",
+    type: "internal"
   });
 
   // Queries
   const productsQuery = useQuery({
-    queryKey: ["/api/products", { 
+    queryKey: ["/api/logistics/products", { 
       page: currentPage, 
       limit: pageSize,
       search: searchTerm || undefined,
-      category: selectedCategory !== "all" ? selectedCategory : undefined
+      category: selectedCategory !== "all" ? selectedCategory : undefined,
+      producer: selectedProducer !== "all" ? selectedProducer : undefined
     }],
     queryFn: async ({ queryKey }) => {
       const [, params] = queryKey as [string, any];
       const searchParams = new URLSearchParams();
-      
+
       if (params.page) searchParams.append('page', params.page.toString());
       if (params.limit) searchParams.append('limit', params.limit.toString());
       if (params.search) searchParams.append('search', params.search);
       if (params.category) searchParams.append('category', params.category);
-      
-      const response = await fetch(`/api/products?${searchParams}`);
+      if (params.producer) searchParams.append('producer', params.producer);
+
+      const response = await fetch(`/api/logistics/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
+      const result = await response.json();
+
+      return result;
+    },
+  });
+
+  const producersQuery = useQuery({
+    queryKey: ["/api/producers"],
+    queryFn: async () => {
+      const response = await fetch('/api/producers');
+      if (!response.ok) throw new Error('Failed to fetch producers');
       return response.json();
     },
   });
@@ -74,7 +92,7 @@ export default function AdminProducts() {
   // Mutations
   const createProductMutation = useMutation({
     mutationFn: async (data: typeof productForm) => {
-      const response = await fetch("/api/products", {
+      const response = await fetch("/api/logistics/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -84,7 +102,7 @@ export default function AdminProducts() {
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Produto criado com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
       resetProductForm();
       setIsProductDialogOpen(false);
     },
@@ -92,7 +110,7 @@ export default function AdminProducts() {
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof productForm }) => {
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(`/api/logistics/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -102,7 +120,7 @@ export default function AdminProducts() {
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
       resetProductForm();
       setEditingProduct(null);
       setIsProductDialogOpen(false);
@@ -111,53 +129,55 @@ export default function AdminProducts() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/logistics/products/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Erro ao deletar produto");
       return response.json();
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Produto deletado com sucesso!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
     },
   });
 
   const importProductsMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, producerId }: { file: File; producerId: string }) => {
       if (file.size > 50 * 1024 * 1024) {
         throw new Error('Arquivo muito grande. O limite é de 50MB.');
       }
 
       const formData = new FormData();
       formData.append('file', file);
-      
-      const response = await fetch('/api/products/import', {
+      formData.append('producerId', producerId);
+
+      const response = await fetch('/api/logistics/products/import', {
         method: 'POST',
         body: formData,
       });
-      
+
       const responseData = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(responseData.error || 'Erro ao importar produtos');
       }
-      
+
       return responseData;
     },
     onSuccess: (data) => {
       const hasErrors = data.errors && data.errors.length > 0;
-      
+
       toast({
         title: hasErrors ? "Importação Concluída com Avisos" : "Importação Concluída",
         description: hasErrors 
           ? `${data.imported} de ${data.total} produtos importados. ${data.errors.length} produtos tiveram problemas.`
-          : `${data.imported} produtos importados com sucesso!`,
+          : `${data.imported} produtos importados com sucesso para o produtor!`,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
       setIsImportDialogOpen(false);
       setImportFile(null);
       setImportProgress(0);
-      
+      setSelectedProducerForImport("");
+
       if (hasErrors) {
         console.log('Import errors:', data.errors);
       }
@@ -187,13 +207,19 @@ export default function AdminProducts() {
       depth: "",
       imageLink: "",
       mainColor: "",
-      secondaryColor: ""
+      secondaryColor: "",
+      producerId: "internal",
+      type: "internal"
     });
   };
 
   const handleEditProduct = (product: any) => {
     setEditingProduct(product);
-    setProductForm(product);
+    setProductForm({
+      ...product,
+      producerId: product.producerId || "internal",
+      type: product.type || (product.producerId === "internal" ? "internal" : "external")
+    });
     setIsProductDialogOpen(true);
   };
 
@@ -205,17 +231,24 @@ export default function AdminProducts() {
 
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const formData = {
+      ...productForm,
+      producerId: productForm.producerId || "internal",
+      type: productForm.producerId === "internal" || !productForm.producerId ? "internal" : "external"
+    };
+
     if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: productForm });
+      updateProductMutation.mutate({ id: editingProduct.id, data: formData });
     } else {
-      createProductMutation.mutate(productForm);
+      createProductMutation.mutate(formData);
     }
   };
 
   const handleImport = () => {
-    if (importFile) {
+    if (importFile && selectedProducerForImport) {
       setImportProgress(25);
-      importProductsMutation.mutate(importFile);
+      importProductsMutation.mutate({ file: importFile, producerId: selectedProducerForImport });
     }
   };
 
@@ -259,19 +292,10 @@ export default function AdminProducts() {
   const products = productsData?.products || [];
   const totalProducts = productsData?.total || 0;
   const totalPages = productsData?.totalPages || 1;
-  
-  // For categories, we'll get them from all products
-  const allProductsQuery = useQuery({
-    queryKey: ["/api/products/all-categories"],
-    queryFn: async () => {
-      const response = await fetch('/api/products?limit=9999');
-      if (!response.ok) throw new Error('Failed to fetch all products');
-      const data = await response.json();
-      return data.products || [];
-    },
-  });
-  
-  const categories = ['all', ...new Set((allProductsQuery.data || []).map((product: any) => product.category).filter(Boolean))];
+  const producers = producersQuery.data || [];
+
+  // Categories from products
+  const categories = ['all', ...new Set(products.map((product: any) => product.category).filter(Boolean))];
 
   if (productsQuery.isLoading) {
     return (
@@ -288,9 +312,9 @@ export default function AdminProducts() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Produtos</h1>
           <p className="text-gray-600 mt-2">
-            Gerencie produtos, importar e editar catálogo
+            Gerencie produtos internos e de produtores terceirizados
           </p>
         </div>
       </div>
@@ -298,7 +322,7 @@ export default function AdminProducts() {
       <Card className="shadow-xl border-0">
         <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
           <div className="flex justify-between items-center">
-            <CardTitle className="text-xl font-semibold">Catálogo de Produtos</CardTitle>
+            <CardTitle className="text-xl font-semibold">Catálogo de Produtos - Administração</CardTitle>
             <div className="flex gap-2">
               <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogTrigger asChild>
@@ -309,12 +333,30 @@ export default function AdminProducts() {
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Importar Produtos</DialogTitle>
+                    <DialogTitle>Importar Produtos para Produtor</DialogTitle>
                     <DialogDescription>
-                      Faça upload de um arquivo JSON com os produtos
+                      Faça upload de um arquivo JSON e associe ao produtor
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="producer-select">Produtor Responsável</Label>
+                      <Select value={selectedProducerForImport} onValueChange={setSelectedProducerForImport}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o produtor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="internal">
+                            Produtos Internos da Empresa
+                          </SelectItem>
+                          {producers?.map((producer: any) => (
+                            <SelectItem key={producer.id} value={producer.id}>
+                              {producer.name} - {producer.specialty}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label htmlFor="file">Arquivo JSON</Label>
                       <input
@@ -345,13 +387,14 @@ export default function AdminProducts() {
                           setIsImportDialogOpen(false);
                           setImportFile(null);
                           setImportProgress(0);
+                          setSelectedProducerForImport("");
                         }}
                       >
                         Cancelar
                       </Button>
                       <Button 
                         onClick={handleImport}
-                        disabled={!importFile || importProductsMutation.isPending}
+                        disabled={!importFile || !selectedProducerForImport || importProductsMutation.isPending}
                       >
                         {importProductsMutation.isPending ? "Importando..." : "Importar"}
                       </Button>
@@ -368,7 +411,18 @@ export default function AdminProducts() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button className="bg-white text-blue-600 hover:bg-blue-50">
+                  <Button 
+                    className="bg-white text-blue-600 hover:bg-blue-50"
+                    onClick={() => {
+                      resetProductForm();
+                      setProductForm(prev => ({
+                        ...prev,
+                        producerId: "internal",
+                        type: "internal"
+                      }));
+                      setEditingProduct(null);
+                    }}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Novo Produto
                   </Button>
@@ -378,6 +432,9 @@ export default function AdminProducts() {
                     <DialogTitle>
                       {editingProduct ? "Editar Produto" : "Novo Produto"}
                     </DialogTitle>
+                    <DialogDescription>
+                      {editingProduct ? "Edite as informações do produto" : "Cadastre um novo produto"}
+                    </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleProductSubmit} className="space-y-6">
                     <Tabs defaultValue="basic" className="w-full">
@@ -386,7 +443,7 @@ export default function AdminProducts() {
                         <TabsTrigger value="details">Detalhes</TabsTrigger>
                         <TabsTrigger value="appearance">Aparência</TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="basic" className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -455,8 +512,65 @@ export default function AdminProducts() {
                             <Label>Produto Ativo</Label>
                           </div>
                         </div>
+
+                        <div>
+                          <Label htmlFor="producerId">Produtor Responsável</Label>
+                          <Select 
+                            value={productForm.producerId}
+                            onValueChange={(value) => setProductForm({
+                              ...productForm, 
+                              producerId: value,
+                              type: value === "internal" ? "internal" : "external"
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o produtor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="internal">
+                                <div className="flex items-center">
+                                  <Package className="h-4 w-4 text-blue-500 mr-2" />
+                                  Produtos Internos da Empresa
+                                </div>
+                              </SelectItem>
+                              {producers?.map((producer: any) => (
+                                <SelectItem key={producer.id} value={producer.id}>
+                                  <div className="flex items-center">
+                                    <Factory className="h-4 w-4 text-purple-500 mr-2" />
+                                    {producer.name} - {producer.specialty}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className={`p-3 rounded-lg border ${
+                          productForm.producerId === "internal" ? "bg-blue-50" : "bg-purple-50"
+                        }`}>
+                          <div className="flex items-center space-x-2 mb-2">
+                            {productForm.producerId === "internal" ? (
+                              <Package className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <Factory className="h-4 w-4 text-purple-600" />
+                            )}
+                            <Label className={`font-medium ${
+                              productForm.producerId === "internal" ? "text-blue-700" : "text-purple-700"
+                            }`}>
+                              Tipo de Produto
+                            </Label>
+                          </div>
+                          <p className={`text-sm ${
+                            productForm.producerId === "internal" ? "text-blue-600" : "text-purple-600"
+                          }`}>
+                            {productForm.producerId === "internal" 
+                              ? "Este produto será cadastrado como PRODUTO INTERNO da empresa"
+                              : `Este produto será associado ao produtor ${producers?.find(p => p.id === productForm.producerId)?.name || 'selecionado'}`
+                            }
+                          </p>
+                        </div>
                       </TabsContent>
-                      
+
                       <TabsContent value="details" className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -503,7 +617,7 @@ export default function AdminProducts() {
                           </div>
                         </div>
                       </TabsContent>
-                      
+
                       <TabsContent value="appearance" className="space-y-4">
                         <div>
                           <Label htmlFor="imageLink">Link da Imagem</Label>
@@ -585,6 +699,22 @@ export default function AdminProducts() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="min-w-48">
+              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os produtores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os produtores</SelectItem>
+                  <SelectItem value="internal">Produtos Internos</SelectItem>
+                  {producers?.map((producer: any) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Products Table */}
@@ -592,11 +722,17 @@ export default function AdminProducts() {
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum produto encontrado</h3>
-              <p className="text-gray-500 mb-6">Comece adicionando seu primeiro produto.</p>
-              <Button onClick={() => setIsProductDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Produto
-              </Button>
+              <p className="text-gray-500 mb-6">Comece adicionando produtos internos ou importando de produtores.</p>
+              <div className="flex gap-4 justify-center">
+                <Button onClick={() => setIsProductDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Produto
+                </Button>
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar JSON
+                </Button>
+              </div>
             </div>
           ) : (
             <Table>
@@ -605,6 +741,7 @@ export default function AdminProducts() {
                   <TableHead>Imagem</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Tipo/Produtor</TableHead>
                   <TableHead>Preço</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -641,6 +778,19 @@ export default function AdminProducts() {
                       <Badge variant="outline">{product.category || 'Sem categoria'}</Badge>
                     </TableCell>
                     <TableCell>
+                      {product.producerId === 'internal' ? (
+                        <div className="flex items-center">
+                          <Package className="h-4 w-4 text-blue-500 mr-1" />
+                          <Badge className="bg-blue-100 text-blue-800">Interno</Badge>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <Factory className="h-4 w-4 text-purple-500 mr-1" />
+                          <Badge variant="secondary">{product.producerName}</Badge>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <p className="font-medium">
                         R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
@@ -660,7 +810,6 @@ export default function AdminProducts() {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleEditProduct(product)}
-                          data-testid={`edit-product-${product.id}`}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -668,7 +817,6 @@ export default function AdminProducts() {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleDeleteProduct(product.id)}
-                          data-testid={`delete-product-${product.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -679,7 +827,7 @@ export default function AdminProducts() {
               </TableBody>
             </Table>
           )}
-          
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t">
@@ -692,7 +840,6 @@ export default function AdminProducts() {
                   size="sm"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  data-testid="button-previous-page"
                 >
                   Anterior
                 </Button>
@@ -706,7 +853,6 @@ export default function AdminProducts() {
                         size="sm"
                         onClick={() => setCurrentPage(page)}
                         className="w-8 h-8 p-0"
-                        data-testid={`button-page-${page}`}
                       >
                         {page}
                       </Button>
@@ -720,7 +866,6 @@ export default function AdminProducts() {
                         size="sm"
                         onClick={() => setCurrentPage(totalPages)}
                         className="w-8 h-8 p-0"
-                        data-testid={`button-page-${totalPages}`}
                       >
                         {totalPages}
                       </Button>
@@ -732,7 +877,6 @@ export default function AdminProducts() {
                   size="sm"
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  data-testid="button-next-page"
                 >
                   Próxima
                 </Button>
