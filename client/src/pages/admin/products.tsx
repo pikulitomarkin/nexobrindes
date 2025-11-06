@@ -294,6 +294,15 @@ export default function AdminProducts() {
   const totalPages = productsData?.totalPages || 1;
   const producers = producersQuery.data || [];
 
+  // Enrich products with producer names
+  const enrichedProducts = products.map(product => {
+    const producer = producers.find(p => p.id === product.producerId);
+    return {
+      ...product,
+      producerName: product.producerId === 'internal' ? 'Interno' : (producer?.name || 'Produtor não encontrado')
+    };
+  });
+
   // Categories from products
   const categories = ['all', ...new Set(products.map((product: any) => product.category).filter(Boolean))];
 
@@ -748,7 +757,7 @@ export default function AdminProducts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product: any) => (
+                {enrichedProducts.map((product: any) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       {product.imageLink ? (

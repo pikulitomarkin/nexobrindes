@@ -826,11 +826,22 @@ export class PgStorage implements IStorage {
       .limit(limit)
       .offset(offset);
 
-    const totalResults = await pg.select({ count: sql<number>`count(*)` }).from(schema.products);
+    // Get all producers to enrich products with producer names
+    const producers = await pg.select().from(schema.users).where(eq(schema.users.role, 'producer'));
+
+    // Enrich products with producer names
+    const enrichedProducts = products.map(product => ({
+      ...product,
+      producerName: product.producerId === 'internal' ? 'Interno' : 
+        (producers.find(p => p.id === product.producerId)?.name || 'Produtor não encontrado')
+    }));
+
+    const totalResults = await pg.select({ count: sql<number>`count(*)` }).from(schema.products)
+      .where(and(...conditions));
     const total = Number(totalResults[0].count);
     const totalPages = Math.ceil(total / limit);
 
-    return { products, total, page, totalPages };
+    return { products: enrichedProducts, total, page, totalPages };
   }
 
   async getProduct(id: string): Promise<Product | undefined> {
@@ -848,8 +859,11 @@ export class PgStorage implements IStorage {
   }
 
   async updateProduct(id: string, productData: Partial<InsertProduct>): Promise<Product | undefined> {
+    // Remove campos de timestamp se eles existirem no productData para evitar conflitos
+    const { createdAt, updatedAt, ...cleanProductData } = productData as any;
+    
     const results = await pg.update(schema.products)
-      .set({ ...productData, updatedAt: new Date() })
+      .set({ ...cleanProductData, updatedAt: new Date() })
       .where(eq(schema.products.id, id))
       .returning();
     return results[0];

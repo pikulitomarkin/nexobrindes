@@ -2831,8 +2831,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Only if contactName is missing, try to get from client record
           if (!clientName && order?.clientId) {
-            console.log(`Contact name missing, looking for client with ID: ${order.clientId}`);
-
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               console.log(`Found client record:`, clientRecord);
@@ -5842,9 +5840,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const updatedProduct = await storage.updateProduct(req.params.id, req.body);
+      const { id } = req.params;
+      const { createdAt, updatedAt, ...productData } = req.body;
+
+      const updatedProduct = await storage.updateProduct(id, productData);
+      if (!updatedProduct) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
       res.json(updatedProduct);
     } catch (error) {
+      console.error("Error updating product:", error);
       res.status(500).json({ error: "Failed to update product" });
     }
   });
@@ -6110,121 +6116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch budget" });
-    }
-  });
-
-  app.get("/api/budgets/client/:clientId", async (req, res) => {
-    try {
-      const { clientId } = req.params;
-      console.log(`Fetching budgets for client: ${clientId}`);
-
-      let budgets = [];
-
-      // Get all budgets to search through
-      const allBudgets = await storage.getBudgets();
-      console.log(`Total budgets in system: ${allBudgets.length}`);
-
-      // Find budgets that match this client ID in various ways
-      for (const budget of allBudgets) {
-        let shouldInclude = false;
-
-        // Direct match with clientId
-        if (budget.clientId === clientId) {
-          shouldInclude = true;
-        }
-
-        // Check if clientId refers to a user, and find client record
-        if (!shouldInclude) {
-          try {
-            const clientRecord = await storage.getClientByUserId(clientId);
-            if (clientRecord && budget.clientId === clientRecord.id) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        // Check if budget.clientId is a client record, and see if its userId matches
-        if (!shouldInclude) {
-          try {
-            const budgetClientRecord = await storage.getClient(budget.clientId);
-            if (budgetClientRecord && budgetClientRecord.userId === clientId) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        // Also check if contactName matches user info (fallback for orders created from budgets)
-        if (!shouldInclude && budget.contactName) {
-          try {
-            const user = await storage.getUser(clientId);
-            if (user && user.name === budget.contactName) {
-              shouldInclude = true;
-            }
-          } catch (e) {
-            // Continue searching
-          }
-        }
-
-        if (shouldInclude) {
-          budgets.push(budget);
-        }
-      }
-
-      // Remove duplicates
-      const uniqueBudgets = budgets.filter((budget, index, self) =>
-        index === self.findIndex(b => b.id === budget.id)
-      );
-
-      console.log(`Found ${uniqueBudgets.length} unique budgets for client ${clientId}`);
-
-      // Enrich with vendor names and items
-      const enrichedBudgets = await Promise.all(
-        uniqueBudgets.map(async (budget) => {
-          const vendor = await storage.getUser(budget.vendorId);
-          const items = await storage.getBudgetItems(budget.id);
-          const photos = await storage.getBudgetPhotos(budget.id);
-
-          // Enrich items with product details
-          const enrichedItems = await Promise.all(
-            items.map(async (item) => {
-              const product = await storage.getProduct(item.productId);
-              return {
-                ...item,
-                productName: product?.name || 'Produto não encontrado'
-              };
-            })
-          );
-
-          // Get payment data
-          const paymentData = await storage.getBudgetPaymentInfo(budget.id);
-
-          // Ensure all budget fields are properly set
-          return {
-            ...budget,
-            id: budget.id,
-            budgetNumber: budget.budgetNumber || 'N/A',
-            status: budget.status || 'draft',
-            vendorName: vendor?.name || 'Vendedor',
-            photos: photos,
-            items: enrichedItems,
-            paymentData
-          };
-        })
-      );
-
-      // Sort by creation date (newest first)
-      enrichedBudgets.sort((a, b) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
-
-      res.json(enrichedBudgets);
-    } catch (error) {
-      console.error("Error fetching client budgets:", error);
-      res.status(500).json({ error: "Failed to fetch client budgets: " + error.message });
     }
   });
 
