@@ -1632,11 +1632,21 @@ export class PgStorage implements IStorage {
   // ==================== CUSTOMIZATION OPTIONS ====================
 
   async createCustomizationOption(data: InsertCustomizationOption): Promise<CustomizationOption> {
+    console.log('Creating customization option with data:', data);
+    
     const results = await pg.insert(schema.customizationOptions).values({
-      ...data,
+      name: data.name,
+      description: data.description || null,
+      category: data.category,
+      minQuantity: data.minQuantity,
+      price: data.price,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdBy: data.createdBy,
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
+    
+    console.log('Created customization option:', results[0]);
     return results[0];
   }
 

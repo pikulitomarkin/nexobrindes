@@ -381,6 +381,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customization Options endpoints
+  app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
+    try {
+      const options = await storage.getCustomizationOptions();
+      res.json(options);
+    } catch (error) {
+      console.error('Error fetching customization options:', error);
+      res.status(500).json({ error: "Erro ao buscar opções de personalização" });
+    }
+  });
+
+  app.post("/api/settings/customization-options", requireAuth, async (req, res) => {
+    try {
+      const { name, description, category, minQuantity, price, isActive } = req.body;
+
+      if (!name || !category || !minQuantity || !price) {
+        return res.status(400).json({ error: "Campos obrigatórios: nome, categoria, quantidade mínima e preço" });
+      }
+
+      const newOption = await storage.createCustomizationOption({
+        name,
+        description: description || "",
+        category,
+        minQuantity: parseInt(minQuantity),
+        price: parseFloat(price).toFixed(2),
+        isActive: isActive !== undefined ? isActive : true,
+        createdBy: req.user?.id || 'admin'
+      });
+
+      res.json(newOption);
+    } catch (error) {
+      console.error('Error creating customization option:', error);
+      res.status(500).json({ error: "Erro ao criar opção de personalização" });
+    }
+  });
+
+  app.put("/api/settings/customization-options/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, category, minQuantity, price, isActive } = req.body;
+
+      if (!name || !category || !minQuantity || !price) {
+        return res.status(400).json({ error: "Campos obrigatórios: nome, categoria, quantidade mínima e preço" });
+      }
+
+      const updatedOption = await storage.updateCustomizationOption(id, {
+        name,
+        description: description || "",
+        category,
+        minQuantity: parseInt(minQuantity),
+        price: parseFloat(price).toFixed(2),
+        isActive: isActive !== undefined ? isActive : true
+      });
+
+      if (!updatedOption) {
+        return res.status(404).json({ error: "Opção de personalização não encontrada" });
+      }
+
+      res.json(updatedOption);
+    } catch (error) {
+      console.error('Error updating customization option:', error);
+      res.status(500).json({ error: "Erro ao atualizar opção de personalização" });
+    }
+  });
+
+  app.delete("/api/settings/customization-options/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const deleted = await storage.deleteCustomizationOption(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Opção de personalização não encontrada" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting customization option:', error);
+      res.status(500).json({ error: "Erro ao deletar opção de personalização" });
+    }
+  });
+
+  app.post("/api/settings/customization-options/bulk-import", requireAuth, async (req, res) => {
+    try {
+      const { customizations } = req.body;
+
+      if (!customizations || !Array.isArray(customizations)) {
+        return res.status(400).json({ error: "Lista de personalizações inválida" });
+      }
+
+      let imported = 0;
+      const errors = [];
+
+      for (const customization of customizations) {
+        try {
+          if (!customization.name || !customization.category || !customization.minQuantity || customization.price === undefined) {
+            errors.push(`Personalização "${customization.name || 'sem nome'}" - campos obrigatórios faltando`);
+            continue;
+          }
+
+          await storage.createCustomizationOption({
+            name: customization.name,
+            description: customization.description || "",
+            category: customization.category,
+            minQuantity: parseInt(customization.minQuantity),
+            price: parseFloat(customization.price).toFixed(2),
+            isActive: customization.isActive !== undefined ? customization.isActive : true,
+            createdBy: req.user?.id || 'admin'
+          });
+          imported++;
+        } catch (error) {
+          errors.push(`Erro ao importar "${customization.name}": ${error.message}`);
+        }
+      }
+
+      res.json({ 
+        imported, 
+        total: customizations.length, 
+        errors: errors.slice(0, 10) // Limitar erros para não sobrecarregar resposta
+      });
+    } catch (error) {
+      console.error('Error bulk importing customization options:', error);
+      res.status(500).json({ error: "Erro ao importar personalizações em lote" });
+    }
+  });
+
   // Get budget PDF data with all images
   app.get("/api/budgets/:id/pdf-data", async (req, res) => {
     try {
