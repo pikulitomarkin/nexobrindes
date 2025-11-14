@@ -6411,16 +6411,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Include items and photos
+      // Include items, photos, payment info, client and vendor data
       const items = await storage.getBudgetItems(req.params.id);
       const photos = await storage.getBudgetPhotos(req.params.id);
+      const paymentInfo = await storage.getBudgetPaymentInfo(req.params.id);
+
+      // Get client data if clientId exists
+      let clientData = null;
+      if (budget.clientId) {
+        clientData = await storage.getClient(budget.clientId);
+      }
+
+      // Get vendor data if vendorId exists
+      let vendorData = null;
+      if (budget.vendorId) {
+        const user = await storage.getUser(budget.vendorId);
+        if (user) {
+          vendorData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone
+          };
+        }
+      }
 
       res.json({
         ...budget,
         items,
-        photos
+        photos,
+        paymentInfo,
+        client: clientData,
+        vendor: vendorData
       });
     } catch (error) {
+      console.error('Error fetching budget:', error);
       res.status(500).json({ error: "Failed to fetch budget" });
     }
   });

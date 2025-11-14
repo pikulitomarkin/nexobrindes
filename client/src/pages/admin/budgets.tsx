@@ -580,9 +580,28 @@ export default function AdminBudgets() {
     }
   };
 
+  const fetchBudgetDetailsMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}`);
+      if (!response.ok) throw new Error("Erro ao buscar detalhes do orçamento");
+      return response.json();
+    },
+    onSuccess: (fullBudget) => {
+      setBudgetToView(fullBudget);
+      setViewBudgetDialogOpen(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleViewBudget = (budget: any) => {
-    setBudgetToView(budget);
-    setViewBudgetDialogOpen(true);
+    // Fetch full budget details including items, client, vendor, and payment info
+    fetchBudgetDetailsMutation.mutate(budget.id);
   };
 
   const handleGeneratePDF = (budget: any) => {
