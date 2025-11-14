@@ -199,6 +199,36 @@ export default function AdminClients() {
     },
   });
 
+  const updateClientMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ClientFormValues> }) => {
+      const response = await fetch(`/api/clients/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao atualizar cliente");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      setShowEditClient(false);
+      setSelectedClientId(null);
+      form.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Cliente atualizado com sucesso!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeleteClient = (clientId: string, clientName: string) => {
     if (confirm(`Tem certeza que deseja excluir o cliente "${clientName}"?`)) {
       deleteClientMutation.mutate(clientId);
@@ -206,11 +236,53 @@ export default function AdminClients() {
   };
 
   const onSubmit = (data: ClientFormValues) => {
-    createClientMutation.mutate(data);
+    if (selectedClientId && showEditClient) {
+      // Edição de cliente existente
+      updateClientMutation.mutate({ id: selectedClientId, data });
+    } else {
+      // Criação de novo cliente
+      createClientMutation.mutate(data);
+    }
   };
 
   const handleEditClient = (client: any) => {
     setSelectedClientId(client.id);
+    // Popular o formulário com os dados do cliente
+    form.reset({
+      name: client.name || "",
+      email: client.email || "",
+      phone: client.phone || "",
+      whatsapp: client.whatsapp || "",
+      cpfCnpj: client.cpfCnpj || "",
+      address: client.address || "",
+      vendorId: client.vendorId || "",
+      password: "", // Não preencher senha por segurança
+      nomeFantasia: client.nomeFantasia || "",
+      razaoSocial: client.razaoSocial || "",
+      inscricaoEstadual: client.inscricaoEstadual || "",
+      logradouro: client.logradouro || "",
+      numero: client.numero || "",
+      complemento: client.complemento || "",
+      bairro: client.bairro || "",
+      cidade: client.cidade || "",
+      cep: client.cep || "",
+      emailBoleto: client.emailBoleto || "",
+      emailNF: client.emailNF || "",
+      nomeContato: client.nomeContato || "",
+      emailContato: client.emailContato || "",
+      enderecoFaturamentoLogradouro: client.enderecoFaturamentoLogradouro || "",
+      enderecoFaturamentoNumero: client.enderecoFaturamentoNumero || "",
+      enderecoFaturamentoComplemento: client.enderecoFaturamentoComplemento || "",
+      enderecoFaturamentoBairro: client.enderecoFaturamentoBairro || "",
+      enderecoFaturamentoCidade: client.enderecoFaturamentoCidade || "",
+      enderecoFaturamentoCep: client.enderecoFaturamentoCep || "",
+      enderecoEntregaLogradouro: client.enderecoEntregaLogradouro || "",
+      enderecoEntregaNumero: client.enderecoEntregaNumero || "",
+      enderecoEntregaComplemento: client.enderecoEntregaComplemento || "",
+      enderecoEntregaBairro: client.enderecoEntregaBairro || "",
+      enderecoEntregaCidade: client.enderecoEntregaCidade || "",
+      enderecoEntregaCep: client.enderecoEntregaCep || "",
+    });
     setShowEditClient(true);
   };
 
@@ -1221,42 +1293,557 @@ export default function AdminClients() {
           <DialogHeader>
             <DialogTitle>Editar Cliente</DialogTitle>
           </DialogHeader>
-          {selectedClientId && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-3 rounded-lg mt-4 border">
-                <div className="flex items-center justify-between mb-3">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
-                    <p className="font-mono font-bold text-blue-800">
-                      {(() => {
-                        const client = clients?.find((c: any) => c.id === selectedClientId);
-                        if (!client) return 'N/A';
-                        const code = client.userCode ?? 
-                                    client.code ?? 
-                                    client.loginCode ?? 
-                                    client.accessCode ?? 
-                                    null;
-                        return code ?? 'N/A';
-                      })()}
-                    </p>
+                    <FormLabel className="text-gray-700">Código de Acesso do Cliente</FormLabel>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <User className="h-4 w-4 text-blue-600" />
+                      <span className="font-mono font-bold text-blue-800">
+                        {(() => {
+                          const client = clients?.find((c: any) => c.id === selectedClientId);
+                          if (!client) return 'N/A';
+                          const code = client.userCode ?? 
+                                      client.code ?? 
+                                      client.loginCode ?? 
+                                      client.accessCode ?? 
+                                      null;
+                          return code ?? 'N/A';
+                        })()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Este código não pode ser alterado</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Vendedor</p>
-                    <p className="font-medium text-gray-900">{clients?.find((c: any) => c.id === selectedClientId)?.vendorName || 'N/A'}</p>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => handleEditClient(clients?.find((c: any) => c.id === selectedClientId))}>
-                    Editar
-                  </Button>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">Funcionalidade de edição em desenvolvimento...</p>
-              <Button onClick={() => setShowEditClient(false)}>
-                Fechar
-              </Button>
-            </div>
-          )}
+
+              {/* Informações Básicas */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Informações Básicas</h3>
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome do Contato *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="João Silva" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha de Acesso</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Digite uma nova senha" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-gray-600">Deixe em branco para manter a senha atual</p>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="nomeFantasia"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Fantasia</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Empresa Ltda" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="razaoSocial"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome/Razão Social</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Empresa Comercial Ltda" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cpfCnpj"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF/CNPJ</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123.456.789-00 ou 00.000.000/0001-00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="inscricaoEstadual"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Inscrição Estadual</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123.456.789.012 (se for Indústria ou Comércio)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Endereço Principal */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Endereço Principal</h3>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="logradouro"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Logradouro/Rua</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Rua das Flores" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="numero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="complemento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Complemento</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Apto 45, Bloco B" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bairro"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bairro</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Centro" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="cidade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cidade</FormLabel>
+                        <FormControl>
+                          <Input placeholder="São Paulo" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cep"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CEP</FormLabel>
+                        <FormControl>
+                          <Input placeholder="01234-567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Endereço de Faturamento */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Endereço de Faturamento</h3>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoLogradouro"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Logradouro/Rua</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Rua das Flores" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoNumero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoComplemento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Complemento</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Apto 45, Bloco B" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoBairro"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bairro</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Centro" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoCidade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cidade</FormLabel>
+                        <FormControl>
+                          <Input placeholder="São Paulo" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoFaturamentoCep"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CEP</FormLabel>
+                        <FormControl>
+                          <Input placeholder="01234-567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Endereço de Entrega */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Endereço de Entrega</h3>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaLogradouro"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Logradouro/Rua</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Rua das Flores" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaNumero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaComplemento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Complemento</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Apto 45, Bloco B" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaBairro"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bairro</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Centro" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaCidade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cidade</FormLabel>
+                        <FormControl>
+                          <Input placeholder="São Paulo" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enderecoEntregaCep"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CEP</FormLabel>
+                        <FormControl>
+                          <Input placeholder="01234-567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Contato */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(11) 99999-9999" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="whatsapp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp</FormLabel>
+                        <FormControl>
+                          <Input placeholder="(11) 99999-9999" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="nomeContato"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome do Contato</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome da pessoa de contato" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="emailContato"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail do Contato</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="contato@empresa.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* E-mails Comerciais */}
+              <div className="space-y-4 border-b pb-4">
+                <h3 className="text-lg font-semibold text-gray-900">E-mails Comerciais</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="emailBoleto"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail para Envio de Boleto</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="financeiro@empresa.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="emailNF"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail para Envio de NF</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="nf@empresa.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail Principal</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="contato@empresa.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="vendorId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vendedor Responsável</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um vendedor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {vendors?.map((vendor: any) => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditClient(false);
+                    setSelectedClientId(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={updateClientMutation.isPending}
+                >
+                  {updateClientMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

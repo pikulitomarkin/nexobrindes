@@ -3440,6 +3440,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // UPDATE endpoints
+  
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const clientData = req.body;
+
+      const updatedClient = await storage.updateClient(id, clientData);
+      if (!updatedClient) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
+      res.json(updatedClient);
+    } catch (error) {
+      console.error('Error updating client:', error);
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
   // DELETE endpoints with validations
 
   app.delete("/api/clients/:id", async (req, res) => {
