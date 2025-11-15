@@ -422,6 +422,33 @@ export default function AdminBudgets() {
     },
   });
 
+  const deleteBudgetMutation = useMutation({
+    mutationFn: async (budgetId: string) => {
+      const response = await fetch(`/api/budgets/${budgetId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao excluir orçamento");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      toast({
+        title: "Sucesso!",
+        description: "Orçamento excluído com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [budgetToConvert, setBudgetToConvert] = useState<string | null>(null);
   const [convertClientId, setConvertClientId] = useState("");
@@ -2161,6 +2188,21 @@ export default function AdminBudgets() {
                             Converter
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-900"
+                          onClick={() => {
+                            if (window.confirm(`Tem certeza que deseja excluir o orçamento ${budget.budgetNumber}? Esta ação não pode ser desfeita.`)) {
+                              deleteBudgetMutation.mutate(budget.id);
+                            }
+                          }}
+                          disabled={deleteBudgetMutation.isPending}
+                          data-testid={`button-delete-${budget.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Excluir
+                        </Button>
                       </div>
                     </td>
                   </tr>

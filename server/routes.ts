@@ -6854,7 +6854,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`[UPDATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
 
-          // VALIDATE and PREPARE each item (no DB operations yet)
+          // STEP 1: Get FULL existing items BEFORE any changes (for rollback safety)
+          const existingItems = await storage.getBudgetItems(budgetId);
+          const existingItemIds = existingItems.map(item => item.id);
+          console.log(`[UPDATE BUDGET] Found ${existingItemIds.length} existing items to replace`);
+
+          // STEP 2: VALIDATE and PREPARE each item (no DB operations yet)
           for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
@@ -6899,15 +6904,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
-          // ALL items validated successfully - NOW it's safe to delete old ones
-          console.log(`[UPDATE BUDGET] All ${itemsToInsert.length} items validated. Deleting old items...`);
-          await storage.deleteBudgetItems(budgetId);
+          // STEP 3: Create ALL new items FIRST (safer than deleting first)
+          console.log(`[UPDATE BUDGET] Creating ${itemsToInsert.length} new items FIRST (before deleting old ones)...`);
+          const createdItemIds = [];
           
-          // Insert new items
-          console.log(`[UPDATE BUDGET] Inserting ${itemsToInsert.length} new items...`);
+          // Insert all new items - if this fails, old items remain intact
           for (const itemData of itemsToInsert) {
-            await storage.createBudgetItem(updatedBudget.id, itemData);
+            const newItem = await storage.createBudgetItem(updatedBudget.id, itemData);
+            createdItemIds.push(newItem.id);
           }
+          console.log(`[UPDATE BUDGET] Successfully created ${createdItemIds.length} new items`);
+          
+          // STEP 4: Only delete old items after ALL new ones are created successfully
+          // NOTE: Without DB transactions, if deletion fails after some deletes, we may have
+          // temporary duplicates, but this is better than losing data completely
+          console.log(`[UPDATE BUDGET] Deleting ${existingItemIds.length} old items...`);
+          let deletedCount = 0;
+          for (const oldItemId of existingItemIds) {
+            try {
+              await storage.deleteBudgetItem(oldItemId);
+              deletedCount++;
+            } catch (deleteError) {
+              console.error(`[UPDATE BUDGET] Error deleting old item ${oldItemId}:`, deleteError);
+              // Continue with other deletions even if one fails
+            }
+          }
+          console.log(`[UPDATE BUDGET] Budget items updated - ${createdItemIds.length} new items created, ${deletedCount}/${existingItemIds.length} old items deleted`);
         } else {
           console.log(`[UPDATE BUDGET] Items array empty - deleting all items from budget ${budgetId}`);
           await storage.deleteBudgetItems(budgetId);
