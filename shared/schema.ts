@@ -257,6 +257,14 @@ export const budgets = pgTable("budgets", {
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default('0.00'),
 
+  // Campos para pagamento
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  shippingMethodId: varchar("shipping_method_id").references(() => shippingMethods.id),
+  installments: integer("installments").default(1),
+  downPayment: decimal("down_payment", { precision: 10, scale: 2 }).default('0.00'),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
