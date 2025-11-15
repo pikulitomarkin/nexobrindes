@@ -433,8 +433,23 @@ export class PgStorage implements IStorage {
   }
 
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    // Convert string dates to Date objects if they exist
+    const processedData = { ...updates };
+    
+    if (processedData.deadline && typeof processedData.deadline === 'string') {
+      processedData.deadline = new Date(processedData.deadline);
+    }
+    
+    if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
+      processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    }
+    
+    if (processedData.createdAt && typeof processedData.createdAt === 'string') {
+      processedData.createdAt = new Date(processedData.createdAt);
+    }
+
     const results = await pg.update(schema.orders)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...processedData, updatedAt: new Date() })
       .where(eq(schema.orders.id, id))
       .returning();
     return results[0];
@@ -1275,6 +1290,11 @@ export class PgStorage implements IStorage {
 
     if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
+    }
+
+    // Convert empty clientId to null to avoid foreign key constraint violation
+    if (processedData.clientId === '' || processedData.clientId === undefined) {
+      processedData.clientId = null;
     }
 
     const results = await pg.update(schema.budgets)
