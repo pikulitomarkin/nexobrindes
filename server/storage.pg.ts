@@ -1937,91 +1937,89 @@ export class PgStorage implements IStorage {
   // ==================== QUOTE REQUESTS ====================
 
   async createConsolidatedQuoteRequest(data: any): Promise<any> {
-    return await pg.transaction(async (tx) => {
-      // Get client info for contact name
-      const clientUser = await tx.select().from(schema.users)
-        .where(eq(schema.users.id, data.clientId))
-        .limit(1);
-      
-      const contactName = clientUser[0]?.name || 'Cliente';
-      
-      // Fetch product details including basePrice
-      const enrichedProducts = await Promise.all(
-        data.products.map(async (product: any) => {
-          if (!product.quantity || product.quantity <= 0) {
-            throw new Error(`Invalid quantity for product: ${product.productId}`);
-          }
-          
-          const productDetails = await tx.select().from(schema.products)
-            .where(eq(schema.products.id, product.productId))
-            .limit(1);
-          
-          if (!productDetails[0]) {
-            throw new Error(`Product not found: ${product.productId}`);
-          }
-          
-          const basePrice = productDetails[0].basePrice;
-          const basePriceNum = parseFloat(basePrice || '0');
-          
-          if (!basePrice || isNaN(basePriceNum) || basePriceNum <= 0) {
-            throw new Error(`Product ${product.productId} has invalid price: ${basePrice}`);
-          }
-          
-          const lineTotal = (basePriceNum * product.quantity).toFixed(2);
-          
-          return {
-            ...product,
-            basePrice: basePrice,  // Keep as string from database
-            unitPrice: basePrice,   // For frontend compatibility
-            lineTotal: lineTotal    // Calculated total for this line
-          };
-        })
+    // Get client info for contact name
+    const clientUser = await pg.select().from(schema.users)
+      .where(eq(schema.users.id, data.clientId))
+      .limit(1);
+    
+    const contactName = clientUser[0]?.name || 'Cliente';
+    
+    // Fetch product details including basePrice
+    const enrichedProducts = await Promise.all(
+      data.products.map(async (product: any) => {
+        if (!product.quantity || product.quantity <= 0) {
+          throw new Error(`Invalid quantity for product: ${product.productId}`);
+        }
+        
+        const productDetails = await pg.select().from(schema.products)
+          .where(eq(schema.products.id, product.productId))
+          .limit(1);
+        
+        if (!productDetails[0]) {
+          throw new Error(`Product not found: ${product.productId}`);
+        }
+        
+        const basePrice = productDetails[0].basePrice;
+        const basePriceNum = parseFloat(basePrice || '0');
+        
+        if (!basePrice || isNaN(basePriceNum) || basePriceNum <= 0) {
+          throw new Error(`Product ${product.productId} has invalid price: ${basePrice}`);
+        }
+        
+        const lineTotal = (basePriceNum * product.quantity).toFixed(2);
+        
+        return {
+          ...product,
+          basePrice: basePrice,  // Keep as string from database
+          unitPrice: basePrice,   // For frontend compatibility
+          lineTotal: lineTotal    // Calculated total for this line
+        };
+      })
+    );
+
+    // Calculate total estimated value
+    const totalEstimatedValue = enrichedProducts.reduce((sum: number, product: any) => {
+      return sum + (parseFloat(product.basePrice) * product.quantity);
+    }, 0);
+
+    // Create main quote request
+    const quoteRequestResults = await pg.insert(schema.quoteRequests).values({
+      clientId: data.clientId,
+      vendorId: data.vendorId,
+      contactName: contactName,
+      whatsapp: clientUser[0]?.phone || null,
+      email: clientUser[0]?.email || null,
+      observations: data.observations || null,
+      totalEstimatedValue: totalEstimatedValue.toFixed(2),
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    
+    const quoteRequest = quoteRequestResults[0];
+
+    // Create quote request items
+    if (enrichedProducts && enrichedProducts.length > 0) {
+      await pg.insert(schema.quoteRequestItems).values(
+        enrichedProducts.map((product: any) => ({
+          quoteRequestId: quoteRequest.id,
+          productId: product.productId,
+          productName: product.productName,
+          quantity: product.quantity,
+          basePrice: product.basePrice,  // Already a string from database
+          category: product.category || null,
+          imageLink: product.imageLink || null,
+          observations: product.observations || null,
+          createdAt: new Date()
+        }))
       );
+    }
 
-      // Calculate total estimated value
-      const totalEstimatedValue = enrichedProducts.reduce((sum: number, product: any) => {
-        return sum + (parseFloat(product.basePrice) * product.quantity);
-      }, 0);
-
-      // Create main quote request
-      const quoteRequestResults = await tx.insert(schema.quoteRequests).values({
-        clientId: data.clientId,
-        vendorId: data.vendorId,
-        contactName: contactName,
-        whatsapp: clientUser[0]?.phone || null,
-        email: clientUser[0]?.email || null,
-        observations: data.observations || null,
-        totalEstimatedValue: totalEstimatedValue.toFixed(2),
-        status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).returning();
-      
-      const quoteRequest = quoteRequestResults[0];
-
-      // Create quote request items
-      if (enrichedProducts && enrichedProducts.length > 0) {
-        await tx.insert(schema.quoteRequestItems).values(
-          enrichedProducts.map((product: any) => ({
-            quoteRequestId: quoteRequest.id,
-            productId: product.productId,
-            productName: product.productName,
-            quantity: product.quantity,
-            basePrice: product.basePrice,  // Already a string from database
-            category: product.category || null,
-            imageLink: product.imageLink || null,
-            observations: product.observations || null,
-            createdAt: new Date()
-          }))
-        );
-      }
-
-      return {
-        ...quoteRequest,
-        totalEstimatedValue: totalEstimatedValue.toFixed(2),  // Ensure it's a string
-        items: enrichedProducts
-      };
-    });
+    return {
+      ...quoteRequest,
+      totalEstimatedValue: totalEstimatedValue.toFixed(2),  // Ensure it's a string
+      items: enrichedProducts
+    };
   }
 
   async createQuoteRequest(data: any): Promise<any> {
