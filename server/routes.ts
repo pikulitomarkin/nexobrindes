@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { db as storage, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db';
+import { OrderEnrichmentService } from './services/order-enrichment.js';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -5986,6 +5987,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching clients:", error);
       res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Get orders for a specific client
+  app.get("/api/clients/:id/orders", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Fetching orders for client: ${id}`);
+
+      const orders = await storage.getOrdersByClient(id);
+      console.log(`Found ${orders.length} orders for client ${id}`);
+
+      // Enrich orders using the service
+      const enrichmentService = new OrderEnrichmentService(storage);
+      const enrichedOrders = await enrichmentService.enrichOrders(orders, {
+        includeUnreadNotes: true
+      });
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching client orders:", error);
+      res.status(500).json({ error: "Failed to fetch client orders" });
     }
   });
 

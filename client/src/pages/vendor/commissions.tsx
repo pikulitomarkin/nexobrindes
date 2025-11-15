@@ -3,9 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Clock } from "lucide-react";
 
 export default function VendorCommissions() {
-  const vendorId = "vendor-1";
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const vendorId = currentUser.id;
+  
   const { data: commissions, isLoading } = useQuery({
     queryKey: ["/api/commissions/vendor", vendorId],
+    enabled: !!vendorId,
   });
 
   if (isLoading) {
