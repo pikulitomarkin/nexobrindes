@@ -6,6 +6,7 @@ import { queryClient } from "@/lib/queryClient";
 import Login from "@/pages/login";
 import ClientRegister from "@/pages/ClientRegister";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import RoleBasedRedirect from "@/components/auth/RoleBasedRedirect";
 import MainLayout from "@/components/layout/main-layout";
 import NotFound from "@/pages/not-found";
 
@@ -79,6 +80,9 @@ import LogisticsDashboard from "@/pages/logistics/dashboard";
 import LogisticsProducts from "@/pages/logistics/products";
 import LogisticsProducers from "@/pages/logistics/producers";
 
+// Lazy imports
+const AdminFixCommissions = lazy(() => import("./pages/admin/fix-commissions"));
+
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,31 +154,115 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Switch>
-                  {/* Admin Routes */}
-                  <Route path="/" component={AdminDashboard} />
-                  <Route path="/admin" component={AdminDashboard} />
-                  <Route path="/admin/dashboard" component={AdminDashboard} />
-                  <Route path="/admin/orders" component={AdminOrders} />
-                  <Route path="/admin/budgets" component={AdminBudgets} />
-                  <Route path="/admin/clients" component={AdminClients} />
-                  <Route path="/admin/vendors" component={AdminVendors} />
-                  <Route path="/admin/branches" component={AdminBranches} />
-                  <Route path="/admin/partners" component={AdminPartners} />
-                  <Route path="/admin/producers" component={AdminProducers} />
-                  <Route path="/admin/logistics" component={AdminLogistics} />
-                  <Route path="/admin/products" component={AdminProducts} />
-                  <Route path="/admin/settings" component={AdminSettings} />
-                  <Route path="/admin/commission-management" component={AdminCommissionManagement} />
-                  <Route path="/admin/commission-settings" component={AdminCommissionSettings} />
-                  <Route path="/admin/fix-commissions" component={lazy(() => import("./pages/admin/fix-commissions"))} />
-                  <Route path="/admin/partners" component={AdminPartners} />
-                  <Route path="/admin/users" component={AdminUsers} />
-                  <Route path="/admin/reports" component={AdminReports} />
-                  <Route path="/admin/producer-payments" component={AdminProducerPayments} />
-                  <Route path="/admin/finance" component={AdminFinance} />
-                  <Route path="/admin/customizations" component={AdminCustomizations} />
-                  <Route path="/admin/settings" component={AdminSettings} />
-                  <Route path="/admin/logs" component={AdminLogs} />
+                  {/* Root redirect based on role */}
+                  <Route path="/" component={RoleBasedRedirect} />
+                  
+                  {/* Admin Routes - Protected */}
+                  <Route path="/admin" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/dashboard" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/orders" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminOrders />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/budgets" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminBudgets />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/clients" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminClients />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/vendors" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminVendors />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/branches" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminBranches />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/partners" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminPartners />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/producers" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminProducers />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/logistics" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminLogistics />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/products" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminProducts />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/settings" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminSettings />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/commission-management" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminCommissionManagement />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/commission-settings" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminCommissionSettings />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/fix-commissions" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminFixCommissions />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/users" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminUsers />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/reports" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminReports />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/producer-payments" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminProducerPayments />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/finance" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminFinance />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/customizations" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminCustomizations />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/logs" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminLogs />
+                    </ProtectedRoute>
+                  )} />
 
                   {/* Vendor Routes */}
                   <Route path="/vendor/dashboard" component={VendorDashboard} />
@@ -203,13 +291,37 @@ function App() {
                   <Route path="/producer/profile-settings" component={ProducerProfileSettings} />
                   <Route path="/producer/receivables" component={ProducerReceivables} />
 
-                  {/* Partner Routes */}
-                  <Route path="/partner/dashboard" component={PartnerDashboard} />
-                  <Route path="/partner/commission-management" component={PartnerCommissionManagement} />
-                  <Route path="/partner/clients" component={() => <AdminClients />} />
-                  <Route path="/partner/vendors" component={() => <AdminVendors />} />
-                  <Route path="/partner/producers" component={() => <AdminProducers />} />
-                  <Route path="/partner/products" component={() => <AdminProducts />} />
+                  {/* Partner Routes - Protected */}
+                  <Route path="/partner/dashboard" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <PartnerDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/commission-management" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <PartnerCommissionManagement />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/clients" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminClients />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/vendors" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminVendors />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/producers" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminProducers />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/products" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminProducts />
+                    </ProtectedRoute>
+                  )} />
 
                   {/* Finance Routes - accessible by admin, finance and partner users */}
                   <Route path="/finance"
@@ -262,13 +374,37 @@ function App() {
                     )}
                   />
 
-                  {/* Logistics Routes */}
-                  <Route path="/logistics/dashboard" component={LogisticsDashboard} />
-                  <Route path="/logistics/paid-orders" component={LogisticsDashboard} />
-                  <Route path="/logistics/production-tracking" component={LogisticsDashboard} />
-                  <Route path="/logistics/shipments" component={LogisticsDashboard} />
-                  <Route path="/logistics/products" component={LogisticsProducts} />
-                  <Route path="/logistics/producers" component={LogisticsProducers} />
+                  {/* Logistics Routes - Protected */}
+                  <Route path="/logistics/dashboard" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/logistics/paid-orders" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/logistics/production-tracking" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/logistics/shipments" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsDashboard />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/logistics/products" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsProducts />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/logistics/producers" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "logistics"]}>
+                      <LogisticsProducers />
+                    </ProtectedRoute>
+                  )} />
 
                   {/* 404 Route */}
                   <Route component={NotFound} />

@@ -56,7 +56,7 @@ export default function ProtectedRoute({ children, requiredRole, requiredRoles }
           // Redirect to appropriate main dashboard
           switch (data.user.role) {
             case "vendor":
-              setLocation("/vendor/orders");
+              setLocation("/vendor/dashboard");
               break;
             case "client":
               setLocation("/client/orders");
@@ -68,7 +68,7 @@ export default function ProtectedRoute({ children, requiredRole, requiredRoles }
               setLocation("/logistics/dashboard");
               break;
             case "partner":
-              setLocation("/dashboard");
+              setLocation("/partner/dashboard");
               break;
             case "finance":
               setLocation("/finance");
