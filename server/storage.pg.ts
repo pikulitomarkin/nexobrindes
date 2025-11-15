@@ -1592,6 +1592,43 @@ export class PgStorage implements IStorage {
     }
   }
 
+  async getBankTransaction(id: string): Promise<BankTransaction | undefined> {
+    try {
+      const result = await pg.select().from(schema.bankTransactions)
+        .where(eq(schema.bankTransactions.id, id))
+        .limit(1);
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      const row = result[0];
+      return {
+        id: row.id,
+        importId: row.importId,
+        fitId: row.fitId || '',
+        date: row.date,
+        hasValidDate: row.hasValidDate || false,
+        amount: row.amount,
+        description: row.description || '',
+        memo: row.memo || '',
+        bankRef: row.bankRef || '',
+        originalType: row.originalType || '',
+        type: row.type || 'other',
+        status: row.status || 'unmatched',
+        matchedOrderId: row.matchedOrderId || null,
+        matchedPaymentId: row.matchedPaymentId || null,
+        matchedAt: row.matchedAt || null,
+        notes: row.notes || '',
+        matchedEntityType: row.matchedEntityType || null,
+        matchedEntityId: row.matchedEntityId || null
+      };
+    } catch (error) {
+      console.error('Error fetching bank transaction by id:', error);
+      return undefined;
+    }
+  }
+
   async getBankTransactionByFitId(fitId: string): Promise<BankTransaction | null> {
     try {
       const result = await pg.select().from(schema.bankTransactions).where(eq(schema.bankTransactions.fitId, fitId)).limit(1);
