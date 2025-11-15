@@ -599,6 +599,7 @@ export default function VendorBudgets() {
       contactPhone: budget.contactPhone || "",
       contactEmail: budget.contactEmail || "",
       vendorId: budget.vendorId,
+      branchId: budget.branchId || "matriz",
       validUntil: budget.validUntil || "",
       deliveryDeadline: budget.deliveryDeadline || "",
       deliveryType: budget.deliveryType || "delivery",
@@ -658,14 +659,14 @@ export default function VendorBudgets() {
       }),
       paymentMethodId: budget.paymentMethodId || "",
       shippingMethodId: budget.shippingMethodId || "",
-      installments: budget.installments || 1,
-      downPayment: parseFloat(budget.downPayment || 0),
-      remainingAmount: parseFloat(budget.remainingAmount || 0),
-      shippingCost: parseFloat(budget.shippingCost || 0),
+      installments: Number(budget.installments ?? 1),
+      downPayment: Number(budget.downPayment ?? 0),
+      remainingAmount: Number(budget.remainingAmount ?? 0),
+      shippingCost: Number(budget.shippingCost ?? 0),
       hasDiscount: Boolean(budget.hasDiscount),
       discountType: budget.discountType || "percentage",
-      discountPercentage: parseFloat(budget.discountPercentage || 0),
-      discountValue: parseFloat(budget.discountValue || 0)
+      discountPercentage: Number(budget.discountPercentage ?? 0),
+      discountValue: Number(budget.discountValue ?? 0)
     });
 
     setIsEditMode(true);

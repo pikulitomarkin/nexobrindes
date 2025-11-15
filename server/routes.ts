@@ -344,7 +344,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgets = await storage.getBudgetsByVendor(vendorId);
       console.log(`Found ${budgets.length} budgets for vendor ${vendorId}`);
 
-      res.json(budgets);
+      // Enrich each budget with its items (like admin does)
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          const items = await storage.getBudgetItems(budget.id);
+          return {
+            ...budget,
+            items
+          };
+        })
+      );
+
+      res.json(enrichedBudgets);
     } catch (error) {
       console.error("Error fetching budgets by vendor:", error);
       res.status(500).json({ error: "Failed to fetch budgets" });
