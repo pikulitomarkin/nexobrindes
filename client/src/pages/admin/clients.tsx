@@ -91,6 +91,7 @@ export default function AdminClients() {
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["/api/clients"],
+    refetchOnMount: 'always', // Always refetch to prevent stale cache after page refresh
   });
 
   const { data: vendors } = useQuery({
