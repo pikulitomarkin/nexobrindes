@@ -1043,6 +1043,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const seenUserIds = new Set();
       const allUsers = users
         .filter(u => {
+          // Filter out inactive users
+          if (u.isActive === false) {
+            return false;
+          }
           // Remove duplicate user entries (keep first occurrence)
           if (seenUserIds.has(u.id)) {
             console.log(`Skipping duplicate user: ${u.name} (${u.id})`);
