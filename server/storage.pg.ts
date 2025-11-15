@@ -180,31 +180,29 @@ export class PgStorage implements IStorage {
     email?: string | null;
     phone?: string | null;
   }, clientData: Omit<InsertClient, 'userId'>): Promise<{ user: User; client: Client }> {
-    return await pg.transaction(async (tx) => {
-      // Create user first
-      const userResults = await tx.insert(schema.users).values({
-        username: userData.username,
-        password: userData.password,
-        role: "client",
-        name: userData.name,
-        email: userData.email || null,
-        phone: userData.phone || null,
-        isActive: true
-      }).returning();
-      const user = userResults[0];
+    // Create user first
+    const userResults = await pg.insert(schema.users).values({
+      username: userData.username,
+      password: userData.password,
+      role: "client",
+      name: userData.name,
+      email: userData.email || null,
+      phone: userData.phone || null,
+      isActive: true
+    }).returning();
+    const user = userResults[0];
 
-      // Create client profile linked to user
-      const clientResults = await tx.insert(schema.clients).values({
-        ...clientData,
-        userId: user.id,
-        name: userData.name,
-        email: userData.email || clientData.email || null,
-        phone: userData.phone || clientData.phone || null
-      }).returning();
-      const client = clientResults[0];
+    // Create client profile linked to user
+    const clientResults = await pg.insert(schema.clients).values({
+      ...clientData,
+      userId: user.id,
+      name: userData.name,
+      email: userData.email || clientData.email || null,
+      phone: userData.phone || clientData.phone || null
+    }).returning();
+    const client = clientResults[0];
 
-      return { user, client };
-    });
+    return { user, client };
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined> {
