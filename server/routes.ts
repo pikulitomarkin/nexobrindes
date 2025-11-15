@@ -6184,35 +6184,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Código de usuário já existe" });
       }
 
-      console.log("Creating user account...");
-      // Create user first
-      const user = await storage.createUser({
-        username: username,
-        password: clientData.password,
-        role: "client",
-        name: clientData.name,
-        email: clientData.email || null,
-        phone: clientData.phone || null,
-        isActive: true
-      });
+      console.log("Creating user and client atomically in transaction...");
+      
+      // Create user and client in a single transaction (atomic operation)
+      const { user, client } = await storage.createClientWithUser(
+        {
+          username: username,
+          password: clientData.password,
+          name: clientData.name,
+          email: clientData.email || null,
+          phone: clientData.phone || null
+        },
+        {
+          whatsapp: clientData.whatsapp || null,
+          cpfCnpj: clientData.cpfCnpj || null,
+          address: clientData.address || null,
+          vendorId: clientData.vendorId || null,
+          isActive: true
+        }
+      );
 
-      console.log(`User created with ID: ${user.id}`);
-      console.log("Creating client profile...");
-
-      // Create client profile
-      const client = await storage.createClient({
-        userId: user.id,
-        name: clientData.name,
-        email: clientData.email || null,
-        phone: clientData.phone || null,
-        whatsapp: clientData.whatsapp || null,
-        cpfCnpj: clientData.cpfCnpj || null,
-        address: clientData.address || null,
-        vendorId: clientData.vendorId || null,
-        isActive: true
-      });
-
-      console.log(`SUCCESS: Client created successfully: ${client.id} - ${client.name}`);
+      console.log(`SUCCESS: User and client created successfully: ${client.id} - ${client.name}`);
 
       const response = {
         success: true,

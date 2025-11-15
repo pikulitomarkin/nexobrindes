@@ -139,6 +139,7 @@ export interface IStorage {
   getClients(): Promise<Client[]>;
   getClient(id: string): Promise<Client | undefined>;
   createClient(clientData: InsertClient): Promise<Client>;
+  createClientWithUser(userData: { username: string; password: string; name: string; email?: string | null; phone?: string | null; }, clientData: Omit<InsertClient, 'userId'>): Promise<{ user: User; client: Client }>;
   updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
   getClientByUserId(userId: string): Promise<Client | undefined>; // Added for retrieving client by userId
