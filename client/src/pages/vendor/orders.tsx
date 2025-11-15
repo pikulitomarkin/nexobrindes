@@ -572,14 +572,14 @@ export default function VendorOrders() {
       }) || [],
       paymentMethodId: order.paymentMethodId || "",
       shippingMethodId: order.shippingMethodId || "",
-      installments: order.installments || 1,
-      downPayment: parseFloat(order.downPayment || 0),
-      remainingAmount: parseFloat(order.remainingAmount || 0),
-      shippingCost: parseFloat(order.shippingCost || 0),
-      hasDiscount: order.hasDiscount || false,
+      installments: Number(order.installments ?? 1),
+      downPayment: Number(order.downPayment ?? 0),
+      remainingAmount: Number(order.remainingAmount ?? 0),
+      shippingCost: Number(order.shippingCost ?? 0),
+      hasDiscount: Boolean(order.hasDiscount),
       discountType: order.discountType || "percentage",
-      discountPercentage: parseFloat(order.discountPercentage || 0),
-      discountValue: parseFloat(order.discountValue || 0)
+      discountPercentage: Number(order.discountPercentage ?? 0),
+      discountValue: Number(order.discountValue ?? 0)
     });
 
     setIsEditMode(true);

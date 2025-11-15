@@ -1249,14 +1249,14 @@ export class PgStorage implements IStorage {
     return true;
   }
 
-  async convertBudgetToOrder(budgetId: string, producerId?: string): Promise<Order> {
+  async convertBudgetToOrder(budgetId: string, clientId: string, deliveryDate?: string): Promise<Order> {
     const budget = await this.getBudget(budgetId);
     if (!budget) throw new Error('Budget not found');
 
     // Create order from budget
     const orderData: InsertOrder = {
       orderNumber: `PED-${Date.now()}`,
-      clientId: budget.clientId!,
+      clientId: clientId,
       vendorId: budget.vendorId,
       branchId: budget.branchId,
       budgetId: budget.id,
@@ -1268,7 +1268,9 @@ export class PgStorage implements IStorage {
       contactName: budget.contactName,
       contactPhone: budget.contactPhone,
       contactEmail: budget.contactEmail,
-      deliveryType: budget.deliveryType
+      deliveryType: budget.deliveryType,
+      deliveryDeadline: deliveryDate,
+      deadline: deliveryDate
     } as InsertOrder;
 
     const order = await this.createOrder(orderData);
