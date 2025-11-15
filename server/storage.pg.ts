@@ -226,7 +226,20 @@ export class PgStorage implements IStorage {
   }
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
-    return await pg.select().from(schema.clients).where(eq(schema.clients.vendorId, vendorId));
+    const clients = await pg.select().from(schema.clients).where(eq(schema.clients.vendorId, vendorId));
+    
+    // Filter out deleted clients (clients whose user was deleted)
+    const activeClients = await Promise.all(
+      clients.map(async (client) => {
+        if (client.userId) {
+          const user = await this.getUser(client.userId);
+          return user ? client : null;
+        }
+        return client; // Keep clients without userId (legacy records)
+      })
+    );
+    
+    return activeClients.filter((client): client is Client => client !== null);
   }
 
   // ==================== ORDERS ====================
