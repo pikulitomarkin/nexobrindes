@@ -1253,9 +1253,6 @@ export class PgStorage implements IStorage {
     const budget = await this.getBudget(budgetId);
     if (!budget) throw new Error('Budget not found');
 
-    // Convert deliveryDate string to Date object if provided
-    const parsedDeliveryDate = deliveryDate ? new Date(deliveryDate) : null;
-
     // Create order from budget
     const orderData: InsertOrder = {
       orderNumber: `PED-${Date.now()}`,
@@ -1272,8 +1269,8 @@ export class PgStorage implements IStorage {
       contactPhone: budget.contactPhone,
       contactEmail: budget.contactEmail,
       deliveryType: budget.deliveryType,
-      deliveryDeadline: parsedDeliveryDate,
-      deadline: parsedDeliveryDate
+      deliveryDeadline: deliveryDate,
+      deadline: deliveryDate
     } as InsertOrder;
 
     const order = await this.createOrder(orderData);
