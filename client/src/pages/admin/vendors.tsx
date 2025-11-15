@@ -31,7 +31,17 @@ const vendorFormSchema = z.object({
   branchId: z.string().optional(),
 });
 
+const editVendorFormSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
+  branchId: z.string().optional(),
+});
+
 type VendorFormValues = z.infer<typeof vendorFormSchema>;
+type EditVendorFormValues = z.infer<typeof editVendorFormSchema>;
 
 export default function AdminVendors() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -86,6 +96,35 @@ export default function AdminVendors() {
     },
   });
 
+  const editForm = useForm<EditVendorFormValues>({
+    resolver: zodResolver(editVendorFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      commissionRate: "10.00",
+      branchId: "",
+    },
+  });
+
+  // Load vendor data when edit dialog opens
+  React.useEffect(() => {
+    if (selectedVendorId && showEditVendor) {
+      const vendor = vendors?.find((v: any) => v.id === selectedVendorId);
+      if (vendor) {
+        editForm.reset({
+          name: vendor.name || "",
+          email: vendor.email || "",
+          phone: vendor.phone || "",
+          address: vendor.address || "",
+          commissionRate: vendor.commissionRate || "10.00",
+          branchId: vendor.branchId || "",
+        });
+      }
+    }
+  }, [selectedVendorId, showEditVendor, vendors, editForm]);
+
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormValues) => {
       const vendorData = {
@@ -127,6 +166,46 @@ export default function AdminVendors() {
     },
   });
 
+  const updateVendorMutation = useMutation({
+    mutationFn: async (data: EditVendorFormValues) => {
+      const vendorData = {
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        commissionRate: data.commissionRate,
+        branchId: data.branchId === "default" ? null : data.branchId
+      };
+      const response = await fetch(`/api/vendors/${selectedVendorId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vendorData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao atualizar vendedor");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      setShowEditVendor(false);
+      setSelectedVendorId(null);
+      editForm.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Vendedor atualizado com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível atualizar o vendedor",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteVendorMutation = useMutation({
     mutationFn: async (vendorId: string) => {
       const response = await fetch(`/api/vendors/${vendorId}`, {
@@ -161,6 +240,10 @@ export default function AdminVendors() {
 
   const onSubmit = (data: VendorFormValues) => {
     createVendorMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: EditVendorFormValues) => {
+    updateVendorMutation.mutate(data);
   };
 
   if (isLoading) {
@@ -626,20 +709,145 @@ export default function AdminVendors() {
         setShowEditVendor(open);
         if (!open) {
           setSelectedVendorId(null);
+          editForm.reset();
         }
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Vendedor</DialogTitle>
+            <DialogDescription>
+              Atualize os dados do vendedor
+            </DialogDescription>
           </DialogHeader>
-          {selectedVendorId && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">Funcionalidade de edição em desenvolvimento...</p>
-              <Button onClick={() => setShowEditVendor(false)}>
-                Fechar
-              </Button>
-            </div>
-          )}
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Completo *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Maria Santos" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="maria@email.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="(11) 99999-9999" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Rua das Flores, 123, Centro, São Paulo, SP" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="commissionRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Taxa de Comissão (%)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" placeholder="10.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="branchId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Filial</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a filial" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="default">Matriz (Padrão)</SelectItem>
+                        {branches?.map((branch: any) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            <div className="flex items-center">
+                              {branch.isHeadquarters ? (
+                                <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                              ) : (
+                                <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                              )}
+                              {branch.name} - {branch.city}
+                              {branch.isHeadquarters && (
+                                <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                  Matriz
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditVendor(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={updateVendorMutation.isPending}
+                >
+                  {updateVendorMutation.isPending ? "Atualizando..." : "Atualizar Vendedor"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

@@ -949,6 +949,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update vendor
+  app.put("/api/vendors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      console.log(`Updating vendor ${id} with data:`, updateData);
+
+      // Update user data
+      const updatedUser = await storage.updateUser(id, {
+        name: updateData.name,
+        email: updateData.email,
+        phone: updateData.phone,
+        address: updateData.address,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Vendedor não encontrado" });
+      }
+
+      // Update vendor commission rate
+      await storage.updateVendorCommission(id, updateData.commissionRate);
+
+      console.log(`Vendor ${id} updated successfully`);
+      res.json({
+        success: true,
+        user: updatedUser,
+        message: "Vendedor atualizado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating vendor:", error);
+      res.status(500).json({ error: "Erro ao atualizar vendedor: " + error.message });
+    }
+  });
+
   // Get all users
   app.get("/api/users", async (req, res) => {
     try {
