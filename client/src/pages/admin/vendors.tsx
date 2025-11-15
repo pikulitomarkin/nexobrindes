@@ -109,7 +109,7 @@ export default function AdminVendors() {
   });
 
   // Load vendor data when edit dialog opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedVendorId && showEditVendor) {
       const vendor = vendors?.find((v: any) => v.id === selectedVendorId);
       if (vendor) {
