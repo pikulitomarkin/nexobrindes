@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, CreditCard, Truck, Lock, Eye, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, CreditCard, Truck, Lock, Eye, EyeOff, Database, Download, Info, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -24,6 +24,9 @@ export default function AdminSettings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // State for database backup
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Payment method form
   const [paymentMethodForm, setPaymentMethodForm] = useState({
@@ -447,6 +450,61 @@ export default function AdminSettings() {
     return labels[type as keyof typeof labels] || type;
   };
 
+  const handleSave = () => {
+    // Aqui você salvaria as configurações
+    toast({
+      title: "Configurações salvas",
+      description: "As configurações foram salvas com sucesso.",
+    });
+  };
+
+  const handleDatabaseBackup = async () => {
+    try {
+      setIsDownloading(true);
+
+      const response = await fetch('/api/admin/database/backup');
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar backup');
+      }
+
+      // Get filename from response headers
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : `database_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+      const blob = await response.blob();
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Backup criado com sucesso",
+        description: `Arquivo ${filename} foi baixado.`,
+      });
+
+    } catch (error) {
+      console.error('Erro ao fazer backup:', error);
+      toast({
+        title: "Erro ao criar backup",
+        description: "Não foi possível gerar o backup do banco de dados.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -843,6 +901,54 @@ export default function AdminSettings() {
                 <p className="text-center text-gray-500 py-8">Nenhum método de frete cadastrado</p>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Database Backup Section */}
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Backup do Banco de Dados
+            </CardTitle>
+            <CardDescription>
+              Faça o download completo de todos os dados do sistema
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">O backup inclui:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Todos os usuários (sem senhas)</li>
+                    <li>Clientes, produtos e orçamentos</li>
+                    <li>Pedidos e ordens de produção</li>
+                    <li>Pagamentos e comissões</li>
+                    <li>Configurações do sistema</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleDatabaseBackup}
+              disabled={isDownloading}
+              className="w-full"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando backup...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Baixar Backup Completo do Banco
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>

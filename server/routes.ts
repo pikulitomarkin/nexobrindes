@@ -1840,6 +1840,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Database backup endpoint
+  app.get("/api/admin/database/backup", requireAuth, async (req, res) => {
+    try {
+      console.log("Creating database backup...");
+
+      // Get all data from all tables
+      const [
+        users,
+        clients, 
+        vendors,
+        partners,
+        products,
+        budgets,
+        budgetItems,
+        orders,
+        productionOrders,
+        payments,
+        commissions,
+        branches,
+        paymentMethods,
+        shippingMethods,
+        customizationOptions,
+        producerPayments,
+        accountsReceivable,
+        bankTransactions,
+        expenseNotes,
+        systemLogs
+      ] = await Promise.all([
+        storage.getUsers(),
+        storage.getClients(),
+        storage.getVendors(),
+        storage.getPartners(), 
+        storage.getProducts({ limit: 10000 }).then(result => result.products),
+        storage.getBudgets(),
+        Promise.resolve([]), // Budget items will be included in budgets
+        storage.getOrders(),
+        storage.getProductionOrders(),
+        storage.getPayments(),
+        storage.getAllCommissions(),
+        storage.getBranches(),
+        storage.getAllPaymentMethods(),
+        storage.getAllShippingMethods(),
+        storage.getCustomizationOptions(),
+        storage.getProducerPayments(),
+        storage.getAccountsReceivable(),
+        storage.getBankTransactions(),
+        storage.getExpenseNotes(),
+        storage.getSystemLogs()
+      ]);
+
+      const backupData = {
+        metadata: {
+          exportDate: new Date().toISOString(),
+          version: "1.0",
+          totalRecords: users.length + clients.length + products.length + budgets.length + orders.length
+        },
+        data: {
+          users: users.map(u => ({ ...u, password: '[HIDDEN]' })), // Hide passwords
+          clients,
+          vendors,
+          partners,
+          products,
+          budgets,
+          orders,
+          productionOrders,
+          payments,
+          commissions,
+          branches,
+          paymentMethods,
+          shippingMethods,
+          customizationOptions,
+          producerPayments,
+          accountsReceivable,
+          bankTransactions,
+          expenseNotes,
+          systemLogs: systemLogs.slice(0, 1000) // Limit logs to prevent huge files
+        }
+      };
+
+      console.log(`Database backup created with ${backupData.metadata.totalRecords} total records`);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename=database_backup_${new Date().toISOString().split('T')[0]}.json`);
+      res.json(backupData);
+
+    } catch (error) {
+      console.error("Error creating database backup:", error);
+      res.status(500).json({ error: "Erro ao criar backup do banco de dados" });
+    }
+  });
+
   // Update production order status
   app.patch("/api/production-orders/:id/status", async (req, res) => {
     try {
