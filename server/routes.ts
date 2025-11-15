@@ -6669,31 +6669,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemCustomizationValue: itemCustomizationValue.toFixed(2),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           customizationPhoto: item.customizationPhoto || "",
+          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           // General Customization
           hasGeneralCustomization: item.hasGeneralCustomization || false,
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: generalCustomizationValue.toFixed(2),
-          // Product dimensions
-          productWidth: item.productWidth,
-          productHeight: item.productHeight,
-          productDepth: item.productDepth,
+          // Product dimensions - sanitize empty strings to null for numeric fields
+          productWidth: item.productWidth && item.productWidth !== "" ? item.productWidth : null,
+          productHeight: item.productHeight && item.productHeight !== "" ? item.productHeight : null,
+          productDepth: item.productDepth && item.productDepth !== "" ? item.productDepth : null,
           // Item discount
           hasItemDiscount: item.hasItemDiscount || false,
           itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
-          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
-        });
-      }
-
-      // Update payment and shipping information
-      if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
-        await storage.updateBudgetPaymentInfo(req.params.id, {
-          paymentMethodId: budgetData.paymentMethodId || null,
-          shippingMethodId: budgetData.shippingMethodId || null,
-          installments: budgetData.installments || 1,
-          downPayment: budgetData.downPayment?.toString() || "0.00",
-          remainingAmount: budgetData.remainingAmount?.toString() || "0.00",
-          shippingCost: budgetData.shippingCost?.toString() || "0.00"
+          itemDiscountPercentage: item.itemDiscountPercentage ? (typeof item.itemDiscountPercentage === 'string' ? parseFloat(item.itemDiscountPercentage) : item.itemDiscountPercentage) : 0,
+          itemDiscountValue: item.itemDiscountValue ? (typeof item.itemDiscountValue === 'string' ? parseFloat(item.itemDiscountValue) : item.itemDiscountValue) : 0
         });
       }
 

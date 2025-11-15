@@ -257,7 +257,7 @@ export const budgets = pgTable("budgets", {
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default('0.00'),
 
-  // Campos para pagamento
+  // Campos para pagamento (consolidados da tabela budgetPaymentInfo)
   paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
   shippingMethodId: varchar("shipping_method_id").references(() => shippingMethods.id),
   installments: integer("installments").default(1),
