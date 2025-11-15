@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import letterheadUrl from '@assets/Folha timbrada Nexo2 (1).pdf_1763191602297.png';
+import letterheadUrl from '@assets/Folha timbrada Nexo2 (1).pdf (1)_1763192535053.png';
 
 export interface BudgetPDFData {
   budget: {
@@ -74,10 +74,11 @@ export interface BudgetPDFData {
 
 export class PDFGenerator {
   private doc: jsPDF;
-  private currentY: number = 20;
+  private currentY: number = 60;
   private pageWidth: number;
   private pageHeight: number;
   private margin: number = 20;
+  private topMargin: number = 60;
   private letterheadDataUrl: string | null = null;
   private imageCache: Map<string, string | null> = new Map();
 
@@ -128,7 +129,7 @@ export class PDFGenerator {
     if (this.currentY + spaceNeeded > this.pageHeight - this.margin) {
       this.doc.addPage();
       this.applyLetterheadBackground();
-      this.currentY = this.margin;
+      this.currentY = this.topMargin;
     }
   }
 
@@ -219,7 +220,7 @@ export class PDFGenerator {
         
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          const imageData = canvas.toDataURL('image/jpeg', 0.7);
+          const imageData = canvas.toDataURL('image/jpeg', 0.4);
           this.imageCache.set(imageLink, imageData);
           return imageData;
         }
@@ -670,7 +671,7 @@ export class PDFGenerator {
       // Apply letterhead to first page
       this.applyLetterheadBackground();
 
-      this.currentY = 20;
+      this.currentY = this.topMargin;
 
       console.log('Adding header...');
       this.addHeader(data);
