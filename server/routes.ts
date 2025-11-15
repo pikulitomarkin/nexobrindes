@@ -6027,9 +6027,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Updating profile for user: ${userId}`, updateData);
 
-      // Update user record first
+      // Update user record first (excluding name - it's not editable by client)
       const updatedUser = await storage.updateUser(userId, {
-        name: updateData.name,
         email: updateData.email,
         phone: updateData.phone,
         address: updateData.address
@@ -6038,13 +6037,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update or create client record
       const clientRecord = await storage.getClientByUserId(userId);
       if (clientRecord) {
-        // Update existing client record with all commercial fields
+        // Update existing client record with all commercial fields (excluding name and cpfCnpj - not editable)
         await storage.updateClient(clientRecord.id, {
-          name: updateData.name,
           email: updateData.email,
           phone: updateData.phone,
           whatsapp: updateData.whatsapp,
-          cpfCnpj: updateData.cpfCnpj,
           address: updateData.address,
           // Commercial fields
           nomeFantasia: updateData.nomeFantasia,
