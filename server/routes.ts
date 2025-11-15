@@ -1033,34 +1033,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Also get clients from the clients table and merge them
       const clients = await storage.getClients();
       
-      // Create user objects from clients for backward compatibility
-      const clientUsers = clients.map(client => ({
-        id: client.id,
-        username: client.email || client.name.toLowerCase().replace(/\s+/g, ''),
-        name: client.name,
-        email: client.email,
-        phone: client.phone,
-        role: 'client',
-        isActive: client.isActive !== false
-      }));
+      // CRITICAL FIX: Create map of userId -> client data for enrichment
+      const clientsByUserId = new Map(
+        clients.map(c => [c.userId, c])
+      );
       
-      // Merge users and clients, avoiding duplicates by ID
-      const allUsers = [...users];
-      clientUsers.forEach(clientUser => {
-        // Check if this client ID already exists as a user
-        const existingUser = allUsers.find(u => u.id === clientUser.id);
-        if (!existingUser) {
-          allUsers.push(clientUser);
-        } else {
-          // If user exists but has client role, update with client info
-          if (existingUser.role === 'client') {
-            Object.assign(existingUser, clientUser);
+      // Enrich users with client data and filter duplicates
+      const seenUserIds = new Set();
+      const allUsers = users
+        .filter(u => {
+          // Remove duplicate user entries (keep first occurrence)
+          if (seenUserIds.has(u.id)) {
+            console.log(`Skipping duplicate user: ${u.name} (${u.id})`);
+            return false;
           }
-        }
-      });
+          seenUserIds.add(u.id);
+          return true;
+        })
+        .map(u => {
+          // If this user has a client record, enrich with client data
+          const clientData = clientsByUserId.get(u.id);
+          if (clientData) {
+            return {
+              ...u,
+              // Enrich with client-specific data if available
+              clientId: clientData.id,
+              whatsapp: clientData.whatsapp,
+              cpfCnpj: clientData.cpfCnpj,
+              address: clientData.address || u.address
+            };
+          }
+          return u;
+        });
       
-      console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clientUsers.length} from clients table)`);
-      console.log(`Client users:`, clientUsers.map(c => ({ id: c.id, name: c.name })));
+      console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clients.length} from clients table)`);
+      console.log(`Client records:`, clients.map(c => ({ id: c.id, name: c.name, userId: c.userId })));
       res.json(allUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -6819,7 +6826,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Converting budget ${id} to order with client: ${clientId} and delivery date: ${deliveryDate}`);
 
-      const order = await storage.convertBudgetToOrder(id, clientId, deliveryDate);
+      // CRITICAL FIX: Convert deliveryDate string to Date object for Drizzle
+      const deliveryDateObj = new Date(deliveryDate);
+      
+      const order = await storage.convertBudgetToOrder(id, clientId, deliveryDateObj);
 
       // Update budget status
       await storage.updateBudget(id, { status: 'converted' });
