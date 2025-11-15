@@ -71,29 +71,8 @@ export default function ClientBudgets() {
   // Buscar solicitações de orçamento
   const { data: quoteRequests, isLoading: requestsLoading, refetch: refetchQuoteRequests } = useQuery({
     queryKey: ["/api/quote-requests/client", clientId],
-    queryFn: async () => {
-      try {
-        console.log(`Fetching quote requests for client: ${clientId}`);
-        console.log(`User object:`, user);
-        
-        const response = await fetch(`/api/quote-requests/client/${clientId}`);
-        if (!response.ok) {
-          console.error('Failed to fetch quote requests:', response.status, response.statusText);
-          if (response.status === 404) {
-            return [];
-          }
-          throw new Error(`Failed to fetch quote requests: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log('Quote requests response:', data);
-        return Array.isArray(data) ? data : [];
-      } catch (error) {
-        console.error('Error fetching quote requests:', error);
-        return []; // Retornar array vazio em caso de erro
-      }
-    },
     enabled: !!clientId,
-    refetchInterval: 30000, // Aumentar intervalo para reduzir spam
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
     retry: 1,
   });
