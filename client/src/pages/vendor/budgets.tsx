@@ -867,7 +867,7 @@ export default function VendorBudgets() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="budget-deliveryDeadline">Prazo de Entrega *</Label>
+                  <Label htmlFor="budget-delivery-deadline">Prazo de Entrega *</Label>
                   <Select
                     value={vendorBudgetForm.deliveryDeadline ? (() => {
                       try {
@@ -2121,452 +2121,132 @@ export default function VendorBudgets() {
         </CardContent>
       </Card>
 
-      {/* View Budget Dialog */}      
+      {/* View Budget Dialog */}
       <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Orçamento</DialogTitle>
             <DialogDescription>
-              Visualização completa do orçamento {budgetToView?.budgetNumber}
+              Visualize todos os detalhes do orçamento selecionado
             </DialogDescription>
           </DialogHeader>
-
           {budgetToView && (
             <div className="space-y-6">
-              {/* Budget Header */}              
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="font-semibold">Número do Orçamento</Label>
-                  <p className="text-lg">{budgetToView.budgetNumber}</p>
+                  <Label>Número do Orçamento</Label>
+                  <p className="text-sm font-medium">{budgetToView.budgetNumber}</p>
                 </div>
                 <div>
-                  <Label className="font-semibold">Status</Label>
+                  <Label>Status</Label>
                   <div className="mt-1">{getStatusBadge(budgetToView.status)}</div>
                 </div>
                 <div>
-                  <Label className="font-semibold">Nome de Contato</Label>
-                  <p>{budgetToView.contactName}</p>
-                </div>
-                {budgetToView.contactPhone && (
-                  <div>
-                    <Label className="font-semibold">Telefone</Label>
-                    <p>{budgetToView.contactPhone}</p>
-                  </div>
-                )}
-                {budgetToView.contactEmail && (
-                  <div>
-                    <Label className="font-semibold">Email</Label>
-                    <p>{budgetToView.contactEmail}</p>
-                  </div>
-                )}
-                {budgetToView.clientName && (
-                  <div>
-                    <Label className="font-semibold">Cliente Cadastrado</Label>
-                    <p>{budgetToView.clientName}</p>
-                  </div>
-                )}
-                <div>
-                  <Label className="font-semibold">Data de Criação</Label>
-                  <p>{new Date(budgetToView.createdAt).toLocaleDateString('pt-BR')}</p>
+                  <Label>Cliente</Label>
+                  <p className="text-sm">{budgetToView.contactName}</p>
                 </div>
                 <div>
-                  <Label className="font-semibold">Válido Até</Label>
-                  <p>{budgetToView.validUntil ? new Date(budgetToView.validUntil).toLocaleDateString('pt-BR') : 'Não definido'}</p>
-                </div>
-                <div>
-                  <Label className="font-semibold">Prazo de Entrega</Label>
-                  <p>{budgetToView.deliveryDeadline ? new Date(budgetToView.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
-                </div>
-                <div>
-                  <Label className="font-semibold">Tipo de Entrega</Label>
-                  <p className={budgetToView.deliveryType === 'pickup' ? 'text-blue-600 font-medium' : 'text-green-600 font-medium'}>
-                    {budgetToView.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega com Frete'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-semibold">Valor Total</Label>
-                  <p className="text-lg font-bold text-green-600">
+                  <Label>Valor Total</Label>
+                  <p className="text-sm font-medium">
                     R$ {parseFloat(budgetToView.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-              </div>
-
-              {/* Budget Items */}              
-              {budgetToView.items && budgetToView.items.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Itens do Orçamento ({budgetToView.items.length})</h3>
-                  <div className="space-y-3">
-                    {budgetToView.items.map((item: any, index: number) => (
-                      <div key={index} className="p-4 rounded-lg border bg-gray-50">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Package className="h-4 w-4 text-gray-500" />
-                              <span className="font-medium">{item.productName}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">Quantidade:</span>
-                                <p className="font-medium">{item.quantity}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Valor Unit.:</span>
-                                <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Dimensões:</span>
-                                <p className="font-medium">
-                                  {item.productWidth && item.productHeight && item.productDepth ? 
-                                    `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
-                                    'Não informado'
-                                  }
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">
-                              R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Personalização do Item */}
-                        {item.hasItemCustomization && (
-                          <div className="bg-blue-50 p-3 rounded mb-2">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-blue-700 font-medium">🎨 Personalização do Item</span>
-                            </div>
-                            <p className="text-blue-600 font-medium">{item.itemCustomizationDescription || 'Personalização especial'}</p>
-                            {item.itemCustomizationValue > 0 && (
-                              <p className="text-sm text-blue-500">
-                                Valor: +R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
-                              </p>
-                            )}
-                            {item.additionalCustomizationNotes && (
-                              <p className="text-sm text-blue-500 mt-1">
-                                <strong>Observações:</strong> {item.additionalCustomizationNotes}
-                              </p>
-                            )}
-                            {item.customizationPhoto && (
-                              <div className="mt-2">
-                                <span className="text-xs text-blue-600 block mb-1">Imagem de referência:</span>
-                                <img 
-                                  src={item.customizationPhoto} 
-                                  alt="Personalização do produto" 
-                                  className="w-20 h-20 object-cover rounded border cursor-pointer"
-                                  onClick={() => window.open(item.customizationPhoto, '_blank')}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Personalização Geral */}
-                        {item.hasGeneralCustomization && (
-                          <div className="bg-green-50 p-3 rounded">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-green-700 font-medium">✨ Personalização Geral</span>
-                            </div>
-                            <p className="text-green-600 font-medium">{item.generalCustomizationName || 'Personalização geral'}</p>
-                            {item.generalCustomizationValue > 0 && (
-                              <p className="text-sm text-green-500">
-                                Valor: +R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <Label>Válido Até</Label>
+                  <p className="text-sm">
+                    {budgetToView.validUntil ? new Date(budgetToView.validUntil).toLocaleDateString('pt-BR') : 'Não informado'}
+                  </p>
                 </div>
-              )}
-
-              {/* Budget Details */}              
-              <div>
-                <Label className="font-semibold">Título</Label>
-                <p className="mt-1">{budgetToView.title}</p>
+                <div>
+                  <Label>Prazo de Entrega</Label>
+                  <p className="text-sm">
+                    {budgetToView.deliveryDeadline ? new Date(budgetToView.deliveryDeadline).toLocaleDateString('pt-BR') : 'Não informado'}
+                  </p>
+                </div>
               </div>
 
               {budgetToView.description && (
                 <div>
-                  <Label className="font-semibold">Descrição</Label>
-                  <p className="mt-1">{budgetToView.description}</p>
+                  <Label>Descrição</Label>
+                  <p className="text-sm">{budgetToView.description}</p>
                 </div>
               )}
 
-              {/* Payment and Shipping Information */}              
-              {(budgetToView.paymentMethodId || budgetToView.shippingMethodId) && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Informações de Pagamento e Frete</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                    {budgetToView.paymentMethodId && (
-                      <div>
-                        <Label className="font-semibold">Forma de Pagamento</Label>
-                        <p>{paymentMethods?.find((pm: any) => pm.id === budgetToView.paymentMethodId)?.name || 'Não especificado'}</p>
-                        {budgetToView.installments > 1 && (
-                          <p className="text-sm text-gray-600">{budgetToView.installments}x</p>
-                        )}
-                        {budgetToView.downPayment > 0 && (
-                          <div className="mt-2 space-y-1">
-                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {budgetToView.shippingMethodId && (
-                      <div>
-                        <Label className="font-semibold">Método de Frete</Label>
-                        <p>{shippingMethods?.find((sm: any) => sm.id === budgetToView.shippingMethodId)?.name || 'Não especificado'}</p>
-                        <p className="text-sm text-gray-600">
-                          R$ {parseFloat(budgetToView.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              {/* Items Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Itens do Orçamento</h3>
+                  <span className="text-sm text-gray-500">
+                    {budgetToView.items?.length || 0} item(ns)
+                  </span>
                 </div>
-              )}
 
-              {/* Budget Items */}              
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
-                <div className="space-y-3">
-                  {budgetToView.items?.map((item: any, index: number) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="grid grid-cols-4 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Produto</Label>
-                          <p className="font-semibold">{item.productName}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Quantidade</Label>
-                          <p>{item.quantity}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Preço Unitário</Label>
-                          <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Subtotal</Label>
-                          <p className="font-semibold">
-                            R$ {(parseFloat(item.unitPrice) * parseInt(item.quantity)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Product Size Information */}                      
-                      {(item.productWidth || item.productHeight || item.productDepth) && (
-                        <div className="mt-3 p-3 bg-gray-50 rounded">
-                          <Label className="text-sm font-medium">Dimensões (cm)</Label>
-                          <div className="grid grid-cols-3 gap-4 mt-2">
-                            {item.productWidth && (
-                              <div>
-                                <span className="text-xs text-gray-500">Largura:</span>
-                                <p className="font-medium">{item.productWidth} cm</p>
-                              </div>
-                            )}
-                            {item.productHeight && (
-                              <div>
-                                <span className="text-xs text-gray-500">Altura:</span>
-                                <p className="font-medium">{item.productHeight} cm</p>
-                              </div>
-                            )}
-                            {item.productDepth && (
-                              <div>
-                                <span className="text-xs text-gray-500">Profundidade:</span>
-                                <p className="font-medium">{item.productDepth} cm</p>
-                              </div>
-                            )}
+                {budgetToView.items && budgetToView.items.length > 0 ? (
+                  <div className="space-y-3">
+                    {budgetToView.items.map((item: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="grid grid-cols-4 gap-4">
+                          <div>
+                            <Label className="text-xs text-gray-500">Produto</Label>
+                            <p className="text-sm font-medium">{item.productName || 'Produto não encontrado'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-gray-500">Quantidade</Label>
+                            <p className="text-sm">{item.quantity}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-gray-500">Preço Unitário</Label>
+                            <p className="text-sm">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-gray-500">Total</Label>
+                            <p className="text-sm font-medium">R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                           </div>
                         </div>
-                      )}
 
-                      {item.hasItemCustomization && (
-                        <div className="mt-3 p-3 bg-blue-50 rounded">
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <Label className="text-sm font-medium">Qtd. Personalizada</Label>
-                              <p>{item.customizationQuantity || 0} unidades</p>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium">Valor Unit. Personalização</Label>
-                              <p>R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium">Total Personalização</Label>
-                              <p className="font-semibold text-blue-600">
-                                R$ {((item.customizationQuantity || 0) * parseFloat(item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-2">
-                            <Label className="text-sm font-medium">Descrição</Label>
-                            <p>{item.itemCustomizationDescription || 'N/A'}</p>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-blue-200">
-                            <Label className="text-sm font-medium">Total do Item (Produto + Personalização)</Label>
-                            <p className="font-semibold text-lg">
-                              R$ {(() => {
-                                const productTotal = parseFloat(item.unitPrice) * parseInt(item.quantity);
-                                const customizationTotal = (item.customizationQuantity || 0) * parseFloat(item.itemCustomizationValue || 0);
-                                return (productTotal + customizationTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                              })()}
+                        {/* Show dimensions if available */}
+                        {(item.productWidth || item.productHeight || item.productDepth) && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <Label className="text-xs text-gray-500">Dimensões</Label>
+                            <p className="text-sm">
+                              {item.productWidth && `L: ${item.productWidth}cm`}
+                              {item.productHeight && ` × A: ${item.productHeight}cm`}
+                              {item.productDepth && ` × P: ${item.productDepth}cm`}
                             </p>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {item.hasGeneralCustomization && (
-                        <div className="mt-3 p-3 bg-green-50 rounded">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-sm font-medium">Nome da Personalização Geral</Label>
-                              <p>{item.generalCustomizationName || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium">Valor Unit. Personalização Geral</Label>
-                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                            </div>
+                        {/* Show customizations if available */}
+                        {(item.hasItemCustomization || item.hasGeneralCustomization) && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <Label className="text-xs text-gray-500">Personalizações</Label>
+                            {item.hasItemCustomization && (
+                              <div className="text-sm">
+                                <p>• {item.itemCustomizationDescription || 'Personalização do item'}</p>
+                                <p className="text-xs text-gray-600">
+                                  Valor: R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            )}
+                            {item.hasGeneralCustomization && (
+                              <div className="text-sm">
+                                <p>• {item.generalCustomizationName || 'Personalização geral'}</p>
+                                <p className="text-xs text-gray-600">
+                                  Valor: R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                          <div className="mt-2 pt-2 border-t border-green-200">
-                            <Label className="text-sm font-medium">Total do Item (Produto + Personalização Geral)</Label>
-                            <p className="font-semibold text-lg">
-                              R$ {(() => {
-                                const productTotal = parseFloat(item.unitPrice) * parseInt(item.quantity);
-                                const generalCustomizationTotal = (item.quantity || 0) * parseFloat(item.generalCustomizationValue || 0);
-                                return (productTotal + generalCustomizationTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                              })()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                }
-                </div>
-              </div>
-
-              {/* Discount Details */}              
-              {budgetToView.hasDiscount && (
-                <div className="p-4 bg-orange-50 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">Desconto Aplicado</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="font-medium">Tipo de Desconto</Label>
-                      <p>{budgetToView.discountType === 'percentage' ? 'Porcentagem' : 'Valor Fixo'}</p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Valor do Desconto</Label>
-                      <p className="text-orange-600 font-semibold">
-                        {budgetToView.discountType === 'percentage'
-                          ? `${budgetToView.discountPercentage}%`
-                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Customization Details */}              
-              {budgetToView.hasCustomization && (
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">Personalização Geral</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="font-medium">Percentual</Label>
-                      <p>{budgetToView.customizationPercentage}%</p>
-                    </div>
-                    <div>
-                      <Label className="font-medium">Valor</Label>
-                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="font-medium">Descrição</Label>
-                      <p>{budgetToView.customizationDescription}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Product Customization Images */}              
-              {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {budgetToView.items?.filter((item: any) => item.customizationPhoto).map((item: any, index: number) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <h4 className="font-medium text-lg mb-3">{item.productName}</h4>
-                        <div className="flex flex-col items-center">
-                          <img
-                            src={item.customizationPhoto}
-                            alt={`Personalização ${item.productName}`}
-                            className="w-full max-w-sm h-64 object-contain rounded-lg border"
-                            onError={(e) => {
-                              console.error('Erro ao carregar imagem:', item.customizationPhoto);
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          {item.itemCustomizationDescription && (
-                            <p className="text-sm text-gray-600 mt-3 text-center">{item.itemCustomizationDescription}</p>
-                          )}
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Actions */}              
-              <div className="flex gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => generatePDFMutation.mutate(budgetToView.id)}
-                  disabled={generatePDFMutation.isPending}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  {generatePDFMutation.isPending ? 'Gerando...' : 'Baixar PDF'}
-                </Button>
-
-                {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
-                  <Button
-                    variant="outline"
-                    className="text-blue-600 hover:text-blue-900"
-                    onClick={() => {
-                      setViewBudgetDialogOpen(false);
-                      sendToWhatsAppMutation.mutate(budgetToView.id);
-                    }}
-                    disabled={sendToWhatsAppMutation.isPending}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {sendToWhatsAppMutation.isPending ? 'Enviando...' : 'Enviar WhatsApp'}
-                  </Button>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>Nenhum item encontrado neste orçamento</p>
+                  </div>
                 )}
-
-                {budgetToView.status !== 'converted' && (
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => {
-                      setViewBudgetDialogOpen(false);
-                      handleConvertClick(budgetToView.id);
-                    }}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Converter
-                  </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setViewBudgetDialogOpen(false);
-                    setBudgetToView(null);
-                  }}
-                  className="ml-auto"
-                >
-                  Fechar
-                </Button>
               </div>
             </div>
           )}
@@ -2596,7 +2276,7 @@ export default function VendorBudgets() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Input for Delivery Date */}            
             <div>
               <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
