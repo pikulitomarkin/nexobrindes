@@ -6877,10 +6877,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasGeneralCustomization: item.hasGeneralCustomization || false,
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: generalCustomizationValue.toFixed(2),
-          // Product dimensions - convert empty strings to null
-          productWidth: item.productWidth === "" ? null : item.productWidth,
-          productHeight: item.productHeight === "" ? null : item.productHeight,
-          productDepth: item.productDepth === "" ? null : item.productDepth,
+          // Product dimensions
+          productWidth: item.productWidth || null,
+          productHeight: item.productHeight || null,
+          productDepth: item.productDepth || null,
           // Item discount
           hasItemDiscount: item.hasItemDiscount || false,
           itemDiscountType: item.itemDiscountType || "percentage",
