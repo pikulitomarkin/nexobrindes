@@ -304,11 +304,11 @@ export default function VendorQuoteRequests() {
             </CardHeader>
             <CardContent>
               {/* Lista de produtos (se for orçamento consolidado) */}
-              {request.products && request.products.length > 0 && (
+              {request.items && request.items.length > 0 && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm font-medium text-blue-800 mb-2">Produtos solicitados:</p>
                   <div className="space-y-2">
-                    {request.products.map((product: any, index: number) => (
+                    {request.items.map((product: any, index: number) => (
                       <div key={index} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
                           {product.imageLink && (
@@ -340,11 +340,11 @@ export default function VendorQuoteRequests() {
               )}
 
               {/* Observações específicas dos produtos */}
-              {request.products && request.products.some((p: any) => p.observations) && (
+              {request.items && request.items.some((p: any) => p.observations) && (
                 <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <p className="text-sm font-medium text-gray-800 mb-2">Observações específicas dos produtos:</p>
                   <div className="space-y-1">
-                    {request.products.filter((p: any) => p.observations).map((product: any, index: number) => (
+                    {request.items.filter((p: any) => p.observations).map((product: any, index: number) => (
                       <div key={index} className="text-sm">
                         <strong>{product.productName}:</strong> {product.observations}
                       </div>

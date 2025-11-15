@@ -3978,10 +3978,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Solicitação de orçamento não encontrada" });
       }
 
+      // Get client record from clients table using userId
+      const clientRecord = await storage.getClientByUserId(quoteRequest.clientId);
+      if (!clientRecord) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
       // Criar orçamento oficial baseado na solicitação
       const budgetData = {
         budgetNumber: `ORC-${Date.now()}`,
-        clientId: quoteRequest.clientId,
+        clientId: clientRecord.id,  // Use the client table ID, not user ID
         vendorId: quoteRequest.vendorId,
         contactName: quoteRequest.contactName,
         contactPhone: quoteRequest.whatsapp || '',
