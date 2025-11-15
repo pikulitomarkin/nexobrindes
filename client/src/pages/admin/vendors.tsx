@@ -113,14 +113,17 @@ export default function AdminVendors() {
     if (selectedVendorId && showEditVendor) {
       const vendor = vendors?.find((v: any) => v.id === selectedVendorId);
       if (vendor) {
+        console.log('Loading vendor data for edit:', vendor);
         editForm.reset({
           name: vendor.name || "",
           email: vendor.email || "",
           phone: vendor.phone || "",
           address: vendor.address || "",
-          commissionRate: vendor.commissionRate || "10.00",
-          branchId: vendor.branchId || "",
+          commissionRate: vendor.commissionRate?.toString() || "10.00",
+          branchId: vendor.branchId || "default",
         });
+      } else {
+        console.error('Vendor not found for ID:', selectedVendorId);
       }
     }
   }, [selectedVendorId, showEditVendor, vendors, editForm]);
@@ -168,6 +171,7 @@ export default function AdminVendors() {
 
   const updateVendorMutation = useMutation({
     mutationFn: async (data: EditVendorFormValues) => {
+      console.log('Updating vendor with data:', data);
       const vendorData = {
         name: data.name,
         email: data.email || null,
@@ -176,14 +180,28 @@ export default function AdminVendors() {
         commissionRate: data.commissionRate,
         branchId: data.branchId === "default" ? null : data.branchId
       };
+      
       const response = await fetch(`/api/vendors/${selectedVendorId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
         body: JSON.stringify(vendorData),
       });
+      
+      console.log('Update response status:', response.status);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao atualizar vendedor");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const error = await response.json();
+          throw new Error(error.error || "Erro ao atualizar vendedor");
+        } else {
+          const text = await response.text();
+          console.error('Received HTML instead of JSON:', text);
+          throw new Error("Erro no servidor - resposta inválida");
+        }
       }
       return response.json();
     },
@@ -198,6 +216,7 @@ export default function AdminVendors() {
       });
     },
     onError: (error: any) => {
+      console.error('Vendor update error:', error);
       toast({
         title: "Erro",
         description: error.message || "Não foi possível atualizar o vendedor",

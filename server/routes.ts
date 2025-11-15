@@ -957,25 +957,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Updating vendor ${id} with data:`, updateData);
 
-      // Update user data
-      const updatedUser = await storage.updateUser(id, {
-        name: updateData.name,
-        email: updateData.email,
-        phone: updateData.phone,
-        address: updateData.address,
-      });
+      // Validate required fields
+      if (!updateData.name || updateData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
 
-      if (!updatedUser) {
+      if (!updateData.commissionRate || isNaN(parseFloat(updateData.commissionRate))) {
+        return res.status(400).json({ error: "Taxa de comissão inválida" });
+      }
+
+      // Check if vendor exists
+      const existingVendor = await storage.getUser(id);
+      if (!existingVendor) {
         return res.status(404).json({ error: "Vendedor não encontrado" });
       }
 
-      // Update vendor commission rate
-      await storage.updateVendorCommission(id, updateData.commissionRate);
+      // Update user data
+      const updatedUser = await storage.updateUser(id, {
+        name: updateData.name.trim(),
+        email: updateData.email?.trim() || null,
+        phone: updateData.phone?.trim() || null,
+        address: updateData.address?.trim() || null,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
+      }
+
+      // Update vendor commission rate if provided
+      if (updateData.commissionRate) {
+        await storage.updateVendorCommission(id, updateData.commissionRate);
+      }
+
+      // Get updated vendor info
+      const vendorInfo = await storage.getVendor(id);
 
       console.log(`Vendor ${id} updated successfully`);
       res.json({
         success: true,
-        user: updatedUser,
+        vendor: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          address: updatedUser.address,
+          username: updatedUser.username,
+          userCode: updatedUser.username,
+          commissionRate: vendorInfo?.commissionRate || updateData.commissionRate || '10.00',
+          isActive: updatedUser.isActive
+        },
         message: "Vendedor atualizado com sucesso"
       });
     } catch (error) {
