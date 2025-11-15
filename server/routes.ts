@@ -1853,7 +1853,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         partners,
         products,
         budgets,
-        budgetItems,
         orders,
         productionOrders,
         payments,
@@ -1874,7 +1873,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getPartners(), 
         storage.getProducts({ limit: 10000 }).then(result => result.products),
         storage.getBudgets(),
-        Promise.resolve([]), // Budget items will be included in budgets
         storage.getOrders(),
         storage.getProductionOrders(),
         storage.getPayments(),
@@ -1890,19 +1888,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getSystemLogs()
       ]);
 
+      // Get budget items for all budgets
+      const allBudgetItems = [];
+      for (const budget of budgets) {
+        try {
+          const items = await storage.getBudgetItems(budget.id);
+          allBudgetItems.push(...items.map(item => ({ ...item, budgetId: budget.id })));
+        } catch (error) {
+          console.log(`Error fetching items for budget ${budget.id}:`, error);
+        }
+      }
+
+      // Get budget photos for all budgets
+      const allBudgetPhotos = [];
+      for (const budget of budgets) {
+        try {
+          const photos = await storage.getBudgetPhotos(budget.id);
+          allBudgetPhotos.push(...photos.map(photo => ({ ...photo, budgetId: budget.id })));
+        } catch (error) {
+          console.log(`Error fetching photos for budget ${budget.id}:`, error);
+        }
+      }
+
+      const totalRecords = users.length + clients.length + products.length + budgets.length + 
+                          orders.length + allBudgetItems.length + payments.length + commissions.length;
+
       const backupData = {
         metadata: {
           exportDate: new Date().toISOString(),
-          version: "1.0",
-          totalRecords: users.length + clients.length + products.length + budgets.length + orders.length
+          version: "1.1",
+          totalRecords: totalRecords,
+          tables: {
+            users: users.length,
+            clients: clients.length,
+            vendors: vendors.length,
+            partners: partners.length,
+            products: products.length,
+            budgets: budgets.length,
+            budgetItems: allBudgetItems.length,
+            budgetPhotos: allBudgetPhotos.length,
+            orders: orders.length,
+            productionOrders: productionOrders.length,
+            payments: payments.length,
+            commissions: commissions.length,
+            branches: branches.length,
+            paymentMethods: paymentMethods.length,
+            shippingMethods: shippingMethods.length,
+            customizationOptions: customizationOptions.length,
+            producerPayments: producerPayments.length,
+            accountsReceivable: accountsReceivable.length,
+            bankTransactions: bankTransactions.length,
+            expenseNotes: expenseNotes.length,
+            systemLogs: Math.min(systemLogs.length, 1000)
+          }
         },
         data: {
-          users: users.map(u => ({ ...u, password: '[HIDDEN]' })), // Hide passwords
+          users: users.map(u => ({ ...u, password: '[HIDDEN]' })), // Hide passwords for security
           clients,
           vendors,
           partners,
           products,
           budgets,
+          budgetItems: allBudgetItems,
+          budgetPhotos: allBudgetPhotos,
           orders,
           productionOrders,
           payments,
@@ -1919,15 +1967,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      console.log(`Database backup created with ${backupData.metadata.totalRecords} total records`);
+      console.log(`Database backup created successfully:`);
+      console.log(`- Total records: ${totalRecords}`);
+      console.log(`- Tables included: ${Object.keys(backupData.data).length}`);
+      console.log(`- Export date: ${backupData.metadata.exportDate}`);
 
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename=database_backup_${new Date().toISOString().split('T')[0]}.json`);
-      res.json(backupData);
+      // Set proper headers for JSON download
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="database_backup_${new Date().toISOString().split('T')[0]}.json"`);
+      res.setHeader('Cache-Control', 'no-cache');
+      
+      // Send the actual JSON data
+      res.send(JSON.stringify(backupData, null, 2));
 
     } catch (error) {
       console.error("Error creating database backup:", error);
-      res.status(500).json({ error: "Erro ao criar backup do banco de dados" });
+      res.status(500).json({ error: "Erro ao criar backup do banco de dados: " + error.message });
     }
   });
 
