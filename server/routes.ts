@@ -6931,8 +6931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           console.log(`[UPDATE BUDGET] Budget items updated - ${createdItemIds.length} new items created, ${deletedCount}/${existingItemIds.length} old items deleted`);
         } else {
-          console.log(`[UPDATE BUDGET] Items array empty - deleting all items from budget ${budgetId}`);
-          await storage.deleteBudgetItems(budgetId);
+          // CRITICAL FIX: If items array is empty, DON'T delete existing items
+          // This prevents data loss when frontend accidentally sends empty array
+          console.log(`[UPDATE BUDGET] Items array empty - KEEPING existing items (not deleting)`);
+          console.warn(`[UPDATE BUDGET] WARNING: Received empty items array for budget ${budgetId}, but keeping existing items to prevent data loss`);
         }
       } else {
         console.log(`[UPDATE BUDGET] Metadata-only update - keeping existing items for budget ${budgetId}`);
