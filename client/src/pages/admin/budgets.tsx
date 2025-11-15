@@ -139,6 +139,9 @@ export default function AdminBudgets() {
     queryKey: ["/api/auth/current"],
     queryFn: async () => {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
       const response = await fetch('/api/auth/verify', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -148,6 +151,7 @@ export default function AdminBudgets() {
       const data = await response.json();
       return data.user;
     },
+    enabled: !!localStorage.getItem('authToken'),
   });
 
   const products = productsData?.products || [];
