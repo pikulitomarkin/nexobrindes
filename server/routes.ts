@@ -3695,13 +3695,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
+      // Validar se cliente tem orçamentos
+      const budgets = await storage.getBudgets();
+      const clientBudgets = budgets.filter(budget => budget.clientId === id);
+
+      if (clientBudgets.length > 0) {
+        return res.status(400).json({
+          error: `Não é possível excluir este cliente pois existem ${clientBudgets.length} orçamento(s) associado(s) a ele`
+        });
+      }
+
       // Validar se cliente tem pedidos
       const orders = await storage.getOrders();
       const clientOrders = orders.filter(order => order.clientId === id);
 
       if (clientOrders.length > 0) {
         return res.status(400).json({
-          error: "Não é possível excluir este cliente pois existem pedidos associados a ele"
+          error: `Não é possível excluir este cliente pois existem ${clientOrders.length} pedido(s) associado(s) a ele`
         });
       }
 
