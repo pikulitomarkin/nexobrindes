@@ -586,24 +586,31 @@ export default function VendorBudgets() {
     generatePDFMutation.mutate(budget.id);
   };
 
-  const handleEditBudget = (budget: any) => {
+  const handleEditBudget = async (budget: any) => {
     console.log('Editing budget:', budget);
-    console.log('Budget items:', budget.items);
+    
+    // Fetch full budget details with items
+    try {
+      const response = await fetch(`/api/budgets/${budget.id}`);
+      if (!response.ok) throw new Error('Erro ao buscar orçamento');
+      const fullBudget = await response.json();
+      
+      console.log('Budget items:', fullBudget.items);
 
-    // Pre-populate form with existing budget data
-    setVendorBudgetForm({
-      title: budget.title,
-      description: budget.description || "",
-      clientId: budget.clientId || "",
-      contactName: budget.contactName || "",
-      contactPhone: budget.contactPhone || "",
-      contactEmail: budget.contactEmail || "",
-      vendorId: budget.vendorId,
-      branchId: budget.branchId || "matriz",
-      validUntil: budget.validUntil || "",
-      deliveryDeadline: budget.deliveryDeadline || "",
-      deliveryType: budget.deliveryType || "delivery",
-      items: (budget.items || []).map((item: any) => {
+      // Pre-populate form with existing budget data
+      setVendorBudgetForm({
+        title: fullBudget.title,
+        description: fullBudget.description || "",
+        clientId: fullBudget.clientId || "",
+        contactName: fullBudget.contactName || "",
+        contactPhone: fullBudget.contactPhone || "",
+        contactEmail: fullBudget.contactEmail || "",
+        vendorId: fullBudget.vendorId,
+        branchId: fullBudget.branchId || "matriz",
+        validUntil: fullBudget.validUntil || "",
+        deliveryDeadline: fullBudget.deliveryDeadline || "",
+        deliveryType: fullBudget.deliveryType || "delivery",
+        items: (fullBudget.items || []).map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
 
@@ -657,21 +664,28 @@ export default function VendorBudgets() {
           generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
         };
       }),
-      paymentMethodId: budget.paymentMethodId || "",
-      shippingMethodId: budget.shippingMethodId || "",
-      installments: Number(budget.installments ?? 1),
-      downPayment: Number(budget.downPayment ?? 0),
-      remainingAmount: Number(budget.remainingAmount ?? 0),
-      shippingCost: Number(budget.shippingCost ?? 0),
-      hasDiscount: Boolean(budget.hasDiscount),
-      discountType: budget.discountType || "percentage",
-      discountPercentage: Number(budget.discountPercentage ?? 0),
-      discountValue: Number(budget.discountValue ?? 0)
-    });
+      paymentMethodId: fullBudget.paymentInfo?.paymentMethodId || fullBudget.paymentMethodId || "",
+      shippingMethodId: fullBudget.paymentInfo?.shippingMethodId || fullBudget.shippingMethodId || "",
+      installments: Number(fullBudget.paymentInfo?.installments ?? fullBudget.installments ?? 1),
+      downPayment: Number(fullBudget.paymentInfo?.downPayment ?? fullBudget.downPayment ?? 0),
+      remainingAmount: Number(fullBudget.paymentInfo?.remainingAmount ?? fullBudget.remainingAmount ?? 0),
+      shippingCost: Number(fullBudget.paymentInfo?.shippingCost ?? fullBudget.shippingCost ?? 0),
+      hasDiscount: Boolean(fullBudget.hasDiscount),
+      discountType: fullBudget.discountType || "percentage",
+      discountPercentage: Number(fullBudget.discountPercentage ?? 0),
+      discountValue: Number(fullBudget.discountValue ?? 0)
+      });
 
-    setIsEditMode(true);
-    setEditingBudgetId(budget.id);
-    setIsBudgetDialogOpen(true);
+      setIsEditMode(true);
+      setEditingBudgetId(budget.id);
+      setIsBudgetDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar orçamento para edição",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBudgetSubmit = (e: React.FormEvent) => {

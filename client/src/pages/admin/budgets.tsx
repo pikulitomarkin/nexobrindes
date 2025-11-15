@@ -608,24 +608,31 @@ export default function AdminBudgets() {
     generatePDFMutation.mutate(budget.id);
   };
 
-  const handleEditBudget = (budget: any) => {
+  const handleEditBudget = async (budget: any) => {
     console.log('Editing budget:', budget);
-    console.log('Budget items:', budget.items);
+    
+    // Fetch full budget details with items
+    try {
+      const response = await fetch(`/api/budgets/${budget.id}`);
+      if (!response.ok) throw new Error('Erro ao buscar orçamento');
+      const fullBudget = await response.json();
+      
+      console.log('Budget items:', fullBudget.items);
 
-    // Pre-populate form with existing budget data
-    setAdminBudgetForm({
-      title: budget.title,
-      description: budget.description || "",
-      clientId: budget.clientId || "",
-      contactName: budget.contactName || "",
-      contactPhone: budget.contactPhone || "",
-      contactEmail: budget.contactEmail || "",
-      vendorId: budget.vendorId || "",
-      branchId: budget.branchId || "matriz",
-      validUntil: budget.validUntil || "",
-      deliveryDeadline: budget.deliveryDeadline || "",
-      deliveryType: budget.deliveryType || "delivery",
-      items: (budget.items || []).map((item: any) => {
+      // Pre-populate form with existing budget data
+      setAdminBudgetForm({
+        title: fullBudget.title,
+        description: fullBudget.description || "",
+        clientId: fullBudget.clientId || "",
+        contactName: fullBudget.contactName || "",
+        contactPhone: fullBudget.contactPhone || "",
+        contactEmail: fullBudget.contactEmail || "",
+        vendorId: fullBudget.vendorId || "",
+        branchId: fullBudget.branchId || "matriz",
+        validUntil: fullBudget.validUntil || "",
+        deliveryDeadline: fullBudget.deliveryDeadline || "",
+        deliveryType: fullBudget.deliveryType || "delivery",
+        items: (fullBudget.items || []).map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
 
@@ -679,22 +686,29 @@ export default function AdminBudgets() {
           generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
         };
       }),
-      photos: budget.photos || [],
-      paymentMethodId: budget.paymentMethodId || "",
-      shippingMethodId: budget.shippingMethodId || "",
-      installments: budget.installments || 1,
-      downPayment: parseFloat(budget.downPayment || 0),
-      remainingAmount: parseFloat(budget.remainingAmount || 0),
-      shippingCost: parseFloat(budget.shippingCost || 0),
-      hasDiscount: Boolean(budget.hasDiscount),
-      discountType: budget.discountType || "percentage",
-      discountPercentage: parseFloat(budget.discountPercentage || 0),
-      discountValue: parseFloat(budget.discountValue || 0)
-    });
+      photos: fullBudget.photos || [],
+      paymentMethodId: fullBudget.paymentInfo?.paymentMethodId || fullBudget.paymentMethodId || "",
+      shippingMethodId: fullBudget.paymentInfo?.shippingMethodId || fullBudget.shippingMethodId || "",
+      installments: fullBudget.paymentInfo?.installments || fullBudget.installments || 1,
+      downPayment: parseFloat(fullBudget.paymentInfo?.downPayment || fullBudget.downPayment || 0),
+      remainingAmount: parseFloat(fullBudget.paymentInfo?.remainingAmount || fullBudget.remainingAmount || 0),
+      shippingCost: parseFloat(fullBudget.paymentInfo?.shippingCost || fullBudget.shippingCost || 0),
+      hasDiscount: Boolean(fullBudget.hasDiscount),
+      discountType: fullBudget.discountType || "percentage",
+      discountPercentage: parseFloat(fullBudget.discountPercentage || 0),
+      discountValue: parseFloat(fullBudget.discountValue || 0)
+      });
 
-    setIsEditMode(true);
-    setEditingBudgetId(budget.id);
-    setIsCreateDialogOpen(true);
+      setIsEditMode(true);
+      setEditingBudgetId(budget.id);
+      setIsCreateDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar orçamento para edição",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAdminBudgetSubmit = (e: React.FormEvent) => {
