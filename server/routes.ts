@@ -6825,11 +6825,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`[UPDATE BUDGET] Updating items: ${budgetData.items.length} items provided`);
         
-        // TODO: Wrap in transaction for atomicity
-        // Delete existing items
-        await storage.deleteBudgetItems(budgetId);
-
-        // Recreate items if array not empty
+        // CRITICAL FIX: VALIDATE and PREPARE all items BEFORE deleting anything
+        // This prevents data loss if any item has invalid data
+        const itemsToInsert = [];
+        
         if (budgetData.items.length > 0) {
           // Remove duplicate items before processing
           const seenItems = new Set();
@@ -6845,7 +6844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`[UPDATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
 
-          // Process each item
+          // VALIDATE and PREPARE each item (no DB operations yet)
           for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
@@ -6861,7 +6860,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalPrice += (generalCustomizationValue * quantity);
         }
 
-        await storage.createBudgetItem(updatedBudget.id, {
+        // Add to preparation array (no DB operation yet)
+            itemsToInsert.push({
           productId: item.productId,
           producerId: item.producerId || 'internal',
           quantity: quantity,
@@ -6869,13 +6869,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalPrice: totalPrice.toFixed(2),
           // Item Customization
           hasItemCustomization: item.hasItemCustomization || false,
-          selectedCustomizationId: item.selectedCustomizationId || "",
+          selectedCustomizationId: item.selectedCustomizationId || null,
           itemCustomizationValue: itemCustomizationValue.toFixed(2),
-          itemCustomizationDescription: item.itemCustomizationDescription || "",
-          customizationPhoto: item.customizationPhoto || "",
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          customizationPhoto: item.customizationPhoto || null,
           // General Customization
           hasGeneralCustomization: item.hasGeneralCustomization || false,
-          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationName: item.generalCustomizationName || null,
           generalCustomizationValue: generalCustomizationValue.toFixed(2),
           // Product dimensions
           productWidth: item.productWidth || null,
@@ -6886,10 +6886,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemDiscountType: item.itemDiscountType || "percentage",
             itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
             itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
-          });
+            });
+          }
+          
+          // ALL items validated successfully - NOW it's safe to delete old ones
+          console.log(`[UPDATE BUDGET] All ${itemsToInsert.length} items validated. Deleting old items...`);
+          await storage.deleteBudgetItems(budgetId);
+          
+          // Insert new items
+          console.log(`[UPDATE BUDGET] Inserting ${itemsToInsert.length} new items...`);
+          for (const itemData of itemsToInsert) {
+            await storage.createBudgetItem(updatedBudget.id, itemData);
           }
         } else {
-          console.log(`[UPDATE BUDGET] Items array empty - all items removed from budget ${budgetId}`);
+          console.log(`[UPDATE BUDGET] Items array empty - deleting all items from budget ${budgetId}`);
+          await storage.deleteBudgetItems(budgetId);
         }
       } else {
         console.log(`[UPDATE BUDGET] Metadata-only update - keeping existing items for budget ${budgetId}`);
