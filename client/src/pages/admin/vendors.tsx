@@ -31,17 +31,13 @@ const vendorFormSchema = z.object({
   branchId: z.string().optional(),
 });
 
-const editVendorFormSchema = z.object({
-  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
-  branchId: z.string().optional(),
+// Schema for editing vendor - password is optional
+const vendorEditFormSchema = vendorFormSchema.extend({
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional().or(z.literal("")),
 });
 
 type VendorFormValues = z.infer<typeof vendorFormSchema>;
-type EditVendorFormValues = z.infer<typeof editVendorFormSchema>;
+type VendorEditFormValues = z.infer<typeof vendorEditFormSchema>;
 
 export default function AdminVendors() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -83,8 +79,8 @@ export default function AdminVendors() {
     enabled: !!selectedVendorId && showVendorOrders,
   });
 
-  const form = useForm<VendorFormValues>({
-    resolver: zodResolver(vendorFormSchema),
+  const form = useForm<VendorEditFormValues>({
+    resolver: zodResolver(vendorEditFormSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -95,38 +91,6 @@ export default function AdminVendors() {
       branchId: "",
     },
   });
-
-  const editForm = useForm<EditVendorFormValues>({
-    resolver: zodResolver(editVendorFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      commissionRate: "10.00",
-      branchId: "",
-    },
-  });
-
-  // Load vendor data when edit dialog opens
-  useEffect(() => {
-    if (selectedVendorId && showEditVendor) {
-      const vendor = vendors?.find((v: any) => v.id === selectedVendorId);
-      if (vendor) {
-        console.log('Loading vendor data for edit:', vendor);
-        editForm.reset({
-          name: vendor.name || "",
-          email: vendor.email || "",
-          phone: vendor.phone || "",
-          address: vendor.address || "",
-          commissionRate: vendor.commissionRate?.toString() || "10.00",
-          branchId: vendor.branchId || "default",
-        });
-      } else {
-        console.error('Vendor not found for ID:', selectedVendorId);
-      }
-    }
-  }, [selectedVendorId, showEditVendor, vendors, editForm]);
 
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormValues) => {
@@ -170,56 +134,30 @@ export default function AdminVendors() {
   });
 
   const updateVendorMutation = useMutation({
-    mutationFn: async (data: EditVendorFormValues) => {
-      console.log('Updating vendor with data:', data);
-      const vendorData = {
-        name: data.name,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        commissionRate: data.commissionRate,
-        branchId: data.branchId === "default" ? null : data.branchId
-      };
-      
-      const response = await fetch(`/api/vendors/${selectedVendorId}`, {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<VendorFormValues> }) => {
+      const response = await fetch(`/api/vendors/${id}`, {
         method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(vendorData),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
-      
-      console.log('Update response status:', response.status);
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          const error = await response.json();
-          throw new Error(error.error || "Erro ao atualizar vendedor");
-        } else {
-          const text = await response.text();
-          console.error('Received HTML instead of JSON:', text);
-          throw new Error("Erro no servidor - resposta inválida");
-        }
-      }
+      if (!response.ok) throw new Error("Erro ao atualizar vendedor");
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       setShowEditVendor(false);
       setSelectedVendorId(null);
-      editForm.reset();
+      form.reset();
       toast({
         title: "Sucesso!",
         description: "Vendedor atualizado com sucesso!",
       });
     },
-    onError: (error: any) => {
-      console.error('Vendor update error:', error);
+    onError: (error: Error) => {
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível atualizar o vendedor",
+        title: "Erro ao atualizar",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -257,12 +195,45 @@ export default function AdminVendors() {
     }
   };
 
-  const onSubmit = (data: VendorFormValues) => {
-    createVendorMutation.mutate(data);
+  const handleEditVendor = (vendor: any) => {
+    setSelectedVendorId(vendor.id);
+    // Populate form with vendor data
+    form.reset({
+      name: vendor.name || "",
+      email: vendor.email || "",
+      phone: vendor.phone || "",
+      address: vendor.address || "",
+      commissionRate: vendor.commissionRate?.toString() || "10.00",
+      branchId: vendor.branchId || "",
+      password: "", // Don't populate password for security
+    });
+    setShowEditVendor(true);
   };
 
-  const onEditSubmit = (data: EditVendorFormValues) => {
-    updateVendorMutation.mutate(data);
+  const onSubmit = (data: VendorEditFormValues) => {
+    if (selectedVendorId && showEditVendor) {
+      // Edit mode - remove empty password field and normalize foreign keys before mutation
+      const updateData: Partial<VendorEditFormValues> = { ...data };
+      if (!updateData.password || updateData.password.trim() === "") {
+        delete updateData.password;
+      }
+      // Normalize empty branchId to null to avoid FK constraint violation
+      if (!updateData.branchId || updateData.branchId.trim() === "" || updateData.branchId === "default") {
+        updateData.branchId = null as any;
+      }
+      updateVendorMutation.mutate({ id: selectedVendorId, data: updateData });
+    } else {
+      // Create mode - validate password is provided
+      if (!data.password || data.password.trim() === "") {
+        toast({
+          title: "Erro",
+          description: "Senha é obrigatória para criar novo vendedor",
+          variant: "destructive",
+        });
+        return;
+      }
+      createVendorMutation.mutate(data as VendorFormValues);
+    }
   };
 
   if (isLoading) {
@@ -515,10 +486,7 @@ export default function AdminVendors() {
                         variant="ghost" 
                         size="sm" 
                         title="Editar"
-                        onClick={() => {
-                          setSelectedVendorId(vendor.id);
-                          setShowEditVendor(true);
-                        }}
+                        onClick={() => handleEditVendor(vendor)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -728,7 +696,7 @@ export default function AdminVendors() {
         setShowEditVendor(open);
         if (!open) {
           setSelectedVendorId(null);
-          editForm.reset();
+          form.reset();
         }
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -738,10 +706,10 @@ export default function AdminVendors() {
               Atualize os dados do vendedor
             </DialogDescription>
           </DialogHeader>
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -754,9 +722,24 @@ export default function AdminVendors() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha de Acesso (deixe vazio para não alterar)</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Digite uma nova senha (opcional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-gray-600">Deixe em branco se não deseja alterar a senha</p>
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -769,7 +752,7 @@ export default function AdminVendors() {
                   )}
                 />
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
@@ -784,7 +767,7 @@ export default function AdminVendors() {
               </div>
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="address"
                 render={({ field }) => (
                   <FormItem>
@@ -798,7 +781,7 @@ export default function AdminVendors() {
               />
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="commissionRate"
                 render={({ field }) => (
                   <FormItem>
@@ -812,7 +795,7 @@ export default function AdminVendors() {
               />
 
               <FormField
-                control={editForm.control}
+                control={form.control}
                 name="branchId"
                 render={({ field }) => (
                   <FormItem>

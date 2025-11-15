@@ -1282,8 +1282,38 @@ export class PgStorage implements IStorage {
   // ==================== BUDGET ITEMS ====================
 
   async getBudgetItems(budgetId: string): Promise<BudgetItem[]> {
-    return await pg.select().from(schema.budgetItems)
+    const items = await pg.select({
+      id: schema.budgetItems.id,
+      budgetId: schema.budgetItems.budgetId,
+      productId: schema.budgetItems.productId,
+      quantity: schema.budgetItems.quantity,
+      unitPrice: schema.budgetItems.unitPrice,
+      totalPrice: schema.budgetItems.totalPrice,
+      notes: schema.budgetItems.notes,
+      hasItemCustomization: schema.budgetItems.hasItemCustomization,
+      itemCustomizationValue: schema.budgetItems.itemCustomizationValue,
+      itemCustomizationDescription: schema.budgetItems.itemCustomizationDescription,
+      customizationPhoto: schema.budgetItems.customizationPhoto,
+      productWidth: schema.budgetItems.productWidth,
+      productHeight: schema.budgetItems.productHeight,
+      productDepth: schema.budgetItems.productDepth,
+      producerId: schema.budgetItems.producerId,
+      selectedCustomizationId: schema.budgetItems.selectedCustomizationId,
+      additionalCustomizationNotes: schema.budgetItems.additionalCustomizationNotes,
+      hasGeneralCustomization: schema.budgetItems.hasGeneralCustomization,
+      generalCustomizationName: schema.budgetItems.generalCustomizationName,
+      generalCustomizationValue: schema.budgetItems.generalCustomizationValue,
+      hasItemDiscount: schema.budgetItems.hasItemDiscount,
+      itemDiscountType: schema.budgetItems.itemDiscountType,
+      itemDiscountPercentage: schema.budgetItems.itemDiscountPercentage,
+      itemDiscountValue: schema.budgetItems.itemDiscountValue,
+      productName: schema.products.name,
+    })
+      .from(schema.budgetItems)
+      .leftJoin(schema.products, eq(schema.budgetItems.productId, schema.products.id))
       .where(eq(schema.budgetItems.budgetId, budgetId));
+    
+    return items as BudgetItem[];
   }
 
   async createBudgetItem(budgetId: string, itemData: InsertBudgetItem): Promise<BudgetItem> {

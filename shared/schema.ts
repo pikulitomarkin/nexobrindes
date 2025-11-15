@@ -608,7 +608,9 @@ export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Budget = typeof budgets.$inferSelect;
 export type InsertBudget = z.infer<typeof insertBudgetSchema>;
-export type BudgetItem = typeof budgetItems.$inferSelect;
+export type BudgetItem = typeof budgetItems.$inferSelect & {
+  productName?: string; // Added via JOIN with products table
+};
 export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;
 export type BudgetPhoto = typeof budgetPhotos.$inferSelect;
 export type InsertBudgetPhoto = z.infer<typeof insertBudgetPhotoSchema>;

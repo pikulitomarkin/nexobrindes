@@ -931,6 +931,77 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
         </div>
       </div>
 
+      {/* Order Items from Budget */}
+      {order.budgetItems && order.budgetItems.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Itens do Pedido ({order.budgetItems.length})</h3>
+          <div className="space-y-3">
+            {order.budgetItems.map((item: any, index: number) => (
+              <div key={index} className="p-4 rounded-lg border bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">{item.productName || item.product?.name || 'Produto não identificado'}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Quantidade:</span>
+                        <p className="font-medium">{item.quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Valor Unit.:</span>
+                        <p className="font-medium">R$ {parseFloat(item.unitPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Dimensões:</span>
+                        <p className="font-medium">
+                          {item.productWidth && item.productHeight && item.productDepth ? 
+                            `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                            'Não informado'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-green-600">
+                      R$ {parseFloat(item.totalPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Personalização do Item */}
+                {item.hasItemCustomization && (
+                  <div className="bg-blue-50 p-3 rounded mb-2">
+                    <p className="text-sm font-medium text-blue-900">Personalização do Item</p>
+                    <p className="text-sm text-blue-700 mt-1">{item.itemCustomizationDescription || 'Personalização aplicada'}</p>
+                    {item.itemCustomizationValue && parseFloat(item.itemCustomizationValue) > 0 && (
+                      <p className="text-sm text-blue-700">
+                        Valor: R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Personalização Geral */}
+                {item.hasGeneralCustomization && (
+                  <div className="bg-purple-50 p-3 rounded">
+                    <p className="text-sm font-medium text-purple-900">Personalização Geral</p>
+                    <p className="text-sm text-purple-700 mt-1">{item.generalCustomizationName || 'Personalização geral'}</p>
+                    {item.generalCustomizationValue && parseFloat(item.generalCustomizationValue) > 0 && (
+                      <p className="text-sm text-purple-700">
+                        Valor: R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Production Orders */}
       {productionOrders && productionOrders.length > 0 && (
         <div>

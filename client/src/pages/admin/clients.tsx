@@ -60,7 +60,13 @@ const clientFormSchema = z.object({
   enderecoEntregaCep: z.string().optional(),
 });
 
+// Schema for editing client - password is optional
+const clientEditFormSchema = clientFormSchema.extend({
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional().or(z.literal("")),
+});
+
 type ClientFormValues = z.infer<typeof clientFormSchema>;
+type ClientEditFormValues = z.infer<typeof clientEditFormSchema>;
 
 export default function AdminClients() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -102,8 +108,8 @@ export default function AdminClients() {
     enabled: !!selectedClientId && showOrders,
   });
 
-  const form = useForm<ClientFormValues>({
-    resolver: zodResolver(clientFormSchema),
+  const form = useForm<ClientEditFormValues>({
+    resolver: zodResolver(clientEditFormSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -235,13 +241,30 @@ export default function AdminClients() {
     }
   };
 
-  const onSubmit = (data: ClientFormValues) => {
+  const onSubmit = (data: ClientEditFormValues) => {
     if (selectedClientId && showEditClient) {
       // Edição de cliente existente
-      updateClientMutation.mutate({ id: selectedClientId, data });
+      // Remove password se estiver vazio e normalize FK fields
+      const updateData = { ...data };
+      if (!updateData.password || updateData.password.trim() === "") {
+        delete updateData.password;
+      }
+      // Normalize empty vendorId to null to avoid FK constraint violation
+      if (!updateData.vendorId || updateData.vendorId.trim() === "") {
+        updateData.vendorId = null as any;
+      }
+      updateClientMutation.mutate({ id: selectedClientId, data: updateData });
     } else {
-      // Criação de novo cliente
-      createClientMutation.mutate(data);
+      // Criação de novo cliente - validate password is provided
+      if (!data.password || data.password.trim() === "") {
+        toast({
+          title: "Erro",
+          description: "Senha é obrigatória para criar novo cliente",
+          variant: "destructive",
+        });
+        return;
+      }
+      createClientMutation.mutate(data as ClientFormValues);
     }
   };
 
