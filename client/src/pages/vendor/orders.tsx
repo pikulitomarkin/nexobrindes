@@ -624,31 +624,12 @@ export default function VendorOrders() {
       return;
     }
 
-    // Validar entrada obrigatória
-    if (vendorOrderForm.downPayment <= 0) {
-      toast({
-        title: "Erro",
-        description: "O valor de entrada é obrigatório e deve ser maior que zero",
-        variant: "destructive"
-      });
-      return;
-    }
-
     // Validar frete quando delivery
     if (vendorOrderForm.deliveryType === "delivery") {
       if (!vendorOrderForm.shippingMethodId) {
         toast({
           title: "Erro",
           description: "Selecione um método de entrega",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (vendorOrderForm.shippingCost <= 0) {
-        toast({
-          title: "Erro",
-          description: "O valor do frete é obrigatório quando há entrega",
           variant: "destructive"
         });
         return;

@@ -713,16 +713,8 @@ export default function VendorBudgets() {
       toast({ title: "Erro", description: "O número de parcelas deve ser pelo menos 1.", variant: "destructive" });
       return;
     }
-    if (vendorBudgetForm.downPayment <= 0) {
-      toast({ title: "Erro", description: "O valor de entrada é obrigatório.", variant: "destructive" });
-      return;
-    }
     if (vendorBudgetForm.deliveryType !== 'pickup' && !vendorBudgetForm.shippingMethodId) {
       toast({ title: "Erro", description: "O método de frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
-      return;
-    }
-    if (vendorBudgetForm.deliveryType !== 'pickup' && vendorBudgetForm.shippingCost <= 0) {
-      toast({ title: "Erro", description: "O custo do frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
       return;
     }
 
