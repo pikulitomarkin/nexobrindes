@@ -7728,7 +7728,32 @@ Para mais detalhes, entre em contato conosco!`;
       });
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
-      res.json(paidOrders);
+      
+      // Enrich orders with producer names
+      const enrichedOrders = await Promise.all(
+        paidOrders.map(async (order) => {
+          // Enrich items with producer names
+          const enrichedItems = await Promise.all(
+            (order.items || []).map(async (item: any) => {
+              if (item.producerId && item.producerId !== 'internal') {
+                const producer = await storage.getUser(item.producerId);
+                return {
+                  ...item,
+                  producerName: producer?.name || null
+                };
+              }
+              return item;
+            })
+          );
+          
+          return {
+            ...order,
+            items: enrichedItems
+          };
+        })
+      );
+      
+      res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching paid orders for logistics:", error);
       res.status(500).json({ error: "Failed to fetch paid orders" });
