@@ -118,10 +118,10 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
   const transactions: ParsedOFXTransaction[] = [];
 
   // Check for different OFX structures
-  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS ||
+  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS || 
                        ofxData?.BANKMSGSRSV1?.STMTTRNRS ||
                        ofxData?.OFX?.STMTTRNRS;
-
+                       
   if (!stmtTrnRsList) {
     console.warn('No STMTTRNRS found in OFX file. Available keys:', Object.keys(ofxData || {}));
     if (ofxData?.OFX) {
@@ -524,9 +524,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({
-        imported,
-        total: customizations.length,
+      res.json({ 
+        imported, 
+        total: customizations.length, 
         errors: errors.slice(0, 10) // Limitar erros para não sobrecarregar resposta
       });
     } catch (error) {
@@ -1029,10 +1029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     try {
       const users = await storage.getUsers();
-
+      
       // Also get clients from the clients table and merge them
       const clients = await storage.getClients();
-
+      
       // Create user objects from clients for backward compatibility
       const clientUsers = clients.map(client => ({
         id: client.id,
@@ -1043,7 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: 'client',
         isActive: client.isActive !== false
       }));
-
+      
       // Merge users and clients, avoiding duplicates by ID
       const allUsers = [...users];
       clientUsers.forEach(clientUser => {
@@ -1058,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       });
-
+      
       console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clientUsers.length} from clients table)`);
       console.log(`Client users:`, clientUsers.map(c => ({ id: c.id, name: c.name })));
       res.json(allUsers);
@@ -3010,7 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // If still no name, use a descriptive message
+          // If still no name, use a descriptive message instead of "Unknown"
           if (!clientName) {
             clientName = "Nome não informado";
           }
@@ -3517,7 +3517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // UPDATE endpoints
-
+  
   app.put("/api/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -3892,6 +3892,2903 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error converting quote request to budget:", error);
       res.status(500).json({ error: "Erro ao converter solicitação em orçamento: " + error.message });
+    }
+  });
+
+  // Endpoint específico para pedidos do vendedor (usado na página de pedidos do vendedor)
+  app.get("/api/vendors/:vendorId/orders", async (req, res) => {
+    const { vendorId } = req.params;
+    try {
+      const orders = await storage.getOrdersByVendor(vendorId);
+      console.log(`Found ${orders.length} orders for vendor ${vendorId}`);
+
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          const client = await storage.getUser(order.clientId);
+          const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+
+          // Get budget photos and items if order was converted from budget
+          let budgetPhotos = [];
+          let budgetItems = [];
+          if (order.budgetId) {
+            const photos = await storage.getBudgetPhotos(order.budgetId);
+            budgetPhotos = photos.map(photo => photo.imageUrl || photo.photoUrl);
+
+            // Get budget items with product details
+            const items = await storage.getBudgetItems(order.budgetId);
+            budgetItems = await Promise.all(
+              items.map(async (item) => {
+                const product = await storage.getProduct(item.productId);
+                return {
+                  ...item,
+                  product: {
+                    name: product?.name || 'Produto não encontrado',
+                    description: product?.description || '',
+                    category: product?.category || '',
+                    imageLink: product?.imageLink || ''
+                  }
+                };
+              })
+            );
+          }
+
+          // Check if there are unread production notes
+          let hasUnreadNotes = false;
+          let productionNotes = null;
+          let productionDeadline = null;
+          let lastNoteAt = null;
+          if (order.producerId) {
+            const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+            if (productionOrders.length > 0) {
+              const po = productionOrders[0];
+              hasUnreadNotes = po.hasUnreadNotes || false;
+              productionNotes = po.notes;
+              productionDeadline = po.deliveryDeadline;
+              lastNoteAt = po.lastNoteAt;
+            }
+          }
+
+          return {
+            ...order,
+            clientName: client?.name || 'Unknown',
+            producerName: producer?.name || null,
+            hasUnreadNotes: hasUnreadNotes,
+            budgetPhotos: budgetPhotos,
+            budgetItems: budgetItems,
+            productionNotes: productionNotes,
+            productionDeadline: productionDeadline,
+            lastNoteAt: lastNoteAt
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching vendor orders:", error);
+      res.status(500).json({ error: "Failed to fetch vendor orders" });
+    }
+  });
+
+  app.get("/api/vendor/:userId/info", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const vendor = await storage.getVendor(userId);
+      const orders = await storage.getOrdersByVendor(userId);
+      const commissions = await storage.getCommissionsByVendor(userId);
+
+      const monthlySales = orders
+        .filter(order => {
+          if (!order.createdAt) return false;
+          const orderMonth = new Date(order.createdAt).getMonth();
+          const currentMonth = new Date().getMonth();
+          return orderMonth === currentMonth;
+        })
+        .reduce((total, order) => total + parseFloat(order.totalValue), 0);
+
+      const totalCommissions = commissions
+        .reduce((total, commission) => total + parseFloat(commission.amount), 0);
+
+      res.json({
+        vendor,
+        monthlySales,
+        totalCommissions,
+        confirmedOrders: orders.filter(o => o.status !== 'cancelled').length
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch vendor info" });
+    }
+  });
+
+  // Commission routes
+  app.get("/api/commissions", async (req, res) => {
+    try {
+      const commissions = await storage.getAllCommissions();
+
+      // Enrich with user names and determine commission type
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          let vendorName = null;
+          let partnerName = null;
+          let orderValue = commission.orderValue;
+          let orderNumber = commission.orderNumber;
+          let type = 'vendor'; // Default to vendor
+
+          if (commission.vendorId) {
+            const vendor = await storage.getUser(commission.vendorId);
+            vendorName = vendor?.name;
+            type = 'vendor';
+          }
+
+          if (commission.partnerId) {
+            const partner = await storage.getUser(commission.partnerId);
+            partnerName = partner?.name;
+            type = 'partner';
+          }
+
+          // Use existing type field if available, otherwise determine from IDs
+          if (commission.type) {
+            type = commission.type;
+          }
+
+          // Enrich with order data if missing
+          if (commission.orderId && (!orderValue || !orderNumber)) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              orderValue = orderValue || order.totalValue;
+              orderNumber = orderNumber || order.orderNumber;
+            }
+          }
+
+          return {
+            ...commission,
+            type,
+            vendorName,
+            partnerName,
+            orderValue,
+            orderNumber
+          };
+        })
+      );
+
+      // Filter out invalid commissions (without names or order numbers)
+      const validCommissions = enrichedCommissions.filter(commission =>
+        commission.amount &&
+        (commission.vendorName || commission.partnerName) &&
+        commission.orderNumber
+      );
+
+      res.json(validCommissions);
+    } catch (error) {
+      console.error("Error fetching commissions:", error);
+      res.status(500).json({ error: "Failed to fetch commissions" });
+    }
+  });
+
+  app.get("/api/commissions/vendor/:vendorId", async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      console.log(`Fetching commissions for vendor: ${vendorId}`);
+      
+      const commissions = await storage.getCommissionsByVendor(vendorId);
+      console.log(`Found ${commissions.length} commissions for vendor ${vendorId}`);
+
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+
+      console.log(`Returning ${enrichedCommissions.length} enriched commissions for vendor ${vendorId}`);
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching vendor commissions:", error);
+      res.status(500).json({ error: "Failed to fetch vendor commissions" });
+    }
+  });
+
+  app.put("/api/commissions/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      const updatedCommission = await storage.updateCommissionStatus(id, status);
+      if (!updatedCommission) {
+        return res.status(404).json({ error: "Commission not found" });
+      }
+
+      res.json(updatedCommission);
+    } catch (error) {
+      console.error("Error updating commission status:", error);
+      res.status(500).json({ error: "Failed to update commission status" });
+    }
+  });
+
+  // Partners routes
+  // Get all partners
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      const partners = users.filter(user => user.role === 'partner');
+
+      console.log(`Found ${partners.length} partners in users table`);
+
+      const partnersWithDetails = await Promise.all(partners.map(async (partner) => {
+        const partnerProfile = await storage.getPartner(partner.id);
+        return {
+          id: partner.id,
+          name: partner.name,
+          email: partner.email || "",
+          username: partner.username || "",
+          userCode: partner.username || "",
+          phone: partner.phone || "",
+          commissionRate: partnerProfile?.commissionRate || '15.00',
+          createdAt: partner.createdAt,
+          isActive: partner.isActive || true
+        };
+      }));
+
+      res.json(partnersWithDetails);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  // Create partner (admin-level user)
+  app.post("/api/partners", async (req, res) => {
+    try {
+      const { name, email, phone, username, password } = req.body;
+
+      console.log('Creating partner with request data:', { name, email, phone, username, hasPassword: !!password });
+
+      // Validate required fields
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ error: "Nome de usuário é obrigatório" });
+      }
+
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username.trim());
+      if (existingUser) {
+        console.log('Username already exists:', username);
+        return res.status(400).json({ error: "Nome de usuário já existe" });
+      }
+
+      // Create partner using storage method
+      const newPartner = await storage.createPartner({
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        username: username.trim(),
+        password: password,
+        commissionRate: '15.00' // Default commission rate for partners
+      });
+
+      console.log('Partner created successfully:', { id: newPartner.id, username: newPartner.username, name: newPartner.name });
+
+      // Return partner without password
+      const { password: _, ...partnerWithoutPassword } = newPartner;
+
+      res.json({
+        success: true,
+        partner: {
+          ...partnerWithoutPassword,
+          userCode: newPartner.username,
+          commissionRate: '15.00'
+        }
+      });
+    } catch (error) {
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: "Failed to create partner: " + error.message });
+    }
+  });
+
+  app.put("/api/partners/:partnerId/commission", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { commissionRate } = req.body;
+
+      await storage.updatePartnerCommission(partnerId, commissionRate);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner commission:", error);
+      res.status(500).json({ error: "Failed to update partner commission" });
+    }
+  });
+
+  // Delete commission
+  app.delete("/api/commissions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Deleting commission: ${id}`);
+
+      // Get commission details before deletion for logging
+      const commissions = await storage.getAllCommissions();
+      const commission = commissions.find(c => c.id === id);
+
+      const deleted = await storage.deleteCommission(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Comissão não encontrada" });
+      }
+
+      // Log commission deletion
+      if (req.user && req.user.id) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'DELETE',
+            'commissions',
+            id,
+            `Comissão excluída: R$ ${commission?.amount || '0.00'} - ${commission?.type || 'Unknown'} - Pedido: ${commission?.orderNumber || 'N/A'}`,
+            'warning',
+            {
+              commissionId: id,
+              amount: commission?.amount,
+              type: commission?.type,
+              orderNumber: commission?.orderNumber
+            }
+          );
+        } catch (logError) {
+          console.error('Error logging commission deletion:', logError);
+        }
+      }
+
+      res.json({ success: true, message: "Comissão excluída com sucesso" });
+    } catch (error) {
+      console.error("Error deleting commission:", error);
+      res.status(500).json({ error: "Erro ao excluir comissão: " + error.message });
+    }
+  });
+
+  // Update partner name
+  app.put("/api/partners/:partnerId/name", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { name } = req.body;
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      const updatedUser = await storage.updateUser(partnerId, { name: name.trim() });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      res.json({ success: true, user: updatedUser });
+    } catch (error) {
+      console.error("Error updating partner name:", error);
+      res.status(500).json({ error: "Failed to update partner name" });
+    }
+  });
+
+  // Get commissions for a specific partner
+  app.get("/api/commissions/partner/:partnerId", async (req, res) => {
+    try {
+      const { partnerId } = req.params;
+      const commissions = await storage.getCommissionsByPartner(partnerId);
+
+      // Enrich with order data
+      const enrichedCommissions = await Promise.all(
+        commissions.map(async (commission) => {
+          if (commission.orderId) {
+            let order = await storage.getOrder(commission.orderId);
+            if (order) {
+              return {
+                ...commission,
+                orderValue: commission.orderValue || order.totalValue,
+                orderNumber: commission.orderNumber || order.orderNumber
+              };
+            }
+          }
+          return commission;
+        })
+      );
+
+      res.json(enrichedCommissions);
+    } catch (error) {
+      console.error("Error fetching partner commissions:", error);
+      res.status(500).json({ error: "Failed to fetch partner commissions" });
+    }
+  });
+
+  // Get all partners
+  app.get("/api/partners", async (req, res) => {
+    try {
+      const partners = await storage.getPartners();
+
+      // Enrich with commission totals
+      const enrichedPartners = await Promise.all(
+        partners.map(async (partner) => {
+          const commissions = await storage.getCommissionsByPartner(partner.id);
+          const totalCommissions = commissions.reduce((sum, c) => sum + parseFloat(c.amount || '0'), 0);
+
+          return {
+            ...partner,
+            totalCommissions
+          };
+        })
+      );
+
+      console.log(`Found ${enrichedPartners.length} partners`);
+      res.json(enrichedPartners);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  // Update partner (admin only)
+  app.put("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const partnerData = req.body;
+
+      console.log(`Updating partner ${id} with data:`, partnerData);
+
+      // Validate required fields
+      if (!partnerData.name || partnerData.name.trim().length === 0) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      // Update user information
+      const updatedUser = await storage.updateUser(id, {
+        name: partnerData.name.trim(),
+        email: partnerData.email?.trim() || null,
+        phone: partnerData.phone?.trim() || null,
+        isActive: partnerData.isActive !== undefined ? partnerData.isActive : true
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      console.log('Partner updated successfully:', updatedUser.name);
+
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser;
+
+      res.json({
+        success: true,
+        partner: userWithoutPassword,
+        message: "Sócio atualizado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error updating partner:", error);
+      res.status(500).json({ error: "Erro ao atualizar sócio: " + error.message });
+    }
+  });
+
+  // Delete partner
+  app.delete("/api/partners/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Attempting to delete partner: ${id}`);
+
+      // Check if partner has commissions
+      const commissions = await storage.getCommissionsByPartner(id);
+      if (commissions.length > 0) {
+        console.log(`Partner ${id} has ${commissions.length} commissions, cannot delete`);
+        return res.status(400).json({
+          error: "Não é possível excluir este sócio pois existem comissões associadas"
+        });
+      }
+
+      // Delete partner profile first
+      try {
+        await storage.deletePartner(id);
+        console.log(`Partner profile deleted for user: ${id}`);
+      } catch (partnerError) {
+        console.log(`No partner profile found for user ${id}, continuing with user deletion`);
+      }
+
+      // Delete user
+      const userDeleted = await storage.deleteUser(id);
+      if (!userDeleted) {
+        return res.status(404).json({ error: "Sócio não encontrado" });
+      }
+
+      console.log(`Partner and user ${id} deleted successfully`);
+      res.json({ success: true, message: "Sócio excluído com sucesso" });
+    } catch (error) {
+      console.error("Error deleting partner:", error);
+      res.status(500).json({ error: "Erro ao excluir sócio: " + error.message });
+    }
+  });
+
+  // Recalculate commissions for all orders (migration fix)
+  app.post("/api/admin/recalculate-commissions", requireAuth, async (req, res) => {
+    try {
+      console.log("Starting commission recalculation...");
+      await storage.recalculateAllCommissions();
+
+      res.json({
+        success: true,
+        message: "Comissões recalculadas com sucesso"
+      });
+    } catch (error) {
+      console.error("Error recalculating commissions:", error);
+      res.status(500).json({ error: "Erro ao recalcular comissões: " + error.message });
+    }
+  });
+
+  // Get system logs with filters
+  app.get("/api/admin/logs", async (req, res) => {
+    try {
+      const { search, action, user, level, date, export: isExport } = req.query as {
+        search?: string;
+        action?: string;
+        user?: string;
+        level?: string;
+        date?: string;
+        export?: string;
+      };
+
+      const logs = await storage.getSystemLogs({
+        search,
+        action: action === 'all' ? undefined : action,
+        userId: user === 'all' ? undefined : user,
+        level: level === 'all' ? undefined : level,
+        dateFilter: date === 'all' ? undefined : date
+      });
+
+      if (isExport === 'true') {
+        // Return CSV format for export
+        const csvHeaders = 'Data,Usuário,Ação,Nível,Descrição,Detalhes,IP,User Agent\n';
+        const csvData = logs.map((log: any) => {
+          const date = new Date(log.createdAt).toLocaleString('pt-BR');
+          const details = (log.details || '').replace(/"/g, '""');
+          const description = (log.description || '').replace(/"/g, '""');
+          const userAgent = (log.userAgent || '').replace(/"/g, '""');
+
+          return `"${date}","${log.userName}","${log.action}","${log.level}","${description}","${details}","${log.ipAddress || ''}","${userAgent}"`;
+        }).join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=logs-sistema-${new Date().toISOString().split('T')[0]}.csv`);
+        res.send(csvHeaders + csvData);
+      } else {
+        res.json(logs);
+      }
+    } catch (error) {
+      console.error("Error fetching system logs:", error);
+      res.status(500).json({ error: "Failed to fetch system logs" });
+    }
+  });
+
+  // Create backup of logs
+  app.post("/api/admin/logs/backup", async (req, res) => {
+    try {
+      console.log("Creating logs backup...");
+
+      // Get all logs from the last 7 days
+      const logs = await storage.getSystemLogs({
+        dateFilter: 'week'
+      });
+
+      if (logs.length === 0) {
+        return res.json({
+          success: true,
+          message: "Nenhum log encontrado para backup",
+          backupId: null
+        });
+      }
+
+      // Create backup record
+      const backupDate = new Date();
+      const backupId = `backup-${backupDate.getTime()}`;
+
+      // Generate Excel data
+      const excelData = logs.map((log: any) => ({
+        'Data': new Date(log.createdAt).toLocaleString('pt-BR'),
+        'Usuário': log.userName,
+        'Ação': log.action,
+        'Nível': log.level,
+        'Descrição': log.description || '',
+        'Detalhes': log.details || '',
+        'IP': log.ipAddress || '',
+        'User Agent': log.userAgent || ''
+      }));
+
+      // Store backup info
+      const backup = await storage.createLogBackup({
+        id: backupId,
+        backupDate: backupDate,
+        logCount: logs.length,
+        excelData: JSON.stringify(excelData),
+        status: 'completed'
+      });
+
+      // Clean old logs (older than 7 days)
+      await storage.cleanOldLogs(7);
+
+      console.log(`Backup created: ${backupId} with ${logs.length} logs`);
+
+      res.json({
+        success: true,
+        backup: backup,
+        message: `Backup criado com sucesso! ${logs.length} logs arquivados.`
+      });
+    } catch (error) {
+      console.error("Error creating logs backup:", error);
+      res.status(500).json({ error: "Erro ao criar backup de logs: " + error.message });
+    }
+  });
+
+  // Get log backups list
+  app.get("/api/admin/logs/backups", async (req, res) => {
+    try {
+      const backups = await storage.getLogBackups();
+      res.json(backups);
+    } catch (error) {
+      console.error("Error fetching log backups:", error);
+      res.status(500).json({ error: "Failed to fetch log backups" });
+    }
+  });
+
+  // Download log backup as Excel
+  app.get("/api/admin/logs/backups/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const backup = await storage.getLogBackup(id);
+
+      if (!backup) {
+        return res.status(404).json({ error: "Backup não encontrado" });
+      }
+
+      const excelData = JSON.parse(backup.excelData);
+
+      // Set headers for Excel download
+      const fileName = `logs-backup-${new Date(backup.backupDate).toISOString().split('T')[0]}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Send Excel data as JSON (frontend will handle Excel generation)
+      res.json({
+        success: true,
+        data: excelData,
+        fileName: fileName,
+        backupInfo: {
+          date: backup.backupDate,
+          logCount: backup.logCount
+        }
+      });
+    } catch (error) {
+      console.error("Error downloading log backup:", error);
+      res.status(500).json({ error: "Erro ao baixar backup: " + error.message });
+    }
+  });
+
+  // Delete log backup
+  app.delete("/api/admin/logs/backups/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteLogBackup(id);
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Backup não encontrado" });
+      }
+
+      res.json({ success: true, message: "Backup excluído com sucesso" });
+    } catch (error) {
+      console.error("Error deleting log backup:", error);
+      res.status(500).json({ error: "Erro ao excluir backup: " + error.message });
+    }
+  });
+
+  // Get all accounts receivable (orders + manual)
+  app.get("/api/finance/receivables", async (req, res) => {
+    try {
+      const accountsReceivable = await storage.getAccountsReceivable();
+      const manualReceivables = await storage.getManualReceivables();
+      const orders = await storage.getOrders();
+
+      // Enrich order-based receivables with order and client data
+      const enrichedReceivables = await Promise.all(
+        accountsReceivable.map(async (receivable) => {
+          try {
+            // Get order data
+            const order = await storage.getOrder(receivable.orderId);
+            if (!order) {
+              console.log(`Order not found for receivable: ${receivable.orderId}`);
+              return null;
+            }
+
+            // Get client information
+            let clientName = order.contactName;
+            if (!clientName && order.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientByUserId = await storage.getClientByUserId(order.clientId);
+                if (clientByUserId) {
+                  clientName = clientByUserId.name;
+                } else {
+                  const clientUser = await storage.getUser(order.clientId);
+                  if (clientUser) {
+                    clientName = clientUser.name;
+                  }
+                }
+              }
+            }
+
+            if (!clientName) {
+              clientName = "Cliente não informado";
+            }
+
+            // Get payments for this order
+            const payments = await storage.getPaymentsByOrder(order.id);
+            const confirmedPayments = payments.filter(p => p.status === 'confirmed');
+            const totalPaid = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+            // Get last payment date
+            let lastPaymentDate = null;
+            if (confirmedPayments.length > 0) {
+              const sortedPayments = confirmedPayments.sort((a, b) =>
+                new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime()
+              );
+              lastPaymentDate = sortedPayments[0].paidAt || sortedPayments[0].createdAt;
+            }
+
+            // Get budget payment info if order was converted from budget
+            let budgetDownPayment = 0;
+            let budgetShippingCost = 0;
+            if (order.budgetId) {
+              try {
+                const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+                if (budgetPaymentInfo) {
+                  budgetDownPayment = parseFloat(budgetPaymentInfo.downPayment || "0");
+                  budgetShippingCost = parseFloat(budgetPaymentInfo.shippingCost || "0");
+                  console.log(`[RECEIVABLES API] Order ${order.orderNumber} - Budget down payment: R$ ${budgetDownPayment}, shipping: R$ ${budgetShippingCost}`);
+                }
+              } catch (error) {
+                console.log(`Error getting budget payment info for order ${order.id}:`, error);
+              }
+            }
+
+            // Calculate minimum payment (down payment + shipping from budget)
+            const calculatedMinimumPayment = budgetDownPayment + budgetShippingCost;
+            const minimumPayment = calculatedMinimumPayment > 0 ? calculatedMinimumPayment.toFixed(2) : (receivable.minimumPayment || "0.00");
+
+            return {
+              id: receivable.id,
+              orderId: receivable.orderId,
+              orderNumber: order.orderNumber,
+              clientId: receivable.clientId,
+              clientName: clientName,
+              vendorId: receivable.vendorId,
+              dueDate: receivable.dueDate,
+              amount: receivable.amount, // Total amount of the order
+              receivedAmount: totalPaid.toFixed(2), // Actually paid amount
+              minimumPayment: minimumPayment, // Minimum required payment (entrada + frete)
+              status: receivable.status,
+              notes: receivable.notes,
+              createdAt: receivable.createdAt,
+              updatedAt: receivable.updatedAt,
+              lastPaymentDate: lastPaymentDate
+            };
+          } catch (error) {
+            console.error(`Error enriching receivable ${receivable.id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out null values
+      const validOrderReceivables = enrichedReceivables.filter(r => r !== null);
+
+      // Add manual receivables (already in correct format from DB)
+      const allReceivables = [
+        ...validOrderReceivables,
+        ...manualReceivables
+      ];
+
+      res.json(allReceivables);
+    } catch (error) {
+      console.error("Error fetching receivables:", error);
+      res.status(500).json({ error: "Failed to fetch receivables" });
+    }
+  });
+
+  // Get pending orders for payment reconciliation
+  app.get("/api/finance/pending-orders", async (req, res) => {
+    try {
+      console.log("Fetching pending orders for payment reconciliation...");
+
+      const allOrders = await storage.getOrders();
+
+      // Filter orders that have remaining balance to be paid
+      const pendingOrders = allOrders.filter(order => {
+        const totalValue = parseFloat(order.totalValue);
+        const paidValue = parseFloat(order.paidValue || '0');
+        const remainingValue = totalValue - paidValue;
+
+        // Include orders that:
+        // 1. Are not cancelled
+        // 2. Have remaining balance > 0.01 (to avoid floating point issues)
+        // 3. Are confirmed (not just drafts)
+        const shouldInclude = order.status !== 'cancelled' &&
+                             remainingValue > 0.01 &&
+                             (order.status === 'confirmed' || order.status === 'production' || order.status ==='pending');
+
+        if (shouldInclude) {
+          console.log(`Including order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Remaining=${remainingValue}, Status=${order.status}`);
+        }
+
+        return shouldInclude;
+      });
+
+      // Enrich with client names and additional info
+      const enrichedOrders = await Promise.all(
+        pendingOrders.map(async (order) => {
+          // Always use contactName as primary client name
+          let clientName = order.contactName;
+
+          // Only if contactName is missing, try to get from client record
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                }
+              }
+            }
+          }
+
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+
+          // Get budget payment info if order was converted from budget
+          let budgetInfo = null;
+          if (order.budgetId) {
+            try {
+              const budgetPaymentInfo = await storage.getBudgetPaymentInfo(order.budgetId);
+              if (budgetPaymentInfo) {
+                budgetInfo = {
+                  downPayment: parseFloat(budgetPaymentInfo.downPayment || '0'),
+                  remainingAmount: parseFloat(budgetPaymentInfo.remainingAmount || '0'),
+                  installments: budgetPaymentInfo.installments || 1
+                };
+              }
+            } catch (error) {
+              console.log("Error fetching budget info for order:", order.id, error);
+            }
+          }
+
+          return {
+            ...order,
+            clientName: clientName,
+            budgetInfo: budgetInfo
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedOrders.length} pending orders for payment reconciliation`);
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching pending orders:", error);
+      res.status(500).json({ error: "Failed to fetch pending orders for payment reconciliation" });
+    }
+  });
+
+  // Create expense note
+  app.post("/api/finance/expenses", async (req, res) => {
+    try {
+      const { name, amount, category, date, description, status, createdBy } = req.body;
+
+      if (!name || !amount || !category || !date) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Get admin user ID if createdBy not provided
+      let effectiveCreatedBy = createdBy || req.user?.id;
+      if (!effectiveCreatedBy) {
+        const adminUser = await storage.getUserByUsername('admin');
+        effectiveCreatedBy = adminUser?.id;
+        if (!effectiveCreatedBy) {
+          console.error("Cannot create expense note: admin user not found in system");
+          return res.status(500).json({ error: "Usuário admin não encontrado no sistema" });
+        }
+      }
+
+      // Create expense note
+      const expense = await storage.createExpenseNote({
+        date: new Date(date),
+        category: category,
+        description: name + (description ? ` - ${description}` : ''),
+        amount: parseFloat(amount).toFixed(2),
+        vendorId: null, // Notas de despesa não têm vendedor associado
+        orderId: null,  // Não estão associadas a pedidos
+        attachmentUrl: null,
+        status: status || 'recorded',
+        approvedBy: null,
+        approvedAt: null,
+        createdBy: effectiveCreatedBy
+      });
+
+      res.json(expense);
+    } catch (error) {
+      console.error("Error creating expense note:", error);
+      res.status(500).json({ error: "Erro ao criar nota de despesa: " + error.message });
+    }
+  });
+
+  // Get expense notes
+  app.get("/api/finance/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenseNotes();
+      res.json(expenses);
+    } catch (error) {
+      console.error("Error fetching expense notes:", error);
+      res.status(500).json({ error: "Failed to fetch expense notes" });
+    }
+  });
+
+  // Associate multiple payments endpoint
+  app.post("/api/finance/associate-multiple-payments", async (req, res) => {
+    try {
+      const { transactions, orderId, totalAmount } = req.body;
+
+      console.log("Processing multiple payment association:", {
+        transactionCount: transactions?.length,
+        orderId,
+        totalAmount
+      });
+
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação fornecida" });
+      }
+
+      if (!orderId) {
+        return res.status(400).json({ error: "ID do pedido não fornecido" });
+      }
+
+      let paymentsCreated = 0;
+      let errors: string[] = [];
+      let actualTotalAmount = 0;
+      let duplicateCount = 0;
+
+      // Process each transaction
+      for (const txn of transactions) {
+        try {
+          const transaction = await storage.getBankTransaction(txn.transactionId);
+          if (!transaction) {
+            errors.push(`Transação ${txn.transactionId} não encontrada`);
+            continue;
+          }
+
+          if (transaction.status === 'matched') {
+            errors.push(`Transação ${txn.transactionId} já foi conciliada`);
+            duplicateCount++;
+            continue;
+          }
+
+          const amount = Math.abs(parseFloat(transaction.amount));
+
+          // Create payment record with OFX reconciliation
+          const payment = await storage.createPayment({
+            orderId: orderId,
+            amount: amount.toFixed(2),
+            method: "bank_transfer",
+            status: "confirmed",
+            transactionId: transaction.fitId || `TXN-${Date.now()}`,
+            notes: `Conciliação OFX - ${transaction.description}`,
+            paidAt: new Date(transaction.date),
+            // Mark as OFX reconciled to prevent manual payment
+            reconciliationStatus: 'ofx',
+            bankTransactionId: txn.transactionId
+          });
+
+          // Mark transaction as matched
+          await storage.updateBankTransaction(txn.transactionId, {
+            status: 'matched',
+            matchedOrderId: orderId,
+            matchedPaymentId: payment.id,
+            matchedAt: new Date(),
+            notes: `Conciliado com pedido ${orderId}`,
+            matchedEntityType: 'payment',
+            matchedEntityId: payment.id
+          });
+
+          paymentsCreated++;
+          actualTotalAmount += amount;
+
+          console.log(`Created payment ${payment.id} for R$ ${amount} from transaction ${txn.transactionId}`);
+        } catch (error) {
+          console.error(`Error processing transaction ${txn.transactionId}:`, error);
+          errors.push(`Erro ao processar transação ${txn.transactionId}: ${error.message}`);
+        }
+      }
+
+      // Update order paid value
+      if (paymentsCreated > 0) {
+        await storage.updateOrderPaidValue(orderId);
+      }
+
+      res.json({
+        success: true,
+        paymentsCreated,
+        totalAmount: actualTotalAmount.toFixed(2),
+        errors,
+        duplicates: duplicateCount
+      });
+    } catch (error) {
+      console.error("Error in multiple payment association:", error);
+      res.status(500).json({ error: "Erro ao processar associação múltipla de pagamentos: " + error.message });
+    }
+  });
+
+  // Single payment association endpoint
+  app.post("/api/finance/associate-payment", async (req, res) => {
+    try {
+      const { transactionId, orderId, amount } = req.body;
+
+      console.log("Processing single payment association:", { transactionId, orderId, amount });
+
+      const transaction = await storage.getBankTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transação não encontrada" });
+      }
+
+      if (transaction.status === 'matched') {
+        return res.status(400).json({ error: "Transação já foi conciliada" });
+      }
+
+      const paymentAmount = parseFloat(amount);
+      const transactionAmount = Math.abs(parseFloat(transaction.amount));
+
+      // Create payment record with OFX reconciliation
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: paymentAmount.toFixed(2),
+        method: "bank_transfer",
+        status: "confirmed",
+        transactionId: transaction.fitId || `TXN-${Date.now()}`,
+        notes: `Conciliação OFX - ${transaction.description}`,
+        paidAt: new Date(transaction.date),
+        // Mark as OFX reconciled to prevent manual payment
+        reconciliationStatus: 'ofx',
+        bankTransactionId: transactionId
+      });
+
+      // Mark transaction as matched
+      await storage.updateBankTransaction(transactionId, {
+        status: 'matched',
+        matchedOrderId: orderId,
+        matchedPaymentId: payment.id,
+        matchedAt: new Date(),
+        notes: `Conciliado com pedido ${orderId}`,
+        matchedEntityType: 'payment',
+        matchedEntityId: payment.id
+      });
+
+      // Update order paid value
+      await storage.updateOrderPaidValue(orderId);
+
+      // Log payment creation
+      const order = await storage.getOrder(orderId);
+      await storage.logUserAction(
+        req.user?.id || 'system',
+        req.user?.name || 'Sistema',
+        req.user?.role || 'system',
+        'CREATE',
+        'payments',
+        payment.id,
+        `Pagamento processado via OFX: R$ ${paymentAmount.toFixed(2)} - Pedido: ${order?.orderNumber}`,
+        'success',
+        {
+          amount: paymentAmount.toFixed(2),
+          method: 'bank_transfer',
+          orderId: orderId,
+          orderNumber: order?.orderNumber,
+          transactionId: payment.transactionId
+        }
+      );
+
+      console.log(`Created payment ${payment.id} for R$ ${paymentAmount}`);
+
+      res.json({
+        success: true,
+        payment: payment,
+        message: "Pagamento associado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error in payment association:", error);
+      res.status(500).json({ error: "Erro ao associar pagamento: " + error.message });
+    }
+  });
+
+  // Receivables payment endpoint
+  app.post("/api/receivables/:id/payment", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, method, transactionId, notes } = req.body;
+
+      console.log("Processing receivables payment:", { id, amount, method, transactionId });
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
+      }
+
+      // Check if this is a manual receivable or order-based
+      const receivables = await storage.getAccountsReceivable();
+      const receivable = receivables.find(r => r.id === id);
+
+      if (!receivable) {
+        return res.status(404).json({ error: "Conta a receber não encontrada" });
+      }
+
+      let paymentRecord;
+
+      if (receivable.orderId) {
+        // This is an order-based receivable - create payment for the order
+        const order = await storage.getOrder(receivable.orderId);
+        if (!order) {
+          return res.status(404).json({ error: "Pedido relacionado não encontrado" });
+        }
+
+        // Validate payment amount against remaining balance
+        const requested = parseFloat(amount);
+        const alreadyPaid = parseFloat(order.paidValue || '0');
+        const total = parseFloat(order.totalValue);
+
+        // Never accept payment above the remaining amount
+        const allowable = Math.max(0, total - alreadyPaid);
+        const finalAmount = Math.min(requested, allowable);
+
+        if (finalAmount !== requested) {
+          console.log(`[RECEIVABLES PAYMENT] Clamped payment from ${requested} to ${finalAmount} for order ${order.orderNumber}`);
+        }
+
+        // Create payment with confirmed status - this automatically calls updateOrderPaidValue()
+        paymentRecord = await storage.createPayment({
+          orderId: receivable.orderId,
+          amount: finalAmount.toFixed(2),
+          method: method || 'manual',
+          status: 'confirmed',
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || '',
+          paidAt: new Date()
+        });
+
+        console.log(`[RECEIVABLE PAYMENT] Created payment for order ${order.orderNumber}: amount=${finalAmount.toFixed(2)}`);
+
+        // IMPORTANT: Also update the receivedAmount in accounts_receivable for this order
+        // This ensures the UI shows the correct "already paid" amount
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + finalAmount;
+        const totalAmount = parseFloat(receivable.amount);
+
+        await storage.updateAccountsReceivable(receivable.id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= totalAmount ? 'paid' : 'partial',
+          updatedAt: new Date()
+        });
+
+        console.log(`[RECEIVABLE PAYMENT] Updated receivedAmount from ${currentReceived} to ${newReceivedAmount.toFixed(2)} for receivable ${receivable.id}`);
+
+        // Note: createPayment() with status='confirmed' already calls updateOrderPaidValue() which:
+        // 1. Sums all confirmed payments for the order
+        // 2. Updates order.paidValue
+      } else {
+        // This is a manual receivable - update the receivable directly
+        const currentReceived = parseFloat(receivable.receivedAmount || '0');
+        const newReceivedAmount = currentReceived + parseFloat(amount);
+
+        await storage.updateAccountsReceivable(id, {
+          receivedAmount: newReceivedAmount.toFixed(2),
+          status: newReceivedAmount >= parseFloat(receivable.amount) ? 'paid' : 'partial'
+        });
+
+        paymentRecord = {
+          id: `payment-${Date.now()}`,
+          amount: parseFloat(amount).toFixed(2),
+          method: method || "manual",
+          transactionId: transactionId || `MANUAL-${Date.now()}`,
+          notes: notes || "",
+          paidAt: new Date()
+        };
+      }
+
+      console.log("Payment processed successfully:", paymentRecord);
+      res.json({ success: true, payment: paymentRecord });
+    } catch (error) {
+      console.error("Error processing receivables payment:", error);
+      res.status(500).json({ error: "Erro ao processar pagamento: " + error.message });
+    }
+  });
+
+  // Create manual payables endpoint
+  app.post("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const { beneficiary, description, amount, dueDate, category, notes } = req.body;
+
+      if (!beneficiary || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create a manual payable entry
+      const payable = await storage.createManualPayable({
+        beneficiary,
+        description,
+        amount: parseFloat(amount).toFixed(2),
+        dueDate: new Date(dueDate),
+        category: category || 'Outros',
+        notes: notes || null
+      });
+
+      console.log(`Created manual payable: ${payable.id} - ${payable.description} - R$ ${payable.amount}`);
+      res.json(payable);
+    } catch (error) {
+      console.error("Error creating manual payable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a pagar: " + error.message });
+    }
+  });
+
+  // Get manual payables endpoint
+  app.get("/api/finance/payables/manual", async (req, res) => {
+    try {
+      const payables = await storage.getManualPayables();
+      console.log(`Returning ${payables.length} manual payables to frontend`);
+      res.json(payables);
+    } catch (error) {
+      console.error("Error fetching manual payables:", error);
+      res.status(500).json({ error: "Erro ao buscar contas a pagar manuais: " + error.message });
+    }
+  });
+
+  // Pay manual payable endpoint
+  app.post("/api/finance/payables/manual/:id/pay", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes, transactionId } = req.body;
+
+      console.log(`Processing payment for manual payable: ${id}`, { paymentMethod, notes, transactionId });
+
+      // Update the manual payable status to paid
+      const updatedPayable = await storage.updateManualPayable(id, {
+        status: 'paid',
+        paidBy: 'admin-1', // Could be req.user.id in real auth
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'manual',
+        paymentNotes: notes || null,
+        transactionId: transactionId || null
+      });
+
+      if (!updatedPayable) {
+        return res.status(404).json({ error: "Conta a pagar não encontrada" });
+      }
+
+      console.log(`Manual payable ${id} marked as paid successfully`);
+
+      res.json({
+        success: true,
+        payable: updatedPayable,
+        message: "Pagamento registrado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error processing manual payable payment:", error);
+      res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
+    }
+  });
+
+  // Create manual receivables endpoint
+  app.post("/api/finance/receivables/manual", async (req, res) => {
+    try {
+      const { clientName, description, amount, dueDate, notes } = req.body;
+
+      if (!clientName || !description || !amount || !dueDate) {
+        return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
+      }
+
+      // Create a manual receivable entry
+      const receivable = await storage.createManualReceivable({
+        clientName,
+        description,
+        amount: parseFloat(amount).toFixed(2),
+        dueDate: new Date(dueDate),
+        notes: notes || null
+      });
+
+      res.json(receivable);
+    } catch (error) {
+      console.error("Error creating manual receivable:", error);
+      res.status(500).json({ error: "Erro ao criar conta a receber: " + error.message });
+    }
+  });
+
+  // OFX Import for general reconciliation (receivables)
+  app.post("/api/finance/ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo OFX enviado' });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: 'Arquivo deve ter extensão .ofx' });
+      }
+
+      console.log(`Processing OFX file: ${req.file.originalname} (${req.file.size} bytes)`);
+
+      // Parse OFX content
+      const parseResult = await parseOFXBuffer(req.file.buffer);
+      const { transactions, stats } = parseResult;
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
+      }
+
+      // Get admin user ID if req.user not available
+      let uploadedById = req.user?.id;
+      if (!uploadedById) {
+        const adminUser = await storage.getUserByUsername('admin');
+        uploadedById = adminUser?.id;
+        if (!uploadedById) {
+          return res.status(500).json({ error: 'Usuário admin não encontrado no sistema' });
+        }
+      }
+
+      // Create bank import record
+      const importRecord = await storage.createBankImport({
+        filename: req.file.originalname,
+        uploadedBy: uploadedById,
+        status: 'processing',
+        fileSize: req.file.size.toString(),
+        transactionCount: transactions.length
+      });
+
+      console.log(`Created import record: ${importRecord.id}`);
+
+      let importedCount = 0;
+      let skippedCount = 0;
+      let errors: string[] = [];
+
+      // Process and store transactions
+      for (const transaction of transactions) {
+        try {
+          // Check if transaction already exists by fitId
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+          if (existingTransaction) {
+            console.log(`Transaction already exists: ${transaction.fitId}`);
+            skippedCount++;
+            continue;
+          }
+
+          // Validate essential fields
+          if (!transaction.fitId) {
+            console.log(`Skipping transaction without fitId:`, transaction);
+            errors.push(`Transação sem ID único (FITID)`);
+            continue;
+          }
+
+          if (!transaction.amount || transaction.amount === '0' || transaction.amount === '0.00') {
+            console.log(`Skipping zero amount transaction:`, transaction);
+            errors.push(`Transação com valor zero: ${transaction.fitId}`);
+            continue;
+          }
+
+          // Ensure date is properly formatted
+          let transactionDate = transaction.date;
+          if (!transactionDate || !transaction.hasValidDate) {
+            transactionDate = new Date(); // Use current date as fallback
+            console.warn(`Using current date for transaction ${transaction.fitId} - original date invalid`);
+          }
+
+          const newTransaction = await storage.createBankTransaction({
+            importId: importRecord.id,
+            fitId: transaction.fitId,
+            date: transactionDate,
+            hasValidDate: transaction.hasValidDate || false,
+            amount: transaction.amount,
+            description: transaction.description || 'Transação bancária',
+            memo: transaction.description || '',
+            bankRef: transaction.bankRef || '',
+            originalType: transaction.originalType || '',
+            type: transaction.type || 'other',
+            status: 'unmatched',
+            notes: ''
+          });
+
+          console.log(`Created transaction: ${newTransaction.id} - ${transaction.description} - R$ ${transaction.amount}`);
+          importedCount++;
+        } catch (error) {
+          console.error("Error saving transaction:", error);
+          errors.push(`Erro ao salvar transação ${transaction.fitId || 'sem ID'}: ${error.message}`);
+        }
+      }
+
+      // Update import record with results
+      await storage.updateBankImport(importRecord.id, {
+        status: 'completed',
+        processedTransactions: importedCount,
+        skippedTransactions: skippedCount
+      });
+
+      console.log(`OFX import completed: ${importedCount} imported, ${skippedCount} skipped`);
+
+      res.json({
+        success: true,
+        message: `Arquivo OFX importado com sucesso! ${importedCount} transações importadas, ${skippedCount} duplicatas ignoradas.`,
+        importId: importRecord.id,
+        stats: {
+          total: transactions.length,
+          imported: importedCount,
+          skipped: skippedCount,
+          ...stats
+        },
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("OFX import error:", error);
+      res.status(500).json({
+        error: "Erro ao importar arquivo OFX",
+        details: error.message
+      });
+    }
+  });
+
+  // OFX Import for producer payments (payables)
+  app.post("/api/finance/producer-ofx-import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo OFX enviado' });
+      }
+
+      if (!req.file.originalname.toLowerCase().endsWith('.ofx')) {
+        return res.status(400).json({ error: 'Arquivo deve ter extensão .ofx' });
+      }
+
+      console.log(`Processing producer payment OFX file: ${req.file.originalname} (${req.file.size} bytes)`);
+
+      // Parse OFX content
+      const parseResult = await parseOFXBuffer(req.file.buffer);
+      const { transactions, stats } = parseResult;
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: 'Nenhuma transação encontrada no arquivo OFX' });
+      }
+
+      // Filter debit transactions (payments to producers - money going out)
+      // Accept both parsed 'debit' type AND original OFX types like 'PAYMENT', 'DEBIT'
+      const debitTransactions = transactions.filter(t =>
+        t.type === 'debit' ||
+        t.originalType === 'PAYMENT' ||
+        t.originalType === 'DEBIT' ||
+        t.originalType === 'XFER' ||
+        parseFloat(t.amount) < 0 // Also accept negative amounts as debits
+      );
+
+      console.log(`Processing producer payment OFX file: Found ${debitTransactions.length} debit transactions out of ${transactions.length} total`);
+      console.log(`Sample transactions:`, transactions.slice(0, 3).map(t => ({
+        type: t.type,
+        originalType: t.originalType,
+        amount: t.amount,
+        description: t.description
+      })));
+
+      if (debitTransactions.length === 0) {
+        return res.status(400).json({
+          error: "Nenhuma transação de débito (pagamentos) encontrada no arquivo OFX"
+        });
+      }
+
+      // Get admin user ID if req.user not available
+      let uploadedById = req.user?.id;
+      if (!uploadedById) {
+        const adminUser = await storage.getUserByUsername('admin');
+        uploadedById = adminUser?.id;
+        if (!uploadedById) {
+          return res.status(500).json({ error: 'Usuário admin não encontrado no sistema' });
+        }
+      }
+
+      // Create bank import record for producer payments
+      const importRecord = await storage.createBankImport({
+        filename: req.file.originalname,
+        uploadedBy: uploadedById,
+        status: 'processing',
+        fileSize: req.file.size.toString(),
+        transactionCount: debitTransactions.length
+      });
+
+      console.log(`Created producer payment import record: ${importRecord.id}`);
+
+      let importedCount = 0;
+      let skippedCount = 0;
+      let errors: string[] = [];
+
+      // Process each debit transaction
+      for (const transaction of debitTransactions) {
+        try {
+          // Check if transaction already exists
+          const existingTransaction = await storage.getBankTransactionByFitId(transaction.fitId);
+
+          if (existingTransaction) {
+            console.log(`Transaction ${transaction.fitId} already exists, skipping`);
+            skippedCount++;
+            continue;
+          }
+
+          // Validate essential fields
+          if (!transaction.fitId) {
+            console.log(`Skipping debit transaction without fitId:`, transaction);
+            errors.push(`Transação de débito sem ID único (FITID)`);
+            continue;
+          }
+
+          // Ensure date is properly formatted
+          let transactionDate = transaction.date;
+          if (!transactionDate || !transaction.hasValidDate) {
+            transactionDate = new Date(); // Use current date as fallback
+            console.warn(`Using current date for debit transaction ${transaction.fitId}`);
+          }
+
+          // Create new transaction
+          await storage.createBankTransaction({
+            importId: importRecord.id,
+            fitId: transaction.fitId,
+            date: transactionDate,
+            hasValidDate: transaction.hasValidDate || false,
+            amount: transaction.amount, // Keep original negative value
+            description: transaction.description || 'Pagamento bancário',
+            memo: transaction.description || '',
+            bankRef: transaction.bankRef || '',
+            originalType: transaction.originalType || '',
+            type: transaction.type || 'debit',
+            status: 'unmatched',
+            notes: ''
+          });
+
+          console.log(`Created debit transaction: ${transaction.fitId} - ${transaction.description} - R$ ${transaction.amount}`);
+          importedCount++;
+        } catch (transactionError) {
+          console.error(`Error importing producer payment transaction ${transaction.fitId}:`, transactionError);
+          errors.push(`Erro ao importar transação ${transaction.fitId || 'sem ID'}: ${transactionError.message}`);
+        }
+      }
+
+      // Update import record with results
+      await storage.updateBankImport(importRecord.id, {
+        status: 'completed',
+        processedTransactions: importedCount,
+        skippedTransactions: skippedCount
+      });
+
+      console.log(`Producer payment OFX import completed: ${importedCount} imported, ${skippedCount} skipped`);
+
+      res.json({
+        success: true,
+        message: `Arquivo OFX de pagamentos importado com sucesso! ${importedCount} transações de débito importadas, ${skippedCount} duplicatas ignoradas.`,
+        importId: importRecord.id,
+        stats: {
+          total: transactions.length,
+          debits: debitTransactions.length,
+          imported: importedCount,
+          skipped: skippedCount,
+          ...stats
+        },
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error("Producer payment OFX import error:", error);
+      res.status(500).json({
+        error: "Erro ao importar arquivo OFX de pagamentos",
+        details: error.message
+      });
+    }
+  });
+
+  // Financial overview data
+  app.get("/api/finance/overview", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      const payments = await storage.getPayments();
+      const allCommissions = await storage.getAllCommissions();
+      const productionOrders = await storage.getProductionOrders();
+      const bankTransactions = await storage.getBankTransactions();
+      const expenseNotes = await storage.getExpenseNotes();
+      const producerPayments = await storage.getProducerPayments();
+
+      console.log('Overview calculation - Data counts:', {
+        orders: orders.length,
+        payments: payments.length,
+        commissions: allCommissions.length,
+        productionOrders: productionOrders.length,
+        expenseNotes: expenseNotes.length,
+        producerPayments: producerPayments.length
+      });
+
+      // Contas a Receber - usar accountsReceivable (que já tem o valor correto)
+      const accountsReceivable = await storage.getAccountsReceivable();
+      const orderReceivables = accountsReceivable
+        .filter(ar => ar.status !== 'paid')
+        .reduce((total, ar) => {
+          const amount = parseFloat(ar.amount || '0');
+          const received = parseFloat(ar.receivedAmount || '0');
+          const remaining = amount - received;
+          return total + Math.max(0, remaining);
+        }, 0);
+
+      // Add manual receivables
+      const manualReceivables = await storage.getManualReceivables();
+      const manualReceivablesAmount = manualReceivables
+        .filter(receivable => receivable.status !== 'paid')
+        .reduce((total, receivable) => {
+          const amount = parseFloat(receivable.amount || '0');
+          const received = parseFloat(receivable.receivedAmount || '0');
+          return total + Math.max(0, amount - received);
+        }, 0);
+
+      const receivables = orderReceivables + manualReceivablesAmount;
+
+      // Contas a Pagar - usando producer payments em vez de production orders
+      const producers = producerPayments
+        .filter(payment => ['pending', 'approved'].includes(payment.status))
+        .reduce((total, payment) => total + parseFloat(payment.amount || '0'), 0);
+
+      console.log(`Producer payments pending/approved: ${producerPayments.filter(p => ['pending', 'approved'].includes(p.status)).length}, total: ${producers}`);
+
+      const expenses = expenseNotes
+        .filter(expense => expense.status === 'approved' && !expense.reimbursedAt)
+        .reduce((total, expense) => total + parseFloat(expense.amount), 0);
+
+      console.log(`Expenses approved not reimbursed: ${expenseNotes.filter(e => e.status === 'approved' && !e.reimbursedAt).length}, total: ${expenses}`);
+
+      const commissions = allCommissions
+        .filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt)
+        .reduce((total, c) => total + parseFloat(c.amount), 0);
+
+      console.log(`Commissions pending/confirmed: ${allCommissions.filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt).length}, total: ${commissions}`);
+
+      const refunds = orders
+        .filter(order => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+        .reduce((total, order) => {
+          const refundAmount = order.refundAmount ? parseFloat(order.refundAmount) : parseFloat(order.paidValue || '0');
+          return total + refundAmount;
+        }, 0);
+
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
+
+      // Incluir contas a pagar manuais
+      const manualPayables = await storage.getManualPayables();
+      console.log(`Found ${manualPayables.length} manual payables:`, manualPayables.map(p => ({ id: p.id, amount: p.amount, status: p.status })));
+      const manualPayablesAmount = manualPayables
+        .filter(payable => payable.status === 'pending')
+        .reduce((total, payable) => total + parseFloat(payable.amount || '0'), 0);
+
+      console.log(`Manual payables total: ${manualPayablesAmount}`);
+
+      const payables = producers + expenses + commissions + refunds + manualPayablesAmount;
+
+      console.log('Payables breakdown:', {
+        producers: Number(producers) || 0,
+        expenses: Number(expenses) || 0,
+        commissions: Number(commissions) || 0,
+        refunds: Number(refunds) || 0,
+        manual: Number(manualPayablesAmount) || 0
+      });
+
+      // Saldo em Conta - transações bancárias não conciliadas (entrada - saída)
+      const bankBalance = bankTransactions.reduce((total, txn) => {
+        const amount = parseFloat(txn.amount);
+        // Assumir que valores positivos são entrada e negativos são saída
+        return total + amount;
+      }, 0);
+
+      // Comissões Pendentes
+      const pendingCommissions = allCommissions
+        .filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt)
+        .reduce((total, c) => total + parseFloat(c.amount), 0);
+
+      // Receita Total do Mês
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      const monthlyRevenue = orders
+        .filter(order => {
+          if (!order.createdAt) return false;
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+        })
+        .reduce((total, order) => total + parseFloat(order.totalValue), 0);
+
+      // Despesas do Mês
+      const monthlyExpenses = expenseNotes
+        .filter(expense => {
+          if (!expense.createdAt) return false;
+          const expenseDate = new Date(expense.createdAt);
+          return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+        })
+        .reduce((total, expense) => total + parseFloat(expense.amount), 0);
+
+      res.json({
+        receivables: receivables,
+        payables: payables,
+        payablesBreakdown: {
+          producers: Number(producers) || 0,
+          expenses: Number(expenses) || 0,
+          commissions: Number(commissions) || 0,
+          refunds: Number(refunds) || 0,
+          manual: Number(manualPayablesAmount) || 0
+        },
+        balance: bankBalance,
+        pendingCommissions: pendingCommissions,
+        monthlyRevenue: monthlyRevenue,
+        monthlyExpenses: monthlyExpenses
+      });
+    } catch (error) {
+      console.error("Error fetching financial overview:", error);
+      res.status(500).json({ error: "Failed to fetch financial overview" });
+    }
+  });
+
+  app.get("/api/finance/payments", async (req, res) => {
+    try {
+      const payments = await storage.getPayments();
+      const orders = await storage.getOrders();
+
+      const enrichedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const order = orders.find(o => o.id === payment.orderId);
+          let clientName = 'Cliente não identificado';
+
+          if (order) {
+            // Use contactName as primary source
+            clientName = order.contactName;
+
+            // If contactName is missing, try to get from client record
+            if (!clientName && order.clientId) {
+              const clientRecord = await storage.getClient(order.clientId);
+              if (clientRecord) {
+                clientName = clientRecord.name;
+              } else {
+                const clientByUserId = await storage.getClientByUserId(order.clientId);
+                if (clientByUserId) {
+                  clientName = clientByUserId.name;
+                } else {
+                  const clientUser = await storage.getUser(order.clientId);
+                  if (clientUser) {
+                    clientName = clientUser.name;
+                  }
+                }
+              }
+            }
+          }
+
+          return {
+            ...payment,
+            orderNumber: order?.orderNumber || `#${payment.orderId?.slice(-6)}`,
+            clientName: clientName,
+            description: `${payment.method?.toUpperCase() || 'PAGAMENTO'} - ${clientName}`,
+            orderValue: order?.totalValue || '0.00'
+          };
+        })
+      );
+
+      // Sort by payment date (most recent first)
+      enrichedPayments.sort((a, b) => {
+        const dateA = new Date(a.paidAt || a.createdAt);
+        const dateB = new Date(b.paidAt || b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching finance payments:", error);
+      res.status(500).json({ error: "Failed to fetch payments" });
+    }
+  });
+
+  // Producer stats
+  app.get("/api/producer/:producerId/stats", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
+      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
+
+      const activeOrders = productionOrders.filter(po => po.status === 'production' || po.status === 'accepted').length;
+      const pendingOrders = productionOrders.filter(po => po.status === 'pending').length;
+      const completedOrders = productionOrders.filter(po => po.status === 'completed').length;
+      const totalOrders = productionOrders.length;
+
+      const pendingPayments = producerPayments
+        .filter(p => p.status === 'pending' || p.status === 'approved')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      const totalReceived = producerPayments
+        .filter(p => p.status === 'paid')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      res.json({
+        activeOrders,
+        pendingOrders,
+        completedOrders,
+        totalOrders,
+        pendingPayments,
+        totalReceived
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch producer stats" });
+    }
+  });
+
+  // Products
+  app.get("/api/products", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const search = (req.query.search as string) || '';
+      const category = (req.query.category as string) || '';
+
+      const result = await storage.getProducts({
+        page,
+        limit,
+        search,
+        category
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  // Get products grouped by producer for budget/order creation
+  app.get("/api/products/by-producer", async (req, res) => {
+    try {
+      const productsGrouped = await storage.getProductsGroupedByProducer();
+      res.json(productsGrouped);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch products by producer" });
+    }
+  });
+
+  // Get products for specific producer
+  app.get("/api/products/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      const products = await storage.getProductsByProducer(producerId);
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch producer products" });
+    }
+  });
+
+  app.get("/api/products/categories", async (req, res) => {
+    try {
+      const result = await storage.getProducts({ limit: 9999 });
+      const categories = Array.from(new Set(result.products
+        .map((product: any) => product.category)
+        .filter(Boolean)
+      )).sort();
+
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Product search endpoint
+  app.get("/api/products/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q) {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+
+      const products = await storage.searchProducts(q as string);
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search products" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const productData = req.body;
+      const newProduct = await storage.createProduct(productData);
+      res.json(newProduct);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to createproduct" });
+    }
+  });
+
+  // Client profile endpoints
+  app.get("/api/clients/profile/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      console.log(`Fetching profile for user: ${userId}`);
+
+      // First try to find client by userId
+      const clientRecord = await storage.getClientByUserId(userId);
+      let clientData;
+
+      if (clientRecord) {
+        console.log(`Found client record: ${clientRecord.id}`);
+        // Get vendor info if assigned
+        const vendor = clientRecord.vendorId ? await storage.getUser(clientRecord.vendorId) : null;
+        clientData = {
+          ...clientRecord,
+          vendorName: vendor?.name || null
+        };
+      } else {
+        // Fallback to user data
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ error: "Cliente não encontrado" });
+        }
+        clientData = {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          isActive: user.isActive,
+          vendorName: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+
+      res.json(clientData);
+    } catch (error) {
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  app.put("/api/clients/profile/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const updateData = req.body;
+
+      console.log(`Updating profile for user: ${userId}`, updateData);
+
+      // Update user record first
+      const updatedUser = await storage.updateUser(userId, {
+        name: updateData.name,
+        email: updateData.email,
+        phone: updateData.phone,
+        address: updateData.address
+      });
+
+      // Update or create client record
+      const clientRecord = await storage.getClientByUserId(userId);
+      if (clientRecord) {
+        // Update existing client record with all commercial fields
+        await storage.updateClient(clientRecord.id, {
+          name: updateData.name,
+          email: updateData.email,
+          phone: updateData.phone,
+          whatsapp: updateData.whatsapp,
+          cpfCnpj: updateData.cpfCnpj,
+          address: updateData.address,
+          // Commercial fields
+          nomeFantasia: updateData.nomeFantasia,
+          razaoSocial: updateData.razaoSocial,
+          inscricaoEstadual: updateData.inscricaoEstadual,
+          logradouro: updateData.logradouro,
+          numero: updateData.numero,
+          complemento: updateData.complemento,
+          bairro: updateData.bairro,
+          cidade: updateData.cidade,
+          cep: updateData.cep,
+          emailBoleto: updateData.emailBoleto,
+          emailNF: updateData.emailNF,
+          nomeContato: updateData.nomeContato,
+          emailContato: updateData.emailContato
+        });
+      }
+
+      // Get updated data
+      const updatedData = await storage.getClientByUserId(userId);
+      const vendor = updatedData?.vendorId ? await storage.getUser(updatedData.vendorId) : null;
+
+      res.json({
+        ...updatedData,
+        vendorName: vendor?.name || null
+      });
+    } catch (error) {
+      console.error("Error updating client profile:", error);
+      res.status(500).json({ error: "Failed to update client profile" });
+    }
+  });
+
+  app.put("/api/clients/password/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { currentPassword, newPassword } = req.body;
+
+      // Verify current password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      if (user.password !== currentPassword) {
+        return res.status(400).json({ error: "Senha atual incorreta" });
+      }
+
+      // Update password
+      await storage.updateUser(userId, { password: newPassword });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating client password:", error);
+      res.status(500).json({ error: "Failed to update password" });
+    }
+  });
+
+  // Get all clients
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+
+      // Enrich with vendor names and statistics
+      const enrichedClients = await Promise.all(
+        clients.map(async (client) => {
+          const vendor = client.vendorId ? await storage.getUser(client.vendorId) : null;
+          const ownerUser = client.userId ? await storage.getUser(client.userId) : null;
+
+          // Count orders for this client
+          const clientOrders = await storage.getOrdersByClient(client.id);
+          const totalSpent = clientOrders.reduce((sum, order) =>
+            sum + parseFloat(order.totalValue || '0'), 0
+          );
+
+          return {
+            ...client,
+            userCode: ownerUser?.username || null,
+            vendorName: vendor?.name || null,
+            ordersCount: clientOrders.length,
+            totalSpent,
+          };
+        })
+      );
+
+      res.json(enrichedClients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // Create client endpoint
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = req.body;
+      console.log("=== CREATING CLIENT ===");
+      console.log("Request body:", JSON.stringify(clientData, null, 2));
+
+      // Validate required fields
+      if (!clientData.name) {
+        console.log("ERROR: Nome é obrigatório");
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!clientData.password) {
+        console.log("ERROR: Senha é obrigatória");
+        return res.status(400).json({ error: "Senha é obrigatória" });
+      }
+
+      // Use userCode as username if provided, otherwise generate one
+      const username = clientData.userCode || `cli_${Date.now()}`;
+      console.log(`Generated username: ${username}`);
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        console.log(`ERROR: Username ${username} already exists`);
+        return res.status(400).json({ error: "Código de usuário já existe" });
+      }
+
+      console.log("Creating user account...");
+      // Create user first
+      const user = await storage.createUser({
+        username: username,
+        password: clientData.password,
+        role: "client",
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        isActive: true
+      });
+
+      console.log(`User created with ID: ${user.id}`);
+      console.log("Creating client profile...");
+
+      // Create client profile
+      const client = await storage.createClient({
+        userId: user.id,
+        name: clientData.name,
+        email: clientData.email || null,
+        phone: clientData.phone || null,
+        whatsapp: clientData.whatsapp || null,
+        cpfCnpj: clientData.cpfCnpj || null,
+        address: clientData.address || null,
+        vendorId: clientData.vendorId || null,
+        isActive: true
+      });
+
+      console.log(`SUCCESS: Client created successfully: ${client.id} - ${client.name}`);
+
+      const response = {
+        success: true,
+        client: {
+          ...client,
+          userCode: username // Include userCode in response
+        }
+      };
+
+      console.log("Sending response:", JSON.stringify(response, null, 2));
+      res.json(response);
+    } catch (error) {
+      console.error("ERROR creating client:", error);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Erro ao criar cliente: " + error.message });
+    }
+  });
+
+  // Create payments endpoint (used by receivables module)
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const { orderId, amount, method, status, transactionId, notes, paidAt } = req.body;
+
+      console.log("Creating payment:", { orderId, amount, method, status });
+
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID é obrigatório" });
+      }
+
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error:"Valor deve ser maior que zero" });
+      }
+
+      // Verify order exists
+      let order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Create payment
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: parseFloat(amount).toFixed(2),
+        method: method || "manual",
+        status: status || "confirmed",
+        transactionId: transactionId || `MANUAL-${Date.now()}`,
+        notes: notes || "",
+        paidAt: paidAt ? new Date(paidAt) : new Date()
+      });
+
+      console.log("Payment created successfully:", payment.id);
+      res.json(payment);
+    } catch (error) {
+      console.error("Error creating payment:", error);
+      res.status(500).json({ error: "Erro ao criar pagamento: " + error.message });
+    }
+  });
+
+  // Create test payment for order
+  app.post("/api/orders/:id/create-test-payment", async (req, res) => {
+    try {
+      const { amount } = req.body;
+      const orderId = req.params.id;
+
+      let order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Create a confirmed payment
+      const payment = await storage.createPayment({
+        orderId: orderId,
+        amount: amount || "567.00", // Default test amount
+        method: "pix",
+        status: "confirmed",
+        transactionId: `TEST-${Date.now()}`,
+        paidAt: new Date()
+      });
+
+      res.json({ success: true, payment });
+    } catch (error) {
+      console.error("Error creating test payment:", error);
+      res.status(500).json({ error: "Failed to create test payment" });
+    }
+  });
+
+  // Confirm order delivery (client received the order)
+  app.post("/api/orders/:id/confirm-delivery", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      console.log(`Confirming delivery for order: ${id}`);
+
+      // Check all production orders for this order
+      const productionOrders = await storage.getProductionOrdersByOrder(id);
+      const allDelivered = productionOrders.every(po => po.status === 'delivered');
+
+      if (allDelivered) {
+        // All production orders are delivered, mark main order as delivered
+        const updatedOrder = await storage.updateOrderStatus(id, 'delivered');
+        if (!updatedOrder) {
+          return res.status(404).json({ error: "Pedido não encontrado" });
+        }
+
+        console.log(`Order ${id} fully delivered - all producers completed`);
+
+        res.json({
+          success: true,
+          message: "Entrega completa confirmada com sucesso",
+          order: updatedOrder
+        });
+      } else {
+        // Some production orders are still pending, keep as partially shipped
+        const updatedOrder = await storage.updateOrderStatus(id, 'partial_shipped');
+        if (!updatedOrder) {
+          return res.status(404).json({ error: "Pedido não encontrado" });
+        }
+
+        console.log(`Order ${id} partially delivered - some producers still pending`);
+
+        res.json({
+          success: true,
+          message: "Entrega parcial confirmada com sucesso",
+          order: updatedOrder
+        });
+      }
+
+    } catch (error) {
+      console.error("Error confirming delivery:", error);
+      res.status(500).json({ error: "Erro ao confirmar entrega: " + error.message });
+    }
+  });
+
+  // Clear test data endpoint
+  app.delete("/api/orders/test-data", async (req, res) => {
+    try {
+      // Get all orders
+      const orders = await storage.getOrders();
+
+      // Delete test orders (you can adjust the criteria)
+      const testOrders = orders.filter(order =>
+        order.orderNumber?.includes('TEST') ||
+        order.product?.toLowerCase().includes('test') ||
+        order.description?.toLowerCase().includes('test')
+      );
+
+      for (const order of testOrders) {
+        // Delete related production orders first
+        const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+        for (const po of productionOrders) {
+          await storage.deleteProductionOrder(po.id);
+        }
+
+        // Delete the order
+        await storage.deleteOrder(order.id);
+      }
+
+      res.json({
+        success: true,
+        deletedCount: testOrders.length,
+        message: `${testOrders.length} pedidos de teste foram removidos`
+      });
+    } catch (error) {
+      console.error("Error clearing test orders:", error);
+      res.status(500).json({ error: "Failed to clear test orders" });
+    }
+  });
+
+  // Additional product routes
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { createdAt, updatedAt, ...productData } = req.body;
+
+      const updatedProduct = await storage.updateProduct(id, productData);
+      if (!updatedProduct) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProduct(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Produto não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
+  app.post("/api/products/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      // Check file size
+      if (req.file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      let productsData;
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+
+      if (fileExtension === 'json') {
+        try {
+          const fileContent = req.file.buffer.toString('utf8');
+          productsData = JSON.parse(fileContent);
+        } catch (parseError) {
+          return res.status(400).json({
+            error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
+            details: (parseError as Error).message
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
+      }
+
+      if (!Array.isArray(productsData)) {
+        return res.status(400).json({
+          error: "O arquivo JSON deve conter um array de produtos",
+          example: "[{\"Nome\": \"Produto\", \"PrecoVenda\": 10.50}]"
+        });
+      }
+
+      if (productsData.length === 0) {
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio. Adicione pelo menos um produto."
+        });
+      }
+
+      if (productsData.length > 10000) {
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
+        });
+      }
+
+      console.log(`Importing ${productsData.length} products...`);
+
+      const result = await storage.importProducts(productsData);
+
+      console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
+
+      res.json({
+        message: `${result.imported} produtos importados com sucesso`,
+        imported: result.imported,
+        total: productsData.length,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('Import error:', error);
+
+      if (error instanceof SyntaxError) {
+        return res.status(400).json({
+          error: "Formato JSON inválido. Verifique a sintaxe do arquivo.",
+          details: error.message
+        });
+      }
+
+      if ((error as any).code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      res.status(500).json({
+        error: "Erro interno do servidor ao processar importação",
+        details: (error as Error).message
+      });
+    }
+  });
+
+  // Logistics products import route
+  app.post("/api/logistics/products/import", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      const { producerId } = req.body;
+      if (!producerId) {
+        return res.status(400).json({ error: "Produtor é obrigatório para a importação" });
+      }
+
+      // Check file size
+      if (req.file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Arquivo muito grande. O limite é de 50MB."
+        });
+      }
+
+      let productsData;
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase() || '';
+
+      if (fileExtension === 'json') {
+        try {
+          const fileContent = req.file.buffer.toString('utf8');
+          productsData = JSON.parse(fileContent);
+        } catch (parseError) {
+          return res.status(400).json({
+            error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
+            details: (parseError as Error).message
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Formato de arquivo não suportado. Use arquivos JSON." });
+      }
+
+      if (!Array.isArray(productsData)) {
+        return res.status(400).json({
+          error: "O arquivo JSON deve conter um array de produtos"
+        });
+      }
+
+      if (productsData.length === 0) {
+        return res.status(400).json({
+          error: "O arquivo JSON está vazio."
+        });
+      }
+
+      if (productsData.length > 10000) {
+        return res.status(400).json({
+          error: "Muitos produtos no arquivo. O limite é de 10.000 produtos por importação."
+        });
+      }
+
+      console.log(`Importing ${productsData.length} products for producer ${producerId}...`);
+
+      const result = await storage.importProductsForProducer(productsData, producerId);
+
+      console.log(`Import completed: ${result.imported} imported, ${result.errors.length} errors`);
+
+      res.json({
+        message: `${result.imported} produtos importados com sucesso para o produtor`,
+        imported: result.imported,
+        total: productsData.length,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('Logistics products import error:', error);
+      res.status(500).json({
+        error: "Erro interno do servidor ao processar importação de produtos",
+        details: (error as Error).message
+      });
+    }
+  });
+
+  // Budget routes
+  app.get("/api/budgets", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgets();
+      console.log(`Found ${budgets.length} budgets in database`);
+
+      // Enrich budgets with vendor names and item counts
+      const enrichedBudgets = await Promise.all(
+        budgets.map(async (budget) => {
+          try {
+            // Get vendor name
+            let vendorName = 'Vendedor não encontrado';
+            if (budget.vendorId) {
+              const vendor = await storage.getUser(budget.vendorId);
+              vendorName = vendor?.name || vendorName;
+            }
+
+            // Get client name (prioritize contactName, fallback to client record)
+            let clientName = budget.contactName || 'Cliente não informado';
+            if (!clientName && budget.clientId) {
+              const client = await storage.getClient(budget.clientId);
+              if (client) {
+                clientName = client.name;
+              }
+            }
+
+            // Get items count
+            const items = await storage.getBudgetItems(budget.id);
+            const itemCount = items.length;
+
+            // Get photos count
+            const photos = await storage.getBudgetPhotos(budget.id);
+            const photoCount = photos.length;
+
+            // Ensure all required fields are present
+            return {
+              ...budget,
+              id: budget.id,
+              budgetNumber: budget.budgetNumber || 'N/A',
+              title: budget.title || 'Sem título',
+              status: budget.status || 'draft',
+              totalValue: budget.totalValue || '0.00',
+              vendorName,
+              clientName,
+              itemCount,
+              photoCount,
+              createdAt: budget.createdAt || new Date(),
+              validUntil: budget.validUntil,
+              deliveryDeadline: budget.deliveryDeadline
+            };
+          } catch (budgetError) {
+            console.error(`Error enriching budget ${budget.id}:`, budgetError);
+            // Return basic budget data if enrichment fails
+            return {
+              ...budget,
+              vendorName: 'Erro ao carregar',
+              clientName: budget.contactName || 'Cliente não informado',
+              itemCount: 0,
+              photoCount: 0
+            };
+          }
+        })
+      );
+
+      console.log(`Returning ${enrichedBudgets.length} enriched budgets`);
+      res.json(enrichedBudgets);
+    } catch (error) {
+      console.error("Error fetching all budgets:", error);
+      res.status(500).json({ error: "Failed to fetch budgets: " + error.message });
+    }
+  });
+
+  app.get("/api/budgets/:id", async (req, res) => {
+    try {
+      const budget = await storage.getBudget(req.params.id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      // Include items, photos, payment info, client and vendor data
+      const items = await storage.getBudgetItems(req.params.id);
+      const photos = await storage.getBudgetPhotos(req.params.id);
+      const paymentInfo = await storage.getBudgetPaymentInfo(req.params.id);
+
+      // Get client data if clientId exists
+      let clientData = null;
+      if (budget.clientId) {
+        clientData = await storage.getClient(budget.clientId);
+      }
+
+      // Get vendor data if vendorId exists
+      let vendorData = null;
+      if (budget.vendorId) {
+        const user = await storage.getUser(budget.vendorId);
+        if (user) {
+          vendorData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone
+          };
+        }
+      }
+
+      res.json({
+        ...budget,
+        items,
+        photos,
+        paymentInfo,
+        client: clientData,
+        vendor: vendorData
+      });
+    } catch (error) {
+      console.error('Error fetching budget:', error);
+      res.status(500).json({ error: "Failed to fetch budget" });
+    }
+  });
+
+  app.post("/api/budgets", async (req, res) => {
+    try {
+      // Fix branchId if it's "matriz" - replace with actual branch ID
+      if (req.body.branchId === 'matriz' || !req.body.branchId) {
+        const branches = await storage.getBranches();
+        if (branches && branches.length > 0) {
+          req.body.branchId = branches[0].id;
+          console.log(`[CREATE BUDGET] Replaced branchId 'matriz' with real branch ID: ${req.body.branchId}`);
+        }
+      }
+
+      // Validate and process items
+      let processedItems = [];
+      if (req.body.items && Array.isArray(req.body.items)) {
+        console.log(`[CREATE BUDGET] Received ${req.body.items.length} items from frontend`);
+
+        // Validar personalizações antes de criar o orçamento
+        console.log("Validando personalizações dos itens do orçamento:", JSON.stringify(req.body.items, null, 2));
+
+        for (const item of req.body.items) {
+          console.log(`Item: hasItemCustomization=${item.hasItemCustomization}, selectedCustomizationId=${item.selectedCustomizationId}, quantity=${item.quantity}`);
+
+          if (item.hasItemCustomization && item.selectedCustomizationId) {
+            const customizations = await storage.getCustomizationOptions();
+            const customization = customizations.find(c => c.id === item.selectedCustomizationId);
+
+            if (customization) {
+              const itemQty = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+              const minQty = typeof customization.minQuantity === 'string' ? parseInt(customization.minQuantity) : customization.minQuantity;
+
+              console.log(`Validação: itemQty=${itemQty} (${typeof item.quantity}), minQty=${minQty} (${typeof customization.minQuantity}), customization=${customization.name}`);
+
+              if (itemQty < minQty) {
+                return res.status(400).json({
+                  error: `A personalização "${customization.name}" requer no mínimo ${minQty} unidades, mas o item "${item.productName}" tem apenas ${itemQty} unidades.`
+                });
+              }
+            }
+          }
+        }
+
+        // Process items for creation
+        processedItems = req.body.items.map((item: any) => ({
+          productId: item.productId,
+          productName: item.productName,
+          producerId: item.producerId || 'internal',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || null,
+          itemCustomizationValue: item.itemCustomizationValue || 0,
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          additionalCustomizationNotes: item.additionalCustomizationNotes || null,
+          customizationPhoto: item.customizationPhoto || null,
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || null,
+          generalCustomizationValue: item.generalCustomizationValue || 0,
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || 'percentage',
+          itemDiscountPercentage: item.itemDiscountPercentage || 0,
+          itemDiscountValue: item.itemDiscountValue || 0,
+          productWidth: item.productWidth || null,
+          productHeight: item.productHeight || null,
+          productDepth: item.productDepth || null
+        }));
+
+        console.log(`[CREATE BUDGET] Items received:`, processedItems.map(item => ({
+          productId: item.productId,
+          producerId: item.producerId,
+          quantity: item.quantity,
+          hasGeneralCustomization: item.hasGeneralCustomization,
+          generalCustomizationName: item.generalCustomizationName
+        })));
+      }
+
+      // Create budget with processed data
+      const newBudget = await storage.createBudget({
+        ...req.body,
+        items: processedItems,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      console.log("[CREATE BUDGET] Budget created successfully:", newBudget.id);
+
+      res.json(newBudget);
+    } catch (error) {
+      console.error("Error creating budget:", error);
+      res.status(500).json({ error: "Failed to create budget" });
+    }
+  });
+
+  app.put("/api/budgets/:id", async (req, res) => {
+    try {
+      const budgetData = req.body;
+      const updatedBudget = await storage.updateBudget(req.params.id, budgetData);
+
+      // Remove existing items and re-add them to ensure consistency
+      await storage.deleteBudgetItems(req.params.id);
+
+      // Remove duplicate items before processing
+      const seenItems = new Set();
+      const uniqueItems = budgetData.items.filter(item => {
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        if (seenItems.has(itemKey)) {
+          console.log(`[CREATE BUDGET] Removing duplicate budget update item: ${item.productName} (${itemKey})`);
+          return false;
+        }
+        seenItems.add(itemKey);
+        return true;
+      });
+
+      console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
+
+      // Process each item
+      for (const item of uniqueItems) {
+        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
+
+        // Calculate total price including customizations and discounts
+        let totalPrice = unitPrice * quantity;
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
+        }
+        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
+          totalPrice += (generalCustomizationValue * quantity);
+        }
+
+        await storage.createBudgetItem(updatedBudget.id, {
+          productId: item.productId,
+          producerId: item.producerId || 'internal',
+          quantity: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          totalPrice: totalPrice.toFixed(2),
+          // Item Customization
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || "",
+          itemCustomizationValue: itemCustomizationValue.toFixed(2),
+          itemCustomizationDescription: item.itemCustomizationDescription || "",
+          customizationPhoto: item.customizationPhoto || "",
+          // General Customization
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || "",
+          generalCustomizationValue: generalCustomizationValue.toFixed(2),
+          // Product dimensions
+          productWidth: item.productWidth,
+          productHeight: item.productHeight,
+          productDepth: item.productDepth,
+          // Item discount
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
+        });
+      }
+
+      // Update payment and shipping information
+      if (budgetData.paymentMethodId || budgetData.shippingMethodId) {
+        await storage.updateBudgetPaymentInfo(req.params.id, {
+          paymentMethodId: budgetData.paymentMethodId || null,
+          shippingMethodId: budgetData.shippingMethodId || null,
+          installments: budgetData.installments || 1,
+          downPayment: budgetData.downPayment?.toString() || "0.00",
+          remainingAmount: budgetData.remainingAmount?.toString() || "0.00",
+          shippingCost: budgetData.shippingCost?.toString() || "0.00"
+        });
+      }
+
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error updating budget:", error);
+      res.status(500).json({ error: "Failed to update budget" });
+    }
+  });
+
+  app.delete("/api/budgets/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBudget(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete budget" });
+    }
+  });
+
+  // Budget approval endpoint (for clients)
+  app.post("/api/budgets/:id/approve", async (req, res) => {
+    try {
+      const budgetId = req.params.id;
+      const budget = await storage.getBudget(budgetId);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+
+      budget.status = 'approved';
+      budget.updatedAt = new Date().toISOString();
+
+      await storage.updateBudget(budgetId, budget);
+
+      res.json({ success: true, budget });
+    } catch (error) {
+      console.error('Error approving budget:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Budget rejection endpoint (for clients)
+  app.post("/api/budgets/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { observations } = req.body;
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: "rejected",
+        rejectedAt: new Date(),
+        clientObservations: observations || null,
+        hasVendorNotification: true // Nova notificação para o vendedor
+      });
+
+      if (!updatedBudget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      console.log(`Budget ${id} rejected by client with observations: ${observations}`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error rejecting budget:", error);
+      res.status(500).json({ error: "Erro ao rejeitar orçamento" });
+    }
+  });
+
+  // Convert approved budget to order
+  app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { clientId, deliveryDate } = req.body;
+
+      if (!clientId) {
+        return res.status(400).json({ error: "Cliente é obrigatório para conversão" });
+      }
+
+      if (!deliveryDate) {
+        return res.status(400).json({ error: "Prazo de entrega é obrigatório para conversão" });
+      }
+
+      console.log(`Converting budget ${id} to order with client: ${clientId} and delivery date: ${deliveryDate}`);
+
+      const order = await storage.convertBudgetToOrder(id, clientId, deliveryDate);
+
+      // Update budget status
+      await storage.updateBudget(id, { status: 'converted' });
+
+      console.log(`Budget ${id} converted to order: ${order.id}`);
+      res.json(order);
+    } catch (error) {
+      console.error("Error converting budget to order:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -4591,7 +7488,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Filter orders that are paid but not yet in production
       const paidOrders = orders.filter(order => {
         // Check payment status - order must have received some payment
-        const totalValue = parseFloat(order.totalValue);
+        const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0; // Any payment received
 

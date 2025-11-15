@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign, Factory, Bell } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, CheckCircle, Edit, Clock, DollarSign, Factory } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
@@ -510,10 +510,6 @@ export default function VendorOrders() {
     },
   });
 
-  const handleViewOrder = (order: any) => {
-    setSelectedOrder(order);
-    setShowOrderDetailsModal(true);
-  };
 
 
   const handleEditOrder = (order: any) => {
@@ -593,7 +589,7 @@ export default function VendorOrders() {
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     // Validar produtos obrigatórios
     if (vendorOrderForm.items.length === 0) {
       toast({
@@ -648,7 +644,7 @@ export default function VendorOrders() {
         });
         return;
       }
-
+      
       if (vendorOrderForm.shippingCost <= 0) {
         toast({
           title: "Erro",
@@ -870,7 +866,7 @@ export default function VendorOrders() {
                     onChange={(e) => {
                       const selectedDate = e.target.value;
                       const today = new Date().toISOString().split('T')[0];
-
+                      
                       if (selectedDate < today) {
                         toast({
                           title: "Data Inválida",
@@ -879,7 +875,7 @@ export default function VendorOrders() {
                         });
                         return;
                       }
-
+                      
                       setVendorOrderForm({ ...vendorOrderForm, deadline: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -906,13 +902,13 @@ export default function VendorOrders() {
                       try {
                         const days = parseInt(value);
                         if (isNaN(days)) return;
-
+                        
                         const today = new Date();
                         const deliveryDate = new Date(today);
                         deliveryDate.setDate(today.getDate() + days);
-
+                        
                         if (isNaN(deliveryDate.getTime())) return;
-
+                        
                         setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
                       } catch (error) {
                         console.error('Error setting delivery deadline:', error);
@@ -1210,7 +1206,7 @@ export default function VendorOrders() {
                               <Label>
                                 Imagem da Personalização - {item.productName}
                                 <span className="text-xs text-gray-500 ml-2">
-                                  ({item.producerId === 'internal' ? 'Produto Interno' :
+                                  ({item.producerId === 'internal' ? 'Produto Interno' : 
                                     producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
                                 </span>
                               </Label>
@@ -2100,7 +2096,10 @@ export default function VendorOrders() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleViewOrder(order)}
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowOrderDetailsModal(true);
+                          }}
                           data-testid={`button-view-${order.id}`}
                         >
                           <Eye className="h-4 w-4 mr-1" />
@@ -2196,7 +2195,7 @@ export default function VendorOrders() {
           <DialogHeader>
             <DialogTitle>Detalhes do Pedido</DialogTitle>
             <DialogDescription>
-              Visualize todos os detalhes do pedido selecionado
+              Informações completas do pedido
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
