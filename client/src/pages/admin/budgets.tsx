@@ -135,6 +135,21 @@ export default function AdminBudgets() {
     },
   });
 
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/auth/current"],
+    queryFn: async () => {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/auth/verify', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to verify auth');
+      const data = await response.json();
+      return data.user;
+    },
+  });
+
   const products = productsData?.products || [];
   const categories: string[] = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
 
@@ -345,7 +360,7 @@ export default function AdminBudgets() {
       contactName: "",
       contactPhone: "",
       contactEmail: "",
-      vendorId: "",
+      vendorId: currentUser?.id || "",
       branchId: "matriz", // Manter matriz como padrão no reset
       validUntil: "",
       deliveryDeadline: "",
@@ -654,7 +669,7 @@ export default function AdminBudgets() {
         contactName: fullBudget.contactName || "",
         contactPhone: fullBudget.contactPhone || "",
         contactEmail: fullBudget.contactEmail || "",
-        vendorId: fullBudget.vendorId || "",
+        vendorId: fullBudget.vendorId || currentUser?.id || "",
         branchId: fullBudget.branchId || "matriz",
         validUntil: fullBudget.validUntil || "",
         deliveryDeadline: fullBudget.deliveryDeadline || "",
