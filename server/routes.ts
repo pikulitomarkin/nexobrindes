@@ -3955,6 +3955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
+            items: budgetItems, // CRITICAL FIX: Add items for frontend compatibility
             productionNotes: productionNotes,
             productionDeadline: productionDeadline,
             lastNoteAt: lastNoteAt
@@ -6622,27 +6623,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/budgets/:id", async (req, res) => {
     try {
       const budgetData = req.body;
-      const updatedBudget = await storage.updateBudget(req.params.id, budgetData);
+      const budgetId = req.params.id;
+      
+      console.log(`[UPDATE BUDGET] Processing update for budget ${budgetId}`);
+      
+      // CRITICAL FIX: Detect if items should be processed using hasOwnProperty
+      // - If 'items' key not present → metadata-only update (keep existing items)
+      // - If 'items' key present but null/undefined → treat as metadata-only (frontend compat)
+      // - If 'items' key present and is [] → explicit removal of all items
+      // - If 'items' key present and is [...] → update items list
+      const shouldProcessItems = Object.prototype.hasOwnProperty.call(budgetData, 'items') 
+        && budgetData.items !== null 
+        && budgetData.items !== undefined;
+      
+      // Remove items from metadata payload to prevent DB column corruption
+      const budgetMetadata = { ...budgetData };
+      delete budgetMetadata.items;
+      
+      // Update budget metadata
+      const updatedBudget = await storage.updateBudget(budgetId, budgetMetadata);
 
-      // Remove existing items and re-add them to ensure consistency
-      await storage.deleteBudgetItems(req.params.id);
-
-      // Remove duplicate items before processing
-      const seenItems = new Set();
-      const uniqueItems = budgetData.items.filter(item => {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
-        if (seenItems.has(itemKey)) {
-          console.log(`[CREATE BUDGET] Removing duplicate budget update item: ${item.productName} (${itemKey})`);
-          return false;
+      // Process items only if explicitly provided as an array
+      if (shouldProcessItems) {
+        if (!Array.isArray(budgetData.items)) {
+          console.error(`[UPDATE BUDGET] Invalid items format - must be array`);
+          return res.status(400).json({ 
+            error: "Items must be an array when provided" 
+          });
         }
-        seenItems.add(itemKey);
-        return true;
-      });
+        
+        console.log(`[UPDATE BUDGET] Updating items: ${budgetData.items.length} items provided`);
+        
+        // TODO: Wrap in transaction for atomicity
+        // Delete existing items
+        await storage.deleteBudgetItems(budgetId);
 
-      console.log(`Processing ${uniqueItems.length} unique budget update items (filtered from ${budgetData.items.length})`);
+        // Recreate items if array not empty
+        if (budgetData.items.length > 0) {
+          // Remove duplicate items before processing
+          const seenItems = new Set();
+          const uniqueItems = budgetData.items.filter(item => {
+            const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+            if (seenItems.has(itemKey)) {
+              console.log(`[UPDATE BUDGET] Removing duplicate: ${item.productName} (${itemKey})`);
+              return false;
+            }
+            seenItems.add(itemKey);
+            return true;
+          });
 
-      // Process each item
-      for (const item of uniqueItems) {
+          console.log(`[UPDATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
+
+          // Process each item
+          for (const item of uniqueItems) {
         const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
         const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
         const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
@@ -6680,9 +6713,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Item discount
           hasItemDiscount: item.hasItemDiscount || false,
           itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
-          itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
-        });
+            itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+            itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
+          });
+          }
+        } else {
+          console.log(`[UPDATE BUDGET] Items array empty - all items removed from budget ${budgetId}`);
+        }
+      } else {
+        console.log(`[UPDATE BUDGET] Metadata-only update - keeping existing items for budget ${budgetId}`);
       }
 
       // Update payment and shipping information
@@ -6697,10 +6736,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`[UPDATE BUDGET] Successfully updated budget ${req.params.id}`);
       res.json(updatedBudget);
     } catch (error) {
-      console.error("Error updating budget:", error);
-      res.status(500).json({ error: "Failed to update budget" });
+      console.error("[UPDATE BUDGET] Error updating budget:", error);
+      res.status(500).json({ error: "Failed to update budget: " + (error.message || error) });
     }
   });
 
