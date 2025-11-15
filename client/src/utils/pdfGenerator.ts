@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import letterheadUrl from '@assets/Folha timbrada Nexo2 (1).pdf_1763191602297.png';
 
 export interface BudgetPDFData {
   budget: {
@@ -77,6 +78,8 @@ export class PDFGenerator {
   private pageWidth: number;
   private pageHeight: number;
   private margin: number = 20;
+  private letterheadDataUrl: string | null = null;
+  private imageCache: Map<string, string | null> = new Map();
 
   constructor() {
     this.doc = new jsPDF();
@@ -84,9 +87,47 @@ export class PDFGenerator {
     this.pageHeight = this.doc.internal.pageSize.getHeight();
   }
 
+  private async loadLetterhead(): Promise<void> {
+    try {
+      const img = await this.loadImageWithFallback(letterheadUrl);
+      
+      if (img) {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          this.letterheadDataUrl = canvas.toDataURL('image/png');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load letterhead background:', error);
+    }
+  }
+
+  private applyLetterheadBackground(): void {
+    if (this.letterheadDataUrl) {
+      try {
+        this.doc.addImage(
+          this.letterheadDataUrl,
+          'PNG',
+          0,
+          0,
+          this.pageWidth,
+          this.pageHeight
+        );
+      } catch (error) {
+        console.warn('Failed to apply letterhead background:', error);
+      }
+    }
+  }
+
   private addNewPageIfNeeded(spaceNeeded: number): void {
     if (this.currentY + spaceNeeded > this.pageHeight - this.margin) {
       this.doc.addPage();
+      this.applyLetterheadBackground();
       this.currentY = this.margin;
     }
   }
@@ -157,6 +198,51 @@ export class PDFGenerator {
     this.currentY += 20;
   }
 
+  private async loadAndCacheImage(imageLink: string): Promise<string | null> {
+    if (this.imageCache.has(imageLink)) {
+      return this.imageCache.get(imageLink) || null;
+    }
+
+    try {
+      let imageUrl = imageLink;
+      if (imageLink.startsWith('/uploads/')) {
+        imageUrl = `${window.location.origin}${imageLink}`;
+      }
+
+      const img = await this.loadImageWithFallback(imageUrl);
+      
+      if (img) {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = canvas.toDataURL('image/jpeg', 0.7);
+          this.imageCache.set(imageLink, imageData);
+          return imageData;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load product image:', imageLink, error);
+    }
+    
+    this.imageCache.set(imageLink, null);
+    return null;
+  }
+
+  private renderProductThumbnail(imageData: string | null, x: number, y: number, width: number, height: number): void {
+    if (imageData) {
+      this.doc.addImage(imageData, 'JPEG', x, y, width, height);
+    } else {
+      // Draw placeholder
+      this.doc.setDrawColor(200);
+      this.doc.setFillColor(250, 250, 250);
+      this.doc.rect(x, y, width, height, 'FD');
+    }
+  }
+
   private async addItems(data: BudgetPDFData): Promise<void> {
     this.addNewPageIfNeeded(50);
 
@@ -166,8 +252,15 @@ export class PDFGenerator {
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 15;
 
-    // Table headers without image column (cleaner layout)
-    const colWidths = [90, 20, 30, 45];
+    // Preload all product images in parallel
+    const imagePromises = data.items
+      .filter(item => item.product.imageLink)
+      .map(item => this.loadAndCacheImage(item.product.imageLink!));
+    
+    await Promise.all(imagePromises);
+
+    // Table headers with image column
+    const colWidths = [28, 62, 20, 30, 45];
     const startX = this.margin;
     let currentX = startX;
 
@@ -178,12 +271,14 @@ export class PDFGenerator {
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
-    this.doc.text('Produto', currentX + 2, this.currentY);
+    this.doc.text('Imagem', currentX + 2, this.currentY);
     currentX += colWidths[0];
-    this.doc.text('Qtd', currentX + 2, this.currentY);
+    this.doc.text('Produto', currentX + 2, this.currentY);
     currentX += colWidths[1];
-    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    this.doc.text('Qtd', currentX + 2, this.currentY);
     currentX += colWidths[2];
+    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    currentX += colWidths[3];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 10;
@@ -193,8 +288,11 @@ export class PDFGenerator {
 
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
-      const baseRowHeight = 15;
       const hasCustomization = item.hasItemCustomization && item.itemCustomizationDescription;
+      
+      // Get cached image data
+      const imageData = item.product.imageLink ? this.imageCache.get(item.product.imageLink) || null : null;
+      const baseRowHeight = imageData ? 25 : 20;
 
       this.addNewPageIfNeeded(baseRowHeight + (hasCustomization ? 15 : 0) + 5);
 
@@ -206,9 +304,19 @@ export class PDFGenerator {
 
       currentX = startX;
 
+      // Product image thumbnail (now synchronous using cached data)
+      this.renderProductThumbnail(
+        imageData,
+        currentX + 2,
+        this.currentY,
+        24,
+        20
+      );
+      currentX += colWidths[0];
+
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 45 
-        ? item.product.name.substring(0, 45) + '...' 
+      const productName = item.product.name.length > 30 
+        ? item.product.name.substring(0, 30) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
@@ -216,25 +324,25 @@ export class PDFGenerator {
       if (item.product.description) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = item.product.description.length > 50 
-          ? item.product.description.substring(0, 50) + '...' 
+        const description = item.product.description.length > 35 
+          ? item.product.description.substring(0, 35) + '...' 
           : item.product.description;
         this.doc.text(description, currentX + 2, this.currentY + 10);
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-      currentX += colWidths[0];
-
-      // Quantity
-      this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 5);
       currentX += colWidths[1];
 
-      // Unit price
-      this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
+      // Quantity
+      this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 10);
       currentX += colWidths[2];
 
+      // Unit price
+      this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
+      currentX += colWidths[3];
+
       // Total price
-      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 5);
+      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
 
       this.currentY += baseRowHeight;
 
@@ -554,6 +662,13 @@ export class PDFGenerator {
         console.warn('No items found, creating empty items array');
         data.items = [];
       }
+
+      // Load letterhead background
+      console.log('Loading letterhead background...');
+      await this.loadLetterhead();
+      
+      // Apply letterhead to first page
+      this.applyLetterheadBackground();
 
       this.currentY = 20;
 
