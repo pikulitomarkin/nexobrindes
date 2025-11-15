@@ -3719,6 +3719,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Buscar o cliente para obter o userId
+      const client = await storage.getClient(id);
+      if (client && client.userId) {
+        // Marcar o usuário como inativo
+        await storage.updateUser(client.userId, { isActive: false });
+      }
+
       // Excluir cliente
       await storage.deleteClient(id);
       res.json({ success: true });
