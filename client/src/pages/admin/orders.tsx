@@ -209,6 +209,21 @@ export default function AdminOrders() {
     createOrderMutation.mutate(newOrder);
   };
 
+  const handleEditOrder = async (order: any) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`);
+      if (!response.ok) throw new Error('Erro ao buscar pedido');
+      const fullOrder = await response.json();
+      setEditingOrder(fullOrder);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar pedido para edição",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleUpdateOrder = () => {
     if (editingOrder) {
       updateOrderMutation.mutate(editingOrder);
@@ -418,7 +433,7 @@ export default function AdminOrders() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditingOrder(order)}
+                            onClick={() => handleEditOrder(order)}
                             title="Editar pedido"
                           >
                             <Edit className="h-4 w-4" />

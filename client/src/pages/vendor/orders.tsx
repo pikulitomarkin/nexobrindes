@@ -512,23 +512,31 @@ export default function VendorOrders() {
 
 
 
-  const handleEditOrder = (order: any) => {
+  const handleEditOrder = async (order: any) => {
     console.log('Editing order:', order);
 
-    // Pre-populate form with existing order data
-    setVendorOrderForm({
-      title: order.product || order.title || "",
-      description: order.description || "",
-      clientId: order.clientId || "",
-      contactName: order.contactName || "",
-      contactPhone: order.contactPhone || "",
-      contactEmail: order.contactEmail || "",
-      vendorId: order.vendorId,
-      branchId: order.branchId || "", // Incluir branchId do pedido existente
-      deadline: order.deadline || "",
-      deliveryDeadline: order.deliveryDeadline || "",
-      deliveryType: order.deliveryType || "delivery",
-      items: order.items?.map((item: any) => {
+    // Fetch full order details with items
+    try {
+      const response = await fetch(`/api/orders/${order.id}`);
+      if (!response.ok) throw new Error('Erro ao buscar pedido');
+      const fullOrder = await response.json();
+      
+      console.log('Order items:', fullOrder.items);
+
+      // Pre-populate form with existing order data
+      setVendorOrderForm({
+        title: fullOrder.product || fullOrder.title || "",
+        description: fullOrder.description || "",
+        clientId: fullOrder.clientId || "",
+        contactName: fullOrder.contactName || "",
+        contactPhone: fullOrder.contactPhone || "",
+        contactEmail: fullOrder.contactEmail || "",
+        vendorId: fullOrder.vendorId,
+        branchId: fullOrder.branchId || "", // Incluir branchId do pedido existente
+        deadline: fullOrder.deadline || "",
+        deliveryDeadline: fullOrder.deliveryDeadline || "",
+        deliveryType: fullOrder.deliveryType || "delivery",
+        items: fullOrder.items?.map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
 
@@ -570,21 +578,28 @@ export default function VendorOrders() {
           itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
         };
       }) || [],
-      paymentMethodId: order.paymentMethodId || "",
-      shippingMethodId: order.shippingMethodId || "",
-      installments: Number(order.installments ?? 1),
-      downPayment: Number(order.downPayment ?? 0),
-      remainingAmount: Number(order.remainingAmount ?? 0),
-      shippingCost: Number(order.shippingCost ?? 0),
-      hasDiscount: Boolean(order.hasDiscount),
-      discountType: order.discountType || "percentage",
-      discountPercentage: Number(order.discountPercentage ?? 0),
-      discountValue: Number(order.discountValue ?? 0)
-    });
+      paymentMethodId: fullOrder.paymentInfo?.paymentMethodId || fullOrder.paymentMethodId || "",
+      shippingMethodId: fullOrder.paymentInfo?.shippingMethodId || fullOrder.shippingMethodId || "",
+      installments: Number(fullOrder.paymentInfo?.installments ?? fullOrder.installments ?? 1),
+      downPayment: Number(fullOrder.paymentInfo?.downPayment ?? fullOrder.downPayment ?? 0),
+      remainingAmount: Number(fullOrder.paymentInfo?.remainingAmount ?? fullOrder.remainingAmount ?? 0),
+      shippingCost: Number(fullOrder.paymentInfo?.shippingCost ?? fullOrder.shippingCost ?? 0),
+      hasDiscount: Boolean(fullOrder.hasDiscount),
+      discountType: fullOrder.discountType || "percentage",
+      discountPercentage: Number(fullOrder.discountPercentage ?? 0),
+      discountValue: Number(fullOrder.discountValue ?? 0)
+      });
 
-    setIsEditMode(true);
-    setEditingOrderId(order.id);
-    setIsOrderDialogOpen(true);
+      setIsEditMode(true);
+      setEditingOrderId(order.id);
+      setIsOrderDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar pedido para edição",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleOrderSubmit = (e: React.FormEvent) => {
