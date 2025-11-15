@@ -3986,7 +3986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactName: quoteRequest.contactName,
         contactPhone: quoteRequest.whatsapp || '',
         contactEmail: quoteRequest.email || '',
-        title: `Orçamento - ${quoteRequest.products.map(p => p.productName).join(', ')}`,
+        title: `Orçamento - ${(quoteRequest.items || []).map((p: any) => p.productName).join(', ')}`,
         description: quoteRequest.observations || '',
         validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
         deliveryDeadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(), // 45 days from now
@@ -4002,7 +4002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountType: "percentage",
         discountPercentage: 0,
         discountValue: 0,
-        items: (quoteRequest.products || []).map((product: any) => ({
+        items: (quoteRequest.items || []).map((product: any) => ({
           productId: product.productId,
           productName: product.productName,
           producerId: product.producerId || 'internal',

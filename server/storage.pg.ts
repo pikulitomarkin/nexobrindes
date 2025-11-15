@@ -2067,7 +2067,16 @@ export class PgStorage implements IStorage {
   async getQuoteRequestById(id: string): Promise<any> {
     const results = await pg.select().from(schema.quoteRequests)
       .where(eq(schema.quoteRequests.id, id));
-    return results[0];
+    
+    if (!results[0]) {
+      return undefined;
+    }
+    
+    // Enrich with items
+    const items = await pg.select().from(schema.quoteRequestItems)
+      .where(eq(schema.quoteRequestItems.quoteRequestId, results[0].id));
+    
+    return { ...results[0], items };
   }
 
   async updateQuoteRequestStatus(id: string, status: string): Promise<any> {
