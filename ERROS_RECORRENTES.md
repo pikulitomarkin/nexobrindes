@@ -204,12 +204,13 @@ Os pagamentos de produtores eram criados corretamente quando o produtor definia 
 - Botão "Confirmar Entrada" não funciona
 - Modal de associação de pagamentos não abre
 - Transações não são filtradas corretamente para conciliação
+- **Erro:** `storage.getBankTransaction is not a function`
 
 **Causa:** 
 - Interface da conciliação não estava renderizando as transações corretamente
 - Faltavam endpoints `/api/finance/associate-payment` e `/api/finance/associate-multiple-payments`
 - Filtros de transação não consideravam diferentes tipos (credit/debit)
-- Métodos `getBankTransaction` e `updateBankTransaction` não existiam no storage
+- ⚠️ **CAUSA RAIZ:** Métodos `getBankTransaction` e `updateBankTransaction` foram documentados como implementados mas **só existiam na interface IStorage**, não no storage PostgreSQL (storage.pg.ts)
 
 **Solução aplicada:**
 1. Corrigida a renderização das transações OFX na interface:
@@ -219,9 +220,9 @@ Os pagamentos de produtores eram criados corretamente quando o produtor definia 
 2. Adicionados endpoints de associação:
    - `/api/finance/associate-payment` para associação única
    - `/api/finance/associate-multiple-payments` para múltiplas transações
-3. Implementados métodos no storage:
-   - `getBankTransaction()` para buscar transação por ID
-   - `updateBankTransaction()` para atualizar status das transações
+3. ✅ **[IMPLEMENTADO EM 15/11/2025]** Métodos no storage PostgreSQL (storage.pg.ts):
+   - `getBankTransaction(id: string)` para buscar transação por ID (linha 1598)
+   - `updateBankTransaction()` para atualizar status das transações (já existia, linha 1679)
 4. Corrigidos filtros de transação para aceitar valores positivos OU tipo 'credit'
 5. Modal de conciliação agora funciona corretamente com seleção múltipla
 
@@ -229,8 +230,10 @@ Os pagamentos de produtores eram criados corretamente quando o produtor definia 
 - Transações OFX importadas mas não visíveis na conciliação
 - Botões de "Confirmar Entrada" não funcionam
 - Modal não abre ao clicar em conciliação
+- Console mostra erro: `storage.getBankTransaction is not a function`
 
-**Data da correção:** Janeiro 2025
+**Data da correção inicial:** Janeiro 2025  
+**Data da implementação completa:** 15/11/2025 - Implementação real no PostgreSQL storage
 
 ---
 
