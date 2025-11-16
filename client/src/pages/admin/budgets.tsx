@@ -76,10 +76,7 @@ export default function AdminBudgets() {
       const response = await fetch('/api/users');
       if (!response.ok) throw new Error('Failed to fetch users');
       const users = await response.json();
-      console.log('Todos os usuários recebidos:', users.length, users.map((u: any) => ({ name: u.name, role: u.role, isActive: u.isActive })));
-      const filtered = users.filter((u: any) => u.role === 'client' && u.isActive !== false);
-      console.log('Clientes filtrados:', filtered.length, filtered.map((u: any) => ({ name: u.name, isActive: u.isActive })));
-      return filtered;
+      return users.filter((u: any) => u.role === 'client' && u.isActive !== false);
     },
   });
 
