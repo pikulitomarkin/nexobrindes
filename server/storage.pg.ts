@@ -1441,12 +1441,17 @@ export class PgStorage implements IStorage {
 
       // Create production order items with full details
       for (const budgetItem of items) {
+        // Ensure quantity is a number (not a formatted string like "100.000")
+        const quantity = typeof budgetItem.quantity === 'string' 
+          ? parseInt(budgetItem.quantity.replace(/[.,]/g, ''), 10)
+          : budgetItem.quantity;
+
         const productionOrderItemData: InsertProductionOrderItem = {
           productionOrderId: productionOrder.id,
           budgetItemId: budgetItem.id,
           productId: budgetItem.productId,
           productName: budgetItem.productName || 'Produto',
-          quantity: budgetItem.quantity,
+          quantity: quantity,
           unitPrice: budgetItem.unitPrice,
           totalPrice: budgetItem.totalPrice,
           notes: budgetItem.notes,
@@ -1467,7 +1472,7 @@ export class PgStorage implements IStorage {
         };
 
         await pg.insert(schema.productionOrderItems).values(productionOrderItemData);
-        console.log(`Created production order item for product ${budgetItem.productName}`);
+        console.log(`Created production order item for product ${budgetItem.productName} (qty: ${quantity})`);
       }
     }
 
