@@ -1445,10 +1445,8 @@ export class PgStorage implements IStorage {
 
       // Create production order items with full details
       for (const budgetItem of items) {
-        // Ensure quantity is a number - handle both number and string types
-        const quantity = typeof budgetItem.quantity === 'number' 
-          ? budgetItem.quantity
-          : parseInt(String(budgetItem.quantity), 10);
+        // Ensure quantity is an integer - budget_items stores as numeric(10,3) so we need to round
+        const quantity = Math.round(parseFloat(String(budgetItem.quantity)));
 
         const productionOrderItemData: InsertProductionOrderItem = {
           productionOrderId: productionOrder.id,
