@@ -1363,9 +1363,12 @@ export class PgStorage implements IStorage {
     return true;
   }
 
-  async convertBudgetToOrder(budgetId: string, clientId: string, deliveryDate?: string): Promise<Order> {
+  async convertBudgetToOrder(budgetId: string, clientId: string, deliveryDate?: Date | string): Promise<Order> {
     const budget = await this.getBudget(budgetId);
     if (!budget) throw new Error('Budget not found');
+
+    // Normalize deliveryDate to Date object
+    const deliveryDateObj = deliveryDate instanceof Date ? deliveryDate : (deliveryDate ? new Date(deliveryDate) : undefined);
 
     // Create order from budget
     const orderData: InsertOrder = {
@@ -1383,11 +1386,72 @@ export class PgStorage implements IStorage {
       contactPhone: budget.contactPhone,
       contactEmail: budget.contactEmail,
       deliveryType: budget.deliveryType,
-      deliveryDeadline: deliveryDate,
-      deadline: deliveryDate
+      deliveryDeadline: deliveryDateObj,
+      deadline: deliveryDateObj
     } as InsertOrder;
 
     const order = await this.createOrder(orderData);
+
+    // Get budget items to create production orders
+    const budgetItems = await this.getBudgetItems(budgetId);
+    
+    // Group items by producer and create production orders
+    const producerGroups = new Map<string, typeof budgetItems>();
+    
+    for (const item of budgetItems) {
+      if (item.producerId) {
+        if (!producerGroups.has(item.producerId)) {
+          producerGroups.set(item.producerId, []);
+        }
+        producerGroups.get(item.producerId)!.push(item);
+      }
+    }
+
+    // Create one production order per producer with detailed items
+    for (const [producerId, items] of producerGroups.entries()) {
+      const productionOrderData: InsertProductionOrder = {
+        orderId: order.id,
+        producerId: producerId,
+        status: 'pending' as const,
+        deadline: deliveryDateObj,
+        deliveryDeadline: deliveryDateObj,
+        notes: `Itens: ${items.map(i => i.productName).join(', ')}`,
+      };
+
+      const productionOrder = await this.createProductionOrder(productionOrderData);
+      console.log(`Created production order for producer ${producerId} with ${items.length} items`);
+
+      // Create production order items with full details
+      for (const budgetItem of items) {
+        const productionOrderItemData: InsertProductionOrderItem = {
+          productionOrderId: productionOrder.id,
+          budgetItemId: budgetItem.id,
+          productId: budgetItem.productId,
+          productName: budgetItem.productName || 'Produto',
+          quantity: budgetItem.quantity,
+          unitPrice: budgetItem.unitPrice,
+          totalPrice: budgetItem.totalPrice,
+          notes: budgetItem.notes,
+          hasItemCustomization: budgetItem.hasItemCustomization,
+          itemCustomizationValue: budgetItem.itemCustomizationValue,
+          itemCustomizationDescription: budgetItem.itemCustomizationDescription,
+          customizationPhoto: budgetItem.customizationPhoto,
+          productWidth: budgetItem.productWidth,
+          productHeight: budgetItem.productHeight,
+          productDepth: budgetItem.productDepth,
+          hasGeneralCustomization: budgetItem.hasGeneralCustomization,
+          generalCustomizationName: budgetItem.generalCustomizationName,
+          generalCustomizationValue: budgetItem.generalCustomizationValue,
+          hasItemDiscount: budgetItem.hasItemDiscount,
+          itemDiscountType: budgetItem.itemDiscountType,
+          itemDiscountPercentage: budgetItem.itemDiscountPercentage,
+          itemDiscountValue: budgetItem.itemDiscountValue,
+        };
+
+        await pg.insert(schema.productionOrderItems).values(productionOrderItemData);
+        console.log(`Created production order item for product ${budgetItem.productName}`);
+      }
+    }
 
     // Update budget status
     await this.updateBudget(budgetId, { status: 'converted' });

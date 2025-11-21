@@ -124,6 +124,40 @@ export const productionOrders = pgTable("production_orders", {
   producerNotes: text("producer_notes"), // Observações do produtor sobre o valor
 });
 
+export const productionOrderItems = pgTable("production_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productionOrderId: varchar("production_order_id").references(() => productionOrders.id).notNull(),
+  budgetItemId: varchar("budget_item_id").references(() => budgetItems.id),
+  productId: varchar("product_id").references(() => products.id).notNull(),
+  productName: text("product_name").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  
+  // Personalização do item
+  hasItemCustomization: boolean("has_item_customization").default(false),
+  itemCustomizationValue: decimal("item_customization_value", { precision: 10, scale: 2 }).default('0.00'),
+  itemCustomizationDescription: text("item_customization_description"),
+  customizationPhoto: text("customization_photo"),
+  
+  // Dimensões do produto (em cm)
+  productWidth: decimal("product_width", { precision: 8, scale: 2 }),
+  productHeight: decimal("product_height", { precision: 8, scale: 2 }),
+  productDepth: decimal("product_depth", { precision: 8, scale: 2 }),
+  
+  // Personalização geral
+  hasGeneralCustomization: boolean("has_general_customization").default(false),
+  generalCustomizationName: text("general_customization_name"),
+  generalCustomizationValue: decimal("general_customization_value", { precision: 10, scale: 2 }).default('0.00'),
+  
+  // Desconto do item
+  hasItemDiscount: boolean("has_item_discount").default(false),
+  itemDiscountType: text("item_discount_type").default('percentage'),
+  itemDiscountPercentage: decimal("item_discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
+  itemDiscountValue: decimal("item_discount_value", { precision: 10, scale: 2 }).default('0.00'),
+});
+
 export const payments = pgTable("payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").references(() => orders.id).notNull(),
@@ -555,6 +589,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProductionOrderSchema = createInsertSchema(productionOrders).omit({ id: true });
+export const insertProductionOrderItemSchema = createInsertSchema(productionOrderItems).omit({ id: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 export const insertCommissionSchema = createInsertSchema(commissions).omit({ id: true, createdAt: true });
 export const insertPartnerSchema = createInsertSchema(partners).omit({ id: true, createdAt: true, updatedAt: true });
@@ -594,6 +629,8 @@ export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type ProductionOrder = typeof productionOrders.$inferSelect;
 export type InsertProductionOrder = z.infer<typeof insertProductionOrderSchema>;
+export type ProductionOrderItem = typeof productionOrderItems.$inferSelect;
+export type InsertProductionOrderItem = z.infer<typeof insertProductionOrderItemSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Commission = typeof commissions.$inferSelect;
