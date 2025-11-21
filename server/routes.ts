@@ -7773,38 +7773,55 @@ Para mais detalhes, entre em contato conosco!`;
       const orders = await storage.getOrders();
       const productionOrders = await storage.getProductionOrders();
 
-      // Create set of orders already in production
-      const ordersInProduction = new Set(productionOrders.map(po => po.orderId));
+      // Group production orders by order ID
+      const productionOrdersByOrder = new Map<string, any[]>();
+      for (const po of productionOrders) {
+        if (!productionOrdersByOrder.has(po.orderId)) {
+          productionOrdersByOrder.set(po.orderId, []);
+        }
+        productionOrdersByOrder.get(po.orderId)!.push(po);
+      }
 
-      // Filter orders that are paid but not yet in production
+      // Filter orders that are paid but not yet fully sent to production
       const paidOrders = orders.filter(order => {
         // Check payment status - order must have received some payment
         const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0; // Any payment received
 
-        // Check if already in production
-        const notInProduction = !ordersInProduction.has(order.id);
-
         // Check if order has items with external producers
         let hasExternalProducers = false;
+        let uniqueProducers = new Set<string>();
+        
         if (order.budgetId) {
           // For budget-based orders, check budget items
           const budgetItems = order.items || [];
-          hasExternalProducers = budgetItems.some((item: any) =>
-            item.producerId && item.producerId !== 'internal'
-          );
+          for (const item of budgetItems) {
+            if (item.producerId && item.producerId !== 'internal') {
+              hasExternalProducers = true;
+              uniqueProducers.add(item.producerId);
+            }
+          }
         } else if (order.items) {
           // For direct orders, check order items
-          hasExternalProducers = order.items.some((item: any) =>
-            item.producerId && item.producerId !== 'internal'
-          );
+          for (const item of order.items) {
+            if (item.producerId && item.producerId !== 'internal') {
+              hasExternalProducers = true;
+              uniqueProducers.add(item.producerId);
+            }
+          }
         }
 
-        const isValid = isPaid && notInProduction && hasExternalProducers;
+        // Count how many unique producers already have production orders
+        const existingPOs = productionOrdersByOrder.get(order.id) || [];
+        const producersWithPOs = new Set(existingPOs.map(po => po.producerId));
+        
+        // Order is valid if it's paid, has external producers, and NOT ALL producers have POs yet
+        const notAllProducersHavePOs = uniqueProducers.size > producersWithPOs.size;
+        const isValid = isPaid && hasExternalProducers && notAllProducersHavePOs;
 
         if (isValid) {
-          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue}`);
+          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithPOs.size} with POs`);
         }
 
         return isValid;
