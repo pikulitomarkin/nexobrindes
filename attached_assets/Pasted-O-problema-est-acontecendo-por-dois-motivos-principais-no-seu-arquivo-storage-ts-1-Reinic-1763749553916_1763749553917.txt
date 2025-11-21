@@ -1,0 +1,95 @@
+O problema está acontecendo por dois motivos principais no seu arquivo `storage.ts`:
+
+1.  **Reinicialização dos Dados (O problema do "Replit traz de volta"):** Como o sistema usa armazenamento em memória (`MemStorage`), toda vez que o Replit reinicia (ou você faz um novo deploy), ele roda a função `createTestUsers()` e recria todos os clientes de teste que você deletou.
+2.  **Filtro de Ativos:** A função `getClients()` no backend está retornando *todos* os clientes do mapa, sem filtrar se `isActive` é verdadeiro ou falso.
+
+Aqui está a solução para aplicar no arquivo **`storage.ts`**.
+
+### Passo 1: Alterar o método de deletar para "Soft Delete"
+
+Em vez de apagar o registro (o que causaria erros em orçamentos antigos), vamos apenas marcá-lo como inativo.
+
+No arquivo **`storage.ts`**, procure o método `deleteClient` e altere para:
+
+```typescript
+// Em storage.ts
+
+async deleteClient(id: string): Promise<boolean> {
+  const client = this.clients.get(id);
+  if (client) {
+    // Em vez de this.clients.delete(id), apenas desativamos:
+    client.isActive = false;
+    client.updatedAt = new Date();
+    this.clients.set(id, client);
+    return true;
+  }
+  return false;
+}
+```
+
+### Passo 2: Filtrar a busca de clientes
+
+Altere o método `getClients` para retornar apenas os que não foram deletados (ativos).
+
+No arquivo **`storage.ts`**, procure `getClients` e altere para:
+
+```typescript
+// Em storage.ts
+
+async getClients(): Promise<Client[]> {
+  return Array.from(this.clients.values())
+    .filter(client => client.isActive !== false) // ADICIONE ESTA LINHA
+    .map(client => ({
+      ...client,
+      userCode: (client as any).userCode || null
+    }));
+}
+```
+
+### Passo 3: Impedir que os dados de teste voltem (Crucial para o Replit)
+
+Você precisa comentar ou remover a criação dos clientes de teste que você não quer mais.
+
+No arquivo **`storage.ts`**, procure a função `createTestUsers()`. Comente as linhas que criam os `preClient` extras:
+
+```typescript
+// Em storage.ts -> dentro de createTestUsers()
+
+// ... código anterior dos usuários ...
+
+    console.log("Criando clientes pré-cadastrados...");
+
+    // Mantenha apenas o que for essencial, comente o resto para não voltar após o restart
+    const preClient1: Client & { userCode?: string } = {
+      id: "client-1",
+      userId: "client-1", 
+      name: "João Silva",
+      // ... resto dos dados ...
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.clients.set(preClient1.id, preClient1);
+
+    /* COMENTE O BLOCO ABAIXO PARA ELES NÃO VOLTAREM MAIS
+    const preClient2: Client & { userCode?: string } = {
+      id: "client-2",
+      // ...
+    };
+    this.clients.set(preClient2.id, preClient2);
+
+    const preClient3...
+    this.clients.set(preClient3.id, preClient3);
+    
+    // Repita para client 4, 5, etc...
+    */
+    
+    // console.log...
+```
+
+### Resumo da Correção
+
+1.  Ao mudar o `deleteClient` para `isActive = false`, você mantém o histórico para orçamentos antigos, mas o cliente fica "invisível" para novos.
+2.  Ao adicionar o `.filter` no `getClients`, a API `/api/clients` (usada nos selects) parará de enviar clientes inativos.
+3.  Ao comentar o código em `createTestUsers`, você impede que o sistema "ressuscite" dados antigos toda vez que o servidor reinicia.
