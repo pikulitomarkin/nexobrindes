@@ -18,6 +18,7 @@ export default function FinanceReceivables() {
   const [branchFilter, setBranchFilter] = useState("all");
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedReceivable, setSelectedReceivable] = useState<any>(null);
   const [paymentData, setPaymentData] = useState({
     amount: "",
@@ -555,7 +556,15 @@ export default function FinanceReceivables() {
                       </td>
                       <td className="panel-table td space-x-1">
                         <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm" className="h-7 px-2 panel-button">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 px-2 panel-button"
+                            onClick={() => {
+                              setSelectedReceivable(receivable);
+                              setIsDetailsDialogOpen(true);
+                            }}
+                          >
                             <Eye className="h-3 w-3 mr-1" />
                             Ver
                           </Button>
@@ -593,6 +602,102 @@ export default function FinanceReceivables() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Order Details Dialog */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Pedido</DialogTitle>
+            <DialogDescription>
+              {selectedReceivable?.orderNumber}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedReceivable && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Número do Pedido</p>
+                  <p className="font-semibold text-gray-900">{selectedReceivable.orderNumber}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Cliente</p>
+                  <p className="font-semibold text-gray-900">{selectedReceivable.clientName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Data de Vencimento</p>
+                  <p className="font-semibold text-gray-900">
+                    {new Date(selectedReceivable.dueDate).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Status</p>
+                  <div>{getStatusBadge(selectedReceivable.status)}</div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-gray-900 mb-4">Valores</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <span className="text-gray-700">Valor Total do Pedido</span>
+                    <span className="font-semibold text-blue-600">
+                      R$ {parseFloat(selectedReceivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <span className="text-gray-700">Entrada + Frete Mínimo</span>
+                    <span className="font-semibold text-orange-600">
+                      R$ {parseFloat(selectedReceivable.minimumPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                    <span className="text-gray-700">Já Recebido</span>
+                    <span className="font-semibold text-green-600">
+                      R$ {parseFloat(selectedReceivable.paidAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded border-2 border-blue-200">
+                    <span className="text-gray-700 font-semibold">Saldo Restante</span>
+                    <span className="font-bold text-blue-600 text-lg">
+                      R$ {Math.max(0, parseFloat(selectedReceivable.amount) - parseFloat(selectedReceivable.paidAmount || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>
+                  Fechar
+                </Button>
+                {selectedReceivable.status !== 'paid' && (
+                  <Button 
+                    className="gradient-bg text-white"
+                    onClick={() => {
+                      setIsDetailsDialogOpen(false);
+                      setSelectedReceivable(selectedReceivable);
+                      const minimumPayment = parseFloat(selectedReceivable.minimumPayment || 0);
+                      const paidAmount = parseFloat(selectedReceivable.paidAmount || 0);
+                      const isMinimumMet = paidAmount >= minimumPayment;
+                      const remainingAmount = Math.max(0, parseFloat(selectedReceivable.amount) - paidAmount);
+                      const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
+                        minimumPayment.toString() : 
+                        remainingAmount.toString();
+                      setPaymentData({
+                        ...paymentData,
+                        amount: suggestedAmount
+                      });
+                      setIsReceiveDialogOpen(true);
+                    }}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Registrar Pagamento
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Receive Payment Dialog */}
       <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
