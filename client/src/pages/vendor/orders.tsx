@@ -2207,11 +2207,7 @@ export default function VendorOrders() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Cliente</label>
-                      <p>{selectedOrder.clientName || selectedOrder.contactName || "Não informado"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Produto</label>
-                      <p>{selectedOrder.product}</p>
+                      <p>{selectedOrder.contactName || selectedOrder.clientName || "Não informado"}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Descrição</label>
