@@ -330,7 +330,7 @@ export default function ClientProducts() {
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{item.productName}</p>
                               <p className="text-xs text-gray-500">
-                                R$ {item.basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                Qtd: {item.quantity}
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -380,12 +380,6 @@ export default function ClientProducts() {
                       ))}
 
                       <div className="border-t pt-3">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-medium">Total estimado:</span>
-                          <span className="font-bold text-green-600">
-                            R$ {getTotalValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
                         <Button 
                           onClick={handleQuoteRequest}
                           className="w-full gradient-bg text-white"

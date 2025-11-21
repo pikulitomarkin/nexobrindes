@@ -180,40 +180,42 @@ export default function ClientBudgets() {
               {quoteRequests.map((request: any) => (
                 <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-2">
                         {request.productSummary || request.productName || 'Solicitação de Orçamento'}
                       </h3>
                       {request.totalProducts > 1 && (
-                        <p className="text-sm text-blue-600 mt-1">
+                        <p className="text-sm text-blue-600 mb-2">
                           {request.totalProducts} produtos solicitados
                         </p>
                       )}
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
+                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           {new Date(request.createdAt).toLocaleDateString('pt-BR')}
                         </span>
                         <span>Qtd: {request.quantity}</span>
                       </div>
+                      <div className="text-sm text-gray-600">
+                        <span>Vendedor: {request.vendorName || 'Não informado'}</span>
+                      </div>
                     </div>
-                    {getStatusBadge(request.status, 'request')}
+                    <div>
+                      {getStatusBadge(request.status, 'request')}
+                    </div>
                   </div>
 
                   {request.observations && (
-                    <p className="text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded">
+                    <p className="text-sm text-gray-600 mt-3 bg-gray-50 p-2 rounded">
                       <strong>Observações:</strong> {request.observations}
                     </p>
                   )}
 
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>Vendedor: {request.vendorName || 'Não informado'}</span>
-                    {request.status === 'quoted' && (
-                      <span className="text-green-600 font-medium">
-                        ✓ Orçamento enviado pelo vendedor
-                      </span>
-                    )}
-                  </div>
+                  {request.status === 'quoted' && (
+                    <div className="text-green-600 font-medium text-sm mt-3">
+                      ✓ Orçamento enviado pelo vendedor
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
