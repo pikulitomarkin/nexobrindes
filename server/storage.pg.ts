@@ -1204,57 +1204,96 @@ export class PgStorage implements IStorage {
     }).returning();
 
     const newBudget = results[0];
+    console.log(`✅ [PG CREATE BUDGET] Budget criado: ${newBudget.id} (${newBudget.budgetNumber})`);
 
     // Create budget items if provided
     if (budgetData.items && Array.isArray(budgetData.items) && budgetData.items.length > 0) {
-      console.log(`[PG CREATE BUDGET] Processing ${budgetData.items.length} items`);
+      console.log(`📦 [PG CREATE BUDGET] Processando ${budgetData.items.length} items recebidos`);
 
       // Remove duplicates based on productId, producerId, quantity, and unitPrice
       const seenItems = new Set();
       const uniqueItems = budgetData.items.filter(item => {
         const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
         if (seenItems.has(itemKey)) {
-          console.log(`[PG CREATE BUDGET] Removing duplicate item: ${item.productName} (${itemKey})`);
+          console.log(`⚠️ [PG CREATE BUDGET] Item duplicado removido: ${item.productName}`);
           return false;
         }
         seenItems.add(itemKey);
         return true;
       });
 
-      console.log(`[PG CREATE BUDGET] Processing ${uniqueItems.length} unique items (filtered from ${budgetData.items.length})`);
+      console.log(`📊 [PG CREATE BUDGET] ${uniqueItems.length} items únicos para salvar (${budgetData.items.length - uniqueItems.length} duplicados)`);
 
-      // Create budget items
-      for (const itemData of uniqueItems) {
-        try {
-          await pg.insert(schema.budgetItems).values({
-            budgetId: newBudget.id,
-            productId: itemData.productId,
-            productName: itemData.productName || 'Produto',
-            producerId: itemData.producerId || 'internal',
-            quantity: itemData.quantity || 1,
-            unitPrice: (itemData.unitPrice || 0).toString(),
-            totalPrice: (itemData.totalPrice || 0).toString(),
-            hasItemCustomization: itemData.hasItemCustomization || false,
-            selectedCustomizationId: itemData.selectedCustomizationId || null,
-            itemCustomizationValue: (itemData.itemCustomizationValue || 0).toString(),
-            itemCustomizationDescription: itemData.itemCustomizationDescription || null,
-            additionalCustomizationNotes: itemData.additionalCustomizationNotes || null,
-            customizationPhoto: itemData.customizationPhoto || null,
-            hasGeneralCustomization: itemData.hasGeneralCustomization || false,
-            generalCustomizationName: itemData.generalCustomizationName || null,
-            generalCustomizationValue: (itemData.generalCustomizationValue || 0).toString(),
-            hasItemDiscount: itemData.hasItemDiscount || false,
-            itemDiscountType: itemData.itemDiscountType || 'percentage',
-            itemDiscountPercentage: (itemData.itemDiscountPercentage || 0).toString(),
-            itemDiscountValue: (itemData.itemDiscountValue || 0).toString(),
-            productWidth: itemData.productWidth || null,
-            productHeight: itemData.productHeight || null,
-            productDepth: itemData.productDepth || null
-          });
-        } catch (itemError) {
-          console.error(`[PG CREATE BUDGET] Error creating item:`, itemError);
-          // Continue with other items
+      // Create budget items with retry logic
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (let attemptIndex = 0; attemptIndex < uniqueItems.length; attemptIndex++) {
+        const itemData = uniqueItems[attemptIndex];
+        let itemSaved = false;
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (!itemSaved && retryCount < maxRetries) {
+          try {
+            console.log(`🔄 [PG ITEM ${attemptIndex + 1}/${uniqueItems.length}] Salvando: ${itemData.productName} (qty: ${itemData.quantity}, retry: ${retryCount})`);
+            
+            const itemValues = {
+              budgetId: newBudget.id,
+              productId: itemData.productId,
+              productName: itemData.productName || 'Produto',
+              producerId: itemData.producerId || 'internal',
+              quantity: itemData.quantity || 1,
+              unitPrice: (itemData.unitPrice || 0).toString(),
+              totalPrice: (itemData.totalPrice || 0).toString(),
+              hasItemCustomization: itemData.hasItemCustomization || false,
+              selectedCustomizationId: itemData.selectedCustomizationId || null,
+              itemCustomizationValue: (itemData.itemCustomizationValue || 0).toString(),
+              itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+              additionalCustomizationNotes: itemData.additionalCustomizationNotes || null,
+              customizationPhoto: itemData.customizationPhoto || null,
+              hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+              generalCustomizationName: itemData.generalCustomizationName || null,
+              generalCustomizationValue: (itemData.generalCustomizationValue || 0).toString(),
+              hasItemDiscount: itemData.hasItemDiscount || false,
+              itemDiscountType: itemData.itemDiscountType || 'percentage',
+              itemDiscountPercentage: (itemData.itemDiscountPercentage || 0).toString(),
+              itemDiscountValue: (itemData.itemDiscountValue || 0).toString(),
+              productWidth: itemData.productWidth || null,
+              productHeight: itemData.productHeight || null,
+              productDepth: itemData.productDepth || null
+            };
+
+            console.log(`📝 [PG ITEM ${attemptIndex + 1}] Valores: budgetId=${newBudget.id}, productId=${itemValues.productId}, quantity=${itemValues.quantity}`);
+
+            await pg.insert(schema.budgetItems).values(itemValues);
+            
+            console.log(`✅ [PG ITEM ${attemptIndex + 1}] Item salvo com sucesso!`);
+            successCount++;
+            itemSaved = true;
+          } catch (itemError: any) {
+            retryCount++;
+            const errorMsg = itemError?.message || String(itemError);
+            
+            console.error(`❌ [PG ITEM ${attemptIndex + 1}] Erro (tentativa ${retryCount}/${maxRetries}): ${errorMsg}`);
+            console.error(`🔍 [PG ITEM ${attemptIndex + 1}] Stack: ${itemError?.stack?.split('\n').slice(0, 3).join(' | ')}`);
+            
+            if (retryCount >= maxRetries) {
+              console.error(`❌ [PG ITEM ${attemptIndex + 1}] FALHA FINAL: Item "${itemData.productName}" não pôde ser salvo após ${maxRetries} tentativas`);
+              failureCount++;
+              itemSaved = true; // Break the loop even on failure
+            } else {
+              // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+            }
+          }
         }
+      }
+
+      console.log(`\n📊 [PG CREATE BUDGET] RESUMO: ✅ ${successCount} salvos | ❌ ${failureCount} falhados de ${uniqueItems.length} items`);
+      
+      if (failureCount > 0) {
+        console.warn(`⚠️ [PG CREATE BUDGET] AVISO: ${failureCount} items não foram salvos! Verifique a conexão do banco.`);
       }
     }
 
