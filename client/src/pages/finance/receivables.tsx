@@ -78,7 +78,9 @@ export default function FinanceReceivables() {
     minimumPayment: receivable.minimumPayment || "0.00", // Pagamento mínimo obrigatório (entrada + frete)
     status: receivable.status || "pending",
     createdAt: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
-    lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null
+    lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
+    shippingCost: receivable.shippingCost || "0.00",
+    items: receivable.items || []
   }));
 
   const receivePaymentMutation = useMutation({
@@ -636,6 +638,27 @@ export default function FinanceReceivables() {
               </div>
 
               <div className="border-t pt-4">
+                <h3 className="font-semibold text-gray-900 mb-4">Produtos Comprados</h3>
+                {selectedReceivable.items && selectedReceivable.items.length > 0 ? (
+                  <div className="space-y-2 mb-6 max-h-48 overflow-y-auto border rounded p-3 bg-gray-50">
+                    {selectedReceivable.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm py-2 border-b last:border-b-0">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{item.productName}</p>
+                          <p className="text-xs text-gray-500">Qtd: {item.quantity}</p>
+                        </div>
+                        <p className="text-sm text-gray-700">
+                          R$ {(parseFloat(item.totalPrice || item.unitPrice || 0) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mb-6">Nenhum produto encontrado</p>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
                 <h3 className="font-semibold text-gray-900 mb-4">Valores</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
@@ -644,6 +667,14 @@ export default function FinanceReceivables() {
                       R$ {parseFloat(selectedReceivable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+                  {parseFloat(selectedReceivable.shippingCost || 0) > 0 && (
+                    <div className="flex justify-between items-center p-3 bg-amber-50 rounded">
+                      <span className="text-gray-700">Frete</span>
+                      <span className="font-semibold text-amber-600">
+                        R$ {parseFloat(selectedReceivable.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                     <span className="text-gray-700">Entrada + Frete Mínimo</span>
                     <span className="font-semibold text-orange-600">

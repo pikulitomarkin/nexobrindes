@@ -4990,6 +4990,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const calculatedMinimumPayment = budgetDownPayment + budgetShippingCost;
             const minimumPayment = calculatedMinimumPayment > 0 ? calculatedMinimumPayment.toFixed(2) : (receivable.minimumPayment || "0.00");
 
+            // Get order items (from budget or order items)
+            let orderItems = [];
+            if (order.budgetId) {
+              const budgetItems = await storage.getBudgetItems(order.budgetId);
+              orderItems = budgetItems || [];
+            } else if (order.items && Array.isArray(order.items)) {
+              orderItems = order.items;
+            }
+
             return {
               id: receivable.id,
               orderId: receivable.orderId,
@@ -5005,7 +5014,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes: receivable.notes,
               createdAt: receivable.createdAt,
               updatedAt: receivable.updatedAt,
-              lastPaymentDate: lastPaymentDate
+              lastPaymentDate: lastPaymentDate,
+              shippingCost: budgetShippingCost.toFixed(2) || "0.00",
+              items: orderItems
             };
           } catch (error) {
             console.error(`Error enriching receivable ${receivable.id}:`, error);
