@@ -1,3 +1,4 @@
+import { pgStorage } from './storage.pg';
 import {
   type User,
   type InsertUser,
@@ -4897,4 +4898,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = pgStorage;
