@@ -189,11 +189,6 @@ export default function ClientBudgets() {
                           {request.totalProducts} produtos solicitados
                         </p>
                       )}
-                      {request.totalEstimatedValue > 0 && (
-                        <p className="text-sm text-green-600 font-medium mt-1">
-                          Valor estimado: R$ {parseFloat(request.totalEstimatedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      )}
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
