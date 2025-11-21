@@ -1551,13 +1551,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
               shippingAddress: orderDetails.shippingAddress
             });
 
-            // Update production order items if needed
+            // Reconcile production order items (ensure all expected items exist)
             const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
             
-            // If items don't exist yet, create them
-            if (!existingItems || existingItems.length === 0) {
-              console.log(`Creating ${uniqueProducerItems.length} items for production order ${existingForProducer.id}`);
-              for (const item of uniqueProducerItems) {
+            // Build set of existing item keys using comprehensive unique identifier
+            const existingItemKeys = new Set(
+              (existingItems || []).map(item => {
+                // Use multiple fields to ensure uniqueness, including customization
+                const customKey = item.hasItemCustomization ? 
+                  `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
+                const generalKey = item.hasGeneralCustomization ?
+                  `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
+                return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
+              })
+            );
+            
+            // Find items that should exist but don't
+            const missingItems = uniqueProducerItems.filter((item: any) => {
+              const customKey = item.hasItemCustomization ? 
+                `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
+              const generalKey = item.hasGeneralCustomization ?
+                `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
+              const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
+              return !existingItemKeys.has(itemKey);
+            });
+            
+            // Create missing items with error tracking
+            const itemCreationErrors = [];
+            if (missingItems.length > 0) {
+              console.log(`Creating ${missingItems.length} missing items for production order ${existingForProducer.id}`);
+              for (const item of missingItems) {
                 // Add budgetItemId if it exists (for budget-based orders)
                 const itemWithBudgetId = {
                   ...item,
@@ -1565,9 +1588,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 };
                 try {
                   await storage.createProductionOrderItem(existingForProducer.id, itemWithBudgetId);
+                  console.log(`✓ Created item: ${item.productName} (qty: ${item.quantity})`);
                 } catch (error) {
-                  console.error(`Error creating production order item:`, error);
+                  const errorMsg = `Failed to create item ${item.productName}: ${error.message}`;
+                  console.error(`✗ ${errorMsg}`);
+                  itemCreationErrors.push(errorMsg);
                 }
+              }
+              
+              // Alert if any items failed to create
+              if (itemCreationErrors.length > 0) {
+                console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
+                console.error('Failed items:', itemCreationErrors);
               }
             }
 
@@ -1575,14 +1607,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
             producerNames.push(producer.name);
             console.log(`Updated production order ${productionOrder.id} for producer ${producer.name} from pending to accepted`);
           } else {
-            // Production order already sent/accepted, return error
+            // Production order already sent/accepted
             if (producerId) {
               return res.status(400).json({
                 error: `Ordem de produção para ${producer.name} já foi enviada anteriormente`
               });
             }
 
-            // Otherwise, just add to the list and continue
+            // Even if production order exists with accepted/other status,
+            // ensure ALL items exist (reconcile expected vs existing)
+            const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
+            
+            // Build set of existing item keys using comprehensive unique identifier
+            const existingItemKeys = new Set(
+              (existingItems || []).map(item => {
+                // Use multiple fields to ensure uniqueness, including customization
+                const customKey = item.hasItemCustomization ? 
+                  `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
+                const generalKey = item.hasGeneralCustomization ?
+                  `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
+                return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
+              })
+            );
+            
+            // Find items that should exist but don't
+            const missingItems = uniqueProducerItems.filter((item: any) => {
+              const customKey = item.hasItemCustomization ? 
+                `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
+              const generalKey = item.hasGeneralCustomization ?
+                `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
+              const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
+              return !existingItemKeys.has(itemKey);
+            });
+            
+            // Create missing items with error tracking
+            const itemCreationErrors = [];
+            if (missingItems.length > 0) {
+              console.log(`CRITICAL: Production order ${existingForProducer.id} is missing ${missingItems.length} items! Creating them now...`);
+              for (const item of missingItems) {
+                const itemWithBudgetId = {
+                  ...item,
+                  budgetItemId: item.id || item.budgetItemId || null
+                };
+                try {
+                  await storage.createProductionOrderItem(existingForProducer.id, itemWithBudgetId);
+                  console.log(`✓ Created missing item: ${item.productName} (qty: ${item.quantity})`);
+                } catch (error) {
+                  const errorMsg = `Failed to create missing item ${item.productName}: ${error.message}`;
+                  console.error(`✗ ${errorMsg}`);
+                  itemCreationErrors.push(errorMsg);
+                }
+              }
+              
+              // Alert if any items failed to create
+              if (itemCreationErrors.length > 0) {
+                console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
+                console.error('Failed items:', itemCreationErrors);
+              }
+            }
+
+            // Add to the list and continue
             createdOrders.push(existingForProducer);
             producerNames.push(producer.name);
           }

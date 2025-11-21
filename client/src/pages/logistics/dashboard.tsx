@@ -427,10 +427,8 @@ export default function LogisticsDashboard() {
               currentProducerName: producerGroup.producerName,
               producerItems: producerGroup.items,
               producerValue: producerValue.toFixed(2),
-              // Produto principal deste produtor
-              product: producerGroup.items.length > 1
-                ? `${producerGroup.items[0].productName} +${producerGroup.items.length - 1} mais`
-                : producerGroup.items[0].productName
+              // Listar TODOS os produtos deste produtor
+              product: producerGroup.items.map((item: any) => item.productName).join(', ')
             });
           });
         }
