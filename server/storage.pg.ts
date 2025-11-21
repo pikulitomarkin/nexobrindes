@@ -601,11 +601,15 @@ export class PgStorage implements IStorage {
   }
 
   async getProductionOrdersWithItems(productionOrderIds?: string[]): Promise<(ProductionOrder & { items: ProductionOrderItem[] })[]> {
-    let query = pg.select().from(schema.productionOrders);
+    let orders;
     if (productionOrderIds && productionOrderIds.length > 0) {
-      query = query.where(sql`${schema.productionOrders.id} = ANY(${productionOrderIds})`);
+      orders = await pg.select().from(schema.productionOrders)
+        .where(sql`${schema.productionOrders.id} = ANY(ARRAY[${sql.join(productionOrderIds.map(id => sql`${id}`), sql`, `)}]::varchar[])`)
+        .orderBy(desc(schema.productionOrders.id));
+    } else {
+      orders = await pg.select().from(schema.productionOrders)
+        .orderBy(desc(schema.productionOrders.id));
     }
-    const orders = await query.orderBy(desc(schema.productionOrders.id));
     
     return Promise.all(orders.map(async (order) => ({
       ...order,
@@ -1441,10 +1445,10 @@ export class PgStorage implements IStorage {
 
       // Create production order items with full details
       for (const budgetItem of items) {
-        // Ensure quantity is a number (not a formatted string like "100.000")
-        const quantity = typeof budgetItem.quantity === 'string' 
-          ? parseInt(budgetItem.quantity.replace(/[.,]/g, ''), 10)
-          : budgetItem.quantity;
+        // Ensure quantity is a number - handle both number and string types
+        const quantity = typeof budgetItem.quantity === 'number' 
+          ? budgetItem.quantity
+          : parseInt(String(budgetItem.quantity), 10);
 
         const productionOrderItemData: InsertProductionOrderItem = {
           productionOrderId: productionOrder.id,
