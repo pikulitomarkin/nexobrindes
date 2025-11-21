@@ -559,7 +559,7 @@ export default function ClientProfile() {
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
                       value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({ ...profileForm, confirmPassword: e.target.value })}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                       placeholder="Confirme sua nova senha"
                       required
                       minLength={6}

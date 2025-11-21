@@ -272,14 +272,7 @@ export default function ClientBudgets() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Valor Total</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Vendedor</p>
                         <p className="font-medium text-gray-900">
