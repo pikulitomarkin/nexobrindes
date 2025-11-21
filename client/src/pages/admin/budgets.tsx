@@ -74,10 +74,10 @@ export default function AdminBudgets() {
   const { data: clients, isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
     queryFn: async () => {
-      const response = await fetch('/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
-      const users = await response.json();
-      return users.filter((u: any) => u.role === 'client' && u.isActive !== false);
+      const response = await fetch('/api/clients');
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      const clients = await response.json();
+      return clients.filter((c: any) => c.isActive !== false);
     },
   });
 
