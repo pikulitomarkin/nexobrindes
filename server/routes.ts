@@ -5944,24 +5944,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get products grouped by producer for budget/order creation
+  // DEPRECATED: Get all products (producer selection is now at budget item level)
   app.get("/api/products/by-producer", async (req, res) => {
     try {
-      const productsGrouped = await storage.getProductsGroupedByProducer();
-      res.json(productsGrouped);
+      // Retorna todos os produtos (não mais agrupados por produtor)
+      const result = await storage.getProducts({ limit: 9999 });
+      res.json(result.products);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch products by producer" });
+      res.status(500).json({ error: "Failed to fetch products" });
     }
   });
 
-  // Get products for specific producer
+  // DEPRECATED: Get all products (producer is chosen at budget item level)
   app.get("/api/products/producer/:producerId", async (req, res) => {
     try {
-      const { producerId } = req.params;
-      const products = await storage.getProductsByProducer(producerId);
-      res.json(products);
+      // Retorna todos os produtos globais - produtor é agora selecionado por item no orçamento
+      const result = await storage.getProducts({ limit: 9999 });
+      res.json(result.products);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch producer products" });
+      res.status(500).json({ error: "Failed to fetch products" });
     }
   });
 

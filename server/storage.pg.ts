@@ -879,7 +879,7 @@ export class PgStorage implements IStorage {
     limit?: number;
     search?: string;
     category?: string;
-    producer?: string;
+    producer?: string; // Deprecated - não filtra mais por produtor. Produtor agora é escolhido por item no orçamento
   }): Promise<{ products: Product[]; total: number; page: number; totalPages: number; }> {
     const page = options?.page || 1;
     const limit = options?.limit || 50;
@@ -900,23 +900,18 @@ export class PgStorage implements IStorage {
       conditions.push(eq(schema.products.category, options.category));
     }
 
-    if (options?.producer) {
-      conditions.push(eq(schema.products.producerId, options.producer));
-    }
+    // MUDANÇA: Remover filtro de produtor - produtos são agora globais
+    // Produtor é escolhido no nível do item do orçamento (budgetItems.producerId)
 
     const products = await pg.select().from(schema.products)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
 
-    // Get all producers to enrich products with producer names
-    const producers = await pg.select().from(schema.users).where(eq(schema.users.role, 'producer'));
-
-    // Enrich products with producer names
+    // Enrich products info
     const enrichedProducts = products.map(product => ({
       ...product,
-      producerName: product.producerId === 'internal' ? 'Interno' : 
-        (producers.find(p => p.id === product.producerId)?.name || 'Produtor não encontrado')
+      producerName: 'Será definido no orçamento'
     }));
 
     const totalResults = await pg.select({ count: sql<number>`count(*)` }).from(schema.products)
