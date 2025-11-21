@@ -160,7 +160,9 @@ export class PgStorage implements IStorage {
   // ==================== CLIENTS ====================
 
   async getClients(): Promise<Client[]> {
-    return await pg.select().from(schema.clients).orderBy(desc(schema.clients.createdAt));
+    return await pg.select().from(schema.clients)
+      .where(eq(schema.clients.isActive, true))
+      .orderBy(desc(schema.clients.createdAt));
   }
 
   async getClient(id: string): Promise<Client | undefined> {
@@ -214,24 +216,37 @@ export class PgStorage implements IStorage {
   }
 
   async deleteClient(id: string): Promise<boolean> {
-    await pg.delete(schema.clients).where(eq(schema.clients.id, id));
+    // Mark client as inactive instead of deleting
+    const client = await this.getClient(id);
+    if (client && client.userId) {
+      // Also mark the associated user as inactive
+      await pg.update(schema.users)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(schema.users.id, client.userId));
+    }
+    // Mark client as inactive
+    await pg.update(schema.clients)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(schema.clients.id, id));
     return true;
   }
 
   async getClientByUserId(userId: string): Promise<Client | undefined> {
-    const results = await pg.select().from(schema.clients).where(eq(schema.clients.userId, userId));
+    const results = await pg.select().from(schema.clients)
+      .where(and(eq(schema.clients.userId, userId), eq(schema.clients.isActive, true)));
     return results[0];
   }
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
-    const clients = await pg.select().from(schema.clients).where(eq(schema.clients.vendorId, vendorId));
+    const clients = await pg.select().from(schema.clients)
+      .where(and(eq(schema.clients.vendorId, vendorId), eq(schema.clients.isActive, true)));
     
     // Filter out deleted clients (clients whose user was deleted)
     const activeClients = await Promise.all(
       clients.map(async (client) => {
         if (client.userId) {
           const user = await this.getUser(client.userId);
-          return user ? client : null;
+          return user && user.isActive !== false ? client : null;
         }
         return client; // Keep clients without userId (legacy records)
       })
