@@ -6144,13 +6144,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sum + parseFloat(order.totalValue || '0'), 0
           );
 
-          return {
-            ...client,
+          const enriched = {
+            id: client.id,  // CRITICAL: Ensure clientId is the id field
+            userId: client.userId,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            whatsapp: client.whatsapp,
+            cpfCnpj: client.cpfCnpj,
+            address: client.address,
+            vendorId: client.vendorId,
+            isActive: client.isActive,
+            createdAt: client.createdAt,
+            updatedAt: client.updatedAt,
             userCode: ownerUser?.username || null,
             vendorName: vendor?.name || null,
             ordersCount: clientOrders.length,
             totalSpent,
           };
+
+          return enriched;
         })
       );
 
