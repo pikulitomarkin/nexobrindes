@@ -1535,27 +1535,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingOrders = await storage.getProductionOrdersByOrder(id);
         const existingForProducer = existingOrders.find(po => po.producerId === currentProducerId);
 
+        let productionOrder;
+
         if (existingForProducer) {
-          console.log(`Production order already exists for producer ${currentProducerId} on order ${id}`);
+          console.log(`Production order already exists for producer ${currentProducerId} on order ${id} with status: ${existingForProducer.status}`);
 
-          // If sending to specific producer and order already exists, return error
-          if (producerId) {
-            return res.status(400).json({
-              error: `Ordem de produção para ${producer.name} já foi criada anteriormente`
+          // If status is pending, update to accepted (user is confirming the send)
+          if (existingForProducer.status === 'pending') {
+            console.log(`Updating production order ${existingForProducer.id} from pending to accepted`);
+            
+            // Update the production order status and details
+            productionOrder = await storage.updateProductionOrder(existingForProducer.id, {
+              status: 'accepted',
+              orderDetails: JSON.stringify(orderDetails),
+              shippingAddress: orderDetails.shippingAddress
             });
-          }
 
-          // Otherwise, just add to the list and continue
-          createdOrders.push(existingForProducer);
-          producerNames.push(producer.name);
+            // Update production order items if needed
+            const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
+            
+            // If items don't exist yet, create them
+            if (!existingItems || existingItems.length === 0) {
+              console.log(`Creating ${uniqueProducerItems.length} items for production order ${existingForProducer.id}`);
+              for (const item of uniqueProducerItems) {
+                // Add budgetItemId if it exists (for budget-based orders)
+                const itemWithBudgetId = {
+                  ...item,
+                  budgetItemId: item.id || item.budgetItemId || null
+                };
+                try {
+                  await storage.createProductionOrderItem(existingForProducer.id, itemWithBudgetId);
+                } catch (error) {
+                  console.error(`Error creating production order item:`, error);
+                }
+              }
+            }
+
+            createdOrders.push(productionOrder);
+            producerNames.push(producer.name);
+            console.log(`Updated production order ${productionOrder.id} for producer ${producer.name} from pending to accepted`);
+          } else {
+            // Production order already sent/accepted, return error
+            if (producerId) {
+              return res.status(400).json({
+                error: `Ordem de produção para ${producer.name} já foi enviada anteriormente`
+              });
+            }
+
+            // Otherwise, just add to the list and continue
+            createdOrders.push(existingForProducer);
+            producerNames.push(producer.name);
+          }
           continue;
         }
 
-        // Create production order
-        const productionOrder = await storage.createProductionOrder({
+        // Create new production order if it doesn't exist
+        productionOrder = await storage.createProductionOrder({
           orderId: id,
           producerId: currentProducerId,
-          status: 'pending',
+          status: 'accepted', // Start as accepted since user is actively sending
           deadline: order.deadline,
           deliveryDeadline: order.deliveryDeadline,
           shippingAddress: orderDetails.shippingAddress,
@@ -1564,10 +1602,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           producerValueLocked: false
         });
 
+        // Create production order items
+        console.log(`Creating ${uniqueProducerItems.length} items for production order ${productionOrder.id}`);
+        for (const item of uniqueProducerItems) {
+          // Add budgetItemId if it exists (for budget-based orders)
+          const itemWithBudgetId = {
+            ...item,
+            budgetItemId: item.id || item.budgetItemId || null
+          };
+          try {
+            await storage.createProductionOrderItem(productionOrder.id, itemWithBudgetId);
+          } catch (error) {
+            console.error(`Error creating production order item:`, error);
+          }
+        }
+
         createdOrders.push(productionOrder);
         producerNames.push(producer.name);
 
-        console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${items.length} items`);
+        console.log(`Created production order ${productionOrder.id} for producer ${producer.name} with ${uniqueProducerItems.length} items`);
       }
 
       // Only update order status to production if ALL producers have received their orders

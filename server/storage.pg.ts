@@ -600,6 +600,40 @@ export class PgStorage implements IStorage {
       .where(eq(schema.productionOrderItems.productionOrderId, productionOrderId));
   }
 
+  async createProductionOrderItem(productionOrderId: string, itemData: any): Promise<ProductionOrderItem> {
+    // Convert quantity to integer (budget items store as numeric)
+    const quantity = Math.round(parseFloat(String(itemData.quantity || 0)));
+    
+    const productionOrderItemData: InsertProductionOrderItem = {
+      productionOrderId: productionOrderId,
+      budgetItemId: itemData.budgetItemId || null,
+      productId: itemData.productId,
+      productName: itemData.productName || 'Produto',
+      quantity: quantity,
+      unitPrice: itemData.unitPrice,
+      totalPrice: itemData.totalPrice,
+      notes: itemData.notes || null,
+      hasItemCustomization: itemData.hasItemCustomization || false,
+      itemCustomizationValue: itemData.itemCustomizationValue || null,
+      itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+      customizationPhoto: itemData.customizationPhoto || null,
+      productWidth: itemData.productWidth || null,
+      productHeight: itemData.productHeight || null,
+      productDepth: itemData.productDepth || null,
+      hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+      generalCustomizationName: itemData.generalCustomizationName || null,
+      generalCustomizationValue: itemData.generalCustomizationValue || null,
+      hasItemDiscount: itemData.hasItemDiscount || false,
+      itemDiscountType: itemData.itemDiscountType || 'percentage',
+      itemDiscountPercentage: itemData.itemDiscountPercentage || null,
+      itemDiscountValue: itemData.itemDiscountValue || null,
+    };
+
+    const results = await pg.insert(schema.productionOrderItems).values(productionOrderItemData).returning();
+    console.log(`Created production order item for product ${itemData.productName} (qty: ${quantity})`);
+    return results[0];
+  }
+
   async getProductionOrdersWithItems(productionOrderIds?: string[]): Promise<(ProductionOrder & { items: ProductionOrderItem[] })[]> {
     let orders;
     if (productionOrderIds && productionOrderIds.length > 0) {
