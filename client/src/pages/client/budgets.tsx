@@ -177,47 +177,63 @@ export default function ClientBudgets() {
               <p className="text-sm text-gray-600 mb-4">
                 Encontradas {quoteRequests.length} solicitações de orçamento
               </p>
-              {quoteRequests.map((request: any) => (
-                <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2">
-                        {request.productSummary || request.productName || 'Solicitação de Orçamento'}
-                      </h3>
-                      {request.totalProducts > 1 && (
-                        <p className="text-sm text-blue-600 mb-2">
-                          {request.totalProducts} produtos solicitados
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {new Date(request.createdAt).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span>Qtd: {request.quantity}</span>
+              {quoteRequests.map((request: any) => {
+                const totalQuantity = request.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
+                const productNames = request.items?.map((item: any) => item.productName).join(', ') || 'Solicitação de Orçamento';
+                
+                return (
+                  <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-2">
+                          {productNames}
+                        </h3>
+                        {request.items && request.items.length > 1 && (
+                          <p className="text-sm text-blue-600 mb-2">
+                            {request.items.length} produtos solicitados
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {new Date(request.createdAt).toLocaleDateString('pt-BR')}
+                          </span>
+                          {totalQuantity > 0 && <span>Qtd: {totalQuantity}</span>}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <span>Vendedor: {request.vendorName || 'Não informado'}</span>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <span>Vendedor: {request.vendorName || 'Não informado'}</span>
+                      <div>
+                        {getStatusBadge(request.status, 'request')}
                       </div>
                     </div>
-                    <div>
-                      {getStatusBadge(request.status, 'request')}
-                    </div>
+
+                    {request.items && request.items.length > 0 && (
+                      <div className="text-sm bg-gray-50 p-2 rounded mb-3">
+                        <p className="font-medium mb-1">Itens solicitados:</p>
+                        {request.items.map((item: any, idx: number) => (
+                          <p key={idx} className="text-gray-700">
+                            • {item.productName} (Qtd: {item.quantity})
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {request.observations && (
+                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded mb-3">
+                        <strong>Observações:</strong> {request.observations}
+                      </p>
+                    )}
+
+                    {request.status === 'quoted' && (
+                      <div className="text-green-600 font-medium text-sm">
+                        ✓ Orçamento enviado pelo vendedor
+                      </div>
+                    )}
                   </div>
-
-                  {request.observations && (
-                    <p className="text-sm text-gray-600 mt-3 bg-gray-50 p-2 rounded">
-                      <strong>Observações:</strong> {request.observations}
-                    </p>
-                  )}
-
-                  {request.status === 'quoted' && (
-                    <div className="text-green-600 font-medium text-sm mt-3">
-                      ✓ Orçamento enviado pelo vendedor
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">
