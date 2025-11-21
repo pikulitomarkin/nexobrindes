@@ -7812,16 +7812,17 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        // Count how many unique producers already have production orders
+        // Count how many unique producers already have production orders that were SENT (not pending)
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
-        const producersWithPOs = new Set(existingPOs.map(po => po.producerId));
+        const sentPOs = existingPOs.filter(po => po.status !== 'pending');
+        const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
         
-        // Order is valid if it's paid, has external producers, and NOT ALL producers have POs yet
-        const notAllProducersHavePOs = uniqueProducers.size > producersWithPOs.size;
-        const isValid = isPaid && hasExternalProducers && notAllProducersHavePOs;
+        // Order is valid if it's paid, has external producers, and NOT ALL producers have been sent POs yet
+        const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
+        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs;
 
         if (isValid) {
-          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithPOs.size} with POs`);
+          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
         }
 
         return isValid;
