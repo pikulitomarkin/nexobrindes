@@ -2531,8 +2531,8 @@ export default function AdminBudgets() {
                   <SelectValue placeholder={clientsLoading ? "Carregando clientes..." : "Selecione o cliente"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {clients?.filter((client: any) => client.clientId).map((client: any) => (
-                    <SelectItem key={client.clientId} value={client.clientId}>{client.name}</SelectItem>
+                  {clients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
