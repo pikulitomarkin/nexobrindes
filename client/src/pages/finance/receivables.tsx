@@ -78,6 +78,7 @@ export default function FinanceReceivables() {
     minimumPayment: receivable.minimumPayment || "0.00", // Pagamento mínimo obrigatório (entrada + frete)
     status: receivable.status || "pending",
     createdAt: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
+    orderDate: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
     lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
     shippingCost: receivable.shippingCost || "0.00",
     items: receivable.items || []
@@ -624,6 +625,12 @@ export default function FinanceReceivables() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Cliente</p>
                   <p className="font-semibold text-gray-900">{selectedReceivable.clientName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Data de Entrada do Pedido</p>
+                  <p className="font-semibold text-gray-900">
+                    {new Date(selectedReceivable.orderDate).toLocaleDateString('pt-BR')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Data de Vencimento</p>
