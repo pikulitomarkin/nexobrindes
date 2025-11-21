@@ -31,8 +31,9 @@ export default function AdminBudgets() {
   const [budgetToView, setBudgetToView] = useState<any>(null);
   const { toast } = useToast();
 
-  // State for selected producer in product selection
-  const [selectedProducerId, setSelectedProducerId] = useState<string>("");
+  // State for product/producer selection - NEW FLOW: Product first, then producer
+  const [selectedProductForProducer, setSelectedProductForProducer] = useState<any>(null);
+  const [showProducerSelector, setShowProducerSelector] = useState(false);
 
   // Admin budget form state - independent from vendor
   const [adminBudgetForm, setAdminBudgetForm] = useState({
@@ -235,12 +236,12 @@ export default function AdminBudgets() {
     updateAdminBudgetItem(itemIndex, 'customizationPhoto', '');
   };
 
-  // Admin budget functions
+  // Admin budget functions - NEW FLOW
   const addProductToAdminBudget = (product: any, producerId?: string) => {
     const newItem = {
       productId: product.id,
       productName: product.name,
-      producerId: producerId || product.producerId || 'internal', // Ensure producerId is captured
+      producerId: producerId || 'internal', // User must select producer now
       quantity: 1,
       unitPrice: parseFloat(product.basePrice),
       totalPrice: parseFloat(product.basePrice),
@@ -266,6 +267,8 @@ export default function AdminBudgets() {
       ...prev,
       items: [...prev.items, newItem]
     }));
+    setSelectedProductForProducer(null);
+    setShowProducerSelector(false);
   };
 
   const updateAdminBudgetItem = (index: number, field: string, value: any) => {
@@ -384,7 +387,8 @@ export default function AdminBudgets() {
     });
     setIsEditMode(false);
     setEditingBudgetId(null);
-    setSelectedProducerId("");
+    setSelectedProductForProducer(null);
+    setShowProducerSelector(false);
   };
 
   const createAdminBudgetMutation = useMutation({
@@ -1401,7 +1405,7 @@ export default function AdminBudgets() {
                   </div>
                 )}
 
-                {/* Add Products */}
+                {/* Add Products - NEW FLOW: Product first, then producer */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -1410,96 +1414,113 @@ export default function AdminBudgets() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {!selectedProducerId ? (
-                      <div className="text-center py-8">
-                        <Button
-                          type="button"
-                          className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-700 hover:to-teal-600 text-white"
-                          onClick={() => setSelectedProducerId("select")}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Adicionar Produto
-                        </Button>
-                        <p className="text-sm text-gray-500 mt-2">Clique para escolher um produto</p>
-                      </div>
-                    ) : selectedProducerId === "select" ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label>Selecionar Produtor *</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedProducerId("select")}
-                          >
-                            Trocar Produtor
-                          </Button>
+                    <div className="space-y-4">
+                      {/* Product Search and Filter */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Buscar produtos..."
+                            value={budgetProductSearch}
+                            onChange={(e) => setBudgetProductSearch(e.target.value)}
+                            className="pl-9"
+                          />
                         </div>
-                        <Select 
-                          value="" 
-                          onValueChange={(value) => setSelectedProducerId(value)}
-                        >
+                        <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Escolha um produtor para ver seus produtos" />
+                            <SelectValue placeholder="Categoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="internal">Produtos Internos</SelectItem>
-                            {producers?.map((producer: any) => (
-                              <SelectItem key={producer.id} value={producer.id}>
-                                {producer.name} - {producer.specialty}
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category === "all" ? "Todas as Categorias" : category}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label className="flex items-center gap-2">
-                            <Factory className="h-4 w-4" />
-                            Selecionado: {selectedProducerId === 'internal' ? 'Produtos Internos' : 
-                              producers?.find((p: any) => p.id === selectedProducerId)?.name || 'Produtor não encontrado'}
-                          </Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedProducerId("select")}
-                          >
-                            Trocar Produtor
-                          </Button>
-                        </div>
 
-                        {/* Product Search and Filter */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                            <Input
-                              placeholder="Buscar produtos..."
-                              value={budgetProductSearch}
-                              onChange={(e) => setBudgetProductSearch(e.target.value)}
-                              className="pl-9"
-                            />
-                          </div>
-                          <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Categoria" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((category) => (
-                                <SelectItem key={category} value={category}>
-                                  {category === "all" ? "Todas as Categorias" : category}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      {/* Product List - ALL PRODUCTS (not filtered by producer) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                        {(() => {
+                          // NOVO: Mostrar TODOS os produtos
+                          const filteredProducts = products.filter((product: any) => {
+                            const matchesSearch = !budgetProductSearch ||
+                              product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                              product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
+                              product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
 
-                        {/* Product List */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                            const matchesCategory = budgetCategoryFilter === "all" ||
+                              product.category === budgetCategoryFilter;
+
+                            return matchesSearch && matchesCategory;
+                          });
+
+                          if (filteredProducts.length === 0) {
+                            return (
+                              <div className="col-span-full text-center py-8">
+                                <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <p className="text-gray-500">
+                                  Nenhum produto encontrado com os filtros aplicados
+                                </p>
+                                {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setBudgetProductSearch("");
+                                      setBudgetCategoryFilter("all");
+                                    }}
+                                    className="mt-2"
+                                  >
+                                    Limpar filtros
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          return filteredProducts.map((product: any) => (
+                            <div 
+                              key={product.id} 
+                              className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => {
+                                setSelectedProductForProducer(product);
+                                setShowProducerSelector(true);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                {product.imageLink ? (
+                                  <img 
+                                    src={product.imageLink} 
+                                    alt={product.name} 
+                                    className="w-8 h-8 object-cover rounded" 
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                    <Package className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  {product.category && (
+                                    <p className="text-xs text-blue-600">{product.category}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                        <span>
                           {(() => {
-                            const producerProducts = productsByProducer[selectedProducerId] || [];
-                            const filteredProducts = producerProducts.filter((product: any) => {
+                            const filteredProducts = products.filter((product: any) => {
                               const matchesSearch = !budgetProductSearch ||
                                 product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
                                 product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
@@ -1510,101 +1531,61 @@ export default function AdminBudgets() {
 
                               return matchesSearch && matchesCategory;
                             });
-
-                            if (filteredProducts.length === 0) {
-                              return (
-                                <div className="col-span-full text-center py-8">
-                                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                  <p className="text-gray-500">
-                                    {budgetProductSearch || budgetCategoryFilter !== "all" ?
-                                      "Nenhum produto encontrado com os filtros aplicados" :
-                                      `Nenhum produto disponível para ${selectedProducerId === 'internal' ? 'Produtos Internos' : 'este produtor'}`
-                                    }
-                                  </p>
-                                  {(budgetProductSearch || budgetCategoryFilter !== "all") && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setBudgetProductSearch("");
-                                        setBudgetCategoryFilter("all");
-                                      }}
-                                      className="mt-2"
-                                    >
-                                      Limpar filtros
-                                    </Button>
-                                  )}
-                                </div>
-                              );
-                            }
-
-                            return filteredProducts.map((product: any) => (
-                              <div 
-                                key={product.id} 
-                                className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
-                                onClick={() => addProductToAdminBudget(product, selectedProducerId)}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {product.imageLink ? (
-                                    <img 
-                                      src={product.imageLink} 
-                                      alt={product.name} 
-                                      className="w-8 h-8 object-cover rounded" 
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                      <Package className="h-4 w-4 text-gray-400" />
-                                    </div>
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{product.name}</p>
-                                    <p className="text-xs text-gray-500">
-                                      R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </p>
-                                    {product.category && (
-                                      <p className="text-xs text-blue-600">{product.category}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ));
+                            return `${filteredProducts.length} produtos encontrados`;
                           })()}
-                        </div>
+                        </span>
+                        {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setBudgetProductSearch("");
+                              setBudgetCategoryFilter("all");
+                            }}
+                          >
+                            Limpar filtros
+                          </Button>
+                        )}
+                      </div>
+                    </div>
 
-                        <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
-                          <span>
-                            {(() => {
-                              const producerProducts = productsByProducer[selectedProducerId] || [];
-                              const filteredProducts = producerProducts.filter((product: any) => {
-                                const matchesSearch = !budgetProductSearch ||
-                                  product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                                  product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                                  product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
-
-                                const matchesCategory = budgetCategoryFilter === "all" ||
-                                  product.category === budgetCategoryFilter;
-
-                                return matchesSearch && matchesCategory;
-                              });
-                              return `${filteredProducts.length} produtos encontrados`;
-                            })()}
-                          </span>
-                          {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                    {/* Producer Selector Dialog - appears after product selected */}
+                    {showProducerSelector && selectedProductForProducer && (
+                      <Dialog open={showProducerSelector} onOpenChange={setShowProducerSelector}>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Selecionar Produtor</DialogTitle>
+                            <DialogDescription>
+                              Escolha qual produtor executará o produto: <strong>{selectedProductForProducer.name}</strong>
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-2">
                             <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
+                              variant="outline"
+                              className="w-full justify-start"
                               onClick={() => {
-                                setBudgetProductSearch("");
-                                setBudgetCategoryFilter("all");
+                                addProductToAdminBudget(selectedProductForProducer, 'internal');
                               }}
                             >
-                              Limpar filtros
+                              Produtos Internos
                             </Button>
-                          )}
-                        </div>
-                      </div>
+                            {producers?.map((producer: any) => (
+                              <Button
+                                key={producer.id}
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => {
+                                  addProductToAdminBudget(selectedProductForProducer, producer.id);
+                                }}
+                              >
+                                <Factory className="h-4 w-4 mr-2" />
+                                {producer.name} - {producer.specialty}
+                              </Button>
+                            ))}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     )}
                   </CardContent>
                 </Card>
