@@ -372,14 +372,17 @@ export default function LogisticsDashboard() {
   };
 
   // Expandir pedidos pagos por produtor - cada produtor vira uma linha separada
-  // FILTRA produtores que já têm production order
+  // FILTRA produtores que já têm production order ENVIADA (status !== pending)
   const expandPaidOrdersByProducer = (orders: any[], existingProductionOrders: any[]) => {
     const expandedOrders: any[] = [];
 
-    // Criar mapa de produtores que já receberam production orders
-    const producersWithOrders = new Set();
+    // Criar mapa de produtores que já receberam production orders ENVIADAS (não-pending)
+    const producersWithSentOrders = new Set();
     existingProductionOrders?.forEach((po: any) => {
-      producersWithOrders.add(`${po.orderId}-${po.producerId}`);
+      // Só considerar "enviado" se status não for "pending"
+      if (po.status !== 'pending') {
+        producersWithSentOrders.add(`${po.orderId}-${po.producerId}`);
+      }
     });
 
     orders?.forEach((order: any) => {
@@ -399,10 +402,10 @@ export default function LogisticsDashboard() {
           }
         });
 
-        // Filtrar produtores que ainda NÃO receberam production order
+        // Filtrar produtores que ainda NÃO receberam production order ENVIADA
         const pendingProducers = Array.from(itemsByProducer.values()).filter((producerGroup: any) => {
           const key = `${order.id}-${producerGroup.producerId}`;
-          return !producersWithOrders.has(key);
+          return !producersWithSentOrders.has(key);
         });
 
         // Se há produtores pendentes, criar uma entrada para cada um
