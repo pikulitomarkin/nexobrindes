@@ -7068,8 +7068,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update budget status
       await storage.updateBudget(id, { status: 'converted' });
 
-      console.log(`Budget ${id} converted to order: ${order.id}`);
-      res.json(order);
+      // Get production orders with items for the response
+      const productionOrders = await storage.getProductionOrdersByOrder(order.id);
+      const productionOrdersWithItems = await storage.getProductionOrdersWithItems(productionOrders.map(po => po.id));
+
+      console.log(`Budget ${id} converted to order: ${order.id} with ${productionOrdersWithItems.length} production orders`);
+      res.json({
+        order,
+        productionOrders: productionOrdersWithItems
+      });
     } catch (error) {
       console.error("Error converting budget to order:", error);
       res.status(500).json({ error: error.message });

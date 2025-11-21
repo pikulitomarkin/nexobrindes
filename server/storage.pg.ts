@@ -595,6 +595,24 @@ export class PgStorage implements IStorage {
     return results[0];
   }
 
+  async getProductionOrderItems(productionOrderId: string): Promise<ProductionOrderItem[]> {
+    return await pg.select().from(schema.productionOrderItems)
+      .where(eq(schema.productionOrderItems.productionOrderId, productionOrderId));
+  }
+
+  async getProductionOrdersWithItems(productionOrderIds?: string[]): Promise<(ProductionOrder & { items: ProductionOrderItem[] })[]> {
+    let query = pg.select().from(schema.productionOrders);
+    if (productionOrderIds && productionOrderIds.length > 0) {
+      query = query.where(sql`${schema.productionOrders.id} = ANY(${productionOrderIds})`);
+    }
+    const orders = await query.orderBy(desc(schema.productionOrders.id));
+    
+    return Promise.all(orders.map(async (order) => ({
+      ...order,
+      items: await this.getProductionOrderItems(order.id)
+    })));
+  }
+
   // ==================== PAYMENTS ====================
 
   async getPayments(): Promise<Payment[]> {
