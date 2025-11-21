@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,34 +51,37 @@ export default function ClientProfile() {
       const response = await fetch(`/api/clients/profile/${currentUser.id}`);
       if (!response.ok) throw new Error('Failed to fetch client profile');
       const data = await response.json();
-      
-      // Update form with current data
-      setProfileForm({
-        name: data.name || "",
-        email: data.email || "",
-        phone: data.phone || "",
-        whatsapp: data.whatsapp || "",
-        address: data.address || "",
-        // Novos campos comerciais
-        nomeFantasia: data.nomeFantasia || "",
-        razaoSocial: data.razaoSocial || "",
-        inscricaoEstadual: data.inscricaoEstadual || "",
-        logradouro: data.logradouro || "",
-        numero: data.numero || "",
-        complemento: data.complemento || "",
-        bairro: data.bairro || "",
-        cidade: data.cidade || "",
-        cep: data.cep || "",
-        emailBoleto: data.emailBoleto || "",
-        emailNF: data.emailNF || "",
-        nomeContato: data.nomeContato || "",
-        emailContato: data.emailContato || "",
-      });
-      
       return data;
     },
     enabled: !!currentUser.id,
   });
+
+  // Load form data when query data changes
+  useEffect(() => {
+    if (clientData) {
+      setProfileForm({
+        name: clientData.name || "",
+        email: clientData.email || "",
+        phone: clientData.phone || "",
+        whatsapp: clientData.whatsapp || "",
+        address: clientData.address || "",
+        // Novos campos comerciais
+        nomeFantasia: clientData.nomeFantasia || "",
+        razaoSocial: clientData.razaoSocial || "",
+        inscricaoEstadual: clientData.inscricaoEstadual || "",
+        logradouro: clientData.logradouro || "",
+        numero: clientData.numero || "",
+        complemento: clientData.complemento || "",
+        bairro: clientData.bairro || "",
+        cidade: clientData.cidade || "",
+        cep: clientData.cep || "",
+        emailBoleto: clientData.emailBoleto || "",
+        emailNF: clientData.emailNF || "",
+        nomeContato: clientData.nomeContato || "",
+        emailContato: clientData.emailContato || "",
+      });
+    }
+  }, [clientData]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {

@@ -274,13 +274,6 @@ export default function ClientBudgets() {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Vendedor</p>
-                        <p className="font-medium text-gray-900">
-                          {budget.vendorName || 'Não informado'}
-                        </p>
-                      </div>
-
-                      <div>
                         <p className="text-sm text-gray-600 mb-1">Prazo de Entrega</p>
                         <p className="font-medium text-gray-900">
                           {budget.deliveryDeadline ?
