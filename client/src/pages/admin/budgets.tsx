@@ -1098,7 +1098,7 @@ export default function AdminBudgets() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum cliente selecionado</SelectItem>
-                      {clients?.map((client: any) => (
+                      {clients?.filter((client: any) => client.isActive).map((client: any) => (
                         <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                       ))}
                     </SelectContent>
