@@ -639,8 +639,8 @@ export default function ClientProducts() {
               <div key={item.productId} className="border-b last:border-b-0 pb-2 mb-2 last:mb-0">
                 <div className="flex justify-between items-start text-sm mb-1">
                   <span className="font-medium">{item.productName}</span>
-                  <span className="font-medium">
-                    {item.quantity}x - R$ {(item.basePrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <span className="text-gray-600">
+                    {item.quantity}x
                   </span>
                 </div>
                 {item.observations && (
@@ -648,12 +648,6 @@ export default function ClientProducts() {
                 )}
               </div>
             ))}
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between items-center font-bold">
-                <span>Total estimado:</span>
-                <span>R$ {getTotalValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
           </div>
 
           <form onSubmit={handleSubmitQuote} className="space-y-4">
