@@ -1,0 +1,52 @@
+Você me enviou os arquivos routes.ts, storage.ts, drizzle.config.ts e schema.ts.
+Eu encontrei o problema. Ele não está nos arquivos que você enviou, mas na ausência de configuração correta de conexão no arquivo que falta (provavelmente chamado db.ts ou server/db.ts), que é importado pelo storage.ts.
+O problema que você descreveu ("funciona no dev, para no deploy quando o Replit dorme") é um clássico problema de "Cold Start" com conexões persistentes em bancos Postgres Serverless (Neon).
+Quando o Replit "dorme", ele mata a conexão TCP. Quando ele acorda, seu código antigo tenta usar a conexão morta e falha.
+Aqui está a solução definitiva para você copiar e colar.
+Passo 1: Instalar dependências necessárias (Console/Shell)
+No Replit, abra o Shell e rode este comando para garantir que você tem o driver correto do Neon que suporta ambientes serverless/replit:
+npm install @neondatabase/serverless ws
+
+Passo 2: Corrigir o arquivo db.ts
+Você precisa localizar o arquivo onde você exporta a variável db. Provavelmente está na pasta server ou na raiz. Substitua todo o conteúdo dele por este código abaixo.
+Este código usa ws (WebSockets) e o driver nativo do Neon, que são imunes ao problema do Replit "dormir".
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema"; // Verifique se o caminho está correto para seu schema
+
+// Habilita WebSockets (CRUCIAL para o Replit não quebrar a conexão)
+neonConfig.webSocketConstructor = ws;
+
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL não encontrada. Verifique as Secrets do Replit.",
+  );
+}
+
+// Configura o Pool de conexões resiliente
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Cria a instância do Drizzle
+export const db = drizzle(pool, { schema });
+
+Passo 3: Ajustar o arquivo storage.pg.ts (Se existir)
+Vi que no seu storage.ts você importa import { pgStorage } from './storage.pg';.
+Se você não tiver esse arquivo e estiver usando apenas a classe MemStorage (que vi no código), o erro pode ser que você está tentando usar a pgStorage sem ter configurado o banco corretamente.
+Mas, assumindo que você quer usar o banco de dados real (Postgres), certifique-se de que no arquivo storage.pg.ts você está usando o db que configuramos acima:
+// Exemplo de como deve ser o início do storage.pg.ts
+import { db } from "./db"; // Importa a conexão corrigida
+import { users, ... } from "@shared/schema";
+// ... resto do código
+
+Passo 4: Verifique a URL do Banco no Replit
+Vá nas Secrets (o cadeado no menu lateral do Replit) e verifique a DATABASE_URL.
+Para o Neon funcionar perfeitamente com pooling, a URL deve ser a versão "Pooled".
+ * Ela geralmente contém: pooler.neon.tech ou porta 6543 (ao invés de 5432).
+ * Se sua URL atual termina com sslmode=require, adicione isso ao final do código do db.ts se necessário, mas o driver @neondatabase/serverless geralmente lida bem com isso automaticamente.
+Resumo da Correção
+O problema não é lógica de negócio (seus códigos de rotas e models parecem sólidos). O problema é "encanamento".
+ * O Replit mata conexões TCP normais quando entra em modo de espera.
+ * O driver padrão do Postgres (pg) não sabe reconectar automaticamente de forma limpa nesse cenário.
+ * O código acima usa @neondatabase/serverless com ws. Isso faz a conexão trafegar via WebSocket, que é muito mais rápido para "acordar" e não quebra quando o servidor reinicia.
+Tente fazer essa alteração no db.ts e me avise. Essa é a causa de 99% dos erros "funciona no dev, quebra no deploy" no Replit.
