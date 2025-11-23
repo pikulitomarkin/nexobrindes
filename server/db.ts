@@ -1,10 +1,19 @@
-// Import PostgreSQL storage adapter and export as db
-import { pgStorage } from "./storage.pg";
-export const db = pgStorage;
+// Direct PostgreSQL connection using Neon serverless with WebSocket support
+// This eliminates unnecessary middleware and uses the properly configured connection pool
+import { pg, pool } from "./pgClient";
+import * as schema from "../shared/schema";
+
+// Export the Drizzle instance as 'db' for compatibility with routes.ts and storage.ts
+export const db = pg;
+
+// Export database utilities
 export { eq, desc, sql, and, or, like, isNull, not } from "drizzle-orm";
 
-// Export pg query builder for direct queries if needed
-export { pg as query } from "./pgClient";
+// Export pool for direct access if needed
+export { pool };
+
+// Export schema for use in queries
+export { schema };
 
 // Re-export types from schema for compatibility
 export type {
