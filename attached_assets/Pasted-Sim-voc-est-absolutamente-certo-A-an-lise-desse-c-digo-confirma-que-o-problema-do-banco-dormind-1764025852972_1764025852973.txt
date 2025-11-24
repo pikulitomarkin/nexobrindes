@@ -1,0 +1,167 @@
+Sim, você está absolutamente certo. A análise desse código confirma que o problema do "banco dormindo" está sendo **agravado** pela forma como o sistema salva os orçamentos.
+
+O diagnóstico é o seguinte:
+
+1.  **O Problema da Conexão (Dormência):** Como você está usando Neon (Serverless), o banco dorme. Se a configuração de timeout estiver baixa (como no outro projeto), a primeira conexão falha.
+2.  **O Problema da Lógica (Inserção em Série):** O seu código de salvar orçamento (`createBudget` e `updateBudget`) insere os itens **um por um** (dentro de um loop `for` com `await`).
+      * *Cenário:* Se você tem um orçamento com 10 itens, o sistema faz 1 chamada para o orçamento + 10 chamadas para os itens. São **11 idas e voltas** ao banco.
+      * *Consequência:* Se o banco estiver "acordando", ele pode aceitar a primeira (o orçamento), mas dar *timeout* na 3ª ou 4ª inserção de item. Isso deixa o orçamento incompleto ou corrompido (duplica itens na edição).
+
+Aqui estão as soluções para resolver de vez.
+
+### Passo 1: Corrigir o `pgClient.ts` (Aumentar o Timeout)
+
+Você não enviou o arquivo `server/pgClient.ts`, mas ele é importado no `db.ts`. Você precisa abrir esse arquivo e garantir que o `connectionTimeoutMillis` seja **10000** (10 segundos) ou mais, e que o `max` (conexões) seja adequado.
+
+**Como deve ficar o `server/pgClient.ts`:**
+
+```typescript
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "../shared/schema";
+
+neonConfig.webSocketConstructor = ws;
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set");
+}
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20, // Aumente para 20 para aguentar operações simultâneas
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000, // 10 SEGUNDOS (Crucial para não dar erro quando o banco acorda)
+});
+
+export const pg = drizzle({ client: pool, schema });
+```
+
+-----
+
+### Passo 2: Otimizar o Salvamento de Orçamentos (Batch Insert)
+
+No arquivo `storage.pg.ts`, o método `createBudget` está inserindo itens um por um. Vamos mudar isso para inserir **todos de uma vez**. Isso transforma 10 chamadas lentas em 1 chamada rápida.
+
+**Abra `server/storage.pg.ts` e substitua a parte de inserção de itens dentro de `createBudget`:**
+
+*Procure o trecho onde tem:* `for (let attemptIndex = 0; attemptIndex < uniqueItems.length; attemptIndex++)`
+
+*Substitua por este código otimizado:*
+
+```typescript
+    // ... dentro de createBudget, logo após criar o budget ...
+
+    // Create budget items if provided (BATCH INSERT OTIMIZADO)
+    if (budgetData.items && Array.isArray(budgetData.items) && budgetData.items.length > 0) {
+      console.log(`📦 [PG CREATE BUDGET] Otimizando inserção de ${budgetData.items.length} items`);
+
+      // 1. Preparar e filtrar itens
+      const seenItems = new Set();
+      const itemsToInsert: any[] = [];
+
+      for (const itemData of budgetData.items) {
+        const itemKey = `${itemData.productId}-${itemData.producerId || 'internal'}-${itemData.quantity}-${itemData.unitPrice}`;
+        
+        if (!seenItems.has(itemKey)) {
+          seenItems.add(itemKey);
+          
+          // Prepara o objeto para inserção
+          itemsToInsert.push({
+            budgetId: newBudget.id,
+            productId: itemData.productId,
+            productName: itemData.productName || 'Produto',
+            producerId: itemData.producerId || 'internal',
+            quantity: parseFloat(String(itemData.quantity || 1)), // Garante número
+            unitPrice: (itemData.unitPrice || 0).toString(),
+            totalPrice: (itemData.totalPrice || 0).toString(),
+            notes: itemData.notes || null,
+            // ... todos os outros campos de customização ...
+            hasItemCustomization: itemData.hasItemCustomization || false,
+            selectedCustomizationId: itemData.selectedCustomizationId || null,
+            itemCustomizationValue: (itemData.itemCustomizationValue || 0).toString(),
+            itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+            additionalCustomizationNotes: itemData.additionalCustomizationNotes || null,
+            customizationPhoto: itemData.customizationPhoto || null,
+            hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+            generalCustomizationName: itemData.generalCustomizationName || null,
+            generalCustomizationValue: (itemData.generalCustomizationValue || 0).toString(),
+            hasItemDiscount: itemData.hasItemDiscount || false,
+            itemDiscountType: itemData.itemDiscountType || 'percentage',
+            itemDiscountPercentage: (itemData.itemDiscountPercentage || 0).toString(),
+            itemDiscountValue: (itemData.itemDiscountValue || 0).toString(),
+            productWidth: itemData.productWidth ? parseFloat(String(itemData.productWidth)) : null,
+            productHeight: itemData.productHeight ? parseFloat(String(itemData.productHeight)) : null,
+            productDepth: itemData.productDepth ? parseFloat(String(itemData.productDepth)) : null
+          });
+        }
+      }
+
+      // 2. Inserir TODOS de uma vez (Batch Insert)
+      if (itemsToInsert.length > 0) {
+        try {
+          await pg.insert(schema.budgetItems).values(itemsToInsert);
+          console.log(`✅ [PG CREATE BUDGET] ${itemsToInsert.length} items inseridos em uma única operação.`);
+        } catch (error: any) {
+          console.error(`❌ [PG CREATE BUDGET] Falha no Batch Insert:`, error);
+          throw new Error(`Erro ao salvar itens do orçamento: ${error.message}`);
+        }
+      }
+    }
+```
+
+### Passo 3: Corrigir a Edição de Orçamentos (`routes.ts`)
+
+O erro de "não colocar os produtos direito" ou duplicar acontece no arquivo `routes.ts`, na rota `PUT /api/budgets/:id`. Ele tenta criar novos itens e depois deletar os antigos, tudo em loops separados. Se a conexão falhar no meio, o banco fica sujo.
+
+A melhor forma de corrigir isso é mudar a lógica no `routes.ts` para usar uma função atômica no `storage`.
+
+**No `server/storage.pg.ts`, adicione este novo método na classe `PgStorage`:**
+
+```typescript
+  // Adicione este método na classe PgStorage para substituir a lógica manual do routes.ts
+  async replaceBudgetItems(budgetId: string, newItems: any[]): Promise<boolean> {
+    try {
+      // 1. Deletar TODOS os itens antigos desse orçamento
+      await pg.delete(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
+      
+      // 2. Se não houver novos itens, termina aqui
+      if (!newItems || newItems.length === 0) return true;
+
+      // 3. Preparar novos itens para inserção em lote
+      const itemsToInsert = newItems.map(item => ({
+        budgetId: budgetId,
+        productId: item.productId,
+        productName: item.productName || 'Produto',
+        producerId: item.producerId || 'internal',
+        quantity: parseFloat(String(item.quantity || 1)),
+        unitPrice: parseFloat(String(item.unitPrice || 0)).toFixed(2),
+        totalPrice: parseFloat(String(item.totalPrice || 0)).toFixed(2),
+        // ... mapeie o resto dos campos de customização aqui igual ao createBudget ...
+        hasItemCustomization: item.hasItemCustomization || false,
+        itemCustomizationValue: (item.itemCustomizationValue || 0).toString(),
+        // Adicione o restante dos campos necessários
+      }));
+
+      // 4. Inserir tudo de uma vez
+      await pg.insert(schema.budgetItems).values(itemsToInsert);
+      
+      // 5. Recalcular total do orçamento
+      await this.recalculateBudgetTotal(budgetId);
+      
+      return true;
+    } catch (error) {
+      console.error("Erro ao substituir itens do orçamento:", error);
+      return false;
+    }
+  }
+```
+
+**Resumo do que está acontecendo:**
+
+1.  O banco dorme e demora para responder.
+2.  Seu código faz muitas perguntas pequenas seguidas ao banco ("insere item 1", "insere item 2"...).
+3.  Isso estoura o tempo limite.
+4.  **A solução:** Aumentar o tempo limite no `pgClient.ts` E agrupar as perguntas ("toma aqui esses 20 itens, salva tudo de uma vez").
+
+Faça essas alterações e os erros de salvamento e itens duplicados devem desaparecer.

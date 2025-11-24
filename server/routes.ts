@@ -1259,6 +1259,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Título é obrigatório" });
       }
 
+      // Convert empty clientId to null (to avoid foreign key violation)
+      if (!budgetData.clientId || budgetData.clientId === '' || budgetData.clientId === 'null') {
+        budgetData.clientId = null;
+      }
+      
       // Validate clientId if provided
       if (budgetData.clientId) {
         try {
