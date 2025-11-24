@@ -1430,10 +1430,21 @@ export class PgStorage implements IStorage {
     const budget = await this.getBudget(budgetId);
     if (!budget) throw new Error('Budget not found');
 
+    // Get budget payment info (contains shipping and payment data)
+    const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
+    console.log(`[CONVERT BUDGET] Payment info for budget ${budgetId}:`, budgetPaymentInfo);
+
     // Normalize deliveryDate to Date object
     const deliveryDateObj = deliveryDate instanceof Date ? deliveryDate : (deliveryDate ? new Date(deliveryDate) : undefined);
 
-    // Create order from budget
+    // Helper function to ensure money fields are properly formatted
+    const toMoneyString = (value: any): string => {
+      if (value === null || value === undefined || value === '') return "0.00";
+      const num = parseFloat(String(value));
+      return isNaN(num) ? "0.00" : num.toFixed(2);
+    };
+
+    // Create order from budget with payment and shipping info
     const orderData: InsertOrder = {
       orderNumber: `PED-${Date.now()}`,
       clientId: clientId,
@@ -1450,8 +1461,29 @@ export class PgStorage implements IStorage {
       contactEmail: budget.contactEmail,
       deliveryType: budget.deliveryType,
       deliveryDeadline: deliveryDateObj,
-      deadline: deliveryDateObj
+      deadline: deliveryDateObj,
+      // Copy payment and shipping info from budget (with proper type conversion)
+      paymentMethodId: budgetPaymentInfo?.paymentMethodId || null,
+      shippingMethodId: budgetPaymentInfo?.shippingMethodId || null,
+      shippingCost: toMoneyString(budgetPaymentInfo?.shippingCost),
+      installments: budgetPaymentInfo?.installments ? Number(budgetPaymentInfo.installments) : 1,
+      downPayment: toMoneyString(budgetPaymentInfo?.downPayment),
+      remainingAmount: toMoneyString(budgetPaymentInfo?.remainingAmount || budget.totalValue),
+      // Copy discount info from budget (with proper type conversion)
+      hasDiscount: budget.hasDiscount || false,
+      discountType: budget.discountType || 'percentage',
+      discountPercentage: toMoneyString(budget.discountPercentage),
+      discountValue: toMoneyString(budget.discountValue)
     } as InsertOrder;
+    
+    console.log(`[CONVERT BUDGET] Order data with payment info:`, {
+      paymentMethodId: orderData.paymentMethodId,
+      shippingMethodId: orderData.shippingMethodId,
+      shippingCost: orderData.shippingCost,
+      installments: orderData.installments,
+      downPayment: orderData.downPayment,
+      remainingAmount: orderData.remainingAmount
+    });
 
     const order = await this.createOrder(orderData);
 
