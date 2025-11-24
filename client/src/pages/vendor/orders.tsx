@@ -620,6 +620,28 @@ export default function VendorOrders() {
       setVendorOrderForm(prev => ({ ...prev, branchId: "matriz" }));
     }
 
+    // Validar campos obrigatórios
+    if (!vendorOrderForm.title) {
+      toast({ title: "Erro", description: "O título do pedido é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!vendorOrderForm.contactName) {
+      toast({ title: "Erro", description: "O nome de contato é obrigatório.", variant: "destructive" });
+      return;
+    }
+    if (!vendorOrderForm.paymentMethodId) {
+      toast({ title: "Erro", description: "A forma de pagamento é obrigatória.", variant: "destructive" });
+      return;
+    }
+    if (vendorOrderForm.installments < 1) {
+      toast({ title: "Erro", description: "O número de parcelas deve ser pelo menos 1.", variant: "destructive" });
+      return;
+    }
+    if (vendorOrderForm.deliveryType !== 'pickup' && !vendorOrderForm.shippingMethodId) {
+      toast({ title: "Erro", description: "O método de frete é obrigatório quando o tipo de entrega não é 'Retirada no Local'.", variant: "destructive" });
+      return;
+    }
+
     // Validar datas obrigatórias
     if (!vendorOrderForm.deadline) {
       toast({
@@ -637,18 +659,6 @@ export default function VendorOrders() {
         variant: "destructive"
       });
       return;
-    }
-
-    // Validar frete quando delivery
-    if (vendorOrderForm.deliveryType === "delivery") {
-      if (!vendorOrderForm.shippingMethodId) {
-        toast({
-          title: "Erro",
-          description: "Selecione um método de entrega",
-          variant: "destructive"
-        });
-        return;
-      }
     }
 
     // Validar datas não podem ser no passado
@@ -1515,8 +1525,8 @@ export default function VendorOrders() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="payment-method">Forma de Pagamento</Label>
-                    <Select value={vendorOrderForm.paymentMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, paymentMethodId: value })}>
+                    <Label htmlFor="payment-method">Forma de Pagamento *</Label>
+                    <Select value={vendorOrderForm.paymentMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, paymentMethodId: value })} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a forma de pagamento" />
                       </SelectTrigger>
@@ -1528,8 +1538,8 @@ export default function VendorOrders() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="shipping-method">Método de Frete</Label>
-                    <Select value={vendorOrderForm.shippingMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, shippingMethodId: value })}>
+                    <Label htmlFor="shipping-method">Método de Frete *</Label>
+                    <Select value={vendorOrderForm.shippingMethodId || ""} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, shippingMethodId: value })} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o método de frete" />
                       </SelectTrigger>
@@ -1550,8 +1560,8 @@ export default function VendorOrders() {
                     {selectedPaymentMethod.type === "credit_card" && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label htmlFor="installments">Número de Parcelas</Label>
-                          <Select value={vendorOrderForm.installments?.toString() || "1"} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, installments: parseInt(value) })}>
+                          <Label htmlFor="installments">Número de Parcelas *</Label>
+                          <Select value={vendorOrderForm.installments?.toString() || "1"} onValueChange={(value) => setVendorOrderForm({ ...vendorOrderForm, installments: parseInt(value) })} required>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -1567,37 +1577,28 @@ export default function VendorOrders() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <div>
-                        <Label htmlFor="down-payment">Valor de Entrada (R$)</Label>
+                        <Label htmlFor="down-payment">Valor de Entrada (R$) *</Label>
                         <Input
                           id="down-payment"
-                          value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString()) : ''}
+                          value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const rawValue = e.target.value;
-                            if (rawValue === '' || rawValue === 'R$ ') {
-                              const total = calculateTotalWithShipping();
-                              setVendorOrderForm({
-                                ...vendorOrderForm,
-                                downPayment: 0,
-                                remainingAmount: total
-                              });
-                            } else {
-                              const downPayment = parseCurrencyValue(rawValue);
-                              const total = calculateTotalWithShipping();
-                              setVendorOrderForm({
-                                ...vendorOrderForm,
-                                downPayment,
-                                remainingAmount: Math.max(0, total - downPayment)
-                              });
-                            }
+                            const downPayment = parseCurrencyValue(e.target.value);
+                            const total = calculateTotalWithShipping();
+                            setVendorOrderForm({
+                              ...vendorOrderForm,
+                              downPayment,
+                              remainingAmount: Math.max(0, total - downPayment)
+                            });
                           }}
                           placeholder="R$ 0,00"
+                          required
                         />
                         <div className="text-xs text-gray-600 mt-2 space-y-1">
                           <div className="flex justify-between">
                             <span>Subtotal dos Produtos:</span>
-                            <span>R$ {vendorOrderForm.downPayment > 0 ? (calculateOrderTotal() - vendorOrderForm.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>R$ {calculateOrderTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
                           {vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
                             <div className="flex justify-between">
@@ -1644,35 +1645,26 @@ export default function VendorOrders() {
                     <h4 className="font-medium">Configuração de Frete</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="shipping-cost">Valor do Frete</Label>
+                        <Label htmlFor="shipping-cost">Valor do Frete (R$) *</Label>
                         <Input
                           id="shipping-cost"
-                          value={vendorOrderForm.shippingCost > 0 ? currencyMask(vendorOrderForm.shippingCost.toString()) : ''}
+                          value={vendorOrderForm.shippingCost > 0 ? currencyMask(vendorOrderForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
-                            const rawValue = e.target.value;
-                            if (rawValue === '' || rawValue === 'R$ ') {
-                              const total = calculateOrderTotal();
-                              setVendorOrderForm({
-                                ...vendorOrderForm,
-                                shippingCost: 0,
-                                remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
-                              });
-                            } else {
-                              const shippingCost = parseCurrencyValue(rawValue);
-                              const total = calculateOrderTotal() + shippingCost;
-                              setVendorOrderForm({
-                                ...vendorOrderForm,
-                                shippingCost,
-                                remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
-                              });
-                            }
+                            const shippingCost = parseCurrencyValue(e.target.value);
+                            const total = calculateOrderTotal() + shippingCost;
+                            setVendorOrderForm({
+                              ...vendorOrderForm,
+                              shippingCost,
+                              remainingAmount: Math.max(0, total - (vendorOrderForm.downPayment || 0))
+                            });
                           }}
                           placeholder="R$ 0,00"
+                          required
                         />
-                        <p className="text-xs text-gray-500 mt-1">Será somado ao total do pedido</p>
+                        <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do pedido</p>
                       </div>
                       <div>
-                        <Label>Prazo de Entrega</Label>
+                        <Label>Prazo Estimado</Label>
                         <p className="text-sm text-gray-600 mt-2">
                           {selectedShippingMethod.estimatedDays} dias úteis
                         </p>
