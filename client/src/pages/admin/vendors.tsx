@@ -233,7 +233,7 @@ export default function AdminVendors() {
         delete updateData.password;
       }
       // Normalize empty branchId to null to avoid FK constraint violation
-      if (!updateData.branchId || updateData.branchId.trim() === "" || updateData.branchId === "default") {
+      if (!updateData.branchId || updateData.branchId === "default" || (typeof updateData.branchId === "string" && updateData.branchId.trim() === "")) {
         updateData.branchId = null as any;
       }
       updateVendorMutation.mutate({ id: selectedVendorId, data: updateData });
