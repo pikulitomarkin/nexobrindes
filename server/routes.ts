@@ -2792,19 +2792,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Handle clientId - use the provided clientId if exists, otherwise create order without client link
+      // Note: orders.clientId references clients.id, NOT users.id
       let finalClientId = null;
       if (orderData.clientId && orderData.clientId !== "") {
-        // Verify client exists
+        // First try to find client by ID directly
         const clientRecord = await storage.getClient(orderData.clientId);
         if (clientRecord) {
-          finalClientId = clientRecord.userId || orderData.clientId;
-          console.log("Using client record:", clientRecord.name);
+          finalClientId = clientRecord.id; // Use client.id (from clients table)
+          console.log("Using client record by id:", clientRecord.name, "clientId:", clientRecord.id);
         } else {
-          // Try finding by userId
+          // Try finding by userId (when clientId is actually a userId)
           const clientByUserId = await storage.getClientByUserId(orderData.clientId);
           if (clientByUserId) {
-            finalClientId = orderData.clientId;
-            console.log("Using client by userId:", clientByUserId.name);
+            finalClientId = clientByUserId.id; // Use client.id, NOT the userId
+            console.log("Using client by userId:", clientByUserId.name, "clientId:", clientByUserId.id);
           }
         }
       }
