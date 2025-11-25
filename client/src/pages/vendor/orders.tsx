@@ -432,11 +432,9 @@ export default function VendorOrders() {
 
   const updateOrderMutation = useMutation({
     mutationFn: async (data: any) => {
-      const selectedClient = clients?.find(c => c.id === data.clientId);
-
-      // Create proper order structure for update
+      // Create proper order structure for update - keep original clientId to avoid FK issues
       const orderData = {
-        clientId: selectedClient?.userId || data.clientId,
+        // Don't change clientId on update - keep the original value from the order
         vendorId: data.vendorId,
         product: data.title, // Use title as product name
         description: data.description || "",
@@ -535,8 +533,8 @@ export default function VendorOrders() {
         contactEmail: fullOrder.contactEmail || "",
         vendorId: fullOrder.vendorId,
         branchId: fullOrder.branchId || "", // Incluir branchId do pedido existente
-        deadline: fullOrder.deadline || "",
-        deliveryDeadline: fullOrder.deliveryDeadline || "",
+        deadline: fullOrder.deadline ? new Date(fullOrder.deadline).toISOString().split('T')[0] : "",
+        deliveryDeadline: fullOrder.deliveryDeadline ? new Date(fullOrder.deliveryDeadline).toISOString().split('T')[0] : "",
         deliveryType: fullOrder.deliveryType || "delivery",
         items: fullOrder.items?.map((item: any) => {
         // Ensure producerId is correctly mapped
