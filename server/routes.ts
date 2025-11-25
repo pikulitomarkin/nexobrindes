@@ -1973,6 +1973,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Associate OFX bank transactions with producer payment
+  app.post("/api/finance/producer-payments/associate-payment", async (req, res) => {
+    try {
+      const { transactionIds, productionOrderId } = req.body;
+
+      console.log("Associate payment request:", { transactionIds, productionOrderId });
+
+      if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação selecionada" });
+      }
+
+      if (!productionOrderId) {
+        return res.status(400).json({ error: "ID da ordem de produção não informado" });
+      }
+
+      // Get the production order
+      const productionOrder = await storage.getProductionOrder(productionOrderId);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Get or create producer payment for this production order
+      let producerPayment = await storage.getProducerPaymentByProductionOrderId(productionOrderId);
+      
+      if (!producerPayment) {
+        // Create payment if it doesn't exist
+        if (!productionOrder.producerValue || parseFloat(productionOrder.producerValue) <= 0) {
+          return res.status(400).json({ error: "Ordem de produção não possui valor definido para o produtor" });
+        }
+
+        producerPayment = await storage.createProducerPayment({
+          productionOrderId,
+          producerId: productionOrder.producerId,
+          amount: productionOrder.producerValue,
+          status: 'pending',
+          notes: productionOrder.producerNotes || null
+        });
+        console.log(`Created producer payment ${producerPayment.id} for association`);
+      }
+
+      // Get the bank transactions
+      const bankTransactions = await Promise.all(
+        transactionIds.map((id: string) => storage.getBankTransaction(id))
+      );
+
+      const validTransactions = bankTransactions.filter(t => t && t.status !== 'matched');
+      
+      if (validTransactions.length === 0) {
+        return res.status(400).json({ error: "Nenhuma transação válida encontrada. As transações podem já ter sido conciliadas." });
+      }
+
+      // Calculate total from selected transactions (use absolute value for debits)
+      const transactionTotal = validTransactions.reduce((sum, t) => {
+        const amount = Math.abs(parseFloat(t.amount));
+        return sum + amount;
+      }, 0);
+
+      const paymentAmount = parseFloat(producerPayment.amount);
+      const difference = transactionTotal - paymentAmount;
+      const hasAdjustment = Math.abs(difference) > 0.01;
+
+      console.log(`Association: Transaction total = ${transactionTotal}, Payment amount = ${paymentAmount}, Difference = ${difference}`);
+
+      // Update bank transactions to mark as matched
+      for (const txn of validTransactions) {
+        await storage.updateBankTransaction(txn.id, {
+          status: 'matched',
+          matchedOrderId: productionOrderId,
+          matchedAt: new Date()
+        });
+      }
+
+      // Get producer name for response
+      let producerName = 'Produtor';
+      if (productionOrder.producerId) {
+        const producer = await storage.getProducer(productionOrder.producerId);
+        if (producer) {
+          producerName = producer.name;
+        }
+      }
+
+      // Update producer payment to paid with OFX reconciliation
+      const updatedPayment = await storage.updateProducerPayment(producerPayment.id, {
+        status: 'paid',
+        paidAt: new Date(),
+        paymentMethod: 'ofx',
+        reconciliationStatus: 'ofx_matched',
+        bankTransactionId: transactionIds[0], // Primary transaction ID
+        notes: hasAdjustment 
+          ? `Conciliado via OFX. Diferença: R$ ${difference.toFixed(2)} (${transactionIds.length} transações)`
+          : `Conciliado via OFX com ${transactionIds.length} transação(ões)`
+      });
+
+      // Update production order payment status
+      await storage.updateProductionOrder(productionOrderId, {
+        paymentStatus: 'paid'
+      });
+
+      console.log(`Producer payment ${producerPayment.id} associated with ${validTransactions.length} OFX transactions`);
+
+      res.json({
+        success: true,
+        payment: {
+          ...updatedPayment,
+          producerName,
+          amount: paymentAmount.toFixed(2),
+          transactionTotal: transactionTotal.toFixed(2),
+          difference: difference.toFixed(2),
+          hasAdjustment,
+          transactionsCount: validTransactions.length
+        },
+        message: `Pagamento de R$ ${paymentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} conciliado com sucesso`
+      });
+    } catch (error) {
+      console.error("Error associating producer payment:", error);
+      res.status(500).json({ error: "Erro ao associar pagamento: " + error.message });
+    }
+  });
+
+  // Approve producer payment (move from pending to approved)
+  app.post("/api/finance/producer-payments/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      console.log(`Approving producer payment: ${id}`);
+
+      // First try to find by producer payment ID
+      let payment = await storage.getProducerPayment(id);
+
+      if (!payment) {
+        // If not found, try to find by production order ID
+        payment = await storage.getProducerPaymentByProductionOrderId(id);
+      }
+
+      if (!payment) {
+        return res.status(404).json({ error: "Pagamento do produtor não encontrado" });
+      }
+
+      if (payment.status === 'paid') {
+        return res.status(400).json({ error: "Este pagamento já foi realizado" });
+      }
+
+      const updatedPayment = await storage.updateProducerPayment(payment.id, {
+        status: 'approved',
+        reconciliationStatus: 'pending'
+      });
+
+      console.log(`Producer payment ${payment.id} approved for OFX reconciliation`);
+
+      res.json({
+        success: true,
+        payment: updatedPayment,
+        message: "Pagamento aprovado. Agora você pode conciliar com transações do OFX."
+      });
+    } catch (error) {
+      console.error("Error approving producer payment:", error);
+      res.status(500).json({ error: "Erro ao aprovar pagamento: " + error.message });
+    }
+  });
+
   // Update producer value for production order
   app.patch("/api/production-orders/:id/value", async (req, res) => {
     try {
