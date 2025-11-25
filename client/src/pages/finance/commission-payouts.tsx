@@ -19,6 +19,8 @@ export default function FinanceCommissionPayouts() {
   const [branchFilter, setBranchFilter] = useState("all");
   const [selectedCommission, setSelectedCommission] = useState<any>(null);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingCommission, setViewingCommission] = useState<any>(null);
   const [selectedCommissions, setSelectedCommissions] = useState<Set<string>>(new Set());
   const [isBulkPayDialogOpen, setIsBulkPayDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -164,6 +166,11 @@ export default function FinanceCommissionPayouts() {
   const handleMarkAsPaid = (commission: any) => {
     setSelectedCommission(commission);
     setIsPayDialogOpen(true);
+  };
+
+  const handleViewCommission = (commission: any) => {
+    setViewingCommission(commission);
+    setIsViewDialogOpen(true);
   };
 
   const confirmPayment = () => {
@@ -399,6 +406,7 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
             onSelectAll={handleSelectAll}
@@ -412,6 +420,7 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
             onSelectAll={handleSelectAll}
@@ -425,6 +434,7 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
+            onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
             onSelectAll={handleSelectAll}
@@ -512,6 +522,66 @@ export default function FinanceCommissionPayouts() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* View Commission Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Comissão</DialogTitle>
+          </DialogHeader>
+          {viewingCommission && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Tipo</p>
+                  <p className="font-medium">{viewingCommission.type === 'vendor' ? 'Vendedor' : 'Sócio'}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Nome</p>
+                  <p className="font-medium">{getUserName(viewingCommission)}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Pedido</p>
+                  <p className="font-medium">{viewingCommission.orderNumber || 'N/A'}</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Percentual</p>
+                  <p className="font-medium">{viewingCommission.percentage}%</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Valor do Pedido</p>
+                  <p className="font-medium">R$ {parseFloat(viewingCommission.orderValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Valor Comissão</p>
+                  <p className="font-bold text-green-700">R$ {parseFloat(viewingCommission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-500">Status</p>
+                <div className="mt-1">{getStatusBadge(viewingCommission.status)}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Criada em</p>
+                  <p className="font-medium">{viewingCommission.createdAt ? new Date(viewingCommission.createdAt).toLocaleDateString('pt-BR') : '-'}</p>
+                </div>
+                {viewingCommission.paidAt && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500">Paga em</p>
+                    <p className="font-medium">{new Date(viewingCommission.paidAt).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -523,6 +593,7 @@ function CommissionsTable({
   getStatusBadge,
   getTypeIcon,
   onMarkAsPaid,
+  onViewCommission,
   selectedCommissions,
   onSelectCommission,
   onSelectAll
@@ -532,6 +603,7 @@ function CommissionsTable({
   getStatusBadge: (status: string) => JSX.Element;
   getTypeIcon: (type: string) => JSX.Element;
   onMarkAsPaid: (commission: any) => void;
+  onViewCommission: (commission: any) => void;
   selectedCommissions: Set<string>;
   onSelectCommission: (id: string, checked: boolean) => void;
   onSelectAll: (commissions: any[], checked: boolean) => void;
@@ -563,22 +635,19 @@ function CommissionsTable({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Nome
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Pedido
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Percentual
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Valor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  DataCriação
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Data
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ações
                 </th>
               </tr>
@@ -606,50 +675,26 @@ function CommissionsTable({
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {getUserName(commission)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {commission.orderNumber || commission.orderId?.slice(-6) || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {commission.percentage}%
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                       R$ {parseFloat(commission.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       {getStatusBadge(commission.status)}
-                      {commission.type === 'vendor' && commission.status !== 'paid' && (
-                        <span className="text-sm text-gray-500">
-                          Aguardando entrega do pedido
-                        </span>
-                      )}
-                      {commission.type !== 'vendor' && commission.status !== 'paid' && (
-                        <span className="text-sm text-gray-500">
-                          Aguardando confirmação do pedido
-                        </span>
-                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {commission.createdAt ? new Date(commission.createdAt).toLocaleDateString('pt-BR') : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-1">
+                        <Button variant="ghost" size="sm" onClick={() => onViewCommission(commission)}>
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
-                        {['pending', 'confirmed'].includes(commission.status) && commission.type === 'vendor' && (
-                           <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onMarkAsPaid(commission)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Pagar
-                          </Button>
-                        )}
-                         {['pending', 'confirmed'].includes(commission.status) && commission.type !== 'vendor' && (
-                           <Button
+                        {['pending', 'confirmed'].includes(commission.status) && (
+                          <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => onMarkAsPaid(commission)}
