@@ -139,9 +139,31 @@ export class PgStorage implements IStorage {
   }
 
   async updateVendorBranch(userId: string, branchId: string | null): Promise<void> {
-    await pg.update(schema.vendors)
-      .set({ branchId })
-      .where(eq(schema.vendors.userId, userId));
+    console.log(`Updating vendor branch for userId ${userId} to branchId:`, branchId);
+    
+    // First, check if vendor record exists
+    const existingVendor = await pg.select().from(schema.vendors)
+      .where(eq(schema.vendors.userId, userId))
+      .limit(1);
+    
+    if (existingVendor.length === 0) {
+      console.log(`No vendor record found for userId ${userId}, creating one...`);
+      // Create vendor record if it doesn't exist
+      await pg.insert(schema.vendors).values({
+        userId: userId,
+        branchId: branchId,
+        commissionRate: "10.00",
+        isActive: true
+      });
+    } else {
+      // Update existing vendor record
+      const result = await pg.update(schema.vendors)
+        .set({ branchId })
+        .where(eq(schema.vendors.userId, userId))
+        .returning();
+      
+      console.log(`Updated vendor branch:`, result[0]);
+    }
   }
 
   async createVendor(vendorData: any): Promise<User> {
