@@ -2919,15 +2919,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Updating order ${id} with data:`, updateData);
 
+      // Get original order before update for comparison
+      const originalOrder = await storage.getOrder(id);
+      if (!originalOrder) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
       const updatedOrder = await storage.updateOrder(id, updateData);
       if (!updatedOrder) {
-        return res.status(404).json({ error: "Pedido não encontrado" });
+        return res.status(404).json({ error: "Erro ao atualizar pedido" });
       }
 
       // If order is being cancelled, update related commissions
       if (updateData.status === 'cancelled') {
         console.log(`Order ${id} cancelled - updating related commissions and payments`);
         await storage.updateCommissionsByOrderStatus(id, 'cancelled');
+      }
+
+      // === CASCADING UPDATES ===
+      
+      // 1. Check if order value changed - recalculate commissions
+      const originalValue = parseFloat(originalOrder.totalValue || '0');
+      const newValue = parseFloat(updatedOrder.totalValue || '0');
+      
+      if (originalValue !== newValue && updateData.status !== 'cancelled') {
+        console.log(`Order ${id} value changed from ${originalValue} to ${newValue} - recalculating commissions`);
+        
+        // Delete existing commissions for this order
+        const allCommissions = await storage.getAllCommissions();
+        const orderCommissions = allCommissions.filter(c => c.orderId === id);
+        for (const commission of orderCommissions) {
+          await storage.deleteCommission(commission.id);
+        }
+        
+        // Recalculate commissions with new value
+        await storage.calculateCommissions(updatedOrder);
+        console.log(`Commissions recalculated for order ${id}`);
+      }
+
+      // 2. Update production orders if items changed
+      if (updateData.items && Array.isArray(updateData.items) && updateData.items.length > 0) {
+        console.log(`Order ${id} items updated - syncing production orders`);
+        
+        // Get existing production orders for this order
+        const existingProductionOrders = await storage.getProductionOrdersByOrder(id);
+        
+        // Group new items by producer
+        const producerGroups = new Map<string, typeof updateData.items>();
+        for (const item of updateData.items) {
+          const producerId = item.producerId || 'internal';
+          if (!producerGroups.has(producerId)) {
+            producerGroups.set(producerId, []);
+          }
+          producerGroups.get(producerId)!.push(item);
+        }
+
+        // Get deadline for production orders
+        const deliveryDeadline = updatedOrder.deliveryDeadline || new Date();
+
+        // For each producer group, create or update production order
+        for (const [producerId, items] of producerGroups.entries()) {
+          if (producerId === 'internal') continue; // Skip internal production
+          
+          // Check if production order already exists for this producer
+          const existingPO = existingProductionOrders.find(po => po.producerId === producerId);
+          
+          if (existingPO) {
+            // Update existing production order notes
+            const itemsDescription = items.map((i: any) => `${i.productName} (${i.quantity}x)`).join(', ');
+            await storage.updateProductionOrderStatus(
+              existingPO.id, 
+              existingPO.status, 
+              `Itens atualizados: ${itemsDescription}`
+            );
+            console.log(`Updated production order ${existingPO.id} for producer ${producerId}`);
+          } else {
+            // Create new production order for this producer
+            const productionOrderData = {
+              orderId: id,
+              producerId: producerId,
+              status: 'pending' as const,
+              deadline: typeof deliveryDeadline === 'string' ? new Date(deliveryDeadline) : deliveryDeadline,
+              deliveryDeadline: typeof deliveryDeadline === 'string' ? new Date(deliveryDeadline) : deliveryDeadline,
+              notes: `Itens: ${items.map((i: any) => `${i.productName} (${i.quantity}x)`).join(', ')}`,
+            };
+            
+            const newPO = await storage.createProductionOrder(productionOrderData);
+            console.log(`Created new production order ${newPO.id} for producer ${producerId}`);
+            
+            // Create production order items
+            for (const item of items) {
+              await storage.createProductionOrderItem(newPO.id, {
+                productId: item.productId,
+                productName: item.productName,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice?.toString() || '0',
+                totalPrice: item.totalPrice?.toString() || '0'
+              });
+            }
+          }
+        }
+
+        // Remove production orders for producers that are no longer in the order
+        const newProducerIds = Array.from(producerGroups.keys());
+        for (const existingPO of existingProductionOrders) {
+          if (!newProducerIds.includes(existingPO.producerId) && existingPO.status === 'pending') {
+            // Mark as cancelled instead of deleting
+            await storage.updateProductionOrderStatus(existingPO.id, 'cancelled', 'Produtor removido do pedido');
+            console.log(`Cancelled production order ${existingPO.id} - producer removed from order`);
+          }
+        }
+        
+        console.log(`Production orders synced for order ${id}`);
       }
 
       // Log order update (non-blocking)
@@ -2955,7 +3058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ).catch(() => {});
       }
 
-      console.log(`Order ${id} updated successfully`);
+      console.log(`Order ${id} updated successfully with cascading updates`);
       res.json(updatedOrder);
     } catch (error) {
       console.error("Error updating order:", error);
