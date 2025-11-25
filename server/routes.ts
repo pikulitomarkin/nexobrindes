@@ -3752,6 +3752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorsWithInfo = await Promise.all(
         vendors.map(async (vendor) => {
           const vendorInfo = await storage.getVendor(vendor.id);
+          const branch = vendorInfo?.branchId ? await storage.getBranch(vendorInfo.branchId) : null;
           return {
             id: vendor.id,
             name: vendor.name,
@@ -3759,7 +3760,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: vendor.phone,
             address: vendor.address,
             username: vendor.username,
-            userCode: vendor.username, // Use username as userCode for display
+            userCode: vendor.username,
+            branchId: vendorInfo?.branchId || null,
+            branchName: branch?.name || null,
             commissionRate: vendorInfo?.commissionRate || '10.00',
             isActive: vendorInfo?.isActive || true
           };
