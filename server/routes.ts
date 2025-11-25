@@ -2945,15 +2945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (originalValue !== newValue && updateData.status !== 'cancelled') {
         console.log(`Order ${id} value changed from ${originalValue} to ${newValue} - recalculating commissions`);
         
-        // Delete existing commissions for this order
-        const allCommissions = await storage.getAllCommissions();
-        const orderCommissions = allCommissions.filter(c => c.orderId === id);
-        for (const commission of orderCommissions) {
-          await storage.deleteCommission(commission.id);
-        }
-        
-        // Recalculate commissions with new value
-        await storage.calculateCommissions(updatedOrder);
+        // Recalculate commissions with new value (updates existing commissions)
+        await storage.recalculateCommissionsForOrder(updatedOrder);
         console.log(`Commissions recalculated for order ${id}`);
       }
 

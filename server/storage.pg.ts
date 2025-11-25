@@ -454,6 +454,81 @@ export class PgStorage implements IStorage {
     }
   }
 
+  async recalculateCommissionsForOrder(order: Order): Promise<void> {
+    try {
+      console.log(`Recalculating commissions for order ${order.orderNumber}`);
+      
+      const orderValue = parseFloat(order.totalValue);
+      
+      // Get existing commissions for this order
+      const existingCommissions = await pg
+        .select()
+        .from(schema.commissions)
+        .where(eq(schema.commissions.orderId, order.id));
+      
+      if (existingCommissions.length === 0) {
+        console.log(`No existing commissions found for order ${order.id}, creating new ones`);
+        await this.calculateCommissions(order);
+        return;
+      }
+      
+      // Get vendor commission rate
+      const vendor = await pg
+        .select()
+        .from(schema.vendors)
+        .where(eq(schema.vendors.userId, order.vendorId))
+        .then(rows => rows[0]);
+      
+      const vendorRate = vendor?.commissionRate || '10.00';
+      const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
+      
+      // Get all partners for partner commissions
+      const allPartners = await pg
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.role, 'partner'));
+      
+      const partnerRate = '15.00';
+      const totalPartnerCommission = (orderValue * parseFloat(partnerRate)) / 100;
+      const individualPartnerCommission = allPartners.length > 0 
+        ? totalPartnerCommission / allPartners.length 
+        : 0;
+      
+      // Update each existing commission
+      for (const commission of existingCommissions) {
+        if (commission.type === 'vendor') {
+          await pg.update(schema.commissions)
+            .set({
+              orderValue: order.totalValue,
+              percentage: vendorRate,
+              amount: vendorCommissionAmount.toFixed(2)
+            })
+            .where(eq(schema.commissions.id, commission.id));
+          
+          console.log(`Updated vendor commission ${commission.id}: R$ ${vendorCommissionAmount.toFixed(2)} (${vendorRate}%)`);
+        } else if (commission.type === 'partner') {
+          const individualPercentage = allPartners.length > 0 
+            ? (parseFloat(partnerRate) / allPartners.length).toFixed(2) 
+            : partnerRate;
+          
+          await pg.update(schema.commissions)
+            .set({
+              orderValue: order.totalValue,
+              percentage: individualPercentage,
+              amount: individualPartnerCommission.toFixed(2)
+            })
+            .where(eq(schema.commissions.id, commission.id));
+          
+          console.log(`Updated partner commission ${commission.id}: R$ ${individualPartnerCommission.toFixed(2)}`);
+        }
+      }
+      
+      console.log(`Recalculated ${existingCommissions.length} commissions for order ${order.orderNumber}`);
+    } catch (error) {
+      console.error('Error recalculating commissions:', error);
+    }
+  }
+
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     // Convert string dates to Date objects if they exist
     const processedData = { ...updates };
