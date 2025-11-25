@@ -195,8 +195,23 @@ export default function AdminVendors() {
     }
   };
 
-  const handleEditVendor = (vendor: any) => {
+  const handleEditVendor = async (vendor: any) => {
     setSelectedVendorId(vendor.id);
+    
+    // Get vendor details including branchId from the vendors table
+    let vendorBranchId = "";
+    try {
+      const vendorDetails = await fetch(`/api/vendors/${vendor.id}/details`);
+      if (vendorDetails.ok) {
+        const details = await vendorDetails.json();
+        vendorBranchId = details.branchId || "";
+      }
+    } catch (error) {
+      console.log("Error fetching vendor details:", error);
+      // Fallback to vendor.branchId if available
+      vendorBranchId = vendor.branchId || "";
+    }
+    
     // Populate form with vendor data
     form.reset({
       name: vendor.name || "",
@@ -204,7 +219,7 @@ export default function AdminVendors() {
       phone: vendor.phone || "",
       address: vendor.address || "",
       commissionRate: vendor.commissionRate?.toString() || "10.00",
-      branchId: vendor.branchId || "",
+      branchId: vendorBranchId,
       password: "", // Don't populate password for security
     });
     setShowEditVendor(true);

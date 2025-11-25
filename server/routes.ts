@@ -970,6 +970,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get vendor details including branchId
+  app.get("/api/vendors/:id/details", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get user info
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "Vendedor não encontrado" });
+      }
+      
+      // Get vendor specific info (including branchId)
+      const vendorInfo = await storage.getVendor(id);
+      
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        commissionRate: vendorInfo?.commissionRate || '10.00',
+        branchId: vendorInfo?.branchId || null,
+        isActive: user.isActive
+      });
+    } catch (error) {
+      console.error("Error getting vendor details:", error);
+      res.status(500).json({ error: "Erro ao buscar detalhes do vendedor: " + error.message });
+    }
+  });
+
   // Update vendor
   app.put("/api/vendors/:id", async (req, res) => {
     try {
@@ -1005,9 +1035,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
       }
 
-      // Update vendor commission rate if provided
+      // Update vendor commission rate and branchId
       if (updateData.commissionRate) {
         await storage.updateVendorCommission(id, updateData.commissionRate);
+      }
+
+      // Update vendor branchId if provided
+      if (updateData.branchId !== undefined) {
+        await storage.updateVendorBranch(id, updateData.branchId);
       }
 
       // Get updated vendor info
@@ -1025,6 +1060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: updatedUser.username,
           userCode: updatedUser.username,
           commissionRate: vendorInfo?.commissionRate || updateData.commissionRate || '10.00',
+          branchId: vendorInfo?.branchId || null,
           isActive: updatedUser.isActive
         },
         message: "Vendedor atualizado com sucesso"
