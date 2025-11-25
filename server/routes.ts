@@ -3797,7 +3797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userCode: vendor.username, // Use username as userCode for display
             commissionRate: vendorInfo?.commissionRate || '10.00',
             branchId: vendorInfo?.branchId || null, // Include branchId
-            isActive: vendorInfo?.isActive || true
+            isActive: vendor.isActive
           };
         })
       );
