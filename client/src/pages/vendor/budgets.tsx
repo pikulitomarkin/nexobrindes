@@ -1875,7 +1875,7 @@ export default function VendorBudgets() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Aprovados</p>
                 <p className="text-3xl font-bold gradient-text">
-                  {budgets?.filter((b: any) => b.status === 'approved').length || 0}
+                  {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'converted').length || 0}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
