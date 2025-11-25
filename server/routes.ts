@@ -120,10 +120,10 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
   const transactions: ParsedOFXTransaction[] = [];
 
   // Check for different OFX structures
-  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS ||
+  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS || 
                        ofxData?.BANKMSGSRSV1?.STMTTRNRS ||
                        ofxData?.OFX?.STMTTRNRS;
-
+                       
   if (!stmtTrnRsList) {
     console.warn('No STMTTRNRS found in OFX file. Available keys:', Object.keys(ofxData || {}));
     if (ofxData?.OFX) {
@@ -526,9 +526,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({
-        imported,
-        total: customizations.length,
+      res.json({ 
+        imported, 
+        total: customizations.length, 
         errors: errors.slice(0, 10) // Limitar erros para não sobrecarregar resposta
       });
     } catch (error) {
@@ -970,36 +970,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get vendor details including branchId
-  app.get("/api/vendors/:id/details", async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // Get user info
-      const user = await storage.getUser(id);
-      if (!user) {
-        return res.status(404).json({ error: "Vendedor não encontrado" });
-      }
-
-      // Get vendor specific info (including branchId)
-      const vendorInfo = await storage.getVendor(id);
-
-      res.json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        commissionRate: vendorInfo?.commissionRate || '10.00',
-        branchId: vendorInfo?.branchId || null,
-        isActive: user.isActive
-      });
-    } catch (error) {
-      console.error("Error getting vendor details:", error);
-      res.status(500).json({ error: "Erro ao buscar detalhes do vendedor: " + error.message });
-    }
-  });
-
   // Update vendor
   app.put("/api/vendors/:id", async (req, res) => {
     try {
@@ -1035,14 +1005,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
       }
 
-      // Update vendor commission rate and branchId
+      // Update vendor commission rate if provided
       if (updateData.commissionRate) {
         await storage.updateVendorCommission(id, updateData.commissionRate);
-      }
-
-      // Update vendor branchId if provided
-      if (updateData.branchId !== undefined) {
-        await storage.updateVendorBranch(id, updateData.branchId);
       }
 
       // Get updated vendor info
@@ -1060,7 +1025,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: updatedUser.username,
           userCode: updatedUser.username,
           commissionRate: vendorInfo?.commissionRate || updateData.commissionRate || '10.00',
-          branchId: vendorInfo?.branchId || null,
           isActive: updatedUser.isActive
         },
         message: "Vendedor atualizado com sucesso"
@@ -1075,15 +1039,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     try {
       const users = await storage.getUsers();
-
+      
       // Also get clients from the clients table and merge them
       const clients = await storage.getClients();
-
+      
       // CRITICAL FIX: Create map of userId -> client data for enrichment
       const clientsByUserId = new Map(
         clients.map(c => [c.userId, c])
       );
-
+      
       // Enrich users with client data and filter duplicates
       const seenUserIds = new Set();
       const allUsers = users
@@ -1115,7 +1079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return u;
         });
-
+      
       console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clients.length} from clients table)`);
       console.log(`Client records:`, clients.map(c => ({ id: c.id, name: c.name, userId: c.userId })));
       res.json(allUsers);
@@ -1308,7 +1272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!budgetData.clientId || budgetData.clientId === '' || budgetData.clientId === 'null') {
         budgetData.clientId = null;
       }
-
+      
       // Validate clientId if provided
       if (budgetData.clientId) {
         try {
@@ -1604,7 +1568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // If status is pending, update to accepted (user is confirming the send)
           if (existingForProducer.status === 'pending') {
             console.log(`Updating production order ${existingForProducer.id} from pending to accepted`);
-
+            
             // Update the production order status and details
             productionOrder = await storage.updateProductionOrder(existingForProducer.id, {
               status: 'accepted',
@@ -1614,29 +1578,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Reconcile production order items (ensure all expected items exist)
             const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
-
+            
             // Build set of existing item keys using comprehensive unique identifier
             const existingItemKeys = new Set(
               (existingItems || []).map(item => {
                 // Use multiple fields to ensure uniqueness, including customization
-                const customKey = item.hasItemCustomization ?
+                const customKey = item.hasItemCustomization ? 
                   `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
                 const generalKey = item.hasGeneralCustomization ?
                   `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
                 return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               })
             );
-
+            
             // Find items that should exist but don't
             const missingItems = uniqueProducerItems.filter((item: any) => {
-              const customKey = item.hasItemCustomization ?
+              const customKey = item.hasItemCustomization ? 
                 `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
               const generalKey = item.hasGeneralCustomization ?
                 `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
               const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               return !existingItemKeys.has(itemKey);
             });
-
+            
             // Create missing items with error tracking
             const itemCreationErrors = [];
             if (missingItems.length > 0) {
@@ -1656,7 +1620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   itemCreationErrors.push(errorMsg);
                 }
               }
-
+              
               // Alert if any items failed to create
               if (itemCreationErrors.length > 0) {
                 console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
@@ -1678,29 +1642,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Even if production order exists with accepted/other status,
             // ensure ALL items exist (reconcile expected vs existing)
             const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
-
+            
             // Build set of existing item keys using comprehensive unique identifier
             const existingItemKeys = new Set(
               (existingItems || []).map(item => {
                 // Use multiple fields to ensure uniqueness, including customization
-                const customKey = item.hasItemCustomization ?
+                const customKey = item.hasItemCustomization ? 
                   `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
                 const generalKey = item.hasGeneralCustomization ?
                   `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
                 return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               })
             );
-
+            
             // Find items that should exist but don't
             const missingItems = uniqueProducerItems.filter((item: any) => {
-              const customKey = item.hasItemCustomization ?
+              const customKey = item.hasItemCustomization ? 
                 `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
               const generalKey = item.hasGeneralCustomization ?
                 `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
               const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               return !existingItemKeys.has(itemKey);
             });
-
+            
             // Create missing items with error tracking
             const itemCreationErrors = [];
             if (missingItems.length > 0) {
@@ -1719,7 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   itemCreationErrors.push(errorMsg);
                 }
               }
-
+              
               // Alert if any items failed to create
               if (itemCreationErrors.length > 0) {
                 console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
@@ -1983,6 +1947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
         notes: notes || null,
+        transactionId: transactionId || null,
         // Mark as manual payment to prevent OFX reconciliation
         reconciliationStatus: 'manual',
         bankTransactionId: null
@@ -2049,7 +2014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all data from all tables
       const [
         users,
-        clients,
+        clients, 
         vendors,
         partners,
         products,
@@ -2071,7 +2036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUsers(),
         storage.getClients(),
         storage.getVendors(),
-        storage.getPartners(),
+        storage.getPartners(), 
         storage.getProducts({ limit: 10000 }).then(result => result.products),
         storage.getBudgets(),
         storage.getOrders(),
@@ -2111,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const totalRecords = users.length + clients.length + products.length + budgets.length +
+      const totalRecords = users.length + clients.length + products.length + budgets.length + 
                           orders.length + allBudgetItems.length + payments.length + commissions.length;
 
       const backupData = {
@@ -2177,7 +2142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="database_backup_${new Date().toISOString().split('T')[0]}.json"`);
       res.setHeader('Cache-Control', 'no-cache');
-
+      
       // Send the actual JSON data
       res.send(JSON.stringify(backupData, null, 2));
 
@@ -2480,6 +2445,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching production orders for producer:", error);
       res.status(500).json({ error: "Failed to fetch production orders for producer" });
+    }
+  });
+
+  // Get producer payments by producer ID
+  app.get("/api/finance/producer-payments/producer/:producerId", async (req, res) => {
+    try {
+      const { producerId } = req.params;
+      console.log(`Fetching producer payments for producer: ${producerId}`);
+
+      const producerPayments = await storage.getProducerPaymentsByProducer(producerId);
+      console.log(`Found ${producerPayments.length} producer payments for producer ${producerId}`);
+
+      // Enrich with production order and order data
+      const enrichedPayments = await Promise.all(
+        producerPayments.map(async (payment) => {
+          const productionOrder = await storage.getProductionOrder(payment.productionOrderId);
+          let order = null;
+
+          if (productionOrder) {
+            order = await storage.getOrder(productionOrder.orderId);
+          }
+
+          return {
+            ...payment,
+            productionOrder,
+            order,
+            // Add clientName, orderNumber, product from order if available
+            clientName: order?.contactName || 'Cliente não encontrado',
+            orderNumber: order?.orderNumber || 'N/A',
+            product: order?.product || 'Produto não informado'
+          };
+        })
+      );
+
+      console.log(`Returning ${enrichedPayments.length} enriched producer payments for producer ${producerId}`);
+      res.json(enrichedPayments);
+    } catch (error) {
+      console.error("Error fetching producer payments for producer:", error);
+      res.status(500).json({ error: "Failed to fetch producer payments for producer" });
+    }
+  });
+
+  // Get quote requests for client
+  app.get("/api/quote-requests/client/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      console.log(`Getting quote requests for client: ${clientId}`);
+
+      const quoteRequests = await storage.getQuoteRequestsByClient(clientId);
+      console.log(`Found ${quoteRequests.length} quote requests for client ${clientId}`);
+
+      res.json(quoteRequests);
+    } catch (error) {
+      console.error("Error fetching client quote requests:", error);
+      res.status(500).json({ error: "Failed to fetch quote requests" });
     }
   });
 
@@ -3072,7 +3092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with user data and budget photos/items
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          // Always use contactName as primary client name
+          // Always use contactName as primary client name, no fallback to 'Unknown'
           let clientName = order.contactName;
 
           // Only if contactName is missing, try to get from client record
@@ -3723,16 +3743,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendors
   app.get("/api/vendors", async (req, res) => {
     try {
-      const vendors = await storage.getVendors();
-      console.log(`Found ${vendors.length} vendors`);
+      const users = await storage.getUsers();
+      const vendors = users.filter(user => user.role === 'vendor');
 
-      // Enrich vendors with additional info
-      const enrichedVendors = await Promise.all(
+      const vendorsWithInfo = await Promise.all(
         vendors.map(async (vendor) => {
-          // Get vendor-specific data (commission rate, branchId, etc.)
           const vendorInfo = await storage.getVendor(vendor.id);
-          console.log(`Vendor ${vendor.name} info:`, vendorInfo);
-
           return {
             id: vendor.id,
             name: vendor.name,
@@ -3740,28 +3756,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: vendor.phone,
             address: vendor.address,
             username: vendor.username,
-            userCode: vendor.username, // For compatibility
+            userCode: vendor.username, // Use username as userCode for display
             commissionRate: vendorInfo?.commissionRate || '10.00',
-            branchId: vendorInfo?.branchId || null,
-            isActive: vendor.isActive,
-            role: vendor.role
+            isActive: vendorInfo?.isActive || true
           };
         })
       );
 
-      console.log(`Returning ${enrichedVendors.length} enriched vendors with branchId`);
-      res.json(enrichedVendors);
+      res.json(vendorsWithInfo);
     } catch (error) {
-      console.error("Error fetching vendors:", error);
-      res.status(500).json({ error: "Erro ao buscar vendedores" });
+      res.status(500).json({ error: "Failed to fetch vendors" });
     }
   });
 
   app.post("/api/vendors", async (req, res) => {
     try {
-      const { name, email, password, commissionRate, userCode, phone, address, branchId } = req.body;
+      const { name, email, password, commissionRate, userCode, phone, address } = req.body;
 
-      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate, branchId });
+      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate });
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -3786,8 +3798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: address?.trim() || null,
         username: userCode.trim(),
         password: password || "123456",
-        commissionRate: commissionRate || '10.00',
-        branchId: branchId || null // Pass branchId here
+        commissionRate: commissionRate || '10.00'
       });
 
       // Get vendor info
@@ -3825,7 +3836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // UPDATE endpoints
-
+  
   app.put("/api/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -4400,7 +4411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching commissions for vendor: ${vendorId}`);
-
+      
       const commissions = await storage.getCommissionsByVendor(vendorId);
       console.log(`Found ${commissions.length} commissions for vendor ${vendorId}`);
 
@@ -5429,7 +5440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // This ensures the UI shows the correct "already paid" amount
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
         const newReceivedAmount = currentReceived + finalAmount;
-        const totalAmount =parseFloat(receivable.amount);
+        const totalAmount = parseFloat(receivable.amount);
 
         await storage.updateAccountsReceivable(receivable.id, {
           receivedAmount: newReceivedAmount.toFixed(2),
@@ -5547,7 +5558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create manual receivables endpoint
   app.post("/api/finance/receivables/manual", async (req, res) => {
     try {
-      const {clientName, description, amount, dueDate, notes } = req.body;
+      const { clientName, description, amount, dueDate, notes } = req.body;
 
       if (!clientName || !description || !amount || !dueDate) {
         return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
@@ -6376,7 +6387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Creating user and client atomically in transaction...");
-
+      
       // Create user and client in a single transaction (atomic operation)
       const { user, client } = await storage.createClientWithUser(
         {
@@ -6912,22 +6923,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const budgetData = req.body;
       const budgetId = req.params.id;
-
+      
       console.log(`[UPDATE BUDGET] Processing update for budget ${budgetId}`);
-
+      
       // CRITICAL FIX: Detect if items should be processed using hasOwnProperty
       // - If 'items' key not present → metadata-only update (keep existing items)
       // - If 'items' key present but null/undefined → treat as metadata-only (frontend compat)
       // - If 'items' key present and is [] → explicit removal of all items
       // - If 'items' key present and is [...] → update items list
-      const shouldProcessItems = Object.prototype.hasOwnProperty.call(budgetData, 'items')
-        && budgetData.items !== null
+      const shouldProcessItems = Object.prototype.hasOwnProperty.call(budgetData, 'items') 
+        && budgetData.items !== null 
         && budgetData.items !== undefined;
-
+      
       // Remove items from metadata payload to prevent DB column corruption
       const budgetMetadata = { ...budgetData };
       delete budgetMetadata.items;
-
+      
       // Update budget metadata
       const updatedBudget = await storage.updateBudget(budgetId, budgetMetadata);
 
@@ -6935,17 +6946,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (shouldProcessItems) {
         if (!Array.isArray(budgetData.items)) {
           console.error(`[UPDATE BUDGET] Invalid items format - must be array`);
-          return res.status(400).json({
-            error: "Items must be an array when provided"
+          return res.status(400).json({ 
+            error: "Items must be an array when provided" 
           });
         }
-
+        
         console.log(`[UPDATE BUDGET] Updating items: ${budgetData.items.length} items provided`);
-
+        
         // CRITICAL FIX: VALIDATE and PREPARE all items BEFORE deleting anything
         // This prevents data loss if any item has invalid data
         const itemsToInsert = [];
-
+        
         if (budgetData.items.length > 0) {
           // Remove duplicate items before processing
           const seenItems = new Set();
@@ -6968,60 +6979,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // STEP 2: VALIDATE and PREPARE each item (no DB operations yet)
           for (const item of uniqueItems) {
-            const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
-            const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-            const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
-            const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
+        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
+        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
+        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
 
-            // Calculate total price including customizations and discounts
-            let totalPrice = unitPrice * quantity;
-            if (item.hasItemCustomization && itemCustomizationValue > 0) {
-              totalPrice += (itemCustomizationValue * quantity);
-            }
-            if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
-              totalPrice += (generalCustomizationValue * quantity);
-            }
+        // Calculate total price including customizations and discounts
+        let totalPrice = unitPrice * quantity;
+        if (item.hasItemCustomization && itemCustomizationValue > 0) {
+          totalPrice += (itemCustomizationValue * quantity);
+        }
+        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
+          totalPrice += (generalCustomizationValue * quantity);
+        }
 
-            // Add to preparation array (no DB operation yet)
+        // Add to preparation array (no DB operation yet)
             itemsToInsert.push({
-              productId: item.productId,
-              producerId: item.producerId || 'internal',
-              quantity: quantity,
-              unitPrice: unitPrice.toFixed(2),
-              totalPrice: totalPrice.toFixed(2),
-              // Item Customization
-              hasItemCustomization: item.hasItemCustomization || false,
-              selectedCustomizationId: item.selectedCustomizationId || null,
-              itemCustomizationValue: itemCustomizationValue.toFixed(2),
-              itemCustomizationDescription: item.itemCustomizationDescription || null,
-              customizationPhoto: item.customizationPhoto || null,
-              // General Customization
-              hasGeneralCustomization: item.hasGeneralCustomization || false,
-              generalCustomizationName: item.generalCustomizationName || null,
-              generalCustomizationValue: generalCustomizationValue.toFixed(2),
-              // Product dimensions
-              productWidth: item.productWidth || null,
-              productHeight: item.productHeight || null,
-              productDepth: item.productDepth || null,
-              // Item discount
-              hasItemDiscount: item.hasItemDiscount || false,
-              itemDiscountType: item.itemDiscountType || "percentage",
-              itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
-              itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
+          productId: item.productId,
+          producerId: item.producerId || 'internal',
+          quantity: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          totalPrice: totalPrice.toFixed(2),
+          // Item Customization
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || null,
+          itemCustomizationValue: itemCustomizationValue.toFixed(2),
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          customizationPhoto: item.customizationPhoto || null,
+          // General Customization
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || null,
+          generalCustomizationValue: generalCustomizationValue.toFixed(2),
+          // Product dimensions
+          productWidth: item.productWidth || null,
+          productHeight: item.productHeight || null,
+          productDepth: item.productDepth || null,
+          // Item discount
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || "percentage",
+            itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+            itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
             });
           }
-
+          
           // STEP 3: Create ALL new items FIRST (safer than deleting first)
           console.log(`[UPDATE BUDGET] Creating ${itemsToInsert.length} new items FIRST (before deleting old ones)...`);
           const createdItemIds = [];
-
+          
           // Insert all new items - if this fails, old items remain intact
           for (const itemData of itemsToInsert) {
             const newItem = await storage.createBudgetItem(updatedBudget.id, itemData);
             createdItemIds.push(newItem.id);
           }
           console.log(`[UPDATE BUDGET] Successfully created ${createdItemIds.length} new items`);
-
+          
           // STEP 4: Only delete old items after ALL new ones are created successfully
           // NOTE: Without DB transactions, if deletion fails after some deletes, we may have
           // temporary duplicates, but this is better than losing data completely
@@ -7144,7 +7155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL FIX: Convert deliveryDate string to Date object for Drizzle
       const deliveryDateObj = new Date(deliveryDate);
-
+      
       const order = await storage.convertBudgetToOrder(id, clientId, deliveryDateObj);
 
       // Update budget status
@@ -7499,8 +7510,8 @@ Para mais detalhes, entre em contato conosco!`;
   // Settings Routes - Customization Options
   app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
     try {
-      const options = await storage.getCustomizationOptions();
-      res.json(options);
+      const customizations = await storage.getCustomizationOptions();
+      res.json(customizations);
     } catch (error) {
       console.error('Error fetching customization options:', error);
       res.status(500).json({ error: "Erro interno do servidor" });
@@ -7874,7 +7885,7 @@ Para mais detalhes, entre em contato conosco!`;
         // Check if order has items with external producers
         let hasExternalProducers = false;
         let uniqueProducers = new Set<string>();
-
+        
         if (order.budgetId) {
           // For budget-based orders, check budget items
           const budgetItems = order.items || [];
@@ -7898,7 +7909,7 @@ Para mais detalhes, entre em contato conosco!`;
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
-
+        
         // Order is valid if it's paid, has external producers, and NOT ALL producers have been sent POs yet
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
         const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs;
@@ -7911,7 +7922,7 @@ Para mais detalhes, entre em contato conosco!`;
       });
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
-
+      
       // Enrich orders with producer names
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
@@ -7928,14 +7939,14 @@ Para mais detalhes, entre em contato conosco!`;
               return item;
             })
           );
-
+          
           return {
             ...order,
             items: enrichedItems
           };
         })
       );
-
+      
       res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching paid orders for logistics:", error);

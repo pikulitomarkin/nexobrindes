@@ -195,26 +195,8 @@ export default function AdminVendors() {
     }
   };
 
-  const handleEditVendor = async (vendor: any) => {
+  const handleEditVendor = (vendor: any) => {
     setSelectedVendorId(vendor.id);
-    
-    // Get vendor details including branchId from the vendors table
-    let vendorBranchId = "default";
-    try {
-      const vendorDetails = await fetch(`/api/vendors/${vendor.id}/details`);
-      if (vendorDetails.ok) {
-        const details = await vendorDetails.json();
-        vendorBranchId = details.branchId || "default";
-        console.log(`Vendor ${vendor.id} branchId from API:`, details.branchId);
-      }
-    } catch (error) {
-      console.log("Error fetching vendor details:", error);
-      // Fallback to vendor.branchId if available
-      vendorBranchId = vendor.branchId || "default";
-    }
-    
-    console.log(`Setting branchId for vendor ${vendor.name}:`, vendorBranchId);
-    
     // Populate form with vendor data
     form.reset({
       name: vendor.name || "",
@@ -222,14 +204,10 @@ export default function AdminVendors() {
       phone: vendor.phone || "",
       address: vendor.address || "",
       commissionRate: vendor.commissionRate?.toString() || "10.00",
-      branchId: vendorBranchId,
+      branchId: vendor.branchId || "",
       password: "", // Don't populate password for security
     });
-    
-    // Small delay to ensure form is reset before showing dialog
-    setTimeout(() => {
-      setShowEditVendor(true);
-    }, 100);
+    setShowEditVendor(true);
   };
 
   const onSubmit = (data: VendorEditFormValues) => {
