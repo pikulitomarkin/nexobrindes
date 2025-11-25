@@ -2417,8 +2417,11 @@ export class PgStorage implements IStorage {
     userId?: string;
     level?: string;
     dateFilter?: string;
+    vendorId?: string;
+    limit?: number;
   }): Promise<SystemLog[]> {
     const conditions = [];
+    const limitCount = filters?.limit || 200;
 
     if (filters?.userId) {
       conditions.push(eq(schema.systemLogs.userId, filters.userId));
@@ -2432,24 +2435,39 @@ export class PgStorage implements IStorage {
       conditions.push(eq(schema.systemLogs.level, filters.level));
     }
 
+    // Filtro por vendedor: mostra logs do vendedor + logs de seus clientes
+    if (filters?.vendorId) {
+      conditions.push(
+        or(
+          eq(schema.systemLogs.userId, filters.vendorId),
+          eq(schema.systemLogs.vendorId, filters.vendorId)
+        )!
+      );
+    }
+
     if (conditions.length > 0) {
       return await pg.select().from(schema.systemLogs)
         .where(and(...conditions))
         .orderBy(desc(schema.systemLogs.createdAt))
-        .limit(100);
+        .limit(limitCount);
     }
 
     return await pg.select().from(schema.systemLogs)
       .orderBy(desc(schema.systemLogs.createdAt))
-      .limit(100);
+      .limit(limitCount);
   }
 
   async createSystemLog(logData: InsertSystemLog): Promise<SystemLog> {
-    const results = await pg.insert(schema.systemLogs).values({
-      ...logData,
-      createdAt: new Date()
-    } as any).returning();
-    return results[0];
+    try {
+      const results = await pg.insert(schema.systemLogs).values({
+        ...logData,
+        createdAt: new Date()
+      } as any).returning();
+      return results[0];
+    } catch (error) {
+      console.error('Error creating system log:', error);
+      throw error;
+    }
   }
 
   async logUserAction(
@@ -2463,21 +2481,28 @@ export class PgStorage implements IStorage {
     level?: string,
     details?: any,
     ipAddress?: string,
-    userAgent?: string
+    userAgent?: string,
+    vendorId?: string
   ): Promise<void> {
-    await this.createSystemLog({
-      userId,
-      userName,
-      userRole,
-      action,
-      entity,
-      entityId,
-      description,
-      level: level || 'info',
-      details: details ? JSON.stringify(details) : null,
-      ipAddress: ipAddress || null,
-      userAgent: userAgent || null
-    });
+    try {
+      await this.createSystemLog({
+        userId,
+        userName,
+        userRole,
+        vendorId: vendorId || null,
+        action,
+        entity,
+        entityId,
+        description,
+        level: level || 'info',
+        details: details ? JSON.stringify(details) : null,
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null
+      });
+    } catch (error) {
+      // Log errors silently - don't break the main operation
+      console.error('Failed to log user action (non-blocking):', error);
+    }
   }
 }
 
