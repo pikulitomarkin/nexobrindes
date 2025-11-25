@@ -17,7 +17,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Phone, ShoppingCart, Plus, MessageCircle, Hash, MapPin, User, RefreshCw, FileText, Eye, Edit } from "lucide-react";
+import { Mail, Phone, ShoppingCart, Plus, MessageCircle, Hash, MapPin, User, RefreshCw, FileText, Eye, Edit, Copy } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -29,7 +30,6 @@ const clientFormSchema = z.object({
   cpfCnpj: z.string().optional(),
   address: z.string().optional(),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  // Novos campos comerciais
   nomeFantasia: z.string().optional(),
   razaoSocial: z.string().optional(),
   inscricaoEstadual: z.string().optional(),
@@ -43,6 +43,18 @@ const clientFormSchema = z.object({
   emailNF: z.string().email("Email inválido").optional().or(z.literal("")),
   nomeContato: z.string().optional(),
   emailContato: z.string().email("Email inválido").optional().or(z.literal("")),
+  enderecoFaturamentoLogradouro: z.string().optional(),
+  enderecoFaturamentoNumero: z.string().optional(),
+  enderecoFaturamentoComplemento: z.string().optional(),
+  enderecoFaturamentoBairro: z.string().optional(),
+  enderecoFaturamentoCidade: z.string().optional(),
+  enderecoFaturamentoCep: z.string().optional(),
+  enderecoEntregaLogradouro: z.string().optional(),
+  enderecoEntregaNumero: z.string().optional(),
+  enderecoEntregaComplemento: z.string().optional(),
+  enderecoEntregaBairro: z.string().optional(),
+  enderecoEntregaCidade: z.string().optional(),
+  enderecoEntregaCep: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -55,6 +67,8 @@ export default function VendorClients() {
   const [showOrders, setShowOrders] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState(false);
   const [userCode, setUserCode] = useState("");
+  const [useSameAddressForBilling, setUseSameAddressForBilling] = useState(false);
+  const [useSameAddressForDelivery, setUseSameAddressForDelivery] = useState(false);
   const { toast } = useToast();
 
   const generateUserCode = () => {
@@ -99,7 +113,6 @@ export default function VendorClients() {
       cpfCnpj: "",
       address: "",
       password: "",
-      // Novos campos comerciais
       nomeFantasia: "",
       razaoSocial: "",
       inscricaoEstadual: "",
@@ -113,8 +126,52 @@ export default function VendorClients() {
       emailNF: "",
       nomeContato: "",
       emailContato: "",
+      enderecoFaturamentoLogradouro: "",
+      enderecoFaturamentoNumero: "",
+      enderecoFaturamentoComplemento: "",
+      enderecoFaturamentoBairro: "",
+      enderecoFaturamentoCidade: "",
+      enderecoFaturamentoCep: "",
+      enderecoEntregaLogradouro: "",
+      enderecoEntregaNumero: "",
+      enderecoEntregaComplemento: "",
+      enderecoEntregaBairro: "",
+      enderecoEntregaCidade: "",
+      enderecoEntregaCep: "",
     },
   });
+
+  const copyMainAddressToBilling = () => {
+    const values = form.getValues();
+    form.setValue("enderecoFaturamentoLogradouro", values.logradouro || "");
+    form.setValue("enderecoFaturamentoNumero", values.numero || "");
+    form.setValue("enderecoFaturamentoComplemento", values.complemento || "");
+    form.setValue("enderecoFaturamentoBairro", values.bairro || "");
+    form.setValue("enderecoFaturamentoCidade", values.cidade || "");
+    form.setValue("enderecoFaturamentoCep", values.cep || "");
+  };
+
+  const copyMainAddressToDelivery = () => {
+    const values = form.getValues();
+    form.setValue("enderecoEntregaLogradouro", values.logradouro || "");
+    form.setValue("enderecoEntregaNumero", values.numero || "");
+    form.setValue("enderecoEntregaComplemento", values.complemento || "");
+    form.setValue("enderecoEntregaBairro", values.bairro || "");
+    form.setValue("enderecoEntregaCidade", values.cidade || "");
+    form.setValue("enderecoEntregaCep", values.cep || "");
+  };
+
+  useEffect(() => {
+    if (useSameAddressForBilling) {
+      copyMainAddressToBilling();
+    }
+  }, [useSameAddressForBilling]);
+
+  useEffect(() => {
+    if (useSameAddressForDelivery) {
+      copyMainAddressToDelivery();
+    }
+  }, [useSameAddressForDelivery]);
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
@@ -488,23 +545,205 @@ export default function VendorClients() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Endereço Completo (Resumido)</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Rua das Flores, 123, Centro, São Paulo, SP"
-                          rows={2}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Endereço de Faturamento */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-800">Endereço de Faturamento</h4>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="useSameAddressForBilling"
+                        checked={useSameAddressForBilling}
+                        onCheckedChange={(checked) => {
+                          setUseSameAddressForBilling(checked === true);
+                          if (checked) copyMainAddressToBilling();
+                        }}
+                      />
+                      <label htmlFor="useSameAddressForBilling" className="text-sm text-gray-600 cursor-pointer">
+                        Usar endereço principal
+                      </label>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoLogradouro"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Logradouro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Rua, Avenida..." {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoNumero"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoComplemento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apto, Sala..." {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoBairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Bairro" {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoCidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Cidade" {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoFaturamentoCep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP</FormLabel>
+                          <FormControl>
+                            <Input placeholder="00000-000" {...field} disabled={useSameAddressForBilling} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço de Entrega */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-800">Endereço de Entrega</h4>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="useSameAddressForDelivery"
+                        checked={useSameAddressForDelivery}
+                        onCheckedChange={(checked) => {
+                          setUseSameAddressForDelivery(checked === true);
+                          if (checked) copyMainAddressToDelivery();
+                        }}
+                      />
+                      <label htmlFor="useSameAddressForDelivery" className="text-sm text-gray-600 cursor-pointer">
+                        Usar endereço principal
+                      </label>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaLogradouro"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Logradouro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Rua, Avenida..." {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaNumero"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Número</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123" {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaComplemento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complemento</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apto, Sala..." {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaBairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Bairro" {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaCidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Cidade" {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="enderecoEntregaCep"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CEP</FormLabel>
+                          <FormControl>
+                            <Input placeholder="00000-000" {...field} disabled={useSameAddressForDelivery} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button

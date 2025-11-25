@@ -6413,7 +6413,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cpfCnpj: clientData.cpfCnpj || null,
           address: clientData.address || null,
           vendorId: clientData.vendorId || null,
-          isActive: true
+          isActive: true,
+          nomeFantasia: clientData.nomeFantasia || null,
+          razaoSocial: clientData.razaoSocial || null,
+          inscricaoEstadual: clientData.inscricaoEstadual || null,
+          logradouro: clientData.logradouro || null,
+          numero: clientData.numero || null,
+          complemento: clientData.complemento || null,
+          bairro: clientData.bairro || null,
+          cidade: clientData.cidade || null,
+          cep: clientData.cep || null,
+          emailBoleto: clientData.emailBoleto || null,
+          emailNF: clientData.emailNF || null,
+          nomeContato: clientData.nomeContato || null,
+          emailContato: clientData.emailContato || null,
+          enderecoFaturamentoLogradouro: clientData.enderecoFaturamentoLogradouro || null,
+          enderecoFaturamentoNumero: clientData.enderecoFaturamentoNumero || null,
+          enderecoFaturamentoComplemento: clientData.enderecoFaturamentoComplemento || null,
+          enderecoFaturamentoBairro: clientData.enderecoFaturamentoBairro || null,
+          enderecoFaturamentoCidade: clientData.enderecoFaturamentoCidade || null,
+          enderecoFaturamentoCep: clientData.enderecoFaturamentoCep || null,
+          enderecoEntregaLogradouro: clientData.enderecoEntregaLogradouro || null,
+          enderecoEntregaNumero: clientData.enderecoEntregaNumero || null,
+          enderecoEntregaComplemento: clientData.enderecoEntregaComplemento || null,
+          enderecoEntregaBairro: clientData.enderecoEntregaBairro || null,
+          enderecoEntregaCidade: clientData.enderecoEntregaCidade || null,
+          enderecoEntregaCep: clientData.enderecoEntregaCep || null
         }
       );
 
