@@ -93,6 +93,16 @@ export default function FinancePayables() {
       }
     },
     onSuccess: (data, variables) => {
+      // Fechar o dialog primeiro
+      setIsPayDialogOpen(false);
+      setSelectedPayable(null);
+      setPaymentData({
+        amount: "",
+        method: "",
+        transactionId: "",
+        notes: "",
+      });
+      
       // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
