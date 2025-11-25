@@ -999,7 +999,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: updateData.email?.trim() || null,
         phone: updateData.phone?.trim() || null,
         address: updateData.address?.trim() || null,
-        branchId: updateData.branchId && updateData.branchId !== 'default' ? updateData.branchId : null,
       });
 
       if (!updatedUser) {
@@ -1026,7 +1025,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: updatedUser.username,
           userCode: updatedUser.username,
           commissionRate: vendorInfo?.commissionRate || updateData.commissionRate || '10.00',
-          branchId: updatedUser.branchId || null,
           isActive: updatedUser.isActive
         },
         message: "Vendedor atualizado com sucesso"

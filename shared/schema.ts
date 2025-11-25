@@ -12,7 +12,6 @@ export const users = pgTable("users", {
   email: text("email"),
   phone: text("phone"),
   vendorId: varchar("vendor_id"), // For clients: link to their assigned vendor
-  branchId: varchar("branch_id"), // For vendors: their branch assignment
   isActive: boolean("is_active").default(true),
   // Producer specific fields
   specialty: text("specialty"), // For producers: their specialty
