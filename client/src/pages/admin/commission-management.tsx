@@ -1,9 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Dialog,
   DialogContent,
@@ -22,7 +30,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Edit, Save, Plus, DollarSign, Users, Calculator, Percent } from "lucide-react";
+import { Settings, Edit, Save, Plus, DollarSign, Users, Calculator, Percent, Filter, Trash2, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -49,6 +57,10 @@ export default function CommissionManagement() {
   const [editingPartner, setEditingPartner] = useState<string | null>(null);
   const [editingPartnerName, setEditingPartnerName] = useState<string | null>(null);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
+  const [selectedCommissions, setSelectedCommissions] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [searchFilter, setSearchFilter] = useState<string>("");
   const { toast } = useToast();
 
   // Queries
@@ -208,6 +220,52 @@ export default function CommissionManagement() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (commissionIds: string[]) => {
+      const results = await Promise.all(
+        commissionIds.map(id =>
+          fetch(`/api/commissions/${id}`, { method: "DELETE" })
+        )
+      );
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) throw new Error(`${failed.length} exclusões falharam`);
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      setSelectedCommissions(new Set());
+      toast({ title: "Sucesso!", description: "Comissões excluídas com sucesso" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message || "Não foi possível excluir as comissões", variant: "destructive" });
+    },
+  });
+
+  const bulkMarkPaidMutation = useMutation({
+    mutationFn: async (commissionIds: string[]) => {
+      const results = await Promise.all(
+        commissionIds.map(id =>
+          fetch(`/api/commissions/${id}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "paid" }),
+          })
+        )
+      );
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) throw new Error(`${failed.length} atualizações falharam`);
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      setSelectedCommissions(new Set());
+      toast({ title: "Sucesso!", description: "Comissões marcadas como pagas" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message || "Não foi possível atualizar as comissões", variant: "destructive" });
+    },
+  });
+
   // Handlers
   const handleEditVendorCommission = (vendor: any) => {
     setEditingVendor(vendor.id);
@@ -260,9 +318,78 @@ export default function CommissionManagement() {
     c.orderNumber
   ) || [];
 
+  // Apply filters
+  const filteredCommissions = useMemo(() => {
+    return validCommissions.filter((c: any) => {
+      // Status filter
+      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      // Type filter
+      if (typeFilter !== "all" && c.type !== typeFilter) return false;
+      // Search filter
+      if (searchFilter) {
+        const search = searchFilter.toLowerCase();
+        const matchOrder = c.orderNumber?.toLowerCase().includes(search);
+        const matchName = (c.vendorName || c.partnerName)?.toLowerCase().includes(search);
+        if (!matchOrder && !matchName) return false;
+      }
+      return true;
+    });
+  }, [validCommissions, statusFilter, typeFilter, searchFilter]);
+
   const totalCommissions = validCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const pendingCommissions = validCommissions.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const paidCommissions = validCommissions.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+
+  // Selection handlers
+  const toggleSelectAll = () => {
+    if (selectedCommissions.size === filteredCommissions.length) {
+      setSelectedCommissions(new Set());
+    } else {
+      setSelectedCommissions(new Set(filteredCommissions.map((c: any) => c.id)));
+    }
+  };
+
+  const toggleSelectCommission = (id: string) => {
+    const newSelected = new Set(selectedCommissions);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedCommissions(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedCommissions.size === 0) return;
+    if (confirm(`Tem certeza que deseja excluir ${selectedCommissions.size} comissão(ões)? Esta ação não pode ser desfeita.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedCommissions));
+    }
+  };
+
+  const handleBulkMarkPaid = () => {
+    if (selectedCommissions.size === 0) return;
+    const eligibleIds = Array.from(selectedCommissions).filter(id => {
+      const commission = filteredCommissions.find((c: any) => c.id === id);
+      return commission && commission.status === 'confirmed';
+    });
+    if (eligibleIds.length === 0) {
+      toast({ title: "Aviso", description: "Nenhuma comissão elegível para marcar como paga. Apenas comissões com status 'Confirmada' podem ser marcadas como pagas.", variant: "destructive" });
+      return;
+    }
+    const notEligibleCount = selectedCommissions.size - eligibleIds.length;
+    const message = notEligibleCount > 0 
+      ? `Marcar ${eligibleIds.length} comissão(ões) como paga(s)? (${notEligibleCount} não elegíveis serão ignoradas)`
+      : `Marcar ${eligibleIds.length} comissão(ões) como paga(s)?`;
+    if (confirm(message)) {
+      bulkMarkPaidMutation.mutate(eligibleIds);
+    }
+  };
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setSearchFilter("");
+  };
 
   if (loadingCommissions || loadingVendors || loadingPartners) {
     return (
@@ -550,13 +677,112 @@ export default function CommissionManagement() {
         <TabsContent value="commissions" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Histórico de Comissões</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Histórico de Comissões</span>
+                <span className="text-sm font-normal text-gray-500">
+                  {filteredCommissions.length} de {validCommissions.length} comissões
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Filtros:</span>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <Input
+                    placeholder="Buscar por pedido ou beneficiário..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="h-9"
+                    data-testid="input-search-commissions"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px] h-9" data-testid="select-status-filter">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="confirmed">Confirmada</SelectItem>
+                    <SelectItem value="paid">Paga</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                    <SelectItem value="deducted">Abatida</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[150px] h-9" data-testid="select-type-filter">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Tipos</SelectItem>
+                    <SelectItem value="vendor">Vendedor</SelectItem>
+                    <SelectItem value="partner">Sócio</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(statusFilter !== "all" || typeFilter !== "all" || searchFilter) && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar
+                  </Button>
+                )}
+              </div>
+
+              {/* Bulk Actions Bar */}
+              {selectedCommissions.size > 0 && (
+                <div className="flex items-center gap-4 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span className="text-sm font-medium text-blue-700">
+                    {selectedCommissions.size} selecionada(s)
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkMarkPaid}
+                      disabled={bulkMarkPaidMutation.isPending}
+                      className="h-8"
+                      data-testid="button-bulk-mark-paid"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Marcar como Paga
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleteMutation.isPending}
+                      className="h-8"
+                      data-testid="button-bulk-delete"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Excluir
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSelectedCommissions(new Set())}
+                    className="h-8 ml-auto"
+                  >
+                    Cancelar seleção
+                  </Button>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-3 py-3 text-left">
+                        <Checkbox
+                          checked={filteredCommissions.length > 0 && selectedCommissions.size === filteredCommissions.length}
+                          onCheckedChange={toggleSelectAll}
+                          data-testid="checkbox-select-all"
+                        />
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Data
                       </th>
@@ -587,8 +813,15 @@ export default function CommissionManagement() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {validCommissions?.map((commission: any) => (
-                      <tr key={commission.id}>
+                    {filteredCommissions?.map((commission: any) => (
+                      <tr key={commission.id} className={selectedCommissions.has(commission.id) ? "bg-blue-50" : ""}>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <Checkbox
+                            checked={selectedCommissions.has(commission.id)}
+                            onCheckedChange={() => toggleSelectCommission(commission.id)}
+                            data-testid={`checkbox-commission-${commission.id}`}
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(commission.createdAt).toLocaleDateString('pt-BR')}
                         </td>
