@@ -2880,23 +2880,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Created order with contact name:", newOrder.contactName);
 
-      // Log order creation
-      await storage.logUserAction(
+      // Log order creation (non-blocking)
+      logger.logOrderCreated(
         orderData.vendorId,
         vendor?.name || 'Vendedor',
-        'vendor',
-        'CREATE',
-        'orders',
         newOrder.id,
-        `Pedido criado: ${newOrder.orderNumber} - Cliente: ${newOrder.contactName} - Valor: R$ ${newOrder.totalValue}`,
-        'success',
-        {
-          orderNumber: newOrder.orderNumber,
-          clientName: newOrder.contactName,
-          totalValue: newOrder.totalValue,
-          itemCount: uniqueItems.length
-        }
-      );
+        newOrder.contactName
+      ).catch(() => {});
 
       // Incluir alertas na resposta se existirem
       const response = {
@@ -2929,22 +2919,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateCommissionsByOrderStatus(id, 'cancelled');
       }
 
-      // Log order update
-      await storage.logUserAction(
-        req.user?.id || 'system',
-        req.user?.name || 'Sistema',
-        req.user?.role || 'system',
-        'UPDATE',
-        'orders',
-        id,
-        `Pedido atualizado: ${updatedOrder.orderNumber} - Status: ${updatedOrder.status}`,
-        'info',
-        {
-          orderNumber: updatedOrder.orderNumber,
-          changes: updateData,
-          newStatus: updatedOrder.status
-        }
-      );
+      // Log order update (non-blocking)
+      if (req.user?.role === 'vendor') {
+        logger.logOrderUpdated(
+          req.user.id,
+          req.user.name,
+          id,
+          `Status: ${updatedOrder.status}`
+        ).catch(() => {});
+      } else {
+        storage.logUserAction(
+          req.user?.id || 'system',
+          req.user?.name || 'Sistema',
+          req.user?.role || 'system',
+          'UPDATE',
+          'orders',
+          id,
+          `Pedido atualizado: ${updatedOrder.orderNumber} - Status: ${updatedOrder.status}`,
+          'info',
+          { orderNumber: updatedOrder.orderNumber, changes: updateData, newStatus: updatedOrder.status },
+          undefined,
+          undefined,
+          updatedOrder.vendorId
+        ).catch(() => {});
+      }
 
       console.log(`Order ${id} updated successfully`);
       res.json(updatedOrder);
