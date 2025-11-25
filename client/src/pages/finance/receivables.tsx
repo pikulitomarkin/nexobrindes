@@ -350,6 +350,7 @@ export default function FinanceReceivables() {
                   <SelectItem value="partial">Parcial</SelectItem>
                   <SelectItem value="paid">Pago</SelectItem>
                   <SelectItem value="overdue">Vencido</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
 

@@ -949,7 +949,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateProductionOrderStatus(po.id, 'cancelled', 'Pedido cancelado');
       }
 
-      console.log(`Order ${id} cancelled successfully`);
+      // Update accounts receivable status to cancelled
+      const receivables = await storage.getAccountsReceivableByOrder(id);
+      for (const receivable of receivables) {
+        await storage.updateAccountsReceivable(receivable.id, {
+          status: 'cancelled'
+        });
+      }
+
+      console.log(`Order ${id} cancelled successfully - ${receivables.length} receivables also cancelled`);
 
       res.json({
         success: true,

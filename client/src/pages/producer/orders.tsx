@@ -55,6 +55,7 @@ export default function ProducerOrders() {
       production: "status-badge status-production",
       completed: "status-badge status-completed",
       rejected: "status-badge status-cancelled",
+      cancelled: "status-badge status-cancelled",
     };
 
     const statusLabels = {
@@ -63,6 +64,7 @@ export default function ProducerOrders() {
       production: "Em Produção",
       completed: "Concluído",
       rejected: "Rejeitado",
+      cancelled: "Cancelado",
     };
 
     return (

@@ -328,6 +328,7 @@ export default function LogisticsDashboard() {
       ready: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse",
       shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
       delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      cancelled: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
     };
 
     const statusLabels = {
@@ -335,6 +336,7 @@ export default function LogisticsDashboard() {
       confirmed: "Confirmado - Pago",
       pending: "Pendente",
       accepted: "Aceito",
+      cancelled: "Cancelado",
       production: "Em Produção",
       ready: "🚚 PRONTO PARA EXPEDIÇÃO",
       shipped: "Despachado para Cliente",
