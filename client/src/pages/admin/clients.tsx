@@ -75,7 +75,27 @@ export default function AdminClients() {
   const [showClientDetails, setShowClientDetails] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [userCode, setUserCode] = useState("");
+  const [useSameAddressForBilling, setUseSameAddressForBilling] = useState(false);
+  const [useSameAddressForDelivery, setUseSameAddressForDelivery] = useState(false);
   const { toast } = useToast();
+
+  const copyMainAddressToBilling = () => {
+    form.setValue("enderecoFaturamentoLogradouro", form.getValues("logradouro"));
+    form.setValue("enderecoFaturamentoNumero", form.getValues("numero"));
+    form.setValue("enderecoFaturamentoComplemento", form.getValues("complemento"));
+    form.setValue("enderecoFaturamentoBairro", form.getValues("bairro"));
+    form.setValue("enderecoFaturamentoCidade", form.getValues("cidade"));
+    form.setValue("enderecoFaturamentoCep", form.getValues("cep"));
+  };
+
+  const copyMainAddressToDelivery = () => {
+    form.setValue("enderecoEntregaLogradouro", form.getValues("logradouro"));
+    form.setValue("enderecoEntregaNumero", form.getValues("numero"));
+    form.setValue("enderecoEntregaComplemento", form.getValues("complemento"));
+    form.setValue("enderecoEntregaBairro", form.getValues("bairro"));
+    form.setValue("enderecoEntregaCidade", form.getValues("cidade"));
+    form.setValue("enderecoEntregaCep", form.getValues("cep"));
+  };
 
   const generateUserCode = () => {
     const timestamp = Date.now().toString().slice(-6);
