@@ -195,23 +195,8 @@ export default function AdminVendors() {
     }
   };
 
-  const handleEditVendor = async (vendor: any) => {
+  const handleEditVendor = (vendor: any) => {
     setSelectedVendorId(vendor.id);
-    
-    // Get vendor details including branchId from the vendors table
-    let vendorBranchId = "default";
-    try {
-      const vendorDetails = await fetch(`/api/vendors/${vendor.id}/details`);
-      if (vendorDetails.ok) {
-        const details = await vendorDetails.json();
-        vendorBranchId = details.branchId || "default";
-      }
-    } catch (error) {
-      console.log("Error fetching vendor details:", error);
-      // Fallback to vendor.branchId if available
-      vendorBranchId = vendor.branchId || "default";
-    }
-    
     // Populate form with vendor data
     form.reset({
       name: vendor.name || "",
@@ -219,7 +204,7 @@ export default function AdminVendors() {
       phone: vendor.phone || "",
       address: vendor.address || "",
       commissionRate: vendor.commissionRate?.toString() || "10.00",
-      branchId: vendorBranchId,
+      branchId: vendor.branchId || "",
       password: "", // Don't populate password for security
     });
     setShowEditVendor(true);
@@ -233,7 +218,7 @@ export default function AdminVendors() {
         delete updateData.password;
       }
       // Normalize empty branchId to null to avoid FK constraint violation
-      if (!updateData.branchId || updateData.branchId === "default" || (typeof updateData.branchId === "string" && updateData.branchId.trim() === "")) {
+      if (!updateData.branchId || updateData.branchId.trim() === "" || updateData.branchId === "default") {
         updateData.branchId = null as any;
       }
       updateVendorMutation.mutate({ id: selectedVendorId, data: updateData });
