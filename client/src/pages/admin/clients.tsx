@@ -949,99 +949,83 @@ export default function AdminClients() {
           <CardTitle>Lista de Clientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clients?.map((client: any) => (
-              <Card key={client.id} className="card-hover">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
-                      <div className="flex items-center mt-1">
-                        <User className="h-3 w-3 text-blue-600 mr-1" />
-                        <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                          {(() => {
-                            const code = (client as any).userCode ?? 
-                                        (client as any).code ?? 
-                                        (client as any).loginCode ?? 
-                                        (client as any).accessCode ?? 
-                                        null;
-                            return code ?? 'N/A';
-                          })()}
-                        </span>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF/CNPJ</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {clients?.map((client: any) => (
+                  <tr key={client.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 text-sm font-medium text-gray-900">{client.name}</td>
+                    <td className="px-4 py-4 text-sm">
+                      <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {(() => {
+                          const code = (client as any).userCode ?? 
+                                      (client as any).code ?? 
+                                      (client as any).loginCode ?? 
+                                      (client as any).accessCode ?? 
+                                      null;
+                          return code ?? 'N/A';
+                        })()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600 truncate">{client.email || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">{client.phone || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">{client.cpfCnpj || '—'}</td>
+                    <td className="px-4 py-4 text-sm whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setShowOrders(true);
+                          }}
+                          title="Ver Pedidos"
+                          className="hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Ver Detalhes"
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setShowClientDetails(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Editar"
+                          onClick={() => handleEditClient(client)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Excluir"
+                          onClick={() => handleDeleteClient(client.id, client.name)}
+                          disabled={deleteClientMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedClientId(client.id);
-                          setShowOrders(true);
-                        }}
-                        title="Ver Pedidos"
-                        className="hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        title="Ver Detalhes"
-                        onClick={() => {
-                          setSelectedClientId(client.id);
-                          setShowClientDetails(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        title="Editar"
-                        onClick={() => handleEditClient(client)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        title="Excluir"
-                        onClick={() => handleDeleteClient(client.id, client.name)}
-                        disabled={deleteClientMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {client.email && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">{client.email}</span>
-                      </div>
-                    )}
-                    {client.phone && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.phone}</span>
-                      </div>
-                    )}
-                    {client.whatsapp && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.whatsapp}</span>
-                      </div>
-                    )}
-                    {client.cpfCnpj && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.cpfCnpj}</span>
-                      </div>
-                    )}
-                    {client.address && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="text-xs leading-tight">{client.address}</span>
+                    </td>
+                  </tr>
+                ))}
                       </div>
                     )}
                   </div>
