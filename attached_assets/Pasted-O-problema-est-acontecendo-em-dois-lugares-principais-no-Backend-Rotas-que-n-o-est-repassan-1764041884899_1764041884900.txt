@@ -1,0 +1,109 @@
+O problema está acontecendo em dois lugares principais: no **Backend (Rotas)** que não está repassando o `branchId` para a função de salvar, e no **Storage** que não tem um método genérico para atualizar os dados específicos do Vendedor (apenas da comissão).
+
+Aqui está o passo a passo para corrigir.
+
+### 1\. Atualize o `storage.ts`
+
+Você precisa adicionar um método para atualizar os dados do perfil do vendedor (`Vendor`), pois atualmente só existe `updateVendorCommission`.
+
+No arquivo `storage.ts`:
+
+**Adicione na interface `IStorage`:**
+
+```typescript
+// Procure por updateVendorCommission e adicione updateVendor logo abaixo
+updateVendorCommission(userId: string, commissionRate: string): Promise<void>;
+updateVendor(userId: string, data: Partial<Vendor>): Promise<Vendor | undefined>; // <--- ADICIONE ISSO
+```
+
+**Adicione a implementação na classe `MemStorage`:**
+
+```typescript
+// Adicione este método na classe MemStorage (pode ser logo após updateVendorCommission)
+async updateVendor(userId: string, data: Partial<Vendor>): Promise<Vendor | undefined> {
+  const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
+  if (vendor) {
+    const updatedVendor = { ...vendor, ...data };
+    this.vendors.set(vendor.id, updatedVendor);
+    return updatedVendor;
+  }
+  return undefined;
+}
+```
+
+-----
+
+### 2\. Atualize o `routes.ts`
+
+Aqui é onde está a maior parte do erro. O código está tentando chamar uma função que não existe (`updateVendorBranch`) e, na criação, esqueceu de passar o `branchId`.
+
+No arquivo `routes.ts`:
+
+**Correção na rota de CRIAÇÃO (`POST /api/vendors`):**
+Procure por `app.post("/api/vendors" ...)` e altere o objeto passado para o `createVendor`:
+
+```typescript
+// ... dentro de app.post("/api/vendors")
+const { name, email, password, commissionRate, userCode, phone, address, branchId } = req.body; // <--- Adicione branchId aqui
+
+// ... (validações existentes)
+
+// Create vendor using storage method
+const newVendor = await storage.createVendor({
+  name: name.trim(),
+  email: email?.trim() || null,
+  phone: phone?.trim() || null,
+  address: address?.trim() || null,
+  username: userCode.trim(),
+  password: password || "123456",
+  commissionRate: commissionRate || '10.00',
+  branchId: branchId || null // <--- ADICIONE ESTA LINHA
+});
+```
+
+**Correção na rota de ATUALIZAÇÃO (`PUT /api/vendors/:id`):**
+Procure por `app.put("/api/vendors/:id" ...)` e substitua a lógica de atualização do vendedor:
+
+```typescript
+// ... dentro de app.put("/api/vendors/:id")
+
+// Update user data (código existente do updatedUser...)
+const updatedUser = await storage.updateUser(id, {
+  name: updateData.name.trim(),
+  email: updateData.email?.trim() || null,
+  phone: updateData.phone?.trim() || null,
+  address: updateData.address?.trim() || null,
+});
+
+if (!updatedUser) {
+  return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
+}
+
+// --- INICIO DA CORREÇÃO ---
+// Prepare vendor specific updates
+const vendorUpdates: any = {};
+
+if (updateData.commissionRate) {
+  vendorUpdates.commissionRate = updateData.commissionRate;
+}
+
+// Verifique explicitamente se branchId foi enviado (pode ser null)
+if (updateData.branchId !== undefined) {
+  vendorUpdates.branchId = updateData.branchId;
+}
+
+// Atualize o perfil do vendedor usando o novo método que criamos
+if (Object.keys(vendorUpdates).length > 0) {
+  await storage.updateVendor(id, vendorUpdates);
+}
+// --- FIM DA CORREÇÃO ---
+
+// Remova ou comente as chamadas antigas para updateVendorCommission e updateVendorBranch que estavam aqui
+```
+
+### Resumo do que estava errado:
+
+1.  **Na Criação:** O campo `branchId` chegava do frontend, mas o backend ignorava e não passava para o banco de dados.
+2.  **Na Edição:** O backend tentava chamar `storage.updateVendorBranch` que não existia (provavelmente um código alucinado pela IA anteriormente), fazendo com que a atualização da filial falhasse silenciosamente ou desse erro interno.
+
+Com essas alterações, o sistema passará a salvar corretamente a filial (Branch) tanto na criação quanto na edição.
