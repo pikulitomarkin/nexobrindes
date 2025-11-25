@@ -236,6 +236,7 @@ export default function AdminOrders() {
       confirmed: "bg-blue-100 text-blue-800",
       production: "bg-purple-100 text-purple-800",
       shipped: "bg-indigo-100 text-indigo-800",
+      partial_shipped: "bg-yellow-100 text-yellow-800 animate-pulse border border-yellow-300",
       delivered: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
     };
@@ -245,6 +246,7 @@ export default function AdminOrders() {
       confirmed: "Confirmado",
       production: "Em Produção",
       shipped: "Enviado",
+      partial_shipped: "Parcialmente Enviado",
       delivered: "Entregue",
       cancelled: "Cancelado",
     };

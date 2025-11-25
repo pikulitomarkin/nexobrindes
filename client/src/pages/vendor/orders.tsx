@@ -718,6 +718,7 @@ export default function VendorOrders() {
       delayed: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
       ready: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
       shipped: "bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full text-xs font-medium",
+      partial_shipped: "bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium animate-pulse border border-yellow-300",
       delivered: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
       cancelled: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
     };
@@ -729,6 +730,7 @@ export default function VendorOrders() {
       delayed: "Em Atraso",
       ready: "Pronto",
       shipped: "Enviado",
+      partial_shipped: "Parcialmente Enviado",
       delivered: "Entregue",
       cancelled: "Cancelado",
     };

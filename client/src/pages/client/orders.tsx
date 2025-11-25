@@ -169,7 +169,7 @@ export default function ClientOrders() {
       production: "Em Produção",
       ready: "Pronto para Envio",
       shipped: "Enviado",
-      partial_shipped: "🚚 Envio Parcial",
+      partial_shipped: "Parcialmente Enviado",
       delivered: "Entregue",
       completed: "Finalizado",
       cancelled: "Cancelado",
