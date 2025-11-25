@@ -772,112 +772,76 @@ export default function VendorClients() {
           <CardTitle>Lista de Clientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clients?.map((client: any) => (
-              <Card key={client.id} className="card-hover">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">{client.name}</h3>
-                      <div className="flex items-center mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                        <User className="h-4 w-4 text-blue-600 mr-2" />
-                        <div>
-                          <span className="text-xs text-blue-600 font-medium">Código de Acesso:</span>
-                          <span className="text-sm font-mono font-bold text-blue-800 ml-2">
-                            {client.userCode || client.username || 'N/A'}
-                          </span>
-                        </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF/CNPJ</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {clients?.map((client: any) => (
+                  <tr key={client.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 text-sm font-medium text-gray-900">{client.name}</td>
+                    <td className="px-4 py-4 text-sm">
+                      <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {client.userCode || client.username || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600 truncate">{client.email || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">{client.phone || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">{client.cpfCnpj || '—'}</td>
+                    <td className="px-4 py-4 text-sm whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setShowOrders(true);
+                          }}
+                          title="Ver Pedidos"
+                          className="hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Ver Detalhes"
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setShowClientDetails(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedClientId(client.id);
-                          setShowOrders(true);
-                        }}
-                        title="Ver Pedidos"
-                        className="hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        title="Ver Detalhes"
-                        onClick={() => {
-                          setSelectedClientId(client.id);
-                          setShowClientDetails(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {client.email && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">{client.email}</span>
-                      </div>
-                    )}
-                    {client.phone && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.phone}</span>
-                      </div>
-                    )}
-                    {client.whatsapp && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.whatsapp}</span>
-                      </div>
-                    )}
-                    {client.cpfCnpj && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Hash className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>{client.cpfCnpj}</span>
-                      </div>
-                    )}
-                    {client.address && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="text-xs leading-tight">{client.address}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Pedidos:</span>
-                      <span className="font-medium">{client.ordersCount || 0}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-600">Total gasto:</span>
-                      <span className="font-medium">R$ {(client.totalSpent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          {clients?.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">Ainda não há clientes cadastrados</p>
+              <Button
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="gradient-bg text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Cadastrar Primeiro Cliente
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {clients?.length === 0 && (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-gray-500 mb-4">Ainda não há clientes cadastrados</p>
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="gradient-bg text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Cadastrar Primeiro Cliente
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Dialog para mostrar pedidos do cliente */}
       <Dialog open={showOrders} onOpenChange={(open) => {
