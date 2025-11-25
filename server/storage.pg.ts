@@ -121,7 +121,14 @@ export class PgStorage implements IStorage {
   }
 
   async getVendor(userId: string): Promise<Vendor | undefined> {
-    const results = await pg.select().from(schema.vendors).where(eq(schema.vendors.userId, userId));
+    const results = await pg.select({
+      id: schema.vendors.id,
+      userId: schema.vendors.userId,
+      branchId: schema.vendors.branchId,
+      salesLink: schema.vendors.salesLink,
+      commissionRate: schema.vendors.commissionRate,
+      isActive: schema.vendors.isActive
+    }).from(schema.vendors).where(eq(schema.vendors.userId, userId));
     return results[0];
   }
 
