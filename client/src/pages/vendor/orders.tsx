@@ -2332,7 +2332,7 @@ export default function VendorOrders() {
                               <div className="grid grid-cols-3 gap-4 text-sm">
                                 <div>
                                   <span className="text-gray-500">Quantidade:</span>
-                                  <p className="font-medium">{item.quantity}</p>
+                                  <p className="font-medium">{Math.round(parseFloat(item.quantity || 0)).toLocaleString('pt-BR')}</p>
                                 </div>
                                 <div>
                                   <span className="text-gray-500">Valor Unit.:</span>
@@ -2435,7 +2435,7 @@ export default function VendorOrders() {
                             <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
                               <div>
                                 <span className="text-gray-500">Quantidade:</span>
-                                <span className="ml-1 font-medium">{item.quantity}</span>
+                                <span className="ml-1 font-medium">{Math.round(parseFloat(item.quantity || 0)).toLocaleString('pt-BR')}</span>
                               </div>
                               <div>
                                 <span className="text-gray-500">Preço Unit.:</span>

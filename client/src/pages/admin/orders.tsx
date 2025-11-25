@@ -743,7 +743,7 @@ export default function AdminOrders() {
                         <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                           <div>
                             <span className="font-medium">{item.productName}</span>
-                            <span className="text-sm text-gray-500 ml-2">Qtd: {item.quantity}</span>
+                            <span className="text-sm text-gray-500 ml-2">Qtd: {Math.round(parseFloat(item.quantity || 0)).toLocaleString('pt-BR')}</span>
                             {item.productWidth && item.productHeight && (
                               <div className="text-xs text-gray-500">
                                 Dimensões: {item.productWidth}x{item.productHeight}{item.productDepth ? `x${item.productDepth}` : ''} cm
@@ -773,7 +773,7 @@ export default function AdminOrders() {
                         <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                           <div>
                             <span className="font-medium">{item.product?.name || item.productName}</span>
-                            <span className="text-sm text-gray-500 ml-2">Qtd: {item.quantity}</span>
+                            <span className="text-sm text-gray-500 ml-2">Qtd: {Math.round(parseFloat(item.quantity || 0)).toLocaleString('pt-BR')}</span>
                             {item.productWidth && item.productHeight && (
                               <div className="text-xs text-gray-500">
                                 Dimensões: {item.productWidth}x{item.productHeight}{item.productDepth ? `x${item.productDepth}` : ''} cm
@@ -998,7 +998,7 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Quantidade:</span>
-                        <p className="font-medium">{item.quantity}</p>
+                        <p className="font-medium">{Math.round(parseFloat(item.quantity || 0)).toLocaleString('pt-BR')}</p>
                       </div>
                       <div>
                         <span className="text-gray-500">Valor Unit.:</span>
