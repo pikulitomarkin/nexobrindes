@@ -572,7 +572,23 @@ export default function AdminClients() {
 
                 {/* Endereço de Faturamento */}
                 <div className="space-y-4 border-b pb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Endereço de Faturamento</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Endereço de Faturamento</h3>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useSameAddressForBilling}
+                        onChange={(e) => {
+                          setUseSameAddressForBilling(e.target.checked);
+                          if (e.target.checked) {
+                            copyMainAddressToBilling();
+                          }
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-600">Usar endereço principal</span>
+                    </label>
+                  </div>
 
                   <div className="grid grid-cols-3 gap-4">
                     <FormField
@@ -664,7 +680,23 @@ export default function AdminClients() {
 
                 {/* Endereço de Entrega */}
                 <div className="space-y-4 border-b pb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Endereço de Entrega</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Endereço de Entrega</h3>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useSameAddressForDelivery}
+                        onChange={(e) => {
+                          setUseSameAddressForDelivery(e.target.checked);
+                          if (e.target.checked) {
+                            copyMainAddressToDelivery();
+                          }
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-600">Usar endereço principal</span>
+                    </label>
+                  </div>
 
                   <div className="grid grid-cols-3 gap-4">
                     <FormField
