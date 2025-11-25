@@ -354,10 +354,15 @@ export class PgStorage implements IStorage {
       
       // Insert budget items
       for (const item of orderItems) {
+        // Handle "internal" producer - save as NULL (means internal production)
+        const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== '' 
+          ? item.producerId 
+          : null;
+        
         await pg.insert(schema.budgetItems).values({
           budgetId: virtualBudgetId,
           productId: item.productId,
-          producerId: item.producerId || null,
+          producerId: producerId,
           quantity: item.quantity?.toString() || '1',
           unitPrice: item.unitPrice?.toString() || '0.00',
           totalPrice: item.totalPrice?.toString() || '0.00',
@@ -647,10 +652,15 @@ export class PgStorage implements IStorage {
         await pg.delete(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
         
         for (const item of orderItems) {
+          // Handle "internal" producer - save as NULL (means internal production)
+          const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== '' 
+            ? item.producerId 
+            : null;
+          
           await pg.insert(schema.budgetItems).values({
             budgetId: budgetId,
             productId: item.productId,
-            producerId: item.producerId || null,
+            producerId: producerId,
             quantity: item.quantity?.toString() || '1',
             unitPrice: item.unitPrice?.toString() || '0.00',
             totalPrice: item.totalPrice?.toString() || '0.00',
