@@ -583,7 +583,7 @@ export default function AdminOrders() {
                 {/* Financial Information */}
                 <div>
                   <h3 className="text-lg font-medium mb-3">Informações Financeiras</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="edit-totalValue">Valor Total (R$)</Label>
                       <Input
@@ -596,6 +596,17 @@ export default function AdminOrders() {
                       />
                     </div>
                     <div>
+                      <Label htmlFor="edit-downPayment">Valor de Entrada (R$)</Label>
+                      <Input
+                        id="edit-downPayment"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={parseFloat(editingOrder.downPayment || "0").toFixed(2)}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, downPayment: e.target.value })}
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="edit-paidValue">Valor Pago (R$)</Label>
                       <Input
                         id="edit-paidValue"
@@ -604,6 +615,29 @@ export default function AdminOrders() {
                         min="0"
                         value={parseFloat(editingOrder.paidValue || "0").toFixed(2)}
                         onChange={(e) => setEditingOrder({ ...editingOrder, paidValue: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <Label htmlFor="edit-remainingAmount">Valor Restante (R$)</Label>
+                      <Input
+                        id="edit-remainingAmount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={parseFloat(editingOrder.remainingAmount || editingOrder.remainingValue || "0").toFixed(2)}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, remainingAmount: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-installments">Parcelas</Label>
+                      <Input
+                        id="edit-installments"
+                        type="number"
+                        min="1"
+                        value={editingOrder.installments || 1}
+                        onChange={(e) => setEditingOrder({ ...editingOrder, installments: parseInt(e.target.value) || 1 })}
                       />
                     </div>
                   </div>
