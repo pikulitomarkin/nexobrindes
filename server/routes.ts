@@ -1005,9 +1005,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
       }
 
-      // Update vendor commission rate if provided
-      if (updateData.commissionRate) {
-        await storage.updateVendorCommission(id, updateData.commissionRate);
+      // Update vendor commission rate and branchId if provided
+      if (updateData.commissionRate || updateData.branchId !== undefined) {
+        const vendorUpdateData: any = {};
+        if (updateData.commissionRate) {
+          vendorUpdateData.commissionRate = updateData.commissionRate;
+        }
+        if (updateData.branchId !== undefined) {
+          vendorUpdateData.branchId = updateData.branchId === 'default' ? null : updateData.branchId;
+        }
+        await storage.updateVendor(id, vendorUpdateData);
       }
 
       // Get updated vendor info
@@ -1025,6 +1032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: updatedUser.username,
           userCode: updatedUser.username,
           commissionRate: vendorInfo?.commissionRate || updateData.commissionRate || '10.00',
+          branchId: vendorInfo?.branchId || null,
           isActive: updatedUser.isActive
         },
         message: "Vendedor atualizado com sucesso"
@@ -3758,6 +3766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             username: vendor.username,
             userCode: vendor.username, // Use username as userCode for display
             commissionRate: vendorInfo?.commissionRate || '10.00',
+            branchId: vendorInfo?.branchId || null, // Include branchId
             isActive: vendorInfo?.isActive || true
           };
         })

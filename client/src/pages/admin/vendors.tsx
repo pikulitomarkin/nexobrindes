@@ -204,7 +204,7 @@ export default function AdminVendors() {
       phone: vendor.phone || "",
       address: vendor.address || "",
       commissionRate: vendor.commissionRate?.toString() || "10.00",
-      branchId: vendor.branchId || "",
+      branchId: vendor.branchId || "default",
       password: "", // Don't populate password for security
     });
     setShowEditVendor(true);
