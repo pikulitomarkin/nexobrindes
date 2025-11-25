@@ -2957,7 +2957,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Commissions recalculated for order ${id}`);
       }
 
-      // 2. Update production orders if items changed
+      // 2. Update accounts receivable (financial receivables)
+      console.log(`Updating accounts receivable for order ${id}`);
+      await storage.updateAccountsReceivableForOrder(updatedOrder);
+      console.log(`Accounts receivable updated for order ${id}`);
+
+      // 3. Update production orders if items changed
       if (updateData.items && Array.isArray(updateData.items) && updateData.items.length > 0) {
         console.log(`Order ${id} items updated - syncing production orders`);
         

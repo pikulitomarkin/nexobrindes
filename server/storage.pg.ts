@@ -1787,6 +1787,58 @@ export class PgStorage implements IStorage {
     return results[0];
   }
 
+  async updateAccountsReceivableForOrder(order: Order): Promise<void> {
+    try {
+      const existingAR = await this.getAccountsReceivableByOrder(order.id);
+      
+      if (existingAR.length === 0) {
+        // Create new accounts receivable if none exists
+        await this.createAccountsReceivableForOrder(order);
+        console.log(`Created accounts receivable for order ${order.orderNumber}`);
+        return;
+      }
+
+      // Update existing accounts receivable
+      const ar = existingAR[0];
+      
+      const paidValue = order.paidValue || "0.00";
+      const downPayment = order.downPayment || "0.00";
+      const shippingCost = order.shippingCost || "0.00";
+
+      const minimumPaymentValue = compareMoney(downPayment, "0") > 0
+        ? addMoney(downPayment, shippingCost)
+        : "0.00";
+
+      let status: 'pending' | 'open' | 'partial' | 'paid' | 'overdue' = 'pending';
+      if (compareMoney(paidValue, order.totalValue) >= 0) {
+        status = 'paid';
+      } else if (compareMoney(paidValue, "0") > 0) {
+        status = 'partial';
+      }
+
+      // Ensure deadline is a Date object
+      let dueDate = new Date();
+      if (order.deadline) {
+        dueDate = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline;
+      }
+
+      await pg.update(schema.accountsReceivable)
+        .set({
+          amount: order.totalValue,
+          receivedAmount: paidValue,
+          minimumPayment: minimumPaymentValue,
+          status: status,
+          dueDate: dueDate,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.accountsReceivable.id, ar.id));
+
+      console.log(`Updated accounts receivable for order ${order.orderNumber}: amount=${order.totalValue}, downPayment=${downPayment}, minimumPayment=${minimumPaymentValue}`);
+    } catch (error) {
+      console.error(`Error updating accounts receivable for order ${order.id}:`, error);
+    }
+  }
+
   // ==================== PAYMENT ALLOCATIONS ====================
 
   async getPaymentAllocationsByPayment(paymentId: string): Promise<PaymentAllocation[]> {
