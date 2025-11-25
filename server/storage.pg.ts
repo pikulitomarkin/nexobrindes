@@ -323,6 +323,70 @@ export class PgStorage implements IStorage {
       processedData.orderNumber = await getNextOrderNumber();
     }
 
+    // If items are provided but no budgetId, create a virtual budget to store the items
+    let virtualBudgetId: string | null = null;
+    const orderItems = (processedData as any).items;
+    
+    if (orderItems && orderItems.length > 0 && !processedData.budgetId) {
+      console.log(`Creating virtual budget for direct order with ${orderItems.length} items`);
+      
+      // Create a virtual budget
+      const budgetNumber = `ORC-AUTO-${Date.now()}`;
+      const budgetResults = await pg.insert(schema.budgets).values({
+        budgetNumber,
+        clientId: processedData.clientId,
+        vendorId: processedData.vendorId,
+        title: processedData.product || 'Pedido Direto',
+        description: processedData.description || '',
+        subtotal: processedData.totalValue || '0.00',
+        totalValue: processedData.totalValue || '0.00',
+        status: 'converted', // Mark as converted since it's already an order
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        contactName: processedData.contactName || '',
+        contactPhone: processedData.contactPhone || '',
+        contactEmail: processedData.contactEmail || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+      
+      const virtualBudget = budgetResults[0];
+      virtualBudgetId = virtualBudget.id;
+      
+      // Insert budget items
+      for (const item of orderItems) {
+        await pg.insert(schema.budgetItems).values({
+          budgetId: virtualBudgetId,
+          productId: item.productId,
+          producerId: item.producerId || null,
+          quantity: item.quantity?.toString() || '1',
+          unitPrice: item.unitPrice?.toString() || '0.00',
+          totalPrice: item.totalPrice?.toString() || '0.00',
+          notes: item.notes || null,
+          hasItemCustomization: item.hasItemCustomization || false,
+          selectedCustomizationId: item.selectedCustomizationId || null,
+          itemCustomizationValue: item.itemCustomizationValue?.toString() || '0.00',
+          itemCustomizationDescription: item.itemCustomizationDescription || null,
+          additionalCustomizationNotes: item.additionalCustomizationNotes || null,
+          customizationPhoto: item.customizationPhoto || null,
+          hasGeneralCustomization: item.hasGeneralCustomization || false,
+          generalCustomizationName: item.generalCustomizationName || null,
+          generalCustomizationValue: item.generalCustomizationValue?.toString() || '0.00',
+          hasItemDiscount: item.hasItemDiscount || false,
+          itemDiscountType: item.itemDiscountType || 'percentage',
+          itemDiscountPercentage: item.itemDiscountPercentage?.toString() || '0.00',
+          itemDiscountValue: item.itemDiscountValue?.toString() || '0.00',
+          productWidth: item.productWidth?.toString() || null,
+          productHeight: item.productHeight?.toString() || null
+        });
+      }
+      
+      console.log(`Created virtual budget ${budgetNumber} with ${orderItems.length} items`);
+      processedData.budgetId = virtualBudgetId;
+    }
+
+    // Remove items from processedData before inserting into orders table
+    delete processedData.items;
+
     const results = await pg.insert(schema.orders).values({
       ...processedData,
       paidValue: processedData.paidValue || "0.00",
@@ -531,7 +595,7 @@ export class PgStorage implements IStorage {
 
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     // Convert string dates to Date objects if they exist
-    const processedData = { ...updates };
+    const processedData: any = { ...updates };
     
     if (processedData.deadline && typeof processedData.deadline === 'string') {
       processedData.deadline = new Date(processedData.deadline);
@@ -544,6 +608,77 @@ export class PgStorage implements IStorage {
     if (processedData.createdAt && typeof processedData.createdAt === 'string') {
       processedData.createdAt = new Date(processedData.createdAt);
     }
+
+    // Handle items update if provided
+    const orderItems = processedData.items;
+    if (orderItems && orderItems.length > 0) {
+      // Get the current order to check for budgetId
+      const currentOrder = await pg.select().from(schema.orders).where(eq(schema.orders.id, id)).then(r => r[0]);
+      
+      if (currentOrder) {
+        let budgetId = currentOrder.budgetId;
+        
+        // If no budget exists, create a virtual one
+        if (!budgetId) {
+          console.log(`Creating virtual budget for order ${id} during update`);
+          const budgetNumber = `ORC-AUTO-${Date.now()}`;
+          const budgetResults = await pg.insert(schema.budgets).values({
+            budgetNumber,
+            clientId: currentOrder.clientId,
+            vendorId: currentOrder.vendorId,
+            title: processedData.product || currentOrder.product || 'Pedido Direto',
+            description: processedData.description || currentOrder.description || '',
+            subtotal: processedData.totalValue || currentOrder.totalValue || '0.00',
+            totalValue: processedData.totalValue || currentOrder.totalValue || '0.00',
+            status: 'converted',
+            validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            contactName: processedData.contactName || currentOrder.contactName || '',
+            contactPhone: processedData.contactPhone || currentOrder.contactPhone || '',
+            contactEmail: processedData.contactEmail || currentOrder.contactEmail || '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }).returning();
+          
+          budgetId = budgetResults[0].id;
+          processedData.budgetId = budgetId;
+        }
+        
+        // Delete existing items and insert new ones
+        await pg.delete(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
+        
+        for (const item of orderItems) {
+          await pg.insert(schema.budgetItems).values({
+            budgetId: budgetId,
+            productId: item.productId,
+            producerId: item.producerId || null,
+            quantity: item.quantity?.toString() || '1',
+            unitPrice: item.unitPrice?.toString() || '0.00',
+            totalPrice: item.totalPrice?.toString() || '0.00',
+            notes: item.notes || null,
+            hasItemCustomization: item.hasItemCustomization || false,
+            selectedCustomizationId: item.selectedCustomizationId || null,
+            itemCustomizationValue: item.itemCustomizationValue?.toString() || '0.00',
+            itemCustomizationDescription: item.itemCustomizationDescription || null,
+            additionalCustomizationNotes: item.additionalCustomizationNotes || null,
+            customizationPhoto: item.customizationPhoto || null,
+            hasGeneralCustomization: item.hasGeneralCustomization || false,
+            generalCustomizationName: item.generalCustomizationName || null,
+            generalCustomizationValue: item.generalCustomizationValue?.toString() || '0.00',
+            hasItemDiscount: item.hasItemDiscount || false,
+            itemDiscountType: item.itemDiscountType || 'percentage',
+            itemDiscountPercentage: item.itemDiscountPercentage?.toString() || '0.00',
+            itemDiscountValue: item.itemDiscountValue?.toString() || '0.00',
+            productWidth: item.productWidth?.toString() || null,
+            productHeight: item.productHeight?.toString() || null
+          });
+        }
+        
+        console.log(`Updated ${orderItems.length} items for order ${id}`);
+      }
+    }
+    
+    // Remove items from processedData before updating orders table
+    delete processedData.items;
 
     const results = await pg.update(schema.orders)
       .set({ ...processedData, updatedAt: new Date() })
