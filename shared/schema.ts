@@ -563,6 +563,7 @@ export const systemLogs = pgTable("system_logs", {
   userId: varchar("user_id").references(() => users.id), // Nullable para permitir logs de sistema
   userName: text("user_name").notNull(), // Nome do usuário para facilitar consultas
   userRole: text("user_role").notNull(), // Role do usuário
+  vendorId: varchar("vendor_id").references(() => users.id), // Vendedor associado (para filtrar logs de clientes)
   action: text("action").notNull(), // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
   entity: text("entity"), // orders, users, products, etc.
   entityId: varchar("entity_id"), // ID da entidade afetada
