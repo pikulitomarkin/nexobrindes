@@ -135,12 +135,12 @@ export interface IStorage {
   getVendor(userId: string): Promise<Vendor | undefined>;
   createVendor(vendorData: any): Promise<User>;
   updateVendorCommission(userId: string, commissionRate: string): Promise<void>;
+  updateVendor(userId: string, data: Partial<Vendor>): Promise<Vendor | undefined>;
 
   // Clients
   getClients(): Promise<Client[]>;
   getClient(id: string): Promise<Client | undefined>;
-  createClient(clientData: InsertClient): Promise<Client>;
-  createClientWithUser(userData: { username: string; password: string; name: string; email?: string | null; phone?: string | null; }, clientData: Omit<InsertClient, 'userId'>): Promise<{ user: User; client: Client }>;
+  createClient(clientData: InsertClient & { userCode?: string }): Promise<Client & { userCode?: string }>;
   updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
   getClientByUserId(userId: string): Promise<Client | undefined>; // Added for retrieving client by userId
@@ -1344,7 +1344,7 @@ export class MemStorage implements IStorage {
     const vendorProfile: Vendor = {
       id: randomUUID(),
       userId: newUser.id,
-      branchId: vendorData.branchId || null, // Assign branchId
+      branchId: vendorData.branchId || null,
       salesLink: vendorData.salesLink || null,
       commissionRate: vendorData.commissionRate || "10.00",
       isActive: true
@@ -1357,9 +1357,19 @@ export class MemStorage implements IStorage {
   async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
     const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
     if (vendor) {
-      const updatedVendor = { ...vendor, commissionRate };
+      const updatedVendor = { ...vendor, commissionRate, updatedAt: new Date() };
       this.vendors.set(vendor.id, updatedVendor);
     }
+  }
+
+  async updateVendor(userId: string, data: Partial<Vendor>): Promise<Vendor | undefined> {
+    const vendor = Array.from(this.vendors.values()).find(v => v.userId === userId);
+    if (vendor) {
+      const updatedVendor = { ...vendor, ...data, updatedAt: new Date() };
+      this.vendors.set(vendor.id, updatedVendor);
+      return updatedVendor;
+    }
+    return undefined;
   }
 
   // Client methods
@@ -4543,7 +4553,7 @@ export class MemStorage implements IStorage {
     });
 
     // Enriquecer as solicitações encontradas
-    const enrichedRequests = await Promise.all(matchingRequests.map(async request => {
+    const enrichedRequests = await Promise.all(requests.map(async request => {
       // Buscar informações do vendedor
       const vendor = await this.getUser(request.vendorId);
       const vendorName = vendor?.name || 'Vendedor não identificado';

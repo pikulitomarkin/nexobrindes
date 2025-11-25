@@ -1983,7 +1983,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
         notes: notes || null,
-        transactionId: transactionId || null,
         // Mark as manual payment to prevent OFX reconciliation
         reconciliationStatus: 'manual',
         bankTransactionId: null
@@ -3073,7 +3072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with user data and budget photos/items
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
-          // Always use contactName as primary client name, no fallback to 'Unknown'
+          // Always use contactName as primary client name
           let clientName = order.contactName;
 
           // Only if contactName is missing, try to get from client record
@@ -3760,9 +3759,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors", async (req, res) => {
     try {
-      const { name, email, password, commissionRate, userCode, phone, address } = req.body;
+      const { name, email, password, commissionRate, userCode, phone, address, branchId } = req.body;
 
-      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate });
+      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate, branchId });
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -3787,7 +3786,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: address?.trim() || null,
         username: userCode.trim(),
         password: password || "123456",
-        commissionRate: commissionRate || '10.00'
+        commissionRate: commissionRate || '10.00',
+        branchId: branchId || null // Pass branchId here
       });
 
       // Get vendor info
@@ -5429,7 +5429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // This ensures the UI shows the correct "already paid" amount
         const currentReceived = parseFloat(receivable.receivedAmount || '0');
         const newReceivedAmount = currentReceived + finalAmount;
-        const totalAmount = parseFloat(receivable.amount);
+        const totalAmount =parseFloat(receivable.amount);
 
         await storage.updateAccountsReceivable(receivable.id, {
           receivedAmount: newReceivedAmount.toFixed(2),
@@ -7499,8 +7499,8 @@ Para mais detalhes, entre em contato conosco!`;
   // Settings Routes - Customization Options
   app.get("/api/settings/customization-options", requireAuth, async (req, res) => {
     try {
-      const customizations = await storage.getCustomizationOptions();
-      res.json(customizations);
+      const options = await storage.getCustomizationOptions();
+      res.json(options);
     } catch (error) {
       console.error('Error fetching customization options:', error);
       res.status(500).json({ error: "Erro interno do servidor" });

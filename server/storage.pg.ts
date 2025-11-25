@@ -140,12 +140,12 @@ export class PgStorage implements IStorage {
 
   async updateVendorBranch(userId: string, branchId: string | null): Promise<void> {
     console.log(`Updating vendor branch for userId ${userId} to branchId:`, branchId);
-    
+
     // First, check if vendor record exists
     const existingVendor = await pg.select().from(schema.vendors)
       .where(eq(schema.vendors.userId, userId))
       .limit(1);
-    
+
     if (existingVendor.length === 0) {
       console.log(`No vendor record found for userId ${userId}, creating one...`);
       // Create vendor record if it doesn't exist
@@ -161,7 +161,7 @@ export class PgStorage implements IStorage {
         .set({ branchId })
         .where(eq(schema.vendors.userId, userId))
         .returning();
-      
+
       console.log(`Updated vendor branch:`, result[0]);
     }
   }
@@ -195,8 +195,22 @@ export class PgStorage implements IStorage {
 
   async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
     await pg.update(schema.vendors)
-      .set({ commissionRate })
+      .set({
+        commissionRate,
+        updatedAt: new Date()
+      })
       .where(eq(schema.vendors.userId, userId));
+  }
+
+  async updateVendor(userId: string, data: Partial<Vendor>): Promise<Vendor | undefined> {
+    const results = await pg.update(schema.vendors)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.vendors.userId, userId))
+      .returning();
+    return results[0];
   }
 
   // ==================== CLIENTS ====================
