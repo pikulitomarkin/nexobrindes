@@ -7,6 +7,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { db as storage, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db';
 import { OrderEnrichmentService } from './services/order-enrichment.js';
+import { logger } from './logger';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1363,6 +1364,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("[CREATE BUDGET] Budget created successfully:", newBudget.id);
+
+      // Log budget creation (non-blocking)
+      const vendor = await storage.getUser(budgetData.vendorId);
+      if (vendor) {
+        logger.logBudgetCreated(
+          vendor.id,
+          vendor.name,
+          newBudget.id,
+          budgetData.contactName
+        ).catch(() => {});
+      }
 
       res.json(newBudget);
     } catch (error) {
