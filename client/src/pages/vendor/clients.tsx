@@ -1011,9 +1011,9 @@ export default function VendorClients() {
                       </div>
                     </div>
 
-                    {/* Endereço Completo */}
+                    {/* Endereço Principal */}
                     <div>
-                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Completo</h4>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço Principal</h4>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-600">Logradouro:</label>
@@ -1038,6 +1038,68 @@ export default function VendorClients() {
                         <div>
                           <label className="text-sm font-medium text-gray-600">CEP:</label>
                           <p className="text-sm text-gray-900">{client.cep || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Endereço de Faturamento */}
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço de Faturamento</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoLogradouro || client.endereco_faturamento_logradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoNumero || client.endereco_faturamento_numero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoComplemento || client.endereco_faturamento_complemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoBairro || client.endereco_faturamento_bairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoCidade || client.endereco_faturamento_cidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoFaturamentoCep || client.endereco_faturamento_cep || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Endereço de Entrega */}
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-800 mb-3">Endereço de Entrega</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Logradouro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaLogradouro || client.endereco_entrega_logradouro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Número:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaNumero || client.endereco_entrega_numero || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Complemento:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaComplemento || client.endereco_entrega_complemento || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Bairro:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaBairro || client.endereco_entrega_bairro || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">Cidade:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaCidade || client.endereco_entrega_cidade || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">CEP:</label>
+                          <p className="text-sm text-gray-900">{client.enderecoEntregaCep || client.endereco_entrega_cep || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
