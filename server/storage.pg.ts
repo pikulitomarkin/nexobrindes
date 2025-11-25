@@ -143,6 +143,7 @@ export class PgStorage implements IStorage {
     // Create vendor profile
     await pg.insert(schema.vendors).values({
       userId: newUser.id,
+      branchId: vendorData.branchId || null,
       salesLink: vendorData.salesLink || null,
       commissionRate: vendorData.commissionRate || "10.00",
       isActive: true
@@ -154,6 +155,12 @@ export class PgStorage implements IStorage {
   async updateVendorCommission(userId: string, commissionRate: string): Promise<void> {
     await pg.update(schema.vendors)
       .set({ commissionRate })
+      .where(eq(schema.vendors.userId, userId));
+  }
+
+  async updateVendor(userId: string, updates: { branchId?: string | null; commissionRate?: string; salesLink?: string | null }): Promise<void> {
+    await pg.update(schema.vendors)
+      .set(updates)
       .where(eq(schema.vendors.userId, userId));
   }
 
