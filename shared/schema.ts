@@ -220,7 +220,7 @@ export const branches = pgTable("branches", {
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  // branchId removido - vendedores ficam na matriz
+  branchId: varchar("branch_id").references(() => branches.id),
   salesLink: text("sales_link").unique(),
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default('10.00'),
   isActive: boolean("is_active").default(true),
