@@ -211,6 +211,8 @@ export const branches = pgTable("branches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   city: text("city").notNull(),
+  cnpj: text("cnpj"),
+  address: text("address"),
   isHeadquarters: boolean("is_headquarters").default(false), // Para identificar a matriz
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

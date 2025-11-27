@@ -24,6 +24,8 @@ import { queryClient } from "@/lib/queryClient";
 const branchFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   city: z.string().min(2, "Cidade deve ter pelo menos 2 caracteres"),
+  cnpj: z.string().optional(),
+  address: z.string().optional(),
   isHeadquarters: z.boolean().default(false),
 });
 
@@ -43,6 +45,8 @@ export default function AdminBranches() {
     defaultValues: {
       name: "",
       city: "",
+      cnpj: "",
+      address: "",
       isHeadquarters: false,
     },
   });
@@ -153,6 +157,8 @@ export default function AdminBranches() {
     form.reset({
       name: branch.name,
       city: branch.city,
+      cnpj: branch.cnpj || "",
+      address: branch.address || "",
       isHeadquarters: branch.isHeadquarters || false,
     });
   };
@@ -229,6 +235,34 @@ export default function AdminBranches() {
                       <FormLabel>Cidade *</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: São Paulo" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="cnpj"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CNPJ</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: 00.000.000/0000-00" {...field} data-testid="input-cnpj" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço Completo</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo/SP - CEP 01000-000" {...field} data-testid="input-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -334,6 +368,18 @@ export default function AdminBranches() {
                       <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span>{branch.city}</span>
                     </div>
+                    {branch.cnpj && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span>CNPJ: {branch.cnpj}</span>
+                      </div>
+                    )}
+                    {branch.address && (
+                      <div className="flex items-start text-sm text-gray-600">
+                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="break-words">{branch.address}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200">
