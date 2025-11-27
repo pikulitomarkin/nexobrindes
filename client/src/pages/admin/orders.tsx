@@ -408,7 +408,11 @@ export default function AdminOrders() {
                         {order.vendorName || "Vendedor não informado"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {order.product}
+                        {order.budgetItems && order.budgetItems.length > 0
+                          ? order.budgetItems.length === 1
+                            ? order.budgetItems[0]?.productName || order.budgetItems[0]?.product?.name || 'Produto'
+                            : `${order.budgetItems.length} produtos`
+                          : order.itemsSummary || 'Ver detalhes'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -921,14 +925,6 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
             <div>
               <label className="text-sm font-medium text-gray-500">Vendedor</label>
               <p>{order.vendorName || "Vendedor não informado"}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Produto</label>
-              <p>{order.product}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-500">Descrição</label>
-              <p className="text-gray-700">{order.description}</p>
             </div>
           </div>
         </div>
