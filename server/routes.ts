@@ -701,6 +701,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get payment info
       const paymentInfo = await storage.getBudgetPaymentInfo(id);
 
+      // Get branch info if budget has a branchId
+      let branchInfo = null;
+      if (budget.branchId) {
+        const branch = await storage.getBranch(budget.branchId);
+        if (branch) {
+          branchInfo = {
+            id: branch.id,
+            name: branch.name,
+            city: branch.city,
+            cnpj: branch.cnpj || null,
+            address: branch.address || null,
+            isHeadquarters: branch.isHeadquarters || false
+          };
+          console.log(`Branch info for PDF: ${branch.name} - CNPJ: ${branch.cnpj || 'N/A'}`);
+        }
+      }
+
       // Calculate total budget value
       const totalBudget = enrichedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
 
@@ -712,6 +729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: budget.description,
           clientId: budget.clientId,
           vendorId: budget.vendorId,
+          branchId: budget.branchId,
           totalValue: totalBudget.toFixed(2),
           validUntil: budget.validUntil,
           deliveryDeadline: budget.deliveryDeadline,
@@ -731,6 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           remainingAmount: paymentInfo?.remainingAmount || "0.00",
           shippingCost: paymentInfo?.shippingCost || "0.00"
         },
+        branch: branchInfo,
         items: enrichedItems,
         client: {
           name: clientName,
@@ -7678,6 +7697,22 @@ Para mais detalhes, entre em contato conosco!`;
       // Get payment and shipping info
       const paymentInfo = await storage.getBudgetPaymentInfo(req.params.id);
 
+      // Get branch info if budget has a branchId
+      let branchInfo = null;
+      if (budget.branchId) {
+        const branch = await storage.getBranch(budget.branchId);
+        if (branch) {
+          branchInfo = {
+            id: branch.id,
+            name: branch.name,
+            city: branch.city,
+            cnpj: branch.cnpj || null,
+            address: branch.address || null,
+            isHeadquarters: branch.isHeadquarters || false
+          };
+        }
+      }
+
       const pdfData = {
         budget: {
           id: budget.id,
@@ -7686,6 +7721,7 @@ Para mais detalhes, entre em contato conosco!`;
           description: budget.description,
           clientId: budget.clientId,
           vendorId: budget.vendorId,
+          branchId: budget.branchId,
           totalValue: totalBudget.toFixed(2),
           validUntil: budget.validUntil,
           hasCustomization: budget.hasCustomization,
@@ -7704,6 +7740,7 @@ Para mais detalhes, entre em contato conosco!`;
           remainingAmount: paymentInfo?.remainingAmount || "0.00",
           shippingCost: paymentInfo?.shippingCost || "0.00"
         },
+        branch: branchInfo,
         items: enrichedItems,
         client: {
           name: client?.name || 'Cliente não encontrado',

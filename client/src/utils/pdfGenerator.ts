@@ -10,6 +10,7 @@ export interface BudgetPDFData {
     description?: string;
     clientId: string;
     vendorId: string;
+    branchId?: string;
     totalValue: string;
     validUntil: string;
     hasCustomization: boolean;
@@ -27,7 +28,15 @@ export interface BudgetPDFData {
     downPayment?: string;
     remainingAmount?: string;
     shippingCost?: string;
-    deliveryDeadline?: string; // Added deliveryDeadline
+    deliveryDeadline?: string;
+  };
+  branch?: {
+    id: string;
+    name: string;
+    city: string;
+    cnpj?: string;
+    address?: string;
+    isHeadquarters?: boolean;
   };
   items: Array<{
     id: string;
@@ -197,6 +206,36 @@ export class PDFGenerator {
     }
 
     this.currentY += 20;
+  }
+
+  private addBranchInfo(data: BudgetPDFData): void {
+    if (data.branch && (data.branch.cnpj || data.branch.address)) {
+      this.addNewPageIfNeeded(30);
+
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('FILIAL EMISSORA:', this.margin, this.currentY);
+      this.doc.setFont('helvetica', 'normal');
+
+      let yOffset = 6;
+      this.doc.text(data.branch.name, this.margin, this.currentY + yOffset);
+      yOffset += 6;
+
+      if (data.branch.cnpj) {
+        this.doc.text(`CNPJ: ${data.branch.cnpj}`, this.margin, this.currentY + yOffset);
+        yOffset += 6;
+      }
+
+      if (data.branch.address) {
+        const addressLines = this.doc.splitTextToSize(data.branch.address, this.pageWidth - 2 * this.margin);
+        for (const line of addressLines) {
+          this.doc.text(line, this.margin, this.currentY + yOffset);
+          yOffset += 5;
+        }
+      }
+
+      this.currentY += yOffset + 10;
+    }
   }
 
   private async loadAndCacheImage(imageLink: string): Promise<string | null> {
@@ -678,6 +717,9 @@ export class PDFGenerator {
       
       console.log('Adding client and vendor info...');
       this.addClientVendorInfo(data);
+      
+      console.log('Adding branch info...');
+      this.addBranchInfo(data);
       
       console.log('Adding items...');
       await this.addItems(data);
