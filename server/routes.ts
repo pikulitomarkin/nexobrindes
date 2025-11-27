@@ -4209,6 +4209,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update producer
+  app.patch("/api/producers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, email, phone, specialty, address } = req.body;
+
+      console.log(`Updating producer ${id}:`, { name, email, phone, specialty, address });
+
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: "Nome deve ter pelo menos 2 caracteres" });
+      }
+
+      const updatedUser = await storage.updateUser(id, {
+        name: name.trim(),
+        email: email || null,
+        phone: phone || null,
+        specialty: specialty || null,
+        address: address || null,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Produtor não encontrado" });
+      }
+
+      console.log(`Producer ${id} updated successfully`);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating producer:", error);
+      res.status(500).json({ error: "Erro ao atualizar produtor" });
+    }
+  });
+
+  // Change producer password
+  app.patch("/api/producers/:id/password", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+
+      console.log(`Changing password for producer ${id}`);
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const producer = await storage.getUser(id);
+      if (!producer || producer.role !== 'producer') {
+        return res.status(404).json({ error: "Produtor não encontrado" });
+      }
+
+      await storage.updateUser(id, { password: newPassword });
+
+      console.log(`Password changed successfully for producer ${id}`);
+      res.json({ success: true, message: "Senha alterada com sucesso" });
+    } catch (error) {
+      console.error("Error changing producer password:", error);
+      res.status(500).json({ error: "Erro ao alterar senha" });
+    }
+  });
+
   app.delete("/api/producers/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -4330,6 +4389,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating logistics user:', error);
       res.status(500).json({ error: "Failed to create logistics user" });
+    }
+  });
+
+  // Update logistics user
+  app.patch("/api/logistics/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, email, phone } = req.body;
+
+      console.log(`Updating logistics user ${id}:`, { name, email, phone });
+
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: "Nome deve ter pelo menos 2 caracteres" });
+      }
+
+      const user = await storage.getUser(id);
+      if (!user || user.role !== 'logistics') {
+        return res.status(404).json({ error: "Usuário de logística não encontrado" });
+      }
+
+      const updatedUser = await storage.updateUser(id, {
+        name: name.trim(),
+        email: email || null,
+        phone: phone || null,
+      });
+
+      console.log(`Logistics user ${id} updated successfully`);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating logistics user:", error);
+      res.status(500).json({ error: "Erro ao atualizar usuário" });
+    }
+  });
+
+  // Change logistics user password
+  app.patch("/api/logistics/:id/password", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+
+      console.log(`Changing password for logistics user ${id}`);
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const user = await storage.getUser(id);
+      if (!user || user.role !== 'logistics') {
+        return res.status(404).json({ error: "Usuário de logística não encontrado" });
+      }
+
+      await storage.updateUser(id, { password: newPassword });
+
+      console.log(`Password changed successfully for logistics user ${id}`);
+      res.json({ success: true, message: "Senha alterada com sucesso" });
+    } catch (error) {
+      console.error("Error changing logistics user password:", error);
+      res.status(500).json({ error: "Erro ao alterar senha" });
     }
   });
 

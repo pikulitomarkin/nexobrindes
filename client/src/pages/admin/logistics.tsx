@@ -8,9 +8,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, User, Phone, Mail, Trash2, RefreshCw, Truck } from "lucide-react";
+import { Plus, User, Phone, Mail, Trash2, RefreshCw, Truck, Edit, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const logisticsFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -19,11 +19,32 @@ const logisticsFormSchema = z.object({
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
 
+const logisticsEditSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  phone: z.string().optional(),
+});
+
+const passwordChangeSchema = z.object({
+  newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "Confirme a senha"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmPassword"],
+});
+
 type LogisticsFormValues = z.infer<typeof logisticsFormSchema>;
+type LogisticsEditValues = z.infer<typeof logisticsEditSchema>;
+type PasswordChangeValues = z.infer<typeof passwordChangeSchema>;
 
 export default function AdminLogistics() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [userCode, setUserCode] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
 
   const generateUserCode = () => {
@@ -54,6 +75,23 @@ export default function AdminLogistics() {
       email: "",
       phone: "",
       password: "",
+    },
+  });
+
+  const editForm = useForm<LogisticsEditValues>({
+    resolver: zodResolver(logisticsEditSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+    },
+  });
+
+  const passwordForm = useForm<PasswordChangeValues>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
@@ -129,14 +167,103 @@ export default function AdminLogistics() {
     },
   });
 
+  const updateLogisticsMutation = useMutation({
+    mutationFn: async (data: LogisticsEditValues & { id: string }) => {
+      const response = await apiRequest("PATCH", `/api/logistics/${data.id}`, {
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics"] });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      editForm.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Usuário de logística atualizado com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar usuário",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
+      const response = await apiRequest("PATCH", `/api/logistics/${id}/password`, {
+        newPassword,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics"] });
+      setIsPasswordDialogOpen(false);
+      setEditingUser(null);
+      passwordForm.reset();
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      toast({
+        title: "Sucesso!",
+        description: "Senha alterada com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar senha",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeleteLogistics = (userId: string, userName: string) => {
     if (confirm(`Tem certeza que deseja excluir o usuário "${userName}"?`)) {
       deleteLogisticsMutation.mutate(userId);
     }
   };
 
+  const openEditDialog = (user: any) => {
+    setEditingUser(user);
+    editForm.reset({
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const openPasswordDialog = (user: any) => {
+    setEditingUser(user);
+    passwordForm.reset({
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setIsPasswordDialogOpen(true);
+  };
+
   const onSubmit = (data: LogisticsFormValues) => {
     createLogisticsMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: LogisticsEditValues) => {
+    if (editingUser) {
+      updateLogisticsMutation.mutate({ ...data, id: editingUser.id });
+    }
+  };
+
+  const onPasswordSubmit = (data: PasswordChangeValues) => {
+    if (editingUser) {
+      changePasswordMutation.mutate({ id: editingUser.id, newPassword: data.newPassword });
+    }
   };
 
   if (isLoading) {
@@ -313,16 +440,39 @@ export default function AdminLogistics() {
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
                     <p className="font-mono font-bold text-gray-900">{user.username || user.userCode}</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    title="Excluir usuário"
-                    onClick={() => handleDeleteLogistics(user.id, user.name)}
-                    disabled={deleteLogisticsMutation.isPending}
-                    data-testid={`button-delete-${user.id}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title="Editar usuário"
+                      onClick={() => openEditDialog(user)}
+                      className="hover:bg-blue-50 hover:border-blue-200"
+                      data-testid={`button-edit-${user.id}`}
+                    >
+                      <Edit className="h-4 w-4 text-blue-600" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title="Alterar senha"
+                      onClick={() => openPasswordDialog(user)}
+                      className="hover:bg-yellow-50 hover:border-yellow-200"
+                      data-testid={`button-password-${user.id}`}
+                    >
+                      <Lock className="h-4 w-4 text-yellow-600" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title="Excluir usuário"
+                      onClick={() => handleDeleteLogistics(user.id, user.name)}
+                      disabled={deleteLogisticsMutation.isPending}
+                      className="hover:bg-red-50 hover:border-red-200"
+                      data-testid={`button-delete-${user.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -344,6 +494,194 @@ export default function AdminLogistics() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para editar usuário */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingUser(null);
+          editForm.reset();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Editar Usuário de Logística
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as informações do usuário {editingUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do usuário" {...field} data-testid="input-edit-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="email@exemplo.com" {...field} data-testid="input-edit-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(00) 00000-0000" {...field} data-testid="input-edit-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={updateLogisticsMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {updateLogisticsMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para alterar senha */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => {
+        setIsPasswordDialogOpen(open);
+        if (!open) {
+          setEditingUser(null);
+          passwordForm.reset();
+          setShowNewPassword(false);
+          setShowConfirmPassword(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Alterar Senha
+            </DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para o usuário {editingUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={passwordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nova Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Mínimo 6 caracteres"
+                          {...field}
+                          data-testid="input-new-password"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Repita a nova senha"
+                          {...field}
+                          data-testid="input-confirm-password"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPasswordDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={changePasswordMutation.isPending}
+                  data-testid="button-save-password"
+                >
+                  {changePasswordMutation.isPending ? "Salvando..." : "Alterar Senha"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

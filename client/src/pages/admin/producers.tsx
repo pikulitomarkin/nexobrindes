@@ -9,9 +9,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck, Package, Trash2 } from "lucide-react";
+import { Plus, Factory, MapPin, Phone, User, RefreshCw, Package2, Truck, Package, Trash2, Edit, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
 
 const producerFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -22,7 +23,25 @@ const producerFormSchema = z.object({
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
 
+const producerEditSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  specialty: z.string().optional(),
+  address: z.string().optional(),
+});
+
+const passwordChangeSchema = z.object({
+  newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "Confirme a senha"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmPassword"],
+});
+
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
+type ProducerEditValues = z.infer<typeof producerEditSchema>;
+type PasswordChangeValues = z.infer<typeof passwordChangeSchema>;
 
 export default function AdminProducers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -30,6 +49,11 @@ export default function AdminProducers() {
   const [selectedProducerId, setSelectedProducerId] = useState<string | null>(null);
   const [showProducerProducts, setShowProducerProducts] = useState(false);
   const [showProducerOrders, setShowProducerOrders] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [editingProducer, setEditingProducer] = useState<any>(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
 
   const generateUserCode = () => {
@@ -173,6 +197,118 @@ export default function AdminProducers() {
       });
     },
   });
+
+  const editForm = useForm<ProducerEditValues>({
+    resolver: zodResolver(producerEditSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      specialty: "",
+      address: "",
+    },
+  });
+
+  const passwordForm = useForm<PasswordChangeValues>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const updateProducerMutation = useMutation({
+    mutationFn: async (data: ProducerEditValues & { id: string }) => {
+      const response = await apiRequest("PATCH", `/api/producers/${data.id}`, {
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        specialty: data.specialty || null,
+        address: data.address || null,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/producers"] });
+      setIsEditDialogOpen(false);
+      setEditingProducer(null);
+      editForm.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Produtor atualizado com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar produtor",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
+      const response = await apiRequest("PATCH", `/api/producers/${id}/password`, {
+        newPassword,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/producers"] });
+      setIsPasswordDialogOpen(false);
+      setEditingProducer(null);
+      passwordForm.reset();
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      toast({
+        title: "Sucesso!",
+        description: "Senha alterada com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar senha",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (producer: any) => {
+    setEditingProducer(producer);
+    editForm.reset({
+      name: producer.name || "",
+      email: producer.email || "",
+      phone: producer.phone || "",
+      specialty: producer.specialty || "",
+      address: producer.address || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const openPasswordDialog = (producer: any) => {
+    setEditingProducer(producer);
+    passwordForm.reset({
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setIsPasswordDialogOpen(true);
+  };
+
+  const onEditSubmit = (data: ProducerEditValues) => {
+    if (editingProducer) {
+      updateProducerMutation.mutate({ ...data, id: editingProducer.id });
+    }
+  };
+
+  const onPasswordSubmit = (data: PasswordChangeValues) => {
+    if (editingProducer) {
+      changePasswordMutation.mutate({ id: editingProducer.id, newPassword: data.newPassword });
+    }
+  };
 
   const handleDeleteProducer = (producerId: string, producerName: string) => {
     const confirmMessage = `Tem certeza que deseja excluir o produtor "${producerName}"?\n\nEsta ação não pode ser desfeita e irá:\n- Desativar todos os produtos associados\n- Remover o acesso do produtor ao sistema\n\nSomente produtores sem pedidos de produção ou pagamentos pendentes podem ser excluídos.`;
@@ -403,7 +539,27 @@ export default function AdminProducers() {
                       <p className="text-xs text-gray-500 uppercase tracking-wide">Código de Login</p>
                       <p className="font-mono font-bold text-gray-900">{producer.username}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 flex-wrap">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Editar produtor"
+                        onClick={() => openEditDialog(producer)}
+                        className="hover:bg-blue-50 hover:border-blue-200"
+                        data-testid={`button-edit-producer-${producer.id}`}
+                      >
+                        <Edit className="h-4 w-4 text-blue-600" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Alterar senha"
+                        onClick={() => openPasswordDialog(producer)}
+                        className="hover:bg-yellow-50 hover:border-yellow-200"
+                        data-testid={`button-password-producer-${producer.id}`}
+                      >
+                        <Lock className="h-4 w-4 text-yellow-600" />
+                      </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -623,6 +779,222 @@ export default function AdminProducers() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar produtor */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingProducer(null);
+          editForm.reset();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Editar Produtor
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as informações do produtor {editingProducer?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do produtor" {...field} data-testid="input-edit-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="email@exemplo.com" {...field} data-testid="input-edit-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(11) 99999-9999" {...field} data-testid="input-edit-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="specialty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Especialidade</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Especialidade do produtor" {...field} data-testid="input-edit-specialty" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Endereço do produtor" {...field} data-testid="input-edit-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={updateProducerMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {updateProducerMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para alterar senha */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => {
+        setIsPasswordDialogOpen(open);
+        if (!open) {
+          setEditingProducer(null);
+          passwordForm.reset();
+          setShowNewPassword(false);
+          setShowConfirmPassword(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Alterar Senha
+            </DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para o produtor {editingProducer?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={passwordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nova Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Mínimo 6 caracteres"
+                          {...field}
+                          data-testid="input-new-password"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Repita a nova senha"
+                          {...field}
+                          data-testid="input-confirm-password"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPasswordDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={changePasswordMutation.isPending}
+                  data-testid="button-save-password"
+                >
+                  {changePasswordMutation.isPending ? "Salvando..." : "Alterar Senha"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
