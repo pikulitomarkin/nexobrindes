@@ -2194,7 +2194,7 @@ export default function VendorBudgets() {
                             <div className="grid grid-cols-3 gap-4 text-sm">
                               <div>
                                 <span className="text-gray-500">Quantidade:</span>
-                                <p className="font-medium">{item.quantity}</p>
+                                <p className="font-medium">{Number(item.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                               </div>
                               <div>
                                 <span className="text-gray-500">Valor Unit.:</span>
@@ -2328,7 +2328,7 @@ export default function VendorBudgets() {
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Quantidade</Label>
-                          <p>{item.quantity}</p>
+                          <p>{Number(item.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Preço Unitário</Label>
