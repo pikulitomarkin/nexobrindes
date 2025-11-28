@@ -188,7 +188,7 @@ export default function ProducerOrderDetails() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Produto</Label>
-                  <p className="text-lg font-semibold">{productionOrder.orderDetails?.product || productionOrder.order?.product || 'N/A'}</p>
+                  <p className="text-lg font-semibold">{productionOrder.order?.product || 'N/A'}</p>
                 </div>
                 {/* Removed producerValue from here */}
               </div>
@@ -234,56 +234,7 @@ export default function ProducerOrderDetails() {
             </CardContent>
           </Card>
 
-          {/* Client Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Informações do Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <Label className="text-sm text-gray-500">Nome</Label>
-                    <p className="font-medium">{productionOrder.order?.clientName || 'N/A'}</p>
-                  </div>
-                </div>
-
-                {productionOrder.order?.clientPhone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <Label className="text-sm text-gray-500">Telefone</Label>
-                      <p className="font-medium">{productionOrder.order.clientPhone}</p>
-                    </div>
-                  </div>
-                )}
-
-                {productionOrder.order?.clientEmail && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <Label className="text-sm text-gray-500">E-mail</Label>
-                      <p className="font-medium">{productionOrder.order.clientEmail}</p>
-                    </div>
-                  </div>
-                )}
-
-                {productionOrder.order?.clientAddress && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <Label className="text-sm text-gray-500">Endereço</Label>
-                      <p className="font-medium">{productionOrder.order.clientAddress}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          
 
           {/* Items */}
           {(() => {
@@ -308,7 +259,7 @@ export default function ProducerOrderDetails() {
                           <h4 className="font-semibold text-lg text-gray-900">{item.productName || 'Produto'}</h4>
                           <div className="flex items-center gap-2 mt-1">
                             <Package className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">Quantidade: <strong>{item.quantity}</strong></span>
+                            <span className="text-sm text-gray-600">Quantidade: <strong>{parseFloat(item.quantity) || 1}</strong></span>
                           </div>
                         </div>
                         <div className="text-right">
@@ -387,7 +338,7 @@ export default function ProducerOrderDetails() {
                               <span className="ml-2 text-sm">{item.generalCustomizationName || 'Personalização geral'}</span>
                             </div>
                             <div className="text-sm text-gray-600">
-                              Aplicar em todas as {item.quantity} unidades
+                              Aplicar em todas as {parseFloat(item.quantity) || 1} unidades
                             </div>
                           </div>
                         </div>
@@ -411,7 +362,7 @@ export default function ProducerOrderDetails() {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="text-gray-600">Para produzir:</span>
-                            <span className="font-bold text-gray-900 ml-2">{item.quantity} unidade(s)</span>
+                            <span className="font-bold text-gray-900 ml-2">{parseFloat(item.quantity) || 1} unidade(s)</span>
                           </div>
                           <div>
                             <span className="text-gray-600">Produtor:</span>
