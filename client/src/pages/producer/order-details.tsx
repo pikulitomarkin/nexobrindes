@@ -188,7 +188,11 @@ export default function ProducerOrderDetails() {
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Produto</Label>
-                  <p className="text-lg font-semibold">{productionOrder.order?.product || 'N/A'}</p>
+                  <p className="text-lg font-semibold">
+                    {productionOrder.orderDetails?.items?.[0]?.productName || 
+                     productionOrder.order?.items?.[0]?.productName || 
+                     'Produto N/A'}
+                  </p>
                 </div>
                 {/* Removed producerValue from here */}
               </div>
@@ -418,43 +422,8 @@ export default function ProducerOrderDetails() {
           )}
         </div>
 
-        {/* Shipping Information */}
+        {/* Production Status Only */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Informações de Envio
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Tipo de Entrega</Label>
-                <p className="font-medium">
-                  {productionOrder.order?.deliveryType === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
-                </p>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Endereço de Envio</Label>
-                <p className="font-medium text-gray-900">
-                  {productionOrder.order?.deliveryType === 'pickup'
-                    ? 'Sede Principal - Retirada no Local'
-                    : (productionOrder.order?.shippingAddress || productionOrder.order?.clientAddress || 'Endereço não informado')
-                  }
-                </p>
-              </div>
-
-              {productionOrder.trackingCode && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Código de Rastreamento</Label>
-                  <p className="font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    {productionOrder.trackingCode}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
