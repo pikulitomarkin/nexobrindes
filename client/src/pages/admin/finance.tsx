@@ -1,11 +1,32 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrendingUp, TrendingDown, DollarSign, Clock, Building2 } from "lucide-react";
 
 export default function AdminFinance() {
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+
+  const { data: branches } = useQuery({
+    queryKey: ["/api/branches"],
+    queryFn: async () => {
+      const response = await fetch('/api/branches');
+      if (!response.ok) throw new Error('Failed to fetch branches');
+      return response.json();
+    },
+  });
+
   const { data: overview, isLoading } = useQuery({
-    queryKey: ["/api/finance/overview"],
+    queryKey: ["/api/finance/overview", selectedBranchId],
+    queryFn: async () => {
+      const url = selectedBranchId && selectedBranchId !== "all"
+        ? `/api/finance/overview?branchId=${selectedBranchId}`
+        : `/api/finance/overview`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch overview');
+      return response.json();
+    },
   });
 
   if (isLoading) {
@@ -25,9 +46,38 @@ export default function AdminFinance() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Visão Financeira</h1>
-        <p className="text-gray-600">Controle financeiro completo do sistema</p>
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Visão Financeira</h1>
+          <p className="text-gray-600">Controle financeiro completo do sistema</p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-gray-500" />
+            <Select
+              value={selectedBranchId}
+              onValueChange={setSelectedBranchId}
+            >
+              <SelectTrigger className="w-[250px]" data-testid="select-branch-filter">
+                <SelectValue placeholder="Filtrar por filial" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Filiais</SelectItem>
+                {branches?.map((branch: any) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name} - {branch.city}
+                    {branch.isHeadquarters && " (Matriz)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedBranchId && selectedBranchId !== "all" && (
+            <p className="text-xs text-gray-500">
+              Filtrando pedidos, comissões e recebíveis da filial selecionada
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export default function AdminBudgets() {
     contactPhone: "",
     contactEmail: "",
     vendorId: "",
-    branchId: "matriz", // Definir matriz como padrão
+    branchId: "", // Será definido automaticamente pela primeira filial/matriz
     validUntil: "",
     deliveryDeadline: "",
     deliveryType: "delivery",
@@ -157,6 +157,16 @@ export default function AdminBudgets() {
 
   const products = productsData?.products || [];
   const categories: string[] = ['all', ...Array.from(new Set((products || []).map((product: any) => product.category).filter(Boolean)))];
+
+  // Sincronizar branchId quando branches são carregadas e form não tem valor
+  useEffect(() => {
+    if (branches && branches.length > 0 && !adminBudgetForm.branchId) {
+      const defaultBranch = branches.find((b: any) => b.isHeadquarters) || branches[0];
+      if (defaultBranch) {
+        setAdminBudgetForm(prev => ({ ...prev, branchId: defaultBranch.id }));
+      }
+    }
+  }, [branches, adminBudgetForm.branchId]);
 
   // Group products by producer
   const productsByProducer = products.reduce((acc, product) => {
@@ -368,7 +378,7 @@ export default function AdminBudgets() {
       contactPhone: "",
       contactEmail: "",
       vendorId: currentUser?.id || "",
-      branchId: "matriz", // Manter matriz como padrão no reset
+      branchId: "", // Será definido automaticamente pela primeira filial/matriz
       validUntil: "",
       deliveryDeadline: "",
       deliveryType: "delivery",
@@ -678,7 +688,7 @@ export default function AdminBudgets() {
         contactPhone: fullBudget.contactPhone || "",
         contactEmail: fullBudget.contactEmail || "",
         vendorId: fullBudget.vendorId || currentUser?.id || "",
-        branchId: fullBudget.branchId || "matriz",
+        branchId: fullBudget.branchId || "",
         validUntil: fullBudget.validUntil || "",
         deliveryDeadline: fullBudget.deliveryDeadline || "",
         deliveryType: fullBudget.deliveryType || "delivery",
@@ -1022,7 +1032,7 @@ export default function AdminBudgets() {
                 <div>
                   <Label htmlFor="admin-budget-branch">Filial do Orçamento *</Label>
                   <Select
-                    value={adminBudgetForm.branchId || "matriz"}
+                    value={adminBudgetForm.branchId || (branches?.find((b: any) => b.isHeadquarters)?.id || branches?.[0]?.id || "")}
                     onValueChange={(value) => setAdminBudgetForm({ ...adminBudgetForm, branchId: value })}
                     required
                   >
@@ -1030,7 +1040,6 @@ export default function AdminBudgets() {
                       <SelectValue placeholder="Selecione a filial" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="matriz">Matriz (Padrão)</SelectItem>
                       {branches?.map((branch: any) => (
                         <SelectItem key={branch.id} value={branch.id}>
                           {branch.name} - {branch.city}

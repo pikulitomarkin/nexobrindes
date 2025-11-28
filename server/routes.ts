@@ -6267,13 +6267,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Financial overview data
   app.get("/api/finance/overview", async (req, res) => {
     try {
-      const orders = await storage.getOrders();
+      const { branchId } = req.query;
+      
+      let orders = await storage.getOrders();
       const payments = await storage.getPayments();
-      const allCommissions = await storage.getAllCommissions();
-      const productionOrders = await storage.getProductionOrders();
+      let allCommissions = await storage.getAllCommissions();
+      let productionOrders = await storage.getProductionOrders();
       const bankTransactions = await storage.getBankTransactions();
       const expenseNotes = await storage.getExpenseNotes();
-      const producerPayments = await storage.getProducerPayments();
+      let producerPayments = await storage.getProducerPayments();
+
+      // Filtrar por filial se especificada
+      if (branchId && branchId !== 'all') {
+        console.log(`Filtering financial overview by branchId: ${branchId}`);
+        orders = orders.filter(order => order.branchId === branchId);
+        
+        // Filtrar production orders e producer payments pelos orders filtrados
+        const orderIds = orders.map(o => o.id);
+        productionOrders = productionOrders.filter(po => orderIds.includes(po.orderId));
+        
+        const productionOrderIds = productionOrders.map(po => po.id);
+        producerPayments = producerPayments.filter(pp => productionOrderIds.includes(pp.productionOrderId));
+        
+        // Filtrar comissões pelos orders filtrados
+        allCommissions = allCommissions.filter(c => orderIds.includes(c.orderId));
+      }
 
       console.log('Overview calculation - Data counts:', {
         orders: orders.length,
@@ -6281,11 +6299,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         commissions: allCommissions.length,
         productionOrders: productionOrders.length,
         expenseNotes: expenseNotes.length,
-        producerPayments: producerPayments.length
+        producerPayments: producerPayments.length,
+        branchId: branchId || 'all'
       });
 
       // Contas a Receber - usar accountsReceivable (que já tem o valor correto)
-      const accountsReceivable = await storage.getAccountsReceivable();
+      let accountsReceivable = await storage.getAccountsReceivable();
+      
+      // Filtrar por filial se especificada
+      if (branchId && branchId !== 'all') {
+        const orderIds = orders.map(o => o.id);
+        accountsReceivable = accountsReceivable.filter(ar => orderIds.includes(ar.orderId));
+      }
+      
       const orderReceivables = accountsReceivable
         .filter(ar => ar.status !== 'paid')
         .reduce((total, ar) => {
