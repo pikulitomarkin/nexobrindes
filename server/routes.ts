@@ -5443,7 +5443,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               updatedAt: receivable.updatedAt,
               lastPaymentDate: lastPaymentDate,
               shippingCost: budgetShippingCost.toFixed(2) || "0.00",
-              items: orderItems
+              items: orderItems,
+              branchId: order.branchId
             };
           } catch (error) {
             console.error(`Error enriching receivable ${receivable.id}:`, error);
