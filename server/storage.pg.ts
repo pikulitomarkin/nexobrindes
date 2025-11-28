@@ -1661,6 +1661,40 @@ export class PgStorage implements IStorage {
     const budgetPaymentInfo = await this.getBudgetPaymentInfo(budgetId);
     console.log(`[CONVERT BUDGET] Payment info for budget ${budgetId}:`, budgetPaymentInfo);
 
+    // IMPORTANTE: Buscar dados do cliente selecionado na conversão (não usar dados do orçamento)
+    const client = await this.getClient(clientId);
+    let clientName = budget.contactName; // Fallback para nome do orçamento
+    let clientPhone = budget.contactPhone;
+    let clientEmail = budget.contactEmail;
+    let clientAddress = '';
+
+    if (client) {
+      clientName = client.name;
+      clientPhone = client.phone || budget.contactPhone;
+      clientEmail = client.email || budget.contactEmail;
+      // Montar endereço completo do cliente
+      if (client.enderecoEntregaLogradouro) {
+        clientAddress = [
+          client.enderecoEntregaLogradouro,
+          client.enderecoEntregaNumero,
+          client.enderecoEntregaComplemento,
+          client.enderecoEntregaBairro,
+          client.enderecoEntregaCidade,
+          client.enderecoEntregaCep
+        ].filter(Boolean).join(', ');
+      }
+      console.log(`[CONVERT BUDGET] Using client data from conversion: ${clientName} (${clientId})`);
+    } else {
+      // Tentar buscar usuário se não for registro de cliente
+      const user = await this.getUser(clientId);
+      if (user) {
+        clientName = user.name;
+        clientPhone = user.phone || budget.contactPhone;
+        clientEmail = user.email || budget.contactEmail;
+        console.log(`[CONVERT BUDGET] Using user data from conversion: ${clientName} (${clientId})`);
+      }
+    }
+
     // Normalize deliveryDate to Date object
     const deliveryDateObj = deliveryDate instanceof Date ? deliveryDate : (deliveryDate ? new Date(deliveryDate) : undefined);
 
@@ -1672,6 +1706,7 @@ export class PgStorage implements IStorage {
     };
 
     // Create order from budget with payment and shipping info
+    // USAR DADOS DO CLIENTE DA CONVERSÃO, não do orçamento original
     const orderData: InsertOrder = {
       orderNumber: `PED-${Date.now()}`,
       clientId: clientId,
@@ -1683,9 +1718,10 @@ export class PgStorage implements IStorage {
       totalValue: budget.totalValue,
       paidValue: "0.00",
       status: 'pending',
-      contactName: budget.contactName,
-      contactPhone: budget.contactPhone,
-      contactEmail: budget.contactEmail,
+      contactName: clientName, // Usar nome do cliente da conversão
+      contactPhone: clientPhone, // Usar telefone do cliente da conversão
+      contactEmail: clientEmail, // Usar email do cliente da conversão
+      shippingAddress: clientAddress || '', // Usar endereço do cliente da conversão
       deliveryType: budget.deliveryType,
       deliveryDeadline: deliveryDateObj,
       deadline: deliveryDateObj,
