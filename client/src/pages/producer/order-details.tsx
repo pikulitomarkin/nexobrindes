@@ -57,8 +57,12 @@ export default function ProducerOrderDetails() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, notes, deliveryDate, trackingCode }),
       });
-      if (!response.ok) throw new Error("Erro ao atualizar status");
-      return response.json();
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao atualizar status");
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders", id] });
@@ -71,6 +75,13 @@ export default function ProducerOrderDetails() {
       toast({
         title: "Sucesso!",
         description: "Status atualizado com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro!",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -194,7 +205,48 @@ export default function ProducerOrderDetails() {
                      'Produto N/A'}
                   </p>
                 </div>
-                {/* Removed producerValue from here */}
+                
+                {/* Valor do Produtor */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Label className="text-sm font-medium text-blue-800">Seu Valor para este Pedido</Label>
+                  {productionOrder.producerValue && parseFloat(productionOrder.producerValue) > 0 ? (
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xl font-bold text-green-700">
+                        R$ {parseFloat(productionOrder.producerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      {productionOrder.status === 'pending' || productionOrder.status === 'accepted' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                          onClick={() => {
+                            // You could add a dialog to edit the value here if needed
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Valor Definido
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1">
+                      <p className="text-red-600 font-medium">
+                        ⚠️ Valor não definido
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Defina quanto você cobrará por este pedido
+                      </p>
+                    </div>
+                  )}
+                  {productionOrder.producerNotes && (
+                    <p className="text-xs text-gray-600 mt-2 italic">
+                      Obs: {productionOrder.producerNotes}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {productionOrder.order?.description && (
@@ -490,14 +542,38 @@ export default function ProducerOrderDetails() {
               )}
 
               {productionOrder.status === 'production' && (
-                <Button
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => handleStatusUpdate('ready')}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  {updateStatusMutation.isPending ? 'Finalizando...' : 'Marcar Pronto'}
-                </Button>
+                <>
+                  {!productionOrder.producerValue || parseFloat(productionOrder.producerValue) <= 0 ? (
+                    <div className="w-full p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                        <p className="font-medium text-yellow-800">Valor Obrigatório</p>
+                      </div>
+                      <p className="text-yellow-700 text-sm mb-3">
+                        Você precisa definir o valor que cobrará por este pedido antes de marcá-lo como pronto.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                        onClick={() => {
+                          // Scroll to top or show value input dialog
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                      >
+                        Definir Valor do Pedido
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleStatusUpdate('ready')}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      {updateStatusMutation.isPending ? 'Finalizando...' : 'Marcar Pronto'}
+                    </Button>
+                  )}
+                </>
               )}
 
               {['ready', 'shipped', 'delivered', 'completed'].includes(productionOrder.status) && (

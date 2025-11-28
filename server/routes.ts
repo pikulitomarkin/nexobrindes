@@ -2395,6 +2395,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Updating production order ${id} status to: ${status}`);
 
+      // Get current production order to validate
+      const currentPO = await storage.getProductionOrder(id);
+      if (!currentPO) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Validate that producer value is set before allowing 'ready' status
+      if (status === 'ready') {
+        if (!currentPO.producerValue || parseFloat(currentPO.producerValue) <= 0) {
+          return res.status(400).json({ 
+            error: "Não é possível marcar como pronto sem definir o valor que você cobrará por este pedido. Defina o valor primeiro." 
+          });
+        }
+      }
+
       const updatedPO = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate, trackingCode);
       if (!updatedPO) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
