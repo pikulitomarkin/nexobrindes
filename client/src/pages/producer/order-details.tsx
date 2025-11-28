@@ -41,6 +41,8 @@ export default function ProducerOrderDetails() {
   const { data: productionOrder, isLoading } = useQuery({
     queryKey: ["/api/production-orders", id],
     enabled: !!id,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000, // Refetch every 5 seconds to keep status updated
   });
 
   const updateStatusMutation = useMutation({
@@ -74,19 +76,6 @@ export default function ProducerOrderDetails() {
   });
 
   const handleStatusUpdate = (status: string) => {
-    // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
-    if (status === 'ready' || status === 'completed') {
-      const currentValue = parseFloat(productionOrder?.producerValue || '0');
-      if (!productionOrder?.producerValue || currentValue <= 0) {
-        toast({
-          title: "Valor do serviço não definido",
-          description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     if (status === 'completed' || status === 'rejected') {
       setSelectedStatus(status);
       setIsUpdateDialogOpen(true);
@@ -98,18 +87,6 @@ export default function ProducerOrderDetails() {
   const [trackingCode, setTrackingCode] = useState("");
 
   const handleStatusUpdateWithNotes = () => {
-    // Check if the producerValue exists and is valid before allowing status change to 'ready' or 'completed'
-    if (selectedStatus === 'ready' || selectedStatus === 'completed') {
-      const currentValue = parseFloat(productionOrder?.producerValue || '0');
-      if (!productionOrder?.producerValue || currentValue <= 0) {
-        toast({
-          title: "Valor do serviço não definido",
-          description: "Você precisa definir o valor do serviço para poder marcar o pedido como pronto ou finalizado.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
     updateStatusMutation.mutate({
       status: selectedStatus,
       notes: updateNotes,
@@ -564,8 +541,7 @@ export default function ProducerOrderDetails() {
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleStatusUpdate('accepted')}
-                    disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
-                    title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de aceitar a ordem" : ""}
+                    disabled={updateStatusMutation.isPending}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     {updateStatusMutation.isPending ? 'Aceitando...' : 'Aceitar Ordem'}
@@ -586,8 +562,7 @@ export default function ProducerOrderDetails() {
                 <Button
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   onClick={() => handleStatusUpdate('production')}
-                  disabled={updateStatusMutation.isPending || !productionOrder.producerValue}
-                  title={!productionOrder.producerValue ? "Você deve definir o valor do serviço antes de iniciar produção" : ""}
+                  disabled={updateStatusMutation.isPending}
                 >
                   <Clock className="h-4 w-4 mr-2" />
                   {updateStatusMutation.isPending ? 'Iniciando...' : 'Iniciar Produção'}

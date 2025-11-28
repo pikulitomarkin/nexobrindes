@@ -105,6 +105,7 @@ export interface IStorage {
   updateProductionOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string): Promise<ProductionOrder | undefined>;
   updateProductionOrderValue(id: string, value: string, notes?: string, lockValue?: boolean): Promise<ProductionOrder | undefined>;
   updateProductionOrder(id: string, updates: Partial<ProductionOrder>): Promise<ProductionOrder | undefined>;
+  getProductionOrderItems(productionOrderId: string): Promise<any[]>;
 
   // Payments
   getPayments(): Promise<Payment[]>;

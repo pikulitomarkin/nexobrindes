@@ -310,6 +310,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get production order details with enriched data
+  app.get("/api/production-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`Getting production order details for: ${id}`);
+
+      const productionOrder = await storage.getProductionOrder(id);
+      if (!productionOrder) {
+        return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Get the main order details
+      const order = await storage.getOrder(productionOrder.orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido principal não encontrado" });
+      }
+
+      // Get production order items
+      const items = await storage.getProductionOrderItems(productionOrder.id);
+
+      // Get budget photos if order was converted from budget
+      let photos = [];
+      if (order.budgetId) {
+        const budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
+        photos = budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl);
+      }
+
+      // Parse orderDetails if it exists (JSON string)
+      let orderDetails = null;
+      if (productionOrder.orderDetails) {
+        try {
+          orderDetails = JSON.parse(productionOrder.orderDetails);
+        } catch (e) {
+          console.log("Error parsing orderDetails JSON:", e);
+        }
+      }
+
+      const enrichedProductionOrder = {
+        ...productionOrder,
+        order: order,
+        orderDetails: orderDetails,
+        items: items || [],
+        photos: photos || []
+      };
+
+      console.log(`Production order ${id} details fetched with status: ${productionOrder.status}`);
+      res.json(enrichedProductionOrder);
+    } catch (error) {
+      console.error("Error fetching production order details:", error);
+      res.status(500).json({ error: "Erro ao buscar detalhes da ordem de produção" });
+    }
+  });
+
   // Get budget details for client review
   app.get("/api/budgets/:id/review", async (req, res) => {
     try {
