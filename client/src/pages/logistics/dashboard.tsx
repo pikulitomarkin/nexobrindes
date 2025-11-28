@@ -140,11 +140,14 @@ export default function LogisticsDashboard() {
     }) => {
       // First, update the production order status to delivered
       const poResponse = await fetch(`/api/production-orders/${productionOrderId}/status`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "delivered", notes: "Entrega confirmada pela logística" })
       });
-      if (!poResponse.ok) throw new Error("Erro ao atualizar ordem de produção");
+      if (!poResponse.ok) {
+        const errorData = await poResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao atualizar ordem de produção");
+      }
 
       // Then confirm delivery on the main order (this will check if all POs are delivered)
       const response = await fetch(`/api/orders/${orderId}/confirm-delivery`, {
