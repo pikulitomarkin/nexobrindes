@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { db as storage, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db';
 import { OrderEnrichmentService } from './services/order-enrichment.js';
 import { logger } from './logger';
+import { ObjectStorageService, ObjectNotFoundError } from './objectStorage';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -254,30 +255,44 @@ function generateId(prefix: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve static files from public/uploads directory
+  // Serve static files from public/uploads directory (legacy support)
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
-  // File upload endpoint
+  // Serve objects from Object Storage
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(`/objects/${req.params.objectPath}`);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // File upload endpoint - using Object Storage for persistence
   app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
 
-      // Generate unique filename
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(2, 15);
-      const extension = req.file.originalname.split('.').pop();
-      const filename = `image-${timestamp}-${randomStr}.${extension}`;
-      const filepath = path.join(process.cwd(), 'public', 'uploads', filename);
+      const objectStorageService = new ObjectStorageService();
+      const folder = (req.body.folder || 'uploads') as string;
+      const contentType = req.file.mimetype || 'application/octet-stream';
+      
+      // Upload to Object Storage for persistence
+      const objectPath = await objectStorageService.uploadBuffer(
+        req.file.buffer,
+        folder,
+        contentType
+      );
 
-      // Write file to disk
-      fs.writeFileSync(filepath, req.file.buffer);
-
-      const url = `/uploads/${filename}`;
-
-      console.log(`File uploaded successfully: ${filename}`);
-      res.json({ url });
+      console.log(`File uploaded to Object Storage: ${objectPath}`);
+      res.json({ url: objectPath });
     } catch (error) {
       console.error('Upload error:', error);
       res.status(500).json({ error: 'Erro no upload do arquivo' });
