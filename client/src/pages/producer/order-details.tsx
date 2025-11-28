@@ -34,9 +34,12 @@ export default function ProducerOrderDetails() {
 
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeadlineDialogOpen, setIsDeadlineDialogOpen] = useState(false);
+  const [isValueDialogOpen, setIsValueDialogOpen] = useState(false);
   const [updateNotes, setUpdateNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [producerValue, setProducerValue] = useState("");
+  const [producerNotes, setProducerNotes] = useState("");
 
   const { data: productionOrder, isLoading } = useQuery({
     queryKey: ["/api/production-orders", id],
@@ -86,6 +89,39 @@ export default function ProducerOrderDetails() {
     },
   });
 
+  const updateValueMutation = useMutation({
+    mutationFn: async ({ value, notes }: { value: string; notes?: string }) => {
+      const response = await fetch(`/api/production-orders/${id}/value`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value, notes }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Erro ao definir valor");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders/producer"] });
+      setIsValueDialogOpen(false);
+      setProducerValue("");
+      setProducerNotes("");
+      toast({
+        title: "Sucesso!",
+        description: "Valor definido com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao definir valor",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleStatusUpdate = (status: string) => {
     if (status === 'completed' || status === 'rejected') {
       setSelectedStatus(status);
@@ -111,6 +147,42 @@ export default function ProducerOrderDetails() {
       status: productionOrder?.status,
       notes: updateNotes,
       deliveryDate: deliveryDate
+    });
+  };
+
+  const handleOpenValueDialog = () => {
+    if (productionOrder?.producerValue) {
+      setProducerValue(parseFloat(productionOrder.producerValue).toFixed(2));
+    } else {
+      setProducerValue("");
+    }
+    setProducerNotes(productionOrder?.producerNotes || "");
+    setIsValueDialogOpen(true);
+  };
+
+  const handleSaveValue = () => {
+    if (!producerValue || producerValue.trim() === '') {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um valor",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const numericValue = parseFloat(producerValue.replace(',', '.'));
+    if (isNaN(numericValue) || numericValue <= 0) {
+      toast({
+        title: "Erro",
+        description: "O valor deve ser um número válido maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateValueMutation.mutate({
+      value: numericValue.toFixed(2),
+      notes: producerNotes.trim() || undefined,
     });
   };
 
@@ -219,9 +291,7 @@ export default function ProducerOrderDetails() {
                           variant="outline"
                           size="sm"
                           className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                          onClick={() => {
-                            // You could add a dialog to edit the value here if needed
-                          }}
+                          onClick={handleOpenValueDialog}
                         >
                           Editar
                         </Button>
@@ -555,10 +625,7 @@ export default function ProducerOrderDetails() {
                       <Button
                         variant="outline"
                         className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                        onClick={() => {
-                          // Scroll to top or show value input dialog
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
+                        onClick={handleOpenValueDialog}
                       >
                         Definir Valor do Pedido
                       </Button>
@@ -729,6 +796,67 @@ export default function ProducerOrderDetails() {
               disabled={updateStatusMutation.isPending || !deliveryDate}
             >
               {updateStatusMutation.isPending ? "Salvando..." : "Alterar Prazo"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Value Definition Dialog */}
+      <Dialog open={isValueDialogOpen} onOpenChange={setIsValueDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Definir Valor do Pedido</DialogTitle>
+            <DialogDescription>
+              Defina quanto você cobrará por este pedido de produção
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {productionOrder && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 mb-2">Resumo do Pedido:</h4>
+                <p className="text-sm text-blue-700">
+                  <strong>Produto:</strong> {productionOrder.orderDetails?.items?.[0]?.productName || 
+                   productionOrder.order?.items?.[0]?.productName || 'Produto N/A'}
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>Quantidade:</strong> {productionOrder.orderDetails?.items?.[0]?.quantity || 
+                   productionOrder.order?.items?.[0]?.quantity || '1'} unidade(s)
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="producer-value">Seu Valor de Serviço (R$)</Label>
+              <Input
+                id="producer-value"
+                type="number"
+                step="0.01"
+                placeholder="Ex: 850.00"
+                value={producerValue}
+                onChange={(e) => setProducerValue(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="producer-notes">Observações (Opcional)</Label>
+              <Textarea
+                id="producer-notes"
+                placeholder="Descreva o que está incluído no valor, materiais, prazo, etc."
+                value={producerNotes}
+                onChange={(e) => setProducerNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button variant="outline" onClick={() => setIsValueDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveValue}
+              disabled={!producerValue || parseFloat(producerValue) <= 0 || updateValueMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {updateValueMutation.isPending ? "Salvando..." : "Definir Valor"}
             </Button>
           </div>
         </DialogContent>
