@@ -134,9 +134,19 @@ export default function LogisticsDashboard() {
 
   // Mutation para confirmar a entrega pelo cliente (agora feita pela logística)
   const confirmDeliveryMutation = useMutation({
-    mutationFn: async ({ orderId }: {
+    mutationFn: async ({ productionOrderId, orderId }: {
+      productionOrderId: string;
       orderId: string;
     }) => {
+      // First, update the production order status to delivered
+      const poResponse = await fetch(`/api/production-orders/${productionOrderId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "delivered", notes: "Entrega confirmada pela logística" })
+      });
+      if (!poResponse.ok) throw new Error("Erro ao atualizar ordem de produção");
+
+      // Then confirm delivery on the main order (this will check if all POs are delivered)
       const response = await fetch(`/api/orders/${orderId}/confirm-delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,6 +157,7 @@ export default function LogisticsDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/production-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
       toast({
         title: "Sucesso!",
         description: "Entrega confirmada para o cliente",
@@ -274,8 +285,21 @@ export default function LogisticsDashboard() {
   };
 
   const handleConfirmDelivery = (order: any) => {
-    const orderId = order.orderId || order.id;
-    confirmDeliveryMutation.mutate({ orderId });
+    // order is a production order, so order.id is the production order ID
+    // and order.orderId is the main order ID
+    const productionOrderId = order.id;
+    const orderId = order.orderId;
+    
+    if (!productionOrderId || !orderId) {
+      toast({
+        title: "Erro",
+        description: "IDs do pedido não encontrados",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    confirmDeliveryMutation.mutate({ productionOrderId, orderId });
   };
 
   const confirmDispatch = () => {
