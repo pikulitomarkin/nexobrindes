@@ -29,6 +29,14 @@ export default function ClientBudgets() {
       return response.json();
     },
     onSuccess: (data, variables) => {
+      // Atualizar selectedBudget para refletir o novo status imediatamente
+      if (selectedBudget) {
+        setSelectedBudget({
+          ...selectedBudget,
+          status: variables.status,
+          clientObservations: variables.observations || selectedBudget.clientObservations
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/client", clientId] });
       setViewBudgetDialogOpen(false);
       setClientObservations('');
