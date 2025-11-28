@@ -81,7 +81,8 @@ export default function FinanceReceivables() {
     orderDate: receivable.createdAt ? new Date(receivable.createdAt) : new Date(),
     lastPaymentDate: receivable.lastPaymentDate ? new Date(receivable.lastPaymentDate) : null,
     shippingCost: receivable.shippingCost || "0.00",
-    items: receivable.items || []
+    items: receivable.items || [],
+    branchId: receivable.branchId || undefined
   }));
 
   const receivePaymentMutation = useMutation({
