@@ -265,11 +265,11 @@ export default function AdminOrders() {
       order.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesVendor = vendorFilter === "all" || order.vendorId === vendorFilter;
     const matchesClient = clientFilter === "all" || order.clientId === clientFilter;
-    
+
     return matchesSearch && matchesStatus && matchesVendor && matchesClient;
   });
 
@@ -691,7 +691,7 @@ export default function AdminOrders() {
                     <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
                     <Input
                       id="edit-shipping-cost"
-                      value={editingOrder.shippingCost > 0 ? currencyMask(editingOrder.shippingCost.toString()) : ''}
+                      value={editingOrder.shippingCost > 0 ? currencyMask(parseFloat(editingOrder.shippingCost).toFixed(2)) : ''}
                       onChange={(e) => {
                         const rawValue = e.target.value;
                         if (rawValue === '' || rawValue === 'R$ ') {
