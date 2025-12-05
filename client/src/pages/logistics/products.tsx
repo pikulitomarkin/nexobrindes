@@ -297,7 +297,7 @@ export default function LogisticsProducts() {
   const producers = producersQuery.data || [];
 
   // Categories from products
-  const categories = ['all', ...new Set(products.map((product: any) => product.category).filter(Boolean))];
+  const categories = ['all', ...Array.from(new Set(products.map((product: any) => product.category).filter(Boolean)))];
 
   if (productsQuery.isLoading) {
     return (
@@ -567,7 +567,7 @@ export default function LogisticsProducts() {
                           }`}>
                             {productForm.producerId === "internal" 
                               ? "Este produto será cadastrado como PRODUTO INTERNO da empresa"
-                              : `Este produto será associado ao produtor ${producers?.find(p => p.id === productForm.producerId)?.name || 'selecionado'}`
+                              : `Este produto será associado ao produtor ${producers?.find((p: any) => p.id === productForm.producerId)?.name || 'selecionado'}`
                             }
                           </p>
                         </div>
