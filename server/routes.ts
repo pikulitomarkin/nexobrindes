@@ -279,6 +279,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
 
+      console.log(`Upload request received: ${req.file.originalname}, size: ${req.file.size}, type: ${req.file.mimetype}`);
+
+      // Validate file size (5MB limit)
+      if (req.file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Arquivo muito grande. Limite de 5MB.' });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: 'Tipo de arquivo não permitido. Use apenas imagens.' });
+      }
+
       const objectStorageService = new ObjectStorageService();
       const folder = (req.body.folder || 'uploads') as string;
       
@@ -289,11 +302,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.file.originalname
       );
 
-      console.log(`File uploaded to Object Storage: ${objectPath}`);
+      console.log(`File uploaded successfully: ${objectPath}`);
       res.json({ url: objectPath });
     } catch (error) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: 'Erro no upload do arquivo' });
+      console.error('Upload error details:', {
+        message: error.message,
+        stack: error.stack,
+        fileName: req.file?.originalname,
+        fileSize: req.file?.size
+      });
+      
+      // Return more specific error message
+      const errorMessage = error.message.includes('Object Storage') 
+        ? 'Erro no serviço de armazenamento. Tente novamente.'
+        : 'Erro no upload do arquivo. Verifique o formato e tamanho.';
+        
+      res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
