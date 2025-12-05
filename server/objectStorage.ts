@@ -16,15 +16,31 @@ export class ObjectStorageService {
   constructor() {}
 
   async uploadBuffer(buffer: Buffer, folder: string = "uploads", contentType: string = "application/octet-stream"): Promise<string> {
-    const objectId = randomUUID();
+    const ext = this.getExtensionFromMimeType(contentType);
+    const objectId = `${randomUUID()}${ext}`;
     const objectName = `${folder}/${objectId}`;
     
-    await client.uploadFromBytes(objectName, buffer, {
-      contentType: contentType,
-    });
+    const result = await client.uploadFromBytes(objectName, buffer);
+    
+    if (!result.ok) {
+      console.error("Upload failed:", result.error);
+      throw new Error(`Failed to upload: ${result.error.message}`);
+    }
 
     console.log(`File uploaded to Object Storage: ${objectName}`);
     return `/objects/${objectName}`;
+  }
+
+  private getExtensionFromMimeType(mimeType: string): string {
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+      'application/pdf': '.pdf',
+    };
+    return mimeToExt[mimeType] || '';
   }
 
   async getObject(objectPath: string): Promise<Buffer> {
@@ -37,9 +53,10 @@ export class ObjectStorageService {
     try {
       const result = await client.downloadAsBytes(objectName);
       if (!result.ok) {
+        console.error("Download failed:", result.error);
         throw new ObjectNotFoundError();
       }
-      return Buffer.from(result.value);
+      return result.value[0];
     } catch (error) {
       console.error("Error downloading object:", error);
       throw new ObjectNotFoundError();
@@ -56,10 +73,11 @@ export class ObjectStorageService {
       
       const result = await client.downloadAsBytes(objectName);
       if (!result.ok) {
+        console.error("Download failed:", result.error);
         throw new ObjectNotFoundError();
       }
 
-      const buffer = Buffer.from(result.value);
+      const buffer = result.value[0];
       
       const ext = objectName.split('.').pop()?.toLowerCase() || '';
       const mimeTypes: Record<string, string> = {
