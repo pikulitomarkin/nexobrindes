@@ -297,7 +297,8 @@ export default function LogisticsProducts() {
   const producers = producersQuery.data || [];
 
   // Categories from products
-  const categories = ['all', ...Array.from(new Set(products.map((product: any) => product.category).filter(Boolean)))];
+  const productCategories = products.map((product: any) => product.category).filter((c: unknown): c is string => typeof c === 'string' && c !== '');
+  const categories: string[] = ['all', ...Array.from(new Set<string>(productCategories))];
 
   if (productsQuery.isLoading) {
     return (
