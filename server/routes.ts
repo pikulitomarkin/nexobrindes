@@ -262,8 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      const objectFile = await objectStorageService.getObjectEntityFile(`/objects/${req.params.objectPath}`);
-      objectStorageService.downloadObject(objectFile, res);
+      await objectStorageService.downloadObject(`/objects/${req.params.objectPath}`, res);
     } catch (error) {
       console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {
