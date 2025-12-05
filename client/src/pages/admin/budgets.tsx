@@ -680,19 +680,11 @@ export default function AdminBudgets() {
       console.log('Budget items:', fullBudget.items);
 
       // Pre-populate form with existing budget data
-      setAdminBudgetForm({
-        title: fullBudget.title,
-        description: fullBudget.description || "",
-        clientId: fullBudget.clientId || "",
-        contactName: fullBudget.contactName || "",
-        contactPhone: fullBudget.contactPhone || "",
-        contactEmail: fullBudget.contactEmail || "",
-        vendorId: fullBudget.vendorId || currentUser?.id || "",
-        branchId: fullBudget.branchId || "",
-        validUntil: fullBudget.validUntil || "",
-        deliveryDeadline: fullBudget.deliveryDeadline || "",
-        deliveryType: fullBudget.deliveryType || "delivery",
-        items: (fullBudget.items || []).map((item: any) => {
+      const newDownPayment = parseFloat(fullBudget.paymentInfo?.downPayment || fullBudget.downPayment || 0);
+      const newShippingCost = parseFloat(fullBudget.paymentInfo?.shippingCost || fullBudget.shippingCost || 0);
+      
+      // Build the items array first
+      const itemsArray = (fullBudget.items || []).map((item: any) => {
         // Ensure producerId is correctly mapped
         let producerId = item.producerId;
 
@@ -706,16 +698,6 @@ export default function AdminBudgets() {
         if (!producerId) {
           producerId = 'internal';
         }
-
-        console.log(`Mapping budget item ${item.productName}: producerId=${producerId}`, {
-          hasItemCustomization: item.hasItemCustomization,
-          selectedCustomizationId: item.selectedCustomizationId,
-          itemCustomizationValue: item.itemCustomizationValue,
-          itemCustomizationDescription: item.itemCustomizationDescription,
-          hasGeneralCustomization: item.hasGeneralCustomization,
-          generalCustomizationName: item.generalCustomizationName,
-          generalCustomizationValue: item.generalCustomizationValue
-        });
 
         return {
           productId: item.productId,
@@ -745,18 +727,49 @@ export default function AdminBudgets() {
           generalCustomizationName: item.generalCustomizationName || "",
           generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
         };
-      }),
-      photos: fullBudget.photos || [],
-      paymentMethodId: fullBudget.paymentInfo?.paymentMethodId || fullBudget.paymentMethodId || "",
-      shippingMethodId: fullBudget.paymentInfo?.shippingMethodId || fullBudget.shippingMethodId || "",
-      installments: fullBudget.paymentInfo?.installments || fullBudget.installments || 1,
-      downPayment: parseFloat(fullBudget.paymentInfo?.downPayment || fullBudget.downPayment || 0),
-      remainingAmount: parseFloat(fullBudget.paymentInfo?.remainingAmount || fullBudget.remainingAmount || 0),
-      shippingCost: parseFloat(fullBudget.paymentInfo?.shippingCost || fullBudget.shippingCost || 0),
-      hasDiscount: Boolean(fullBudget.hasDiscount),
-      discountType: fullBudget.discountType || "percentage",
-      discountPercentage: parseFloat(fullBudget.discountPercentage || 0),
-      discountValue: parseFloat(fullBudget.discountValue || 0)
+      });
+      
+      // Calculate the total for this budget to compute remaining amount correctly
+      const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
+        let itemPrice = parseFloat(item.unitPrice) || 0;
+        itemPrice += parseFloat(item.itemCustomizationValue) || 0;
+        itemPrice += parseFloat(item.generalCustomizationValue) || 0;
+        if (item.hasItemDiscount) {
+          const discountAmount = item.itemDiscountType === "percentage" 
+            ? (itemPrice * item.itemDiscountPercentage) / 100 
+            : item.itemDiscountValue;
+          itemPrice -= discountAmount;
+        }
+        return sum + (Math.max(0, itemPrice) * item.quantity);
+      }, 0);
+      
+      const totalBeforeDiscount = subtotalItems + newShippingCost;
+      const newRemainingAmount = Math.max(0, totalBeforeDiscount - newDownPayment);
+      
+      setAdminBudgetForm({
+        title: fullBudget.title,
+        description: fullBudget.description || "",
+        clientId: fullBudget.clientId || "",
+        contactName: fullBudget.contactName || "",
+        contactPhone: fullBudget.contactPhone || "",
+        contactEmail: fullBudget.contactEmail || "",
+        vendorId: fullBudget.vendorId || currentUser?.id || "",
+        branchId: fullBudget.branchId || "",
+        validUntil: fullBudget.validUntil || "",
+        deliveryDeadline: fullBudget.deliveryDeadline || "",
+        deliveryType: fullBudget.deliveryType || "delivery",
+        items: itemsArray,
+        photos: fullBudget.photos || [],
+        paymentMethodId: fullBudget.paymentInfo?.paymentMethodId || fullBudget.paymentMethodId || "",
+        shippingMethodId: fullBudget.paymentInfo?.shippingMethodId || fullBudget.shippingMethodId || "",
+        installments: fullBudget.paymentInfo?.installments || fullBudget.installments || 1,
+        downPayment: newDownPayment,
+        remainingAmount: newRemainingAmount,
+        shippingCost: newShippingCost,
+        hasDiscount: Boolean(fullBudget.hasDiscount),
+        discountType: fullBudget.discountType || "percentage",
+        discountPercentage: parseFloat(fullBudget.discountPercentage || 0),
+        discountValue: parseFloat(fullBudget.discountValue || 0)
       });
 
       setIsEditMode(true);
