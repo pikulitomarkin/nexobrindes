@@ -455,15 +455,6 @@ export default function ProducerReceivables() {
                         </div>
                       </div>
                     )}
-                    {selectedPaymentForDetails.order.shippingAddress && (
-                      <div className="flex items-center gap-2 md:col-span-2 lg:col-span-3">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <Label className="text-sm text-gray-500">Endereço de Entrega</Label>
-                          <p className="font-medium">{selectedPaymentForDetails.order.shippingAddress}</p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

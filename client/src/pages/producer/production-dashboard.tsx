@@ -549,16 +549,6 @@ export default function ProductionDashboard() {
                         </div>
                       </div>
 
-                      {orderDetails?.shippingAddress && (
-                        <div className="mb-4">
-                          <Label className="text-sm font-medium text-gray-500">Endereço de Envio</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <p className="text-sm">{orderDetails.shippingAddress}</p>
-                          </div>
-                        </div>
-                      )}
-
                       {/* Items específicos para este produtor */}
                       {orderDetails?.items && orderDetails.items.length > 0 && (
                         <div className="mb-4">
