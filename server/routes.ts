@@ -3831,24 +3831,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             clientName = "Nome não informado";
           }
 
+          // IMPORTANTE: Priorizar endereço salvo no pedido (definido na conversão do orçamento)
+          // Se não existir, usar endereço do cliente como fallback
+          const savedShippingAddress = order?.shippingAddress;
+          const finalShippingAddress = order?.deliveryType === 'pickup'
+            ? 'Sede Principal - Retirada no Local'
+            : (savedShippingAddress || clientAddress || 'Endereço não informado');
+
           return {
             ...po,
             orderNumber: order?.orderNumber || `PO-${po.id}`,
             product: order?.product || 'Produto não informado',
             clientName: clientName,
-            clientAddress: clientAddress,
+            clientAddress: finalShippingAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
             order: order ? {
               ...order,
               clientName: clientName,
-              clientAddress: clientAddress,
+              clientAddress: finalShippingAddress,
               clientPhone: clientPhone,
               clientEmail: clientEmail,
-              shippingAddress: order.deliveryType === 'pickup'
-                ? 'Sede Principal - Retirada no Local'
-                : (clientAddress || 'Endereço não informado'),
+              shippingAddress: finalShippingAddress,
               deliveryType: order.deliveryType || 'delivery'
             } : null
           };
@@ -8533,24 +8538,29 @@ Para mais detalhes, entre em contato conosco!`;
             clientName = "Nome não informado";
           }
 
+          // IMPORTANTE: Priorizar endereço salvo no pedido (definido na conversão do orçamento)
+          // Se não existir, usar endereço do cliente como fallback
+          const savedShippingAddress = order?.shippingAddress;
+          const finalShippingAddress = order?.deliveryType === 'pickup'
+            ? 'Sede Principal - Retirada no Local'
+            : (savedShippingAddress || clientAddress || 'Endereço não informado');
+
           return {
             ...po,
             orderNumber: order?.orderNumber || `PO-${po.id}`,
             product: order?.product || 'Produto não informado',
             clientName: clientName,
-            clientAddress: clientAddress,
+            clientAddress: finalShippingAddress,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
             order: order ? {
               ...order,
               clientName: clientName,
-              clientAddress: clientAddress,
+              clientAddress: finalShippingAddress,
               clientPhone: clientPhone,
               clientEmail: clientEmail,
-              shippingAddress: order.deliveryType === 'pickup'
-                ? 'Sede Principal - Retirada no Local'
-                : (clientAddress || 'Endereço não informado'),
+              shippingAddress: finalShippingAddress,
               deliveryType: order.deliveryType || 'delivery'
             } : null
           };

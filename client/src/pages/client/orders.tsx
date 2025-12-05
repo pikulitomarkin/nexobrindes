@@ -141,10 +141,10 @@ export default function ClientOrders() {
 
   const getTimelineSteps = (status: string) => {
     const steps = [
-      { id: "confirmed", label: "Confirmado", icon: CheckCircle, completed: ["confirmed", "production", "ready", "shipped", "delivered", "completed"].includes(status) },
-      { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "ready", "shipped", "delivered", "completed"].includes(status) },
-      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "delivered", "completed"].includes(status) },
-      { id: "shipped", label: "Enviado", icon: Truck, completed: ["shipped", "delivered", "completed"].includes(status) },
+      { id: "confirmed", label: "Confirmado", icon: CheckCircle, completed: ["confirmed", "production", "ready", "shipped", "partial_shipped", "delivered", "completed"].includes(status) },
+      { id: "production", label: "Em Produção", icon: Clock, completed: ["production", "ready", "shipped", "partial_shipped", "delivered", "completed"].includes(status) },
+      { id: "ready", label: "Pronto", icon: Package, completed: ["ready", "shipped", "partial_shipped", "delivered", "completed"].includes(status) },
+      { id: "shipped", label: "Enviado", icon: Truck, completed: ["shipped", "partial_shipped", "delivered", "completed"].includes(status) },
       { id: "delivered", label: "Entregue", icon: Home, completed: ["delivered", "completed"].includes(status) },
     ];
     return steps;
