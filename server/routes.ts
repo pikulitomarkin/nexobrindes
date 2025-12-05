@@ -281,13 +281,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const objectStorageService = new ObjectStorageService();
       const folder = (req.body.folder || 'uploads') as string;
-      const contentType = req.file.mimetype || 'application/octet-stream';
       
       // Upload to Object Storage for persistence
       const objectPath = await objectStorageService.uploadBuffer(
         req.file.buffer,
         folder,
-        contentType
+        req.file.originalname
       );
 
       console.log(`File uploaded to Object Storage: ${objectPath}`);

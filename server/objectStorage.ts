@@ -15,8 +15,9 @@ export class ObjectNotFoundError extends Error {
 export class ObjectStorageService {
   constructor() {}
 
-  async uploadBuffer(buffer: Buffer, folder: string = "uploads", contentType: string = "application/octet-stream"): Promise<string> {
-    const ext = this.getExtensionFromMimeType(contentType);
+  async uploadBuffer(buffer: Buffer, folder: string = "uploads", originalFilename: string = ""): Promise<string> {
+    // Extract extension from original filename
+    const ext = originalFilename ? `.${originalFilename.split('.').pop()}` : '';
     const objectId = `${randomUUID()}${ext}`;
     const objectName = `${folder}/${objectId}`;
     
@@ -29,18 +30,6 @@ export class ObjectStorageService {
 
     console.log(`File uploaded to Object Storage: ${objectName}`);
     return `/objects/${objectName}`;
-  }
-
-  private getExtensionFromMimeType(mimeType: string): string {
-    const mimeToExt: Record<string, string> = {
-      'image/jpeg': '.jpg',
-      'image/png': '.png',
-      'image/gif': '.gif',
-      'image/webp': '.webp',
-      'image/svg+xml': '.svg',
-      'application/pdf': '.pdf',
-    };
-    return mimeToExt[mimeType] || '';
   }
 
   async getObject(objectPath: string): Promise<Buffer> {
