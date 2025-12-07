@@ -7425,6 +7425,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgetMetadata = { ...budgetData };
       delete budgetMetadata.items;
       
+      // FIX: Convert 'matriz' branchId to null (matriz is not a valid FK)
+      if (budgetMetadata.branchId === 'matriz') {
+        budgetMetadata.branchId = null;
+      }
+      
       // Update budget metadata
       const updatedBudget = await storage.updateBudget(budgetId, budgetMetadata);
 
