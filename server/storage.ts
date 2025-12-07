@@ -159,7 +159,7 @@ export interface IStorage {
   updateProduct(id: string, productData: any): Promise<any>;
   deleteProduct(id: string): Promise<boolean>;
   importProducts(productsData: any[]): Promise<{ imported: number; errors: string[] }>;
-  importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }>;
+  importProductsForProducer(productsData: any[], producerId: string | null): Promise<{ imported: number; errors: string[] }>;
   searchProducts(query: string): Promise<any[]>;
   getProductsByProducer(producerId: string): Promise<any[]>;
   getProductsGroupedByProducer(): Promise<{ [key: string]: any[] }>;
@@ -2644,14 +2644,17 @@ export class MemStorage implements IStorage {
     return { imported, errors };
   }
 
-  async importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }> {
+  async importProductsForProducer(productsData: any[], producerId: string | null): Promise<{ imported: number; errors: string[] }> {
     const errors: string[] = [];
     let imported = 0;
+    
+    // Handle internal products - null producerId means internal
+    const isInternal = !producerId;
 
-    console.log(`Starting import for producer: ${producerId}, ${productsData.length} products to import`);
+    console.log(`Starting import for producer: ${producerId || 'internal'}, ${productsData.length} products to import`);
 
-    // Verify producer exists (allow 'internal' as well)
-    if (producerId !== 'internal') {
+    // Verify producer exists (skip for internal products)
+    if (!isInternal) {
       const producer = await this.getUser(producerId);
       console.log(`Producer verification for ${producerId}:`, producer ? { id: producer.id, name: producer.name, role: producer.role } : 'not found');
       if (!producer || (producer.role !== 'producer' && producer.role !== 'admin')) {
@@ -2698,8 +2701,8 @@ export class MemStorage implements IStorage {
           basePrice: basePrice.toFixed(2),
           unit: productData.unit || productData.Unidade || 'un',
           isActive: true,
-          producerId: producerId, // Assign to the specified producer (can be 'internal')
-          type: producerId === 'internal' ? 'internal' : 'external',
+          producerId: isInternal ? null : producerId, // null for internal products
+          type: isInternal ? 'internal' : 'external',
           // Additional fields from JSON if available
           externalId: productData.IdProduto || productData.id,
           externalCode: productData.CodigoXbz || productData.codigo,
@@ -2720,12 +2723,12 @@ export class MemStorage implements IStorage {
           updatedAt: new Date()
         };
 
-        console.log(`Importing product ${imported + 1}: ${product.name} for producer ${producerId}`);
+        console.log(`Importing product ${imported + 1}: ${product.name} for producer ${producerId || 'internal'}`);
         this.products.set(productId, product);
         imported++;
 
         if (imported % 10 === 0) {
-          const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
+          const producerName = isInternal ? 'Produtos Internos' : (await this.getUser(producerId!))?.name || 'Unknown';
           console.log(`Progress: ${imported} products imported for ${producerName}...`);
         }
       } catch (error) {
@@ -2734,7 +2737,7 @@ export class MemStorage implements IStorage {
       }
     }
 
-    const producerName = producerId === 'internal' ? 'Produtos Internos' : (await this.getUser(producerId))?.name || 'Unknown';
+    const producerName = isInternal ? 'Produtos Internos' : (await this.getUser(producerId!))?.name || 'Unknown';
     console.log(`Finished importing ${imported} products for ${producerName}. Total products in storage: ${this.products.size}`);
     return { imported, errors };
   }

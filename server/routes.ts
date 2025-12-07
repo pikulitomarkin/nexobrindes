@@ -1938,10 +1938,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Set default values with proper numeric field handling
+      // Handle producerId - 'internal' means null (no external producer)
+      const isInternal = !productData.producerId || productData.producerId === 'internal';
       const newProduct = {
         ...productData,
-        producerId: productData.producerId || 'internal',
-        type: productData.producerId === 'internal' || !productData.producerId ? 'internal' : 'external',
+        producerId: isInternal ? null : productData.producerId,
+        type: isInternal ? 'internal' : 'external',
         isActive: productData.isActive !== undefined ? productData.isActive : true,
         unit: productData.unit || 'un',
         category: productData.category || 'Geral',
@@ -2002,9 +2004,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(num) ? null : num.toString();
       };
 
+      // Handle producerId - 'internal' means null (no external producer)
+      const isInternal = !updateData.producerId || updateData.producerId === 'internal';
+      
       // Clean the update data
       const cleanedUpdateData = {
         ...updateData,
+        // Handle producerId properly
+        producerId: isInternal ? null : updateData.producerId,
+        type: isInternal ? 'internal' : 'external',
         // Clean numeric fields if they exist in the update
         weight: updateData.weight !== undefined ? cleanNumericField(updateData.weight) : undefined,
         height: updateData.height !== undefined ? cleanNumericField(updateData.height) : undefined,
@@ -2515,10 +2523,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
       }
 
-      const { producerId } = req.body;
-      if (!producerId) {
-        return res.status(400).json({ error: "Produtor é obrigatório para a importação" });
-      }
+      let { producerId } = req.body;
+      
+      // Handle internal products - producerId 'internal' or empty means null
+      const isInternal = !producerId || producerId === 'internal';
+      producerId = isInternal ? null : producerId;
 
       // Check file size
       if (req.file.size > 50 * 1024 * 1024) {

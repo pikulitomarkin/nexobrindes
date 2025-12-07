@@ -1271,7 +1271,7 @@ export class PgStorage implements IStorage {
     return { imported, errors };
   }
 
-  async importProductsForProducer(productsData: any[], producerId: string): Promise<{ imported: number; errors: string[] }> {
+  async importProductsForProducer(productsData: any[], producerId: string | null): Promise<{ imported: number; errors: string[] }> {
     let imported = 0;
     const errors: string[] = [];
 
@@ -1282,6 +1282,9 @@ export class PgStorage implements IStorage {
       return isNaN(num) ? null : num.toString();
     };
 
+    // Handle internal products - null producerId means internal
+    const isInternal = !producerId;
+    
     // Map common field names from different JSON formats
     const mapProductFields = (item: any) => {
       return {
@@ -1291,8 +1294,8 @@ export class PgStorage implements IStorage {
         basePrice: (item.PrecoVenda || item.basePrice || item.Preco || 0).toString(),
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
-        producerId: producerId,
-        type: 'external',
+        producerId: isInternal ? null : producerId,
+        type: isInternal ? 'internal' : 'external',
 
         // Optional fields with mapping
         externalId: item.IdProduto?.toString() || item.id?.toString(),
