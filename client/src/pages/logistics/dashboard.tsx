@@ -1233,19 +1233,20 @@ export default function LogisticsDashboard() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                // Criar um objeto específico para este produtor
+                                // Criar um objeto específico para este produtor com endereço garantido
                                 const producerSpecificOrder = {
                                   ...order,
-                                  // Marcar como visualização específica do produtor
                                   viewingProducer: order.producerId,
-                                  viewingProducerName: order.producerName
+                                  viewingProducerName: order.producerName,
+                                  shippingAddress: order.shippingAddress || order.clientAddress || order.order?.shippingAddress || order.order?.clientAddress,
+                                  deliveryType: order.deliveryType || order.order?.deliveryType || 'delivery'
                                 };
                                 setSelectedOrder(producerSpecificOrder);
                                 setShowOrderDetailsModal(true);
                               }}
                             >
                               <Eye className="h-4 w-4 mr-1" />
-                              Ver {order.producerName ? 'Produtor' : 'Pedido'}
+                              Ver Produtor
                             </Button>
                             {order.status === 'ready' && (
                               <Button
@@ -1366,19 +1367,20 @@ export default function LogisticsDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  // Criar um objeto específico para este produtor
+                                  // Criar um objeto específico para este produtor com endereço garantido
                                   const producerSpecificOrder = {
                                     ...order,
-                                    // Marcar como visualização específica do produtor
                                     viewingProducer: order.producerId,
-                                    viewingProducerName: order.producerName
+                                    viewingProducerName: order.producerName,
+                                    shippingAddress: order.shippingAddress || order.clientAddress || order.order?.shippingAddress || order.order?.clientAddress,
+                                    deliveryType: order.deliveryType || order.order?.deliveryType || 'delivery'
                                   };
                                   setSelectedOrder(producerSpecificOrder);
                                   setShowOrderDetailsModal(true);
                                 }}
                               >
                                 <Eye className="h-4 w-4 mr-1" />
-                                Ver {order.producerName ? 'Despacho' : 'Pedido'}
+                                Ver Despacho
                               </Button>
                               <Button
                                 key={`confirm-delivery-btn-${order.uniqueKey}`}
@@ -1498,19 +1500,20 @@ export default function LogisticsDashboard() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  // Criar um objeto específico para este produtor
+                                  // Criar um objeto específico para este produtor com endereço garantido
                                   const producerSpecificOrder = {
                                     ...order,
-                                    // Marcar como visualização específica do produtor
                                     viewingProducer: order.producerId,
-                                    viewingProducerName: order.producerName
+                                    viewingProducerName: order.producerName,
+                                    shippingAddress: order.shippingAddress || order.clientAddress || order.order?.shippingAddress || order.order?.clientAddress,
+                                    deliveryType: order.deliveryType || order.order?.deliveryType || 'delivery'
                                   };
                                   setSelectedOrder(producerSpecificOrder);
                                   setShowOrderDetailsModal(true);
                                 }}
                               >
                                 <Eye className="h-4 w-4 mr-1" />
-                                Ver {order.producerName ? 'Entrega' : 'Pedido'}
+                                Ver Entrega
                               </Button>
                             </div>
                           </td>
