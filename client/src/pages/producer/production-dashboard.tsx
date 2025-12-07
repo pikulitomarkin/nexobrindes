@@ -290,6 +290,163 @@ export default function ProductionDashboard() {
     return true;
   });
 
+  // Separar pedidos por categoria de status
+  const pendingOrders = filteredOrders.filter((o: any) => o.status === 'pending' || o.status === 'accepted')
+    .sort((a: any, b: any) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  const inProductionOrders = filteredOrders.filter((o: any) => o.status === 'production')
+    .sort((a: any, b: any) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  const readyOrders = filteredOrders.filter((o: any) => ['ready', 'shipped', 'delivered', 'completed'].includes(o.status))
+    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Função para renderizar cada card de pedido
+  const renderOrderCard = (order: any, orderDetails: any) => (
+    <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
+      <div
+        className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
+        onClick={() => {
+          const element = document.getElementById(`order-${order.id}`);
+          if (element) {
+            element.style.display = element.style.display === 'none' ? 'block' : 'none';
+          }
+        }}
+      >
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Package className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {orderDetails?.orderNumber || `#${order.id.slice(-6)}`}
+                </h3>
+                <span className="text-sm text-gray-600">
+                  {orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'Cliente N/A'}
+                </span>
+              </div>
+            </div>
+            {getStatusBadge(order.status)}
+          </div>
+          <div className="flex items-center gap-3">
+            {order.producerValue ? (
+              <div className="text-right">
+                <p className="text-sm font-medium text-green-600">Valor definido</p>
+                <p className="text-xs text-gray-500">Aguardando produção</p>
+              </div>
+            ) : (
+              <div className="text-right">
+                <p className="text-sm font-medium text-orange-600">Valor não definido</p>
+                <p className="text-xs text-gray-500">Defina o valor</p>
+              </div>
+            )}
+            <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-xs text-gray-600">▼</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <p className="text-sm text-gray-600 mb-2">
+              Pedido: {orderDetails?.orderNumber || order.order?.orderNumber || 'N/A'}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setLocation(`/producer/order/${order.id}`)}>
+              <Eye className="h-4 w-4 mr-1" />
+              Ver Detalhes Completos
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+          <h4 className="font-medium text-blue-900 mb-2">Produto Principal</h4>
+          <p className="text-blue-800">{orderDetails?.product || order.order?.product || 'Produto não especificado'}</p>
+          {orderDetails?.description && <p className="text-sm text-blue-600 mt-1">{orderDetails.description}</p>}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label className="text-sm font-medium text-gray-500">Cliente</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <User className="h-4 w-4 text-gray-400" />
+              <div>
+                <p className="font-medium">{orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'N/A'}</p>
+                {orderDetails?.clientDetails?.phone && <p className="text-xs text-gray-500">{orderDetails.clientDetails.phone}</p>}
+              </div>
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-500">Prazo</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Calendar className="h-4 w-4 text-gray-400" />
+              <p className="font-medium">{order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Não definido'}</p>
+            </div>
+          </div>
+        </div>
+
+        {orderDetails?.items && orderDetails.items.length > 0 && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-500">Seus Itens para Produzir</Label>
+            <div className="mt-2 space-y-2">
+              {orderDetails.items.map((item: any, index: number) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h5 className="font-medium">{item.productName}</h5>
+                      <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
+                      {item.itemCustomizationDescription && <p className="text-sm text-blue-600">Personalização: {item.itemCustomizationDescription}</p>}
+                    </div>
+                    <span className="text-sm text-gray-500">Item #{index + 1}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {orderDetails?.photos && orderDetails.photos.length > 0 && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-500">Fotos de Referência</Label>
+            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+              {orderDetails.photos.map((photoUrl: string, index: number) => (
+                <div key={index} className="relative group">
+                  <img src={photoUrl} alt={`Foto ${index + 1}`} className="w-full h-20 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer" onClick={() => window.open(photoUrl, '_blank')} />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
+                    <span className="text-white text-xs opacity-0 group-hover:opacity-100">Clique para ampliar</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {order.notes && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-500">Observações</Label>
+            <div className="mt-1 p-3 bg-gray-50 border rounded">
+              <p className="text-sm">{order.notes}</p>
+              {order.lastNoteAt && <p className="text-xs text-gray-500 mt-2">Última atualização: {new Date(order.lastNoteAt).toLocaleString('pt-BR')}</p>}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <span>Produto: {order.order?.product || 'N/A'}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleSetValue(order)} className="flex items-center gap-1" disabled={order.producerValue && parseFloat(order.producerValue) > 0}>
+              <DollarSign className="h-4 w-4" />
+              {order.producerValue ? 'Valor Definido' : 'Definir Valor'}
+            </Button>
+            {getNextAction(order)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -414,228 +571,91 @@ export default function ProductionDashboard() {
 
 
 
-      {/* Orders List with Accordion */}
-      <Card className="shadow-lg border-0">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
-              Ordens de Produção
-              <Badge variant="outline" className="ml-2">
-                {filteredOrders.length} {filteredOrders.length === 1 ? 'ordem' : 'ordens'}
-              </Badge>
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p>Carregando ordens...</p>
-            </div>
-          ) : filteredOrders.length === 0 ? (
+      {/* Orders List with Accordion - Separated by Status */}
+      {isLoading ? (
+        <div className="text-center py-8">
+          <p>Carregando ordens...</p>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <Card className="shadow-lg border-0">
+          <CardContent className="p-6">
             <div className="text-center py-12">
               <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma ordem encontrada</h3>
               <p className="text-gray-500">Não há ordens de produção que correspondam aos filtros selecionados.</p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order: any) => {
-                // Parse order details if available
-                let orderDetails = null;
-                try {
-                  orderDetails = order.orderDetails ? JSON.parse(order.orderDetails) : null;
-                } catch (e) {
-                  console.log('Error parsing order details:', e);
-                }
-
-                return (
-                  <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
-                    {/* Accordion Header - Always Visible */}
-                    <div
-                      className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
-                      onClick={() => {
-                        const element = document.getElementById(`order-${order.id}`);
-                        if (element) {
-                          element.style.display = element.style.display === 'none' ? 'block' : 'none';
-                        }
-                      }}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <Package className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {orderDetails?.orderNumber || `#${order.id.slice(-6)}`}
-                              </h3>
-                              <span className="text-sm text-gray-600">
-                                {orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'Cliente N/A'}
-                              </span>
-                            </div>
-                          </div>
-                          {getStatusBadge(order.status)}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {order.producerValue && (
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-green-600">Valor definido</p>
-                              <p className="text-xs text-gray-500">Aguardando produção</p>
-                            </div>
-                          )}
-                          {!order.producerValue && (
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-orange-600">Valor não definido</p>
-                              <p className="text-xs text-gray-500">Defina o valor</p>
-                            </div>
-                          )}
-                          <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
-                            <span className="text-xs text-gray-600">▼</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Accordion Content - Collapsible */}
-                    <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Pedido: {orderDetails?.orderNumber || order.order?.orderNumber || 'N/A'}
-                          </p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setLocation(`/producer/order/${order.id}`)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Ver Detalhes Completos
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Product Information */}
-                      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">Produto Principal</h4>
-                        <p className="text-blue-800">{orderDetails?.product || order.order?.product || 'Produto não especificado'}</p>
-                        {orderDetails?.description && (
-                          <p className="text-sm text-blue-600 mt-1">{orderDetails.description}</p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <Label className="text-sm font-medium text-gray-500">Cliente</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <div>
-                              <p className="font-medium">{orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'N/A'}</p>
-                              {orderDetails?.clientDetails?.phone && (
-                                <p className="text-xs text-gray-500">{orderDetails.clientDetails.phone}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-500">Prazo</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Calendar className="h-4 w-4 text-gray-400" />
-                            <p className="font-medium">
-                              {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Não definido'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Items específicos para este produtor */}
-                      {orderDetails?.items && orderDetails.items.length > 0 && (
-                        <div className="mb-4">
-                          <Label className="text-sm font-medium text-gray-500">Seus Itens para Produzir</Label>
-                          <div className="mt-2 space-y-2">
-                            {orderDetails.items.map((item: any, index: number) => (
-                              <div key={index} className="p-3 bg-gray-50 rounded-lg border">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <h5 className="font-medium">{item.productName}</h5>
-                                    <p className="text-sm text-gray-600">Quantidade: {item.quantity}</p>
-                                    {item.itemCustomizationDescription && (
-                                      <p className="text-sm text-blue-600">Personalização: {item.itemCustomizationDescription}</p>
-                                    )}
-                                  </div>
-                                  <span className="text-sm text-gray-500">
-                                    Item #{index + 1}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Fotos do orçamento/pedido */}
-                      {orderDetails?.photos && orderDetails.photos.length > 0 && (
-                        <div className="mb-4">
-                          <Label className="text-sm font-medium text-gray-500">Fotos de Referência</Label>
-                          <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
-                            {orderDetails.photos.map((photoUrl: string, index: number) => (
-                              <div key={index} className="relative group">
-                                <img
-                                  src={photoUrl}
-                                  alt={`Foto ${index + 1}`}
-                                  className="w-full h-20 object-cover rounded border hover:opacity-75 transition-opacity cursor-pointer"
-                                  onClick={() => window.open(photoUrl, '_blank')}
-                                />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center">
-                                  <span className="text-white text-xs opacity-0 group-hover:opacity-100">Clique para ampliar</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {order.notes && (
-                        <div className="mb-4">
-                          <Label className="text-sm font-medium text-gray-500">Observações</Label>
-                          <div className="mt-1 p-3 bg-gray-50 border rounded">
-                            <p className="text-sm">{order.notes}</p>
-                            {order.lastNoteAt && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                Última atualização: {new Date(order.lastNoteAt).toLocaleString('pt-BR')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span>Produto: {order.order?.product || 'N/A'}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSetValue(order)}
-                            className="flex items-center gap-1"
-                            disabled={order.producerValue && parseFloat(order.producerValue) > 0}
-                          >
-                            <DollarSign className="h-4 w-4" />
-                            {order.producerValue ? 'Valor Definido' : 'Definir Valor'}
-                          </Button>
-                          {getNextAction(order)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Seção 1: Pedidos Aguardando (Pendentes e Aceitos) */}
+          {pendingOrders.length > 0 && (
+            <Card className="shadow-lg border-0 border-l-4 border-l-yellow-500">
+              <CardHeader className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-b">
+                <CardTitle className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-yellow-600" />
+                  Novos Pedidos - Aguardando Início
+                  <Badge className="ml-2 bg-yellow-600">{pendingOrders.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  {pendingOrders.map((order: any) => {
+                    let orderDetails = null;
+                    try { orderDetails = order.orderDetails ? JSON.parse(order.orderDetails) : null; } catch (e) {}
+                    return renderOrderCard(order, orderDetails);
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+
+          {/* Seção 2: Pedidos Em Produção */}
+          {inProductionOrders.length > 0 && (
+            <Card className="shadow-lg border-0 border-l-4 border-l-blue-500">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+                <CardTitle className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5 text-blue-600" />
+                  Em Produção
+                  <Badge className="ml-2 bg-blue-600">{inProductionOrders.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  {inProductionOrders.map((order: any) => {
+                    let orderDetails = null;
+                    try { orderDetails = order.orderDetails ? JSON.parse(order.orderDetails) : null; } catch (e) {}
+                    return renderOrderCard(order, orderDetails);
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Seção 3: Pedidos Prontos/Finalizados */}
+          {readyOrders.length > 0 && (
+            <Card className="shadow-lg border-0 border-l-4 border-l-green-500">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 border-b">
+                <CardTitle className="text-lg font-semibold text-green-800 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Prontos / Finalizados
+                  <Badge className="ml-2 bg-green-600">{readyOrders.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  {readyOrders.map((order: any) => {
+                    let orderDetails = null;
+                    try { orderDetails = order.orderDetails ? JSON.parse(order.orderDetails) : null; } catch (e) {}
+                    return renderOrderCard(order, orderDetails);
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
 
       {/* Value Setting Dialog - Step 1: Input Value */}
       <Dialog open={isValueDialogOpen} onOpenChange={setIsValueDialogOpen}>
