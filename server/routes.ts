@@ -8409,7 +8409,7 @@ Para mais detalhes, entre em contato conosco!`;
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
       
-      // Enrich orders with producer names
+      // Enrich orders with producer names and client data
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
           // Enrich items with producer names
@@ -8426,9 +8426,60 @@ Para mais detalhes, entre em contato conosco!`;
             })
           );
           
+          // Get client data for logistics display
+          let clientName = order.contactName;
+          let clientAddress = null;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+          
+          if (!clientName && order.clientId) {
+            const clientRecord = await storage.getClient(order.clientId);
+            if (clientRecord) {
+              clientName = clientRecord.name;
+              clientAddress = clientRecord.endereco_entrega_rua 
+                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+                : clientRecord.address;
+              clientPhone = clientRecord.phone || order.contactPhone;
+              clientEmail = clientRecord.email || order.contactEmail;
+            } else {
+              const clientByUserId = await storage.getClientByUserId(order.clientId);
+              if (clientByUserId) {
+                clientName = clientByUserId.name;
+                clientAddress = clientByUserId.endereco_entrega_rua 
+                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
+                  : clientByUserId.address;
+                clientPhone = clientByUserId.phone || order.contactPhone;
+                clientEmail = clientByUserId.email || order.contactEmail;
+              } else {
+                const clientUser = await storage.getUser(order.clientId);
+                if (clientUser) {
+                  clientName = clientUser.name;
+                  clientPhone = clientUser.phone || order.contactPhone;
+                  clientEmail = clientUser.email || order.contactEmail;
+                  clientAddress = clientUser.address;
+                }
+              }
+            }
+          }
+          
+          if (!clientName) {
+            clientName = "Nome não informado";
+          }
+          
+          // Priorizar endereço salvo no pedido, depois endereço do cliente
+          const finalShippingAddress = order.deliveryType === 'pickup'
+            ? 'Sede Principal - Retirada no Local'
+            : (order.shippingAddress || clientAddress || 'Endereço não informado');
+          
           return {
             ...order,
-            items: enrichedItems
+            items: enrichedItems,
+            clientName: clientName,
+            clientAddress: finalShippingAddress,
+            clientPhone: clientPhone,
+            clientEmail: clientEmail,
+            shippingAddress: finalShippingAddress,
+            deliveryType: order.deliveryType || 'delivery'
           };
         })
       );
@@ -8461,14 +8512,18 @@ Para mais detalhes, entre em contato conosco!`;
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
-              clientAddress = clientRecord.address;
+              clientAddress = clientRecord.endereco_entrega_rua 
+                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+                : clientRecord.address;
               clientPhone = clientRecord.phone || order.contactPhone;
               clientEmail = clientRecord.email || order.contactEmail;
             } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 clientName = clientByUserId.name;
-                clientAddress = clientByUserId.address;
+                clientAddress = clientByUserId.endereco_entrega_rua 
+                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
+                  : clientByUserId.address;
                 clientPhone = clientByUserId.phone || order.contactPhone;
                 clientEmail = clientByUserId.email || order.contactEmail;
               } else {
@@ -8549,14 +8604,18 @@ Para mais detalhes, entre em contato conosco!`;
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
               clientName = clientRecord.name;
-              clientAddress = clientRecord.address;
+              clientAddress = clientRecord.endereco_entrega_rua 
+                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+                : clientRecord.address;
               clientPhone = clientRecord.phone || order.contactPhone;
               clientEmail = clientRecord.email || order.contactEmail;
             } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
                 clientName = clientByUserId.name;
-                clientAddress = clientByUserId.address;
+                clientAddress = clientByUserId.endereco_entrega_rua 
+                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
+                  : clientByUserId.address;
                 clientPhone = clientByUserId.phone || order.contactPhone;
                 clientEmail = clientByUserId.email || order.contactEmail;
               } else {
@@ -8573,18 +8632,21 @@ Para mais detalhes, entre em contato conosco!`;
 
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
+          
+          // Priorizar endereço salvo no pedido, depois endereço do cliente
+          const finalShippingAddress = order.deliveryType === 'pickup'
+            ? 'Sede Principal - Retirada no Local'
+            : (order.shippingAddress || clientAddress || 'Endereço não informado');
 
           return {
             ...order,
             clientName,
-            clientAddress: clientAddress || 'Endereço não informado',
+            clientAddress: finalShippingAddress,
             clientPhone,
             clientEmail,
             vendorName: vendor?.name || 'Vendedor',
             producerName: producer?.name || null,
-            shippingAddress: order.deliveryType === 'pickup'
-              ? 'Sede Principal - Retirada no Local'
-              : (clientAddress || 'Endereço não informado'),
+            shippingAddress: finalShippingAddress,
             deliveryType: order.deliveryType || 'delivery'
           };
         })
