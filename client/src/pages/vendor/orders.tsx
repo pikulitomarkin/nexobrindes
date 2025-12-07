@@ -1659,11 +1659,6 @@ export default function VendorOrders() {
                             <span>Entrada para Iniciar:</span>
                             <span>R$ {(vendorOrderForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
-                          {vendorOrderForm.downPayment > 0 && vendorOrderForm.deliveryType !== "pickup" && vendorOrderForm.shippingCost > 0 && (
-                            <p className="text-blue-600 font-medium text-sm">
-                              * Valor inclui frete de R$ {vendorOrderForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div>

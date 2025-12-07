@@ -1606,11 +1606,6 @@ export default function VendorBudgets() {
                             <span>Entrada para Iniciar:</span>
                             <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                           </div>
-                          {vendorBudgetForm.downPayment > 0 && vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 && (
-                            <p className="text-blue-600 font-medium text-sm">
-                              * Valor inclui frete de R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div>

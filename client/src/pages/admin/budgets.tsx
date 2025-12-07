@@ -1705,11 +1705,6 @@ export default function AdminBudgets() {
                             <span>Entrada para Iniciar:</span>
                             <span>R$ {(adminBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
                           </div>
-                          {adminBudgetForm.downPayment > 0 && adminBudgetForm.deliveryType !== "pickup" && adminBudgetForm.shippingCost > 0 && (
-                            <p className="text-blue-600 font-medium text-sm">
-                              * Valor inclui frete de R$ {adminBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div>
