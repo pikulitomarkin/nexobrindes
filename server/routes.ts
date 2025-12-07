@@ -8432,32 +8432,37 @@ Para mais detalhes, entre em contato conosco!`;
           let clientPhone = order.contactPhone;
           let clientEmail = order.contactEmail;
           
-          if (!clientName && order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
+          // Always try to get client address for logistics
+          if (order.clientId) {
+            // Try to get client by ID first (direct client table lookup)
+            let clientRecord = await storage.getClient(order.clientId);
+            
+            // If not found, try by userId
+            if (!clientRecord) {
+              clientRecord = await storage.getClientByUserId(order.clientId);
+            }
+            
             if (clientRecord) {
-              clientName = clientRecord.name;
+              // Use client name if contactName not available
+              if (!clientName) {
+                clientName = clientRecord.name;
+              }
+              // Always get delivery address from client record
               clientAddress = clientRecord.endereco_entrega_rua 
                 ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
                 : clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
+              clientPhone = clientPhone || clientRecord.phone;
+              clientEmail = clientEmail || clientRecord.email;
             } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.endereco_entrega_rua 
-                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
-                  : clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
+              // Fallback to user record
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                if (!clientName) {
                   clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
-                  clientAddress = clientUser.address;
                 }
+                clientPhone = clientPhone || clientUser.phone;
+                clientEmail = clientEmail || clientUser.email;
+                clientAddress = clientUser.address;
               }
             }
           }
@@ -8501,39 +8506,43 @@ Para mais detalhes, entre em contato conosco!`;
           let order = await storage.getOrder(po.orderId);
           const producer = po.producerId ? await storage.getUser(po.producerId) : null;
 
-          // Always use contactName as primary client name
+          // Use contactName as primary client name
           let clientName = order?.contactName;
           let clientAddress = null;
           let clientPhone = order?.contactPhone;
           let clientEmail = order?.contactEmail;
 
-          // Only if contactName is missing, try to get from client record
-          if (!clientName && order?.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
+          // Always try to get client address for logistics, even if we have contactName
+          if (order?.clientId) {
+            // Try to get client by ID first (direct client table lookup)
+            let clientRecord = await storage.getClient(order.clientId);
+            
+            // If not found, try by userId
+            if (!clientRecord) {
+              clientRecord = await storage.getClientByUserId(order.clientId);
+            }
+            
             if (clientRecord) {
-              clientName = clientRecord.name;
+              // Use client name if contactName not available
+              if (!clientName) {
+                clientName = clientRecord.name;
+              }
+              // Always get delivery address from client record
               clientAddress = clientRecord.endereco_entrega_rua 
                 ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
                 : clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
+              clientPhone = clientPhone || clientRecord.phone;
+              clientEmail = clientEmail || clientRecord.email;
             } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.endereco_entrega_rua 
-                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
-                  : clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
+              // Fallback to user record
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                if (!clientName) {
                   clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
-                  clientAddress = clientUser.address;
                 }
+                clientPhone = clientPhone || clientUser.phone;
+                clientEmail = clientEmail || clientUser.email;
+                clientAddress = clientUser.address;
               }
             }
           }
@@ -8599,33 +8608,37 @@ Para mais detalhes, entre em contato conosco!`;
           let clientPhone = order.contactPhone;
           let clientEmail = order.contactEmail;
 
-          // Get client details if available
+          // Get client details - always try to get delivery address
           if (order.clientId) {
-            const clientRecord = await storage.getClient(order.clientId);
+            // Try to get client by ID first (direct client table lookup)
+            let clientRecord = await storage.getClient(order.clientId);
+            
+            // If not found, try by userId
+            if (!clientRecord) {
+              clientRecord = await storage.getClientByUserId(order.clientId);
+            }
+            
             if (clientRecord) {
-              clientName = clientRecord.name;
+              // Use client name if contactName not available
+              if (!clientName || clientName === 'Cliente não identificado') {
+                clientName = clientRecord.name;
+              }
+              // Always get delivery address from client record
               clientAddress = clientRecord.endereco_entrega_rua 
                 ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
                 : clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
+              clientPhone = clientPhone || clientRecord.phone;
+              clientEmail = clientEmail || clientRecord.email;
             } else {
-              const clientByUserId = await storage.getClientByUserId(order.clientId);
-              if (clientByUserId) {
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.endereco_entrega_rua 
-                  ? `${clientByUserId.endereco_entrega_rua}, ${clientByUserId.endereco_entrega_numero || 's/n'}${clientByUserId.endereco_entrega_complemento ? ` - ${clientByUserId.endereco_entrega_complemento}` : ''}, ${clientByUserId.endereco_entrega_bairro || ''}, ${clientByUserId.endereco_entrega_cidade || ''} - ${clientByUserId.endereco_entrega_estado || ''}, CEP: ${clientByUserId.endereco_entrega_cep || ''}`
-                  : clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
-              } else {
-                const clientUser = await storage.getUser(order.clientId);
-                if (clientUser) {
+              // Fallback to user record
+              const clientUser = await storage.getUser(order.clientId);
+              if (clientUser) {
+                if (!clientName || clientName === 'Cliente não identificado') {
                   clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
-                  clientAddress = clientUser.address;
                 }
+                clientPhone = clientPhone || clientUser.phone;
+                clientEmail = clientEmail || clientUser.email;
+                clientAddress = clientUser.address;
               }
             }
           }
