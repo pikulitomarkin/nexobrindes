@@ -256,11 +256,11 @@ export default function FinancePayables() {
     queryKey: ['/api/branches'],
   });
 
-  // Combine all payables
+  // Combine all payables (incluindo pagos para filtro)
   const allPayables = [
-    // Producer payments - apenas pagamentos aprovados e não pagos
+    // Producer payments - todos os pagamentos (pendentes, aprovados e pagos)
     ...producerPayments
-      .filter((payment: any) => payment.status === 'approved' || payment.status === 'pending')
+      .filter((payment: any) => ['pending', 'approved', 'paid'].includes(payment.status))
       .map((payment: any) => ({
         id: `producer-${payment.id}`,
         type: 'producer',
@@ -270,42 +270,45 @@ export default function FinancePayables() {
         status: payment.status,
         beneficiary: payment.producerName,
         orderNumber: payment.orderNumber,
-        productionOrderId: payment.productionOrderId, // Added for using in payment endpoint
+        productionOrderId: payment.productionOrderId,
         category: 'Produção',
-        branchId: payment.branchId || null, // Add branch info
-        actualId: payment.id // Store the original ID
+        branchId: payment.branchId || null,
+        actualId: payment.id,
+        paidAt: payment.paidAt
       })),
 
-    // Approved expenses not reimbursed
+    // Expenses - approved (não reembolsados) e reembolsados (pagos)
     ...expenses
-      .filter((expense: any) => expense.status === 'approved' && !expense.reimbursedAt)
+      .filter((expense: any) => expense.status === 'approved')
       .map((expense: any) => ({
         id: `expense-${expense.id}`,
         type: 'expense',
         dueDate: expense.date,
         description: expense.description,
         amount: expense.amount,
-        status: 'approved',
+        status: expense.reimbursedAt ? 'paid' : 'approved',
         beneficiary: expense.vendorName || 'Despesa Geral',
         category: expense.category,
         orderNumber: expense.orderNumber || '-',
-        branchId: expense.branchId || null // Add branch info
+        branchId: expense.branchId || null,
+        paidAt: expense.reimbursedAt
       })),
 
-    // Confirmed commissions not paid
+    // Commissions - confirmed (não pagas) e pagas
     ...commissions
-      .filter((commission: any) => commission.status === 'confirmed' && !commission.paidAt)
+      .filter((commission: any) => ['confirmed', 'paid'].includes(commission.status) || commission.paidAt)
       .map((commission: any) => ({
         id: `commission-${commission.id}`,
         type: 'commission',
         dueDate: commission.createdAt,
         description: `Comissão - Pedido ${commission.orderNumber}`,
         amount: commission.amount,
-        status: 'confirmed',
+        status: commission.paidAt ? 'paid' : 'confirmed',
         beneficiary: commission.vendorName || commission.partnerName,
         category: commission.type === 'vendor' ? 'Comissão Vendedor' : 'Comissão Parceiro',
         orderNumber: commission.orderNumber,
-        branchId: commission.branchId || null // Add branch info
+        branchId: commission.branchId || null,
+        paidAt: commission.paidAt
       })),
 
     // Cancelled orders with payments (refunds)
@@ -317,15 +320,16 @@ export default function FinancePayables() {
         dueDate: order.updatedAt,
         description: `Estorno - ${order.product}`,
         amount: order.refundAmount || order.paidValue,
-        status: order.refundAmount ? 'defined' : 'pending_definition',
+        status: order.refundedAt ? 'paid' : (order.refundAmount ? 'defined' : 'pending_definition'),
         beneficiary: order.clientName,
         category: 'Estorno',
         orderNumber: order.orderNumber,
-        branchId: order.branchId || null, // Add branch info from order
-        originalOrder: order
+        branchId: order.branchId || null,
+        originalOrder: order,
+        paidAt: order.refundedAt
       })),
 
-    // Manual payables
+    // Manual payables (já inclui todos os status)
     ...manualPayables.map((payable: any) => ({
       id: `manual-${payable.id}`,
       type: 'manual',
@@ -336,7 +340,8 @@ export default function FinancePayables() {
       beneficiary: payable.beneficiary,
       category: payable.category,
       orderNumber: 'MANUAL',
-      branchId: payable.branchId || null // Add branch info
+      branchId: payable.branchId || null,
+      paidAt: payable.paidAt
     }))
   ];
 
