@@ -8448,8 +8448,8 @@ Para mais detalhes, entre em contato conosco!`;
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.endereco_entrega_rua 
-                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+              clientAddress = clientRecord.enderecoEntregaLogradouro 
+                ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
               clientEmail = clientEmail || clientRecord.email;
@@ -8528,8 +8528,8 @@ Para mais detalhes, entre em contato conosco!`;
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.endereco_entrega_rua 
-                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+              clientAddress = clientRecord.enderecoEntregaLogradouro 
+                ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
               clientEmail = clientEmail || clientRecord.email;
@@ -8624,8 +8624,8 @@ Para mais detalhes, entre em contato conosco!`;
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.endereco_entrega_rua 
-                ? `${clientRecord.endereco_entrega_rua}, ${clientRecord.endereco_entrega_numero || 's/n'}${clientRecord.endereco_entrega_complemento ? ` - ${clientRecord.endereco_entrega_complemento}` : ''}, ${clientRecord.endereco_entrega_bairro || ''}, ${clientRecord.endereco_entrega_cidade || ''} - ${clientRecord.endereco_entrega_estado || ''}, CEP: ${clientRecord.endereco_entrega_cep || ''}`
+              clientAddress = clientRecord.enderecoEntregaLogradouro 
+                ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
               clientEmail = clientEmail || clientRecord.email;
