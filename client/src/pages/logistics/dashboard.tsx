@@ -1650,17 +1650,11 @@ export default function LogisticsDashboard() {
                         )}
                       </p>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">
-                        {selectedOrder.viewingProducer ? 'Produtos para este Produtor' : 'Produto Principal'}
-                      </label>
-                      <p className="font-medium">{selectedOrder.product || selectedOrder.order?.product}</p>
-                    </div>
                     {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'delivery' && (
                       <div className="col-span-2">
                         <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
                         <p className="text-gray-700 bg-gray-50 p-2 rounded">
-                          {selectedOrder.shippingAddress || selectedOrder.order?.shippingAddress || 'Endereço não informado'}
+                          {selectedOrder.shippingAddress || selectedOrder.clientAddress || selectedOrder.order?.shippingAddress || selectedOrder.order?.clientAddress || 'Endereço não informado'}
                         </p>
                       </div>
                     )}
