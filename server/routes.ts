@@ -3830,30 +3830,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let clientPhone = order?.contactPhone;
           let clientEmail = order?.contactEmail;
 
-          // Only if contactName is missing, try to get from client record
-          if (!clientName && order?.clientId) {
+          // SEMPRE buscar endereço do cliente para logística (independente do contactName)
+          if (order?.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
             if (clientRecord) {
-              console.log(`Found client record:`, clientRecord);
-              clientName = clientRecord.name;
-              clientAddress = clientRecord.address;
-              clientPhone = clientRecord.phone || order.contactPhone;
-              clientEmail = clientRecord.email || order.contactEmail;
+              if (!clientName) {
+                clientName = clientRecord.name;
+              }
+              // Montar endereço de entrega do cliente
+              clientAddress = clientRecord.enderecoEntregaLogradouro 
+                ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
+                : clientRecord.address;
+              clientPhone = clientPhone || clientRecord.phone;
+              clientEmail = clientEmail || clientRecord.email;
             } else {
               const clientByUserId = await storage.getClientByUserId(order.clientId);
               if (clientByUserId) {
-                console.log(`Found client by userId:`, clientByUserId);
-                clientName = clientByUserId.name;
-                clientAddress = clientByUserId.address;
-                clientPhone = clientByUserId.phone || order.contactPhone;
-                clientEmail = clientByUserId.email || order.contactEmail;
+                if (!clientName) {
+                  clientName = clientByUserId.name;
+                }
+                // Montar endereço de entrega do cliente
+                clientAddress = clientByUserId.enderecoEntregaLogradouro 
+                  ? `${clientByUserId.enderecoEntregaLogradouro}, ${clientByUserId.enderecoEntregaNumero || 's/n'}${clientByUserId.enderecoEntregaComplemento ? ` - ${clientByUserId.enderecoEntregaComplemento}` : ''}, ${clientByUserId.enderecoEntregaBairro || ''}, ${clientByUserId.enderecoEntregaCidade || ''}, CEP: ${clientByUserId.enderecoEntregaCep || ''}`
+                  : clientByUserId.address;
+                clientPhone = clientPhone || clientByUserId.phone;
+                clientEmail = clientEmail || clientByUserId.email;
               } else {
                 const clientUser = await storage.getUser(order.clientId);
                 if (clientUser) {
-                  console.log(`Found user record:`, clientUser);
-                  clientName = clientUser.name;
-                  clientPhone = clientUser.phone || order.contactPhone;
-                  clientEmail = clientUser.email || order.contactEmail;
+                  if (!clientName) {
+                    clientName = clientUser.name;
+                  }
+                  clientPhone = clientPhone || clientUser.phone;
+                  clientEmail = clientEmail || clientUser.email;
                   clientAddress = clientUser.address;
                 }
               }
