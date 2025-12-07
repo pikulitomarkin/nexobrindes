@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Eye, Edit, Send, Package, AlertCircle, Check, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { phoneMask, currencyMask, parseCurrencyValue, formatCurrencyForInput } from "@/utils/masks";
 
 export default function AdminOrders() {
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
@@ -691,7 +691,7 @@ export default function AdminOrders() {
                     <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
                     <Input
                       id="edit-shipping-cost"
-                      value={editingOrder.shippingCost > 0 ? currencyMask(parseFloat(editingOrder.shippingCost).toFixed(2)) : ''}
+                      value={formatCurrencyForInput(parseFloat(editingOrder.shippingCost) || 0)}
                       onChange={(e) => {
                         const rawValue = e.target.value;
                         if (rawValue === '' || rawValue === 'R$ ') {

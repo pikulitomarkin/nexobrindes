@@ -50,3 +50,14 @@ export const parseCurrencyValue = (value: string): number => {
   
   return parseFloat(cleanValue) || 0;
 };
+
+// Função para formatar número para exibição em campo de moeda
+export const formatCurrencyForInput = (value: number): string => {
+  if (!value || value === 0) return '';
+  
+  // Converte número para string com 2 casas decimais no formato brasileiro
+  const formatted = value.toFixed(2).replace('.', ',');
+  
+  // Aplica a máscara de moeda
+  return currencyMask(formatted);
+};
