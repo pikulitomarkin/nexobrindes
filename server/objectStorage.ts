@@ -1,6 +1,8 @@
 import { Client } from "@replit/object-storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 
 const client = new Client();
 
@@ -42,9 +44,6 @@ export class ObjectStorageService {
       console.error("Object Storage upload error:", error);
       
       // Fallback: try to save to local uploads folder for debugging
-      const fs = require('fs');
-      const path = require('path');
-      
       try {
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
         if (!fs.existsSync(uploadsDir)) {
