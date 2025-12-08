@@ -1682,6 +1682,13 @@ export default function LogisticsDashboard() {
                         {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'pickup' ? 'Retirada no Local' : 'Entrega em Casa'}
                       </p>
                     </div>
+                    {/* Valor do Frete */}
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <label className="text-sm font-medium text-blue-700">Valor do Frete</label>
+                      <p className="text-lg font-bold text-blue-600">
+                        R$ {parseFloat(selectedOrder.order?.shippingCost || selectedOrder.shippingCost || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Contato do Cliente</label>
                       <p className="font-medium">{selectedOrder.contactPhone || selectedOrder.order?.contactPhone || 'Não informado'}</p>
