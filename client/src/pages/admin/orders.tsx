@@ -923,6 +923,20 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
               <p>{order.clientName || "Nome não informado"}</p>
             </div>
             <div>
+              <label className="text-sm font-medium text-gray-500">Telefone</label>
+              <p>{order.contactPhone || order.clientPhone || "Não informado"}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Email</label>
+              <p>{order.contactEmail || order.clientEmail || "Não informado"}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
+              <p className="text-gray-700 bg-gray-50 p-2 rounded text-sm">
+                {order.shippingAddress || order.clientAddress || "Endereço não informado"}
+              </p>
+            </div>
+            <div>
               <label className="text-sm font-medium text-gray-500">Vendedor</label>
               <p>{order.vendorName || "Vendedor não informado"}</p>
             </div>
@@ -964,6 +978,12 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
               <label className="text-sm font-medium text-gray-500">Valor Pago</label>
               <p className="text-lg">
                 R$ {parseFloat(order.paidValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <label className="text-sm font-medium text-blue-700">Valor do Frete</label>
+              <p className="text-lg font-bold text-blue-600">
+                R$ {parseFloat(order.shippingCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
             <div>
@@ -1017,6 +1037,19 @@ function OrderDetailsContent({ orderId, onClose }: { orderId: string | null; onC
                     </p>
                   </div>
                 </div>
+
+                {/* Imagem Anexa */}
+                {(item.customizationPhoto || item.imageUrl || item.image) && (
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Imagem Anexa:</p>
+                    <img
+                      src={item.customizationPhoto || item.imageUrl || item.image}
+                      alt="Imagem do item"
+                      className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80"
+                      onClick={() => window.open(item.customizationPhoto || item.imageUrl || item.image, '_blank')}
+                    />
+                  </div>
+                )}
 
                 {/* Personalização do Item */}
                 {item.hasItemCustomization && (
