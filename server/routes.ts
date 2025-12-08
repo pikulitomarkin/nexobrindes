@@ -3394,6 +3394,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientName = "Nome não informado";
       }
 
+      // Build client address and contact info
+      let clientAddress: string | null = null;
+      let clientPhone: string | null = order.contactPhone || null;
+      let clientEmail: string | null = order.contactEmail || null;
+
+      if (order.clientId) {
+        const clientRecord = await storage.getClient(order.clientId);
+        if (clientRecord) {
+          // Build address from delivery fields
+          if (clientRecord.enderecoEntregaLogradouro) {
+            clientAddress = `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`;
+          } else if (clientRecord.address) {
+            clientAddress = clientRecord.address;
+          }
+          if (!clientPhone) clientPhone = clientRecord.phone || null;
+          if (!clientEmail) clientEmail = clientRecord.email || null;
+        } else {
+          const clientByUserId = await storage.getClientByUserId(order.clientId);
+          if (clientByUserId) {
+            if (clientByUserId.enderecoEntregaLogradouro) {
+              clientAddress = `${clientByUserId.enderecoEntregaLogradouro}, ${clientByUserId.enderecoEntregaNumero || 's/n'}${clientByUserId.enderecoEntregaComplemento ? ` - ${clientByUserId.enderecoEntregaComplemento}` : ''}, ${clientByUserId.enderecoEntregaBairro || ''}, ${clientByUserId.enderecoEntregaCidade || ''}, CEP: ${clientByUserId.enderecoEntregaCep || ''}`;
+            } else if (clientByUserId.address) {
+              clientAddress = clientByUserId.address;
+            }
+            if (!clientPhone) clientPhone = clientByUserId.phone || null;
+            if (!clientEmail) clientEmail = clientByUserId.email || null;
+          } else {
+            const clientUser = await storage.getUser(order.clientId);
+            if (clientUser) {
+              clientAddress = clientUser.address || null;
+              if (!clientPhone) clientPhone = clientUser.phone || null;
+              if (!clientEmail) clientEmail = clientUser.email || null;
+            }
+          }
+        }
+      }
+
+      // Priority: saved order address > client delivery address
+      const finalShippingAddress = (order as any).shippingAddress || clientAddress || null;
+
       const vendor = await storage.getUser(order.vendorId);
       const producer = order.producerId ? await storage.getUser(order.producerId) : null;
 
@@ -3475,7 +3515,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payments: payments.filter(p => p.status === 'confirmed'),
         budgetInfo: originalBudgetInfo,
         paidValue: actualPaidValue.toFixed(2),
-        remainingValue: remainingBalance.toFixed(2)
+        remainingValue: remainingBalance.toFixed(2),
+        shippingAddress: finalShippingAddress,
+        clientAddress: clientAddress,
+        clientPhone: clientPhone,
+        clientEmail: clientEmail
       };
 
       res.json(enrichedOrder);
