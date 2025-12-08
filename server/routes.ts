@@ -3826,13 +3826,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Always use contactName as primary client identifier
           let clientName = order?.contactName;
-          let clientAddress = null;
+          let clientAddress: string | null = null;
           let clientPhone = order?.contactPhone;
           let clientEmail = order?.contactEmail;
 
           // SEMPRE buscar endereço do cliente para logística (independente do contactName)
           if (order?.clientId) {
             const clientRecord = await storage.getClient(order.clientId);
+            console.log(`[PROD-ORDER DEBUG] Order ${order?.orderNumber}, clientId=${order.clientId}, clientRecord found=${!!clientRecord}`);
             if (clientRecord) {
               if (!clientName) {
                 clientName = clientRecord.name;
@@ -3841,6 +3842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               clientAddress = clientRecord.enderecoEntregaLogradouro 
                 ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
+              console.log(`[PROD-ORDER DEBUG] Built address from clientRecord: ${clientAddress?.substring(0, 50)}`);
               clientPhone = clientPhone || clientRecord.phone;
               clientEmail = clientEmail || clientRecord.email;
             } else {
@@ -3876,7 +3878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // IMPORTANTE: Priorizar endereço salvo no pedido (definido na conversão do orçamento)
           // Se não existir, usar endereço do cliente como fallback
-          const savedShippingAddress = order?.shippingAddress;
+          const savedShippingAddress = (order as any)?.shippingAddress;
           const finalShippingAddress = order?.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
             : (savedShippingAddress || clientAddress || 'Endereço não informado');
@@ -3887,6 +3889,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             product: order?.product || 'Produto não informado',
             clientName: clientName,
             clientAddress: finalShippingAddress,
+            shippingAddress: finalShippingAddress,
+            deliveryType: order?.deliveryType || 'delivery',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
@@ -3894,9 +3898,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...order,
               clientName: clientName,
               clientAddress: finalShippingAddress,
+              shippingAddress: finalShippingAddress,
               clientPhone: clientPhone,
               clientEmail: clientEmail,
-              shippingAddress: finalShippingAddress,
               deliveryType: order.deliveryType || 'delivery'
             } : null
           };
@@ -8577,7 +8581,7 @@ Para mais detalhes, entre em contato conosco!`;
 
           // IMPORTANTE: Priorizar endereço salvo no pedido (definido na conversão do orçamento)
           // Se não existir, usar endereço do cliente como fallback
-          const savedShippingAddress = order?.shippingAddress;
+          const savedShippingAddress = (order as any)?.shippingAddress;
           const finalShippingAddress = order?.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
             : (savedShippingAddress || clientAddress || 'Endereço não informado');
@@ -8588,6 +8592,8 @@ Para mais detalhes, entre em contato conosco!`;
             product: order?.product || 'Produto não informado',
             clientName: clientName,
             clientAddress: finalShippingAddress,
+            shippingAddress: finalShippingAddress,
+            deliveryType: order?.deliveryType || 'delivery',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             producerName: producer?.name || null,
@@ -8595,9 +8601,9 @@ Para mais detalhes, entre em contato conosco!`;
               ...order,
               clientName: clientName,
               clientAddress: finalShippingAddress,
+              shippingAddress: finalShippingAddress,
               clientPhone: clientPhone,
               clientEmail: clientEmail,
-              shippingAddress: finalShippingAddress,
               deliveryType: order.deliveryType || 'delivery'
             } : null
           };
