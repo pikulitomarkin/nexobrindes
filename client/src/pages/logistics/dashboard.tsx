@@ -1653,14 +1653,15 @@ export default function LogisticsDashboard() {
                         )}
                       </p>
                     </div>
-                    {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'delivery' && (
-                      <div className="col-span-2">
-                        <label className="text-sm font-medium text-gray-500">Endereço de Entrega</label>
-                        <p className="text-gray-700 bg-gray-50 p-2 rounded">
-                          {selectedOrder.shippingAddress || selectedOrder.clientAddress || selectedOrder.order?.shippingAddress || selectedOrder.order?.clientAddress || 'Endereço não informado'}
-                        </p>
-                      </div>
-                    )}
+                    {/* Endereço - sempre mostrar na logística */}
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-gray-500">
+                        {(selectedOrder.deliveryType || selectedOrder.order?.deliveryType) === 'pickup' ? 'Endereço do Cliente' : 'Endereço de Entrega'}
+                      </label>
+                      <p className="text-gray-700 bg-gray-50 p-2 rounded">
+                        {selectedOrder.shippingAddress || selectedOrder.clientAddress || selectedOrder.order?.shippingAddress || selectedOrder.order?.clientAddress || 'Endereço não informado'}
+                      </p>
+                    </div>
                     {(selectedOrder.deadline || selectedOrder.order?.deadline) && (
                       <div>
                         <label className="text-sm font-medium text-gray-500">Prazo</label>
