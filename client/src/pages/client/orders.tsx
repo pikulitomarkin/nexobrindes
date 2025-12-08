@@ -242,7 +242,21 @@ export default function ClientOrders() {
             <CardContent>
               {/* Financial Summary */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-700">
+                      R$ {(parseFloat(order.totalValue) - parseFloat(order.shippingCost || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-sm text-gray-600">Produtos</div>
+                  </div>
+                  {parseFloat(order.shippingCost || '0') > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-500">
+                        R$ {parseFloat(order.shippingCost || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-sm text-gray-600">Frete</div>
+                    </div>
+                  )}
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

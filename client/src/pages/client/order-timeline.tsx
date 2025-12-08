@@ -436,6 +436,20 @@ export default function ClientOrderTimeline() {
                       <div className="mt-1">{getStatusBadge(order.status)}</div>
                     </div>
                     <div>
+                      <label className="text-sm font-medium text-gray-500">Valor dos Produtos</label>
+                      <p className="text-lg font-bold text-green-600">
+                        R$ {(parseFloat(order.totalValue) - parseFloat(order.shippingCost || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    {parseFloat(order.shippingCost || '0') > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Valor do Frete</label>
+                        <p className="text-lg font-bold text-blue-600">
+                          R$ {parseFloat(order.shippingCost || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    <div>
                       <label className="text-sm font-medium text-gray-500">Valor Total</label>
                       <p className="text-lg font-bold text-green-600">
                         R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -603,7 +617,21 @@ export default function ClientOrderTimeline() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Valor Total:</span>
+                <span className="text-gray-600">Valor dos Produtos:</span>
+                <span className="font-bold text-lg text-gray-800">
+                  R$ {(parseFloat(order.totalValue) - parseFloat(order.shippingCost || '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              {parseFloat(order.shippingCost || '0') > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Frete:</span>
+                  <span className="font-semibold text-blue-600">
+                    R$ {parseFloat(order.shippingCost || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="text-gray-600 font-medium">Valor Total:</span>
                 <span className="font-bold text-xl text-green-600">
                   R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
