@@ -743,8 +743,8 @@ export default function AdminBudgets() {
         return sum + (Math.max(0, itemPrice) * item.quantity);
       }, 0);
       
-      const totalBeforeDiscount = subtotalItems + newShippingCost;
-      const newRemainingAmount = Math.max(0, totalBeforeDiscount - newDownPayment);
+      // Remaining amount excludes shipping - shipping is paid upfront with down payment
+      const newRemainingAmount = Math.max(0, subtotalItems - newDownPayment);
       
       setAdminBudgetForm({
         title: fullBudget.title,
@@ -1680,11 +1680,12 @@ export default function AdminBudgets() {
                           value={adminBudgetForm.downPayment > 0 ? currencyMask(adminBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const downPayment = parseCurrencyValue(e.target.value);
-                            const total = calculateAdminTotalWithShipping();
+                            // Use subtotal without shipping - shipping is paid upfront with down payment
+                            const subtotal = calculateAdminBudgetTotal();
                             setAdminBudgetForm({
                               ...adminBudgetForm,
                               downPayment,
-                              remainingAmount: Math.max(0, total - downPayment)
+                              remainingAmount: Math.max(0, subtotal - downPayment)
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1741,11 +1742,12 @@ export default function AdminBudgets() {
                           value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            const total = calculateAdminBudgetTotal() + shippingCost;
+                            // Remaining amount excludes shipping - shipping is paid upfront with down payment
+                            const subtotal = calculateAdminBudgetTotal();
                             setAdminBudgetForm({
                               ...adminBudgetForm,
                               shippingCost,
-                              remainingAmount: Math.max(0, total - (adminBudgetForm.downPayment || 0))
+                              remainingAmount: Math.max(0, subtotal - (adminBudgetForm.downPayment || 0))
                             });
                           }}
                           placeholder="R$ 0,00"

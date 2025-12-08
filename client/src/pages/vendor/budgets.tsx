@@ -663,8 +663,8 @@ export default function VendorBudgets() {
         return sum + (Math.max(0, itemPrice) * item.quantity);
       }, 0);
       
-      const totalBeforeDiscount = subtotalItems + newShippingCost;
-      const newRemainingAmount = Math.max(0, totalBeforeDiscount - newDownPayment);
+      // Remaining amount excludes shipping - shipping is paid upfront with down payment
+      const newRemainingAmount = Math.max(0, subtotalItems - newDownPayment);
       
       setVendorBudgetForm({
         title: fullBudget.title,
@@ -1581,11 +1581,12 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const downPayment = parseCurrencyValue(e.target.value);
-                            const total = calculateTotalWithShipping();
+                            // Use subtotal without shipping - shipping is paid upfront with down payment
+                            const subtotal = calculateBudgetTotal();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               downPayment,
-                              remainingAmount: Math.max(0, total - downPayment)
+                              remainingAmount: Math.max(0, subtotal - downPayment)
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1642,11 +1643,12 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            const total = calculateBudgetTotal() + shippingCost;
+                            // Remaining amount excludes shipping - shipping is paid upfront with down payment
+                            const subtotal = calculateBudgetTotal();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               shippingCost,
-                              remainingAmount: Math.max(0, total - (vendorBudgetForm.downPayment || 0))
+                              remainingAmount: Math.max(0, subtotal - (vendorBudgetForm.downPayment || 0))
                             });
                           }}
                           placeholder="R$ 0,00"
