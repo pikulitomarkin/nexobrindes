@@ -761,9 +761,6 @@ export class PDFGenerator {
       
       console.log('Adding description...');
       this.addDescription(data);
-      
-      console.log('Adding customization images...');
-      await this.addProductCustomizationImages(data);
 
       console.log('Generating PDF blob...');
       return new Promise((resolve) => {
