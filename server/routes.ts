@@ -2170,7 +2170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get producer name for response
       let producerName = 'Produtor';
       if (productionOrder.producerId) {
-        const producer = await storage.getProducer(productionOrder.producerId);
+        const producer = await storage.getUser(productionOrder.producerId);
         if (producer) {
           producerName = producer.name;
         }
