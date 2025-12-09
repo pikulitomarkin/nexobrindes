@@ -111,6 +111,22 @@ export class PDFGenerator {
         
         if (ctx) {
           ctx.drawImage(img, 0, 0);
+          
+          // Clean the branch info area (top-right corner) by sampling background color
+          // and painting over the static Rio de Janeiro text in the letterhead
+          const cleanAreaX = Math.floor(img.naturalWidth * 0.72);
+          const cleanAreaY = Math.floor(img.naturalHeight * 0.02);
+          const cleanAreaW = Math.floor(img.naturalWidth * 0.26);
+          const cleanAreaH = Math.floor(img.naturalHeight * 0.06);
+          
+          // Sample background color from a clean area (white area of letterhead)
+          const sampleData = ctx.getImageData(cleanAreaX + 10, cleanAreaY + cleanAreaH + 5, 1, 1).data;
+          const bgColor = `rgb(${sampleData[0]}, ${sampleData[1]}, ${sampleData[2]})`;
+          
+          // Paint over the static branch text with the sampled background color
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(cleanAreaX, cleanAreaY, cleanAreaW, cleanAreaH);
+          
           this.letterheadDataUrl = canvas.toDataURL('image/png');
         }
       }
@@ -214,15 +230,6 @@ export class PDFGenerator {
     if (data.branch && (data.branch.name || data.branch.cnpj || data.branch.address)) {
       const rightX = this.pageWidth - this.margin;
       let topY = 18;
-      
-      // Draw white background rectangle to cover any static text from letterhead
-      // Position: right side of page, covering the branch info area
-      const bgWidth = 75;
-      const bgHeight = 35;
-      const bgX = rightX - bgWidth;
-      const bgY = 10;
-      this.doc.setFillColor(255, 255, 255);
-      this.doc.rect(bgX, bgY, bgWidth, bgHeight, 'F');
       
       // Filial (nome) - com ícone de prédio
       this.doc.setFontSize(9);
