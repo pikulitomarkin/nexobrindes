@@ -345,14 +345,24 @@ export class PDFGenerator {
   private async addItems(data: BudgetPDFData): Promise<void> {
     this.addNewPageIfNeeded(50);
 
+    // Pre-load all product images
+    const productImages: Map<number, string | null> = new Map();
+    for (const item of data.items) {
+      if (item.product.imageLink) {
+        const imageData = await this.loadAndCacheImage(item.product.imageLink);
+        productImages.set(item.id, imageData);
+      }
+    }
+
     // Title
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 15;
 
-    // Table headers (sem imagens)
-    const colWidths = [90, 20, 35, 40];
+    // Table headers (com imagem do produto)
+    const imgColWidth = 22;
+    const colWidths = [imgColWidth, 68, 20, 35, 40];
     const startX = this.margin;
     let currentX = startX;
 
@@ -363,12 +373,14 @@ export class PDFGenerator {
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
-    this.doc.text('Produto', currentX + 2, this.currentY);
+    this.doc.text('Img', currentX + 2, this.currentY);
     currentX += colWidths[0];
-    this.doc.text('Qtd', currentX + 2, this.currentY);
+    this.doc.text('Produto', currentX + 2, this.currentY);
     currentX += colWidths[1];
-    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    this.doc.text('Qtd', currentX + 2, this.currentY);
     currentX += colWidths[2];
+    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    currentX += colWidths[3];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 10;
@@ -379,7 +391,7 @@ export class PDFGenerator {
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
       const hasCustomization = item.hasItemCustomization && item.itemCustomizationDescription;
-      const baseRowHeight = 20;
+      const baseRowHeight = 22;
 
       this.addNewPageIfNeeded(baseRowHeight + (hasCustomization ? 15 : 0) + 5);
 
@@ -391,9 +403,14 @@ export class PDFGenerator {
 
       currentX = startX;
 
+      // Product thumbnail image
+      const productImageData = productImages.get(item.id);
+      this.renderProductThumbnail(productImageData || null, currentX + 1, this.currentY - 3, 18, 18);
+      currentX += colWidths[0];
+
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 45 
-        ? item.product.name.substring(0, 45) + '...' 
+      const productName = item.product.name.length > 40 
+        ? item.product.name.substring(0, 40) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
@@ -401,22 +418,22 @@ export class PDFGenerator {
       if (item.product.description) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = item.product.description.length > 50 
-          ? item.product.description.substring(0, 50) + '...' 
+        const description = item.product.description.length > 45 
+          ? item.product.description.substring(0, 45) + '...' 
           : item.product.description;
         this.doc.text(description, currentX + 2, this.currentY + 10);
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-      currentX += colWidths[0];
+      currentX += colWidths[1];
 
       // Quantity
       this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 10);
-      currentX += colWidths[1];
+      currentX += colWidths[2];
 
       // Unit price
       this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
-      currentX += colWidths[2];
+      currentX += colWidths[3];
 
       // Total price
       this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
