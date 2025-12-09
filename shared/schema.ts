@@ -213,6 +213,8 @@ export const branches = pgTable("branches", {
   city: text("city").notNull(),
   cnpj: text("cnpj"),
   address: text("address"),
+  email: text("email"),
+  phone: text("phone"),
   isHeadquarters: boolean("is_headquarters").default(false), // Para identificar a matriz
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

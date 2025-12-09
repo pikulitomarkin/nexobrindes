@@ -215,22 +215,32 @@ export class PDFGenerator {
       const rightX = this.pageWidth - this.margin;
       let topY = 18;
       
+      // Filial (nome) - com ícone de prédio
       this.doc.setFontSize(9);
       this.doc.setFont('helvetica', 'bold');
       this.doc.setTextColor(40, 40, 40);
-      this.doc.text(data.branch.name || 'Filial', rightX, topY, { align: 'right' });
+      const branchName = data.branch.name || 'Filial';
+      this.doc.text(branchName, rightX, topY, { align: 'right' });
       
       this.doc.setFont('helvetica', 'normal');
       this.doc.setFontSize(8);
       this.doc.setTextColor(80, 80, 80);
       
-      if (data.branch.cnpj) {
+      // Telefone
+      if (data.branch.phone) {
         topY += 5;
-        this.doc.text(`CNPJ: ${data.branch.cnpj}`, rightX, topY, { align: 'right' });
+        this.doc.text(`Tel: ${data.branch.phone}`, rightX, topY, { align: 'right' });
       }
       
+      // Email
+      if (data.branch.email) {
+        topY += 4;
+        this.doc.text(data.branch.email, rightX, topY, { align: 'right' });
+      }
+      
+      // Endereço
       if (data.branch.address) {
-        topY += 5;
+        topY += 4;
         const addressLines = this.doc.splitTextToSize(data.branch.address, 70);
         addressLines.forEach((line: string) => {
           this.doc.text(line, rightX, topY, { align: 'right' });
@@ -238,14 +248,10 @@ export class PDFGenerator {
         });
       }
       
-      if ((data.branch as any).email) {
+      // CNPJ
+      if (data.branch.cnpj) {
         topY += 1;
-        this.doc.text((data.branch as any).email, rightX, topY, { align: 'right' });
-      }
-      
-      if ((data.branch as any).phone) {
-        topY += 4;
-        this.doc.text((data.branch as any).phone, rightX, topY, { align: 'right' });
+        this.doc.text(`CNPJ: ${data.branch.cnpj}`, rightX, topY, { align: 'right' });
       }
       
       this.doc.setTextColor(0, 0, 0);

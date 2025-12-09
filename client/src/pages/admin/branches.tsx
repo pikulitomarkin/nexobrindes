@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Building2, MapPin, Crown, Trash2 } from "lucide-react";
+import { Plus, Edit, Building2, MapPin, Crown, Trash2, Mail, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -26,6 +26,8 @@ const branchFormSchema = z.object({
   city: z.string().min(2, "Cidade deve ter pelo menos 2 caracteres"),
   cnpj: z.string().optional(),
   address: z.string().optional(),
+  email: z.string().email("E-mail inválido").optional().or(z.literal("")),
+  phone: z.string().optional(),
   isHeadquarters: z.boolean().default(false),
 });
 
@@ -47,6 +49,8 @@ export default function AdminBranches() {
       city: "",
       cnpj: "",
       address: "",
+      email: "",
+      phone: "",
       isHeadquarters: false,
     },
   });
@@ -159,6 +163,8 @@ export default function AdminBranches() {
       city: branch.city,
       cnpj: branch.cnpj || "",
       address: branch.address || "",
+      email: branch.email || "",
+      phone: branch.phone || "",
       isHeadquarters: branch.isHeadquarters || false,
     });
   };
@@ -263,6 +269,34 @@ export default function AdminBranches() {
                       <FormLabel>Endereço Completo</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo/SP - CEP 01000-000" {...field} data-testid="input-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Ex: filial@empresa.com.br" {...field} data-testid="input-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: (11) 99999-9999" {...field} data-testid="input-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -378,6 +412,18 @@ export default function AdminBranches() {
                       <div className="flex items-start text-sm text-gray-600">
                         <MapPin className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
                         <span className="break-words">{branch.address}</span>
+                      </div>
+                    )}
+                    {branch.email && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span>{branch.email}</span>
+                      </div>
+                    )}
+                    {branch.phone && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span>{branch.phone}</span>
                       </div>
                     )}
                   </div>
