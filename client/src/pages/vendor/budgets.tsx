@@ -813,11 +813,11 @@ export default function VendorBudgets() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meus Orçamentos</h1>
-          <p className="text-gray-600">Gerencie orçamentos criados para seus clientes</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">Meus Orçamentos</h1>
+          <p className="text-sm md:text-base text-gray-600">Gerencie orçamentos criados para seus clientes</p>
         </div>
         <Dialog open={isBudgetDialogOpen} onOpenChange={(open) => {
           setIsBudgetDialogOpen(open);
@@ -852,7 +852,7 @@ export default function VendorBudgets() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleBudgetSubmit} className="space-y-6">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="budget-title">Título do Orçamento *</Label>
                   <Input
@@ -1846,66 +1846,66 @@ export default function VendorBudgets() {
       </div>
 
       {/* Stats Cards */}      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Rascunhos</p>
-                <p className="text-3xl font-bold gradient-text">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Rascunhos</p>
+                <p className="text-xl md:text-3xl font-bold gradient-text">
                   {budgets?.filter((b: any) => b.status === 'draft').length || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-gray-600" />
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <FileText className="h-4 w-4 md:h-6 md:w-6 text-gray-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Enviados</p>
-                <p className="text-3xl font-bold gradient-text">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Enviados</p>
+                <p className="text-xl md:text-3xl font-bold gradient-text">
                   {budgets?.filter((b: any) => b.status === 'sent').length || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Send className="h-6 w-6 text-blue-600" />
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Send className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aprovados</p>
-                <p className="text-3xl font-bold gradient-text">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Aprovados</p>
+                <p className="text-xl md:text-3xl font-bold gradient-text">
                   {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'converted').length || 0}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Eye className="h-6 w-6 text-green-600" />
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="card-hover">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-lg font-bold gradient-text">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Valor Total</p>
+                <p className="text-sm md:text-lg font-bold gradient-text">
                   R$ {budgets?.reduce((total: number, b: any) => total + parseFloat(b.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                 </p>
               </div>
-              <div className="w-12 h-12 gradient-bg rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">R$</span>
+              <div className="w-8 h-8 md:w-12 md:h-12 gradient-bg rounded-lg flex items-center justify-center">
+                <span className="text-white text-xs md:text-base font-bold">R$</span>
               </div>
             </div>
           </CardContent>
@@ -1913,10 +1913,10 @@ export default function VendorBudgets() {
       </div>
 
       {/* Filters */}      
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex gap-2">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2331,22 +2331,22 @@ export default function VendorBudgets() {
                 <div className="space-y-3">
                   {budgetToView.items?.map((item: any, index: number) => (
                     <div key={index} className="border rounded-lg p-4">
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                         <div>
-                          <Label className="text-sm font-medium">Produto</Label>
-                          <p className="font-semibold">{item.productName}</p>
+                          <Label className="text-xs md:text-sm font-medium">Produto</Label>
+                          <p className="font-semibold text-sm md:text-base">{item.productName}</p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Quantidade</Label>
-                          <p>{Number(item.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                          <Label className="text-xs md:text-sm font-medium">Quantidade</Label>
+                          <p className="text-sm md:text-base">{Number(item.quantity).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Preço Unitário</Label>
-                          <p>R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                          <Label className="text-xs md:text-sm font-medium">Preço Unitário</Label>
+                          <p className="text-sm md:text-base">R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Subtotal</Label>
-                          <p className="font-semibold">
+                          <Label className="text-xs md:text-sm font-medium">Subtotal</Label>
+                          <p className="font-semibold text-sm md:text-base">
                             R$ {(parseFloat(item.unitPrice) * parseInt(item.quantity)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
@@ -2356,7 +2356,7 @@ export default function VendorBudgets() {
                       {(item.productWidth || item.productHeight || item.productDepth) && (
                         <div className="mt-3 p-3 bg-gray-50 rounded">
                           <Label className="text-sm font-medium">Dimensões (cm)</Label>
-                          <div className="grid grid-cols-3 gap-4 mt-2">
+                          <div className="grid grid-cols-3 gap-2 md:gap-4 mt-2">
                             {item.productWidth && (
                               <div>
                                 <span className="text-xs text-gray-500">Largura:</span>
@@ -2381,17 +2381,17 @@ export default function VendorBudgets() {
 
                       {item.hasItemCustomization && (
                         <div className="mt-3 p-3 bg-blue-50 rounded">
-                          <div className="grid grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                             <div>
-                              <Label className="text-sm font-medium">Qtd. Personalizada</Label>
-                              <p>{item.customizationQuantity || 0} unidades</p>
+                              <Label className="text-xs md:text-sm font-medium">Qtd. Personalizada</Label>
+                              <p className="text-sm">{item.customizationQuantity || 0} unidades</p>
                             </div>
                             <div>
-                              <Label className="text-sm font-medium">Valor Unit. Personalização</Label>
-                              <p>R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                              <Label className="text-xs md:text-sm font-medium">Valor Unit. Personalização</Label>
+                              <p className="text-sm">R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
                             </div>
                             <div>
-                              <Label className="text-sm font-medium">Total Personalização</Label>
+                              <Label className="text-xs md:text-sm font-medium">Total Personalização</Label>
                               <p className="font-semibold text-blue-600">
                                 R$ {((item.customizationQuantity || 0) * parseFloat(item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </p>

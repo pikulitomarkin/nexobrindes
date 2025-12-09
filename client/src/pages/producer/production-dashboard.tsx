@@ -302,7 +302,7 @@ export default function ProductionDashboard() {
   const renderOrderCard = (order: any, orderDetails: any) => (
     <div key={order.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 bg-white">
       <div
-        className="p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
+        className="p-3 md:p-5 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 cursor-pointer transition-all duration-200 border-b border-gray-100"
         onClick={() => {
           const element = document.getElementById(`order-${order.id}`);
           if (element) {
@@ -310,33 +310,33 @@ export default function ProductionDashboard() {
           }
         }}
       >
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 md:h-10 md:w-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Package className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base md:text-lg font-semibold text-gray-900">
                   {orderDetails?.orderNumber || `#${order.id.slice(-6)}`}
                 </h3>
-                <span className="text-sm text-gray-600">
-                  {orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'Cliente N/A'}
-                </span>
+                {getStatusBadge(order.status)}
               </div>
+              <span className="text-xs md:text-sm text-gray-600 truncate block">
+                {orderDetails?.clientDetails?.name || order.clientName || order.order?.clientName || 'Cliente N/A'}
+              </span>
             </div>
-            {getStatusBadge(order.status)}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between sm:justify-end gap-3">
             {order.producerValue ? (
-              <div className="text-right">
-                <p className="text-sm font-medium text-green-600">Valor definido</p>
-                <p className="text-xs text-gray-500">Aguardando produção</p>
+              <div className="text-left sm:text-right">
+                <p className="text-xs md:text-sm font-medium text-green-600">Valor definido</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Aguardando produção</p>
               </div>
             ) : (
-              <div className="text-right">
-                <p className="text-sm font-medium text-orange-600">Valor não definido</p>
-                <p className="text-xs text-gray-500">Defina o valor</p>
+              <div className="text-left sm:text-right">
+                <p className="text-xs md:text-sm font-medium text-orange-600">Valor não definido</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Defina o valor</p>
               </div>
             )}
             <div className="h-6 w-6 bg-gray-200 rounded-full flex items-center justify-center">
@@ -346,8 +346,8 @@ export default function ProductionDashboard() {
         </div>
       </div>
 
-      <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-6 bg-white border-t">
-        <div className="flex justify-between items-start mb-4">
+      <div id={`order-${order.id}`} style={{ display: 'none' }} className="p-4 md:p-6 bg-white border-t">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
           <div>
             <p className="text-sm text-gray-600 mb-2">
               Pedido: {orderDetails?.orderNumber || order.order?.orderNumber || 'N/A'}
@@ -365,7 +365,7 @@ export default function ProductionDashboard() {
           {orderDetails?.description && <p className="text-sm text-blue-600 mt-1">{orderDetails.description}</p>}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 gap-3 md:gap-4 mb-4">
           <div>
             <Label className="text-sm font-medium text-gray-500">Cliente</Label>
             <div className="flex items-center gap-2 mt-1">
@@ -464,77 +464,77 @@ export default function ProductionDashboard() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Painel de Produção</h1>
-        <p className="text-gray-600">Gerencie suas ordens de produção e entregas</p>
+    <div className="p-4 md:p-8">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Painel de Produção</h1>
+        <p className="text-sm md:text-base text-gray-600">Gerencie suas ordens de produção e entregas</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700">Ordens Ativas</p>
-                <p className="text-3xl font-bold text-blue-900 mt-2">
+                <p className="text-xs md:text-sm font-medium text-blue-700">Ordens Ativas</p>
+                <p className="text-xl md:text-3xl font-bold text-blue-900 mt-1 md:mt-2">
                   {stats?.activeOrders || filteredOrders.filter((o: any) => !['completed', 'rejected'].includes(o.status)).length}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">Total em andamento</p>
+                <p className="text-xs text-blue-600 mt-1 hidden md:block">Total em andamento</p>
               </div>
-              <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
+              <div className="h-8 w-8 md:h-12 md:w-12 bg-blue-600 rounded-lg md:rounded-xl flex items-center justify-center">
+                <Package className="h-4 w-4 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-yellow-700">Aguardando</p>
-                <p className="text-3xl font-bold text-yellow-900 mt-2">
+                <p className="text-xs md:text-sm font-medium text-yellow-700">Aguardando</p>
+                <p className="text-xl md:text-3xl font-bold text-yellow-900 mt-1 md:mt-2">
                   {filteredOrders.filter((o: any) => o.status === 'pending').length}
                 </p>
-                <p className="text-xs text-yellow-600 mt-1">Pendentes de aceite</p>
+                <p className="text-xs text-yellow-600 mt-1 hidden md:block">Pendentes de aceite</p>
               </div>
-              <div className="h-12 w-12 bg-yellow-600 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
+              <div className="h-8 w-8 md:h-12 md:w-12 bg-yellow-600 rounded-lg md:rounded-xl flex items-center justify-center">
+                <Clock className="h-4 w-4 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-700">Em Produção</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">
+                <p className="text-xs md:text-sm font-medium text-purple-700">Em Produção</p>
+                <p className="text-xl md:text-3xl font-bold text-purple-900 mt-1 md:mt-2">
                   {filteredOrders.filter((o: any) => ['accepted', 'production'].includes(o.status)).length}
                 </p>
-                <p className="text-xs text-purple-600 mt-1">Sendo produzidas</p>
+                <p className="text-xs text-purple-600 mt-1 hidden md:block">Sendo produzidas</p>
               </div>
-              <div className="h-12 w-12 bg-purple-600 rounded-xl flex items-center justify-center">
-                <RefreshCw className="h-6 w-6 text-white" />
+              <div className="h-8 w-8 md:h-12 md:w-12 bg-purple-600 rounded-lg md:rounded-xl flex items-center justify-center">
+                <RefreshCw className="h-4 w-4 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
+          <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-700">Prontos</p>
-                <p className="text-3xl font-bold text-green-900 mt-2">
+                <p className="text-xs md:text-sm font-medium text-green-700">Prontos</p>
+                <p className="text-xl md:text-3xl font-bold text-green-900 mt-1 md:mt-2">
                   {filteredOrders.filter((o: any) => ['ready', 'shipped', 'delivered', 'completed'].includes(o.status)).length}
                 </p>
-                <p className="text-xs text-green-600 mt-1">Finalizados pela produção</p>
+                <p className="text-xs text-green-600 mt-1 hidden md:block">Finalizados</p>
               </div>
-              <div className="h-12 w-12 bg-green-600 rounded-xl flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
+              <div className="h-8 w-8 md:h-12 md:w-12 bg-green-600 rounded-lg md:rounded-xl flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 md:h-6 md:w-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -542,9 +542,9 @@ export default function ProductionDashboard() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filtrar por status" />
           </SelectTrigger>
           <SelectContent>
@@ -557,7 +557,7 @@ export default function ProductionDashboard() {
         </Select>
 
         <Select value={periodFilter} onValueChange={setPeriodFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filtrar por prazo" />
           </SelectTrigger>
           <SelectContent>
