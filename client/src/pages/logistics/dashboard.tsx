@@ -1781,7 +1781,7 @@ export default function LogisticsDashboard() {
                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                       <span className="text-gray-500">Quantidade:</span>
-                                      <p className="font-medium">{item.quantity}</p>
+                                      <p className="font-medium">{Math.round(parseFloat(item.quantity || 0))}</p>
                                     </div>
                                     <div>
                                       <span className="text-gray-500">Especificações:</span>
