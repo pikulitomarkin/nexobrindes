@@ -1309,7 +1309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Dispatching order - productionOrderId: ${productionOrderId}, orderId: ${orderId}`);
 
-      // Update production order status to shipped
+      // Update production order status to shipped with shippedAt timestamp
       const updatedPO = await storage.updateProductionOrderStatus(
         productionOrderId,
         'shipped',
@@ -1321,6 +1321,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedPO) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
       }
+
+      // Set shippedAt timestamp
+      await storage.updateProductionOrder(productionOrderId, {
+        shippedAt: new Date()
+      });
 
       // Check shipping status and update main order accordingly
       const allProductionOrders = await storage.getProductionOrdersByOrder(orderId);
@@ -2458,6 +2463,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedPO = await storage.updateProductionOrderStatus(id, status, notes, deliveryDate, trackingCode);
       if (!updatedPO) {
         return res.status(404).json({ error: "Ordem de produção não encontrada" });
+      }
+
+      // Set timestamp fields based on status change
+      if (status === 'shipped' && !currentPO.shippedAt) {
+        await storage.updateProductionOrder(id, { shippedAt: new Date() });
+      }
+      if (status === 'delivered' && !currentPO.deliveredAt) {
+        await storage.updateProductionOrder(id, { deliveredAt: new Date() });
       }
 
       console.log(`Production order ${id} status updated successfully to: ${status}`);

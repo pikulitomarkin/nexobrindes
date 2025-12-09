@@ -109,6 +109,8 @@ export const productionOrders = pgTable("production_orders", {
   status: text("status").notNull().default('pending'), // 'pending', 'accepted', 'production', 'quality_check', 'ready', 'preparing_shipment', 'shipped', 'delivered', 'completed', 'rejected'
   deadline: timestamp("deadline"),
   acceptedAt: timestamp("accepted_at"),
+  shippedAt: timestamp("shipped_at"), // Data de despacho
+  deliveredAt: timestamp("delivered_at"), // Data de entrega confirmada
   completedAt: timestamp("completed_at"),
   notes: text("notes"),
   deliveryDeadline: timestamp("delivery_deadline"),

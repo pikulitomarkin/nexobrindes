@@ -1356,7 +1356,7 @@ export default function LogisticsDashboard() {
                             <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {order.dispatchDate ? new Date(order.dispatchDate).toLocaleDateString('pt-BR') : 'N/A'}
+                            {order.shippedAt ? new Date(order.shippedAt).toLocaleDateString('pt-BR') : 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
@@ -1489,7 +1489,7 @@ export default function LogisticsDashboard() {
                             <div className="text-sm text-gray-900">{order.trackingCode || 'N/A'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {order.completedAt ? new Date(order.completedAt).toLocaleDateString('pt-BR') : 'N/A'}
+                            {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('pt-BR') : 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
