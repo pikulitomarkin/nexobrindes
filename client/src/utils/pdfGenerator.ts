@@ -215,6 +215,15 @@ export class PDFGenerator {
       const rightX = this.pageWidth - this.margin;
       let topY = 18;
       
+      // Draw white background rectangle to cover any static text from letterhead
+      // Position: right side of page, covering the branch info area
+      const bgWidth = 75;
+      const bgHeight = 35;
+      const bgX = rightX - bgWidth;
+      const bgY = 10;
+      this.doc.setFillColor(255, 255, 255);
+      this.doc.rect(bgX, bgY, bgWidth, bgHeight, 'F');
+      
       // Filial (nome) - com ícone de prédio
       this.doc.setFontSize(9);
       this.doc.setFont('helvetica', 'bold');
