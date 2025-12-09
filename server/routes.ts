@@ -2188,11 +2188,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : `Conciliado via OFX com ${transactionIds.length} transação(ões)`
       });
 
-      // Update production order payment status
-      await storage.updateProductionOrder(productionOrderId, {
-        paymentStatus: 'paid'
-      });
-
       console.log(`Producer payment ${producerPayment.id} associated with ${validTransactions.length} OFX transactions`);
 
       res.json({
