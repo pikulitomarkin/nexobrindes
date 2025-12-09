@@ -342,15 +342,8 @@ export class PDFGenerator {
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 15;
 
-    // Preload all product images in parallel
-    const imagePromises = data.items
-      .filter(item => item.product.imageLink)
-      .map(item => this.loadAndCacheImage(item.product.imageLink!));
-    
-    await Promise.all(imagePromises);
-
-    // Table headers with image column
-    const colWidths = [28, 62, 20, 30, 45];
+    // Table headers (sem imagens)
+    const colWidths = [90, 20, 35, 40];
     const startX = this.margin;
     let currentX = startX;
 
@@ -361,14 +354,12 @@ export class PDFGenerator {
     this.doc.setFillColor(240, 240, 240);
     this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
-    this.doc.text('Imagem', currentX + 2, this.currentY);
-    currentX += colWidths[0];
     this.doc.text('Produto', currentX + 2, this.currentY);
-    currentX += colWidths[1];
+    currentX += colWidths[0];
     this.doc.text('Qtd', currentX + 2, this.currentY);
-    currentX += colWidths[2];
+    currentX += colWidths[1];
     this.doc.text('Preço Unit.', currentX + 2, this.currentY);
-    currentX += colWidths[3];
+    currentX += colWidths[2];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 10;
@@ -379,10 +370,7 @@ export class PDFGenerator {
     for (let index = 0; index < data.items.length; index++) {
       const item = data.items[index];
       const hasCustomization = item.hasItemCustomization && item.itemCustomizationDescription;
-      
-      // Get cached image data
-      const imageData = item.product.imageLink ? this.imageCache.get(item.product.imageLink) || null : null;
-      const baseRowHeight = imageData ? 25 : 20;
+      const baseRowHeight = 20;
 
       this.addNewPageIfNeeded(baseRowHeight + (hasCustomization ? 15 : 0) + 5);
 
@@ -394,19 +382,9 @@ export class PDFGenerator {
 
       currentX = startX;
 
-      // Product image thumbnail (now synchronous using cached data)
-      this.renderProductThumbnail(
-        imageData,
-        currentX + 2,
-        this.currentY,
-        24,
-        20
-      );
-      currentX += colWidths[0];
-
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 30 
-        ? item.product.name.substring(0, 30) + '...' 
+      const productName = item.product.name.length > 45 
+        ? item.product.name.substring(0, 45) + '...' 
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
@@ -414,22 +392,22 @@ export class PDFGenerator {
       if (item.product.description) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = item.product.description.length > 35 
-          ? item.product.description.substring(0, 35) + '...' 
+        const description = item.product.description.length > 50 
+          ? item.product.description.substring(0, 50) + '...' 
           : item.product.description;
         this.doc.text(description, currentX + 2, this.currentY + 10);
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-      currentX += colWidths[1];
+      currentX += colWidths[0];
 
       // Quantity
       this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 10);
-      currentX += colWidths[2];
+      currentX += colWidths[1];
 
       // Unit price
       this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
-      currentX += colWidths[3];
+      currentX += colWidths[2];
 
       // Total price
       this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
