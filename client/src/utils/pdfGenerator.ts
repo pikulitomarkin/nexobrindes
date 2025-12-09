@@ -434,8 +434,9 @@ export class PDFGenerator {
       }
       currentX += colWidths[1];
 
-      // Quantity
-      this.doc.text(item.quantity.toString(), currentX + 2, this.currentY + 10);
+      // Quantity - ensure it's displayed as integer without thousands separator
+      const qty = typeof item.quantity === 'string' ? parseInt(item.quantity) : Math.round(item.quantity);
+      this.doc.text(qty.toString(), currentX + 2, this.currentY + 10);
       currentX += colWidths[2];
 
       // Unit price
@@ -466,14 +467,13 @@ export class PDFGenerator {
         this.doc.setTextColor(0, 0, 0);
       }
 
-      // Add customization info if exists
+      // Add customization info if exists (without value - value should not appear in PDF)
       if (hasCustomization) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
 
         this.doc.text(`  + Personalização: ${item.itemCustomizationDescription}`, startX + 2, this.currentY);
-        this.doc.text(`    Valor: R$ ${parseFloat(item.itemCustomizationValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, startX + 2, this.currentY + 5);
-        this.currentY += 10;
+        this.currentY += 5;
 
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);

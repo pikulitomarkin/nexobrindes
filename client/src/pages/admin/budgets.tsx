@@ -2334,11 +2334,6 @@ export default function AdminBudgets() {
                               <span className="text-blue-700 font-medium">🎨 Personalização do Item</span>
                             </div>
                             <p className="text-blue-600 font-medium">{item.itemCustomizationDescription || 'Personalização especial'}</p>
-                            {item.itemCustomizationValue > 0 && (
-                              <p className="text-sm text-blue-500">
-                                Valor: +R$ {parseFloat(item.itemCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
-                              </p>
-                            )}
                             {item.additionalCustomizationNotes && (
                               <p className="text-sm text-blue-500 mt-1">
                                 <strong>Observações:</strong> {item.additionalCustomizationNotes}
@@ -2365,11 +2360,6 @@ export default function AdminBudgets() {
                               <span className="text-green-700 font-medium">✨ Personalização Geral</span>
                             </div>
                             <p className="text-green-600 font-medium">{item.generalCustomizationName || 'Personalização geral'}</p>
-                            {item.generalCustomizationValue > 0 && (
-                              <p className="text-sm text-green-500">
-                                Valor: +R$ {parseFloat(item.generalCustomizationValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
-                              </p>
-                            )}
                           </div>
                         )}
                       </div>
