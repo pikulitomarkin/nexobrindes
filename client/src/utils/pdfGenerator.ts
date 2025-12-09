@@ -111,22 +111,6 @@ export class PDFGenerator {
         
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          
-          // Clean the branch info area (top-right corner) by sampling background color
-          // and painting over the static Rio de Janeiro text in the letterhead
-          const cleanAreaX = Math.floor(img.naturalWidth * 0.72);
-          const cleanAreaY = Math.floor(img.naturalHeight * 0.02);
-          const cleanAreaW = Math.floor(img.naturalWidth * 0.26);
-          const cleanAreaH = Math.floor(img.naturalHeight * 0.06);
-          
-          // Sample background color from a clean area (white area of letterhead)
-          const sampleData = ctx.getImageData(cleanAreaX + 10, cleanAreaY + cleanAreaH + 5, 1, 1).data;
-          const bgColor = `rgb(${sampleData[0]}, ${sampleData[1]}, ${sampleData[2]})`;
-          
-          // Paint over the static branch text with the sampled background color
-          ctx.fillStyle = bgColor;
-          ctx.fillRect(cleanAreaX, cleanAreaY, cleanAreaW, cleanAreaH);
-          
           this.letterheadDataUrl = canvas.toDataURL('image/png');
         }
       }
