@@ -805,9 +805,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             city: branch.city,
             cnpj: branch.cnpj || null,
             address: branch.address || null,
+            email: (branch as any).email || null,
+            phone: (branch as any).phone || null,
             isHeadquarters: branch.isHeadquarters || false
           };
-          console.log(`Branch info for PDF: ${branch.name} - CNPJ: ${branch.cnpj || 'N/A'}`);
+          console.log(`Branch info for PDF: ${branch.name} - CNPJ: ${branch.cnpj || 'N/A'} - Email: ${(branch as any).email || 'N/A'}`);
         }
       }
 

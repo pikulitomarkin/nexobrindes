@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import letterheadUrl from '@assets/Folha timbrada Nexo2 (1).pdf (1)_1763192535053.png';
+import letterheadUrl from '@assets/Folha_timbrada_Nexo2_(1).pdf_(2)_1765244657245.png';
 
 export interface BudgetPDFData {
   budget: {
@@ -36,6 +36,8 @@ export interface BudgetPDFData {
     city: string;
     cnpj?: string;
     address?: string;
+    email?: string;
+    phone?: string;
     isHeadquarters?: boolean;
   };
   items: Array<{
@@ -206,6 +208,48 @@ export class PDFGenerator {
     }
 
     this.currentY += 20;
+  }
+
+  private addBranchInfoTopRight(data: BudgetPDFData): void {
+    if (data.branch && (data.branch.name || data.branch.cnpj || data.branch.address)) {
+      const rightX = this.pageWidth - this.margin;
+      let topY = 18;
+      
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(40, 40, 40);
+      this.doc.text(data.branch.name || 'Filial', rightX, topY, { align: 'right' });
+      
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(8);
+      this.doc.setTextColor(80, 80, 80);
+      
+      if (data.branch.cnpj) {
+        topY += 5;
+        this.doc.text(`CNPJ: ${data.branch.cnpj}`, rightX, topY, { align: 'right' });
+      }
+      
+      if (data.branch.address) {
+        topY += 5;
+        const addressLines = this.doc.splitTextToSize(data.branch.address, 70);
+        addressLines.forEach((line: string) => {
+          this.doc.text(line, rightX, topY, { align: 'right' });
+          topY += 4;
+        });
+      }
+      
+      if ((data.branch as any).email) {
+        topY += 1;
+        this.doc.text((data.branch as any).email, rightX, topY, { align: 'right' });
+      }
+      
+      if ((data.branch as any).phone) {
+        topY += 4;
+        this.doc.text((data.branch as any).phone, rightX, topY, { align: 'right' });
+      }
+      
+      this.doc.setTextColor(0, 0, 0);
+    }
   }
 
   private addBranchInfo(data: BudgetPDFData): void {
@@ -710,6 +754,10 @@ export class PDFGenerator {
       // Apply letterhead to first page
       this.applyLetterheadBackground();
 
+      // Add branch info in top right corner (before other content)
+      console.log('Adding branch info in top right...');
+      this.addBranchInfoTopRight(data);
+
       this.currentY = this.topMargin;
 
       console.log('Adding header...');
@@ -717,9 +765,6 @@ export class PDFGenerator {
       
       console.log('Adding client and vendor info...');
       this.addClientVendorInfo(data);
-      
-      console.log('Adding branch info...');
-      this.addBranchInfo(data);
       
       console.log('Adding items...');
       await this.addItems(data);
