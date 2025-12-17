@@ -74,6 +74,7 @@ export const orders = pgTable("orders", {
   paidValue: decimal("paid_value", { precision: 10, scale: 2 }).default('0'),
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).default('0'), // Valor a ser restituído em caso de cancelamento
   status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'partial_shipped', 'delivered', 'cancelled'
+  productStatus: text("product_status").default('to_buy'), // 'to_buy', 'purchased', 'in_store' - Status do produto para dropshipping
   deadline: timestamp("deadline"),
   // Contact information fields
   contactName: text("contact_name").notNull(), // Nome de contato obrigatório
