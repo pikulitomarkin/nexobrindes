@@ -77,6 +77,7 @@ import FinanceReconciliation from "@/pages/finance/reconciliation";
 
 // Logistics imports
 import LogisticsDashboard from "@/pages/logistics/dashboard";
+import LogisticsPaidOrders from "@/pages/logistics/paid-orders";
 import LogisticsProducts from "@/pages/logistics/products";
 import LogisticsProducers from "@/pages/logistics/producers";
 
@@ -382,7 +383,7 @@ function App() {
                   )} />
                   <Route path="/logistics/paid-orders" component={() => (
                     <ProtectedRoute requiredRoles={["admin", "logistics"]}>
-                      <LogisticsDashboard />
+                      <LogisticsPaidOrders />
                     </ProtectedRoute>
                   )} />
                   <Route path="/logistics/production-tracking" component={() => (
