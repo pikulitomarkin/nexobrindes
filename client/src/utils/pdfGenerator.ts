@@ -29,6 +29,8 @@ export interface BudgetPDFData {
     remainingAmount?: string;
     shippingCost?: string;
     deliveryDeadline?: string;
+    interestRate?: string;
+    interestValue?: string;
   };
   branch?: {
     id: string;
@@ -566,6 +568,16 @@ export class PDFGenerator {
             this.currentY += 8;
           }
         }
+      }
+
+      // Credit card interest
+      if (data.budget.interestValue && parseFloat(data.budget.interestValue) > 0) {
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.text('Juros do Cartão:', this.margin, this.currentY);
+        this.doc.setFont('helvetica', 'normal');
+        const interestRate = data.budget.interestRate ? `(${data.budget.interestRate}% x ${data.budget.installments || 1}x)` : '';
+        this.doc.text(`R$ ${parseFloat(data.budget.interestValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${interestRate}`, this.margin + 50, this.currentY);
+        this.currentY += 8;
       }
 
       this.currentY += 10;

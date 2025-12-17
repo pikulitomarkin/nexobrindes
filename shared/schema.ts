@@ -378,6 +378,9 @@ export const budgetPaymentInfo = pgTable("budget_payment_info", {
   downPayment: decimal("down_payment", { precision: 10, scale: 2 }).default('0.00'),
   remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
+  // Credit card interest
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).default('0.00'), // Taxa de juros % aplicada
+  interestValue: decimal("interest_value", { precision: 10, scale: 2 }).default('0.00'), // Valor total de juros em R$
   createdAt: timestamp("created_at").defaultNow(),
 });
 

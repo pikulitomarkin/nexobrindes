@@ -362,11 +362,29 @@ export default function AdminBudgets() {
     return Math.max(0, subtotal);
   };
 
+  // Calculate credit card interest
+  const calculateAdminCreditCardInterest = () => {
+    if (!selectedAdminPaymentMethod || selectedAdminPaymentMethod.type !== 'credit_card') return 0;
+    if (adminBudgetForm.installments <= 1) return 0; // No interest for 1x payment
+    
+    const interestRate = parseFloat(selectedAdminPaymentMethod.installmentInterest || '0');
+    if (interestRate === 0) return 0;
+    
+    const subtotal = calculateAdminBudgetTotal();
+    const shipping = parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost();
+    const baseTotal = subtotal + shipping;
+    
+    // Calculate interest: rate * number of installments (simple interest)
+    const interestValue = (baseTotal * interestRate * adminBudgetForm.installments) / 100;
+    return interestValue;
+  };
+
   // Calculate the total including shipping cost
   const calculateAdminTotalWithShipping = () => {
     const subtotal = calculateAdminBudgetTotal();
     const shipping = parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost();
-    return subtotal + shipping;
+    const interest = calculateAdminCreditCardInterest();
+    return subtotal + shipping + interest;
   };
 
   const resetAdminBudgetForm = () => {
@@ -403,9 +421,13 @@ export default function AdminBudgets() {
 
   const createAdminBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
+      const interestValue = calculateAdminCreditCardInterest();
+      const interestRate = selectedAdminPaymentMethod?.type === 'credit_card' ? parseFloat(selectedAdminPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
-        totalValue: calculateAdminTotalWithShipping().toFixed(2)
+        totalValue: calculateAdminTotalWithShipping().toFixed(2),
+        interestRate: interestRate,
+        interestValue: interestValue.toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -430,9 +452,13 @@ export default function AdminBudgets() {
 
   const updateAdminBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
+      const interestValue = calculateAdminCreditCardInterest();
+      const interestRate = selectedAdminPaymentMethod?.type === 'credit_card' ? parseFloat(selectedAdminPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
-        totalValue: calculateAdminTotalWithShipping().toFixed(2)
+        totalValue: calculateAdminTotalWithShipping().toFixed(2),
+        interestRate: interestRate,
+        interestValue: interestValue.toFixed(2)
       };
       const response = await fetch(`/api/budgets/${editingBudgetId}`, {
         method: "PUT",
@@ -1902,6 +1928,12 @@ export default function AdminBudgets() {
                       }
                     </span>
                   </div>
+                  {calculateAdminCreditCardInterest() > 0 && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Juros do Cartão ({selectedAdminPaymentMethod?.installmentInterest}% x {adminBudgetForm.installments}x):</span>
+                      <span>R$ {calculateAdminCreditCardInterest().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
                     <span>Entrada + Frete (para financeiro):</span>
                     <span>R$ {(adminBudgetForm.downPayment + (adminBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>

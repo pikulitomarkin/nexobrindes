@@ -327,11 +327,29 @@ export default function VendorBudgets() {
     return Math.max(0, subtotal);
   };
 
+  // Calculate credit card interest
+  const calculateCreditCardInterest = () => {
+    if (!selectedPaymentMethod || selectedPaymentMethod.type !== 'credit_card') return 0;
+    if (vendorBudgetForm.installments <= 1) return 0; // No interest for 1x payment
+    
+    const interestRate = parseFloat(selectedPaymentMethod.installmentInterest || '0');
+    if (interestRate === 0) return 0;
+    
+    const subtotal = calculateBudgetTotal();
+    const shipping = parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost();
+    const baseTotal = subtotal + shipping;
+    
+    // Calculate interest: rate * number of installments (simple interest)
+    const interestValue = (baseTotal * interestRate * vendorBudgetForm.installments) / 100;
+    return interestValue;
+  };
+
   // Calculate the total including shipping cost
   const calculateTotalWithShipping = () => {
     const subtotal = calculateBudgetTotal();
     const shipping = parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost();
-    return subtotal + shipping;
+    const interest = calculateCreditCardInterest();
+    return subtotal + shipping + interest;
   };
 
 
@@ -368,9 +386,13 @@ export default function VendorBudgets() {
 
   const createBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
+      const interestValue = calculateCreditCardInterest();
+      const interestRate = selectedPaymentMethod?.type === 'credit_card' ? parseFloat(selectedPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
-        totalValue: calculateTotalWithShipping().toFixed(2)
+        totalValue: calculateTotalWithShipping().toFixed(2),
+        interestRate: interestRate,
+        interestValue: interestValue.toFixed(2)
       };
       const response = await fetch("/api/budgets", {
         method: "POST",
@@ -395,9 +417,13 @@ export default function VendorBudgets() {
 
   const updateBudgetMutation = useMutation({
     mutationFn: async (data: any) => {
+      const interestValue = calculateCreditCardInterest();
+      const interestRate = selectedPaymentMethod?.type === 'credit_card' ? parseFloat(selectedPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
-        totalValue: calculateTotalWithShipping().toFixed(2)
+        totalValue: calculateTotalWithShipping().toFixed(2),
+        interestRate: interestRate,
+        interestValue: interestValue.toFixed(2)
       };
       const response = await fetch(`/api/budgets/${editingBudgetId}`, {
         method: "PUT",
@@ -1803,6 +1829,12 @@ export default function VendorBudgets() {
                       }
                     </span>
                   </div>
+                  {calculateCreditCardInterest() > 0 && (
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>Juros do Cartão ({selectedPaymentMethod?.installmentInterest}% x {vendorBudgetForm.installments}x):</span>
+                      <span>R$ {calculateCreditCardInterest().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
                     <span>Entrada + Frete (para financeiro):</span>
                     <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
