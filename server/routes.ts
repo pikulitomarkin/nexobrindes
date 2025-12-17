@@ -1084,6 +1084,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update product status for dropshipping workflow
+  app.patch("/api/orders/:id/product-status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { productStatus } = req.body;
+
+      console.log(`Updating product status for order ${id} to ${productStatus}`);
+
+      // Validate status
+      const validStatuses = ['to_buy', 'purchased', 'in_store'];
+      if (!validStatuses.includes(productStatus)) {
+        return res.status(400).json({ error: "Status de produto inválido" });
+      }
+
+      // Get order to validate it exists
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Update order product status
+      await storage.updateOrder(id, {
+        productStatus: productStatus,
+        updatedAt: new Date()
+      });
+
+      console.log(`Order ${id} product status updated to ${productStatus}`);
+
+      res.json({
+        success: true,
+        message: `Status do produto atualizado para ${productStatus === 'to_buy' ? 'Comprar Produto' : productStatus === 'purchased' ? 'Produto Comprado' : 'Produto na Loja'}`,
+        order: { ...order, productStatus }
+      });
+    } catch (error) {
+      console.error("Error updating product status:", error);
+      res.status(500).json({ error: "Erro ao atualizar status do produto: " + error.message });
+    }
+  });
+
   // Update vendor
   app.put("/api/vendors/:id", async (req, res) => {
     try {
@@ -8425,6 +8464,133 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get dropshipping orders - all paid orders in the dropshipping workflow
+  app.get("/api/logistics/dropshipping-orders", async (req, res) => {
+    try {
+      console.log("Fetching dropshipping orders for logistics...");
+
+      const orders = await storage.getOrders();
+      const productionOrders = await storage.getProductionOrders();
+
+      // Group production orders by order ID
+      const productionOrdersByOrder = new Map<string, any[]>();
+      for (const po of productionOrders) {
+        if (!productionOrdersByOrder.has(po.orderId)) {
+          productionOrdersByOrder.set(po.orderId, []);
+        }
+        productionOrdersByOrder.get(po.orderId)!.push(po);
+      }
+
+      // Filter orders that are paid and have external producers (dropshipping candidates)
+      const dropshippingOrders = orders.filter(order => {
+        // Order must be cancelled to be excluded
+        if (order.status === 'cancelled') return false;
+        
+        // Check payment status - order must have received some payment
+        const paidValue = parseFloat(order.paidValue || '0');
+        const isPaid = paidValue > 0;
+        
+        if (!isPaid) return false;
+
+        // Check if order has items with external producers
+        let hasExternalProducers = false;
+        if (order.items) {
+          for (const item of order.items) {
+            if (item.producerId && item.producerId !== 'internal') {
+              hasExternalProducers = true;
+              break;
+            }
+          }
+        }
+
+        // Order must have external producers
+        if (!hasExternalProducers) return false;
+
+        // Check if already fully sent to production
+        let uniqueProducers = new Set<string>();
+        for (const item of (order.items || [])) {
+          if (item.producerId && item.producerId !== 'internal') {
+            uniqueProducers.add(item.producerId);
+          }
+        }
+        
+        const existingPOs = productionOrdersByOrder.get(order.id) || [];
+        const sentPOs = existingPOs.filter(po => po.status !== 'pending');
+        const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
+        
+        // Exclude if ALL producers have been sent POs already
+        const allProducersHaveSentPOs = uniqueProducers.size > 0 && uniqueProducers.size === producersWithSentPOs.size;
+        
+        return !allProducersHaveSentPOs;
+      });
+
+      console.log(`Found ${dropshippingOrders.length} dropshipping orders`);
+      
+      // Enrich orders with producer names and client data
+      const enrichedOrders = await Promise.all(
+        dropshippingOrders.map(async (order) => {
+          // Enrich items with producer names
+          const enrichedItems = await Promise.all(
+            (order.items || []).map(async (item: any) => {
+              if (item.producerId && item.producerId !== 'internal') {
+                const producer = await storage.getUser(item.producerId);
+                return {
+                  ...item,
+                  producerName: producer?.name || null
+                };
+              }
+              return item;
+            })
+          );
+          
+          // Get client data
+          let clientName = order.contactName;
+          let clientPhone = order.contactPhone;
+          let clientEmail = order.contactEmail;
+          
+          if (order.clientId) {
+            let clientRecord = await storage.getClient(order.clientId);
+            if (!clientRecord) {
+              clientRecord = await storage.getClientByUserId(order.clientId);
+            }
+            if (clientRecord) {
+              if (!clientName) clientName = clientRecord.name;
+              if (!clientPhone) clientPhone = clientRecord.telefone;
+              if (!clientEmail) clientEmail = clientRecord.email;
+            }
+          }
+          
+          return {
+            ...order,
+            items: enrichedItems,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            clientEmail: clientEmail,
+            productStatus: order.productStatus || 'to_buy'
+          };
+        })
+      );
+
+      // Sort by product status priority: to_buy first, then purchased, then in_store
+      const statusPriority: Record<string, number> = {
+        'to_buy': 1,
+        'purchased': 2,
+        'in_store': 3
+      };
+      
+      enrichedOrders.sort((a, b) => {
+        const priorityA = statusPriority[a.productStatus] || 1;
+        const priorityB = statusPriority[b.productStatus] || 1;
+        return priorityA - priorityB;
+      });
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("Error fetching dropshipping orders:", error);
+      res.status(500).json({ error: "Failed to fetch dropshipping orders" });
+    }
+  });
+
   // Get paid orders for logistics (orders that are paid but not yet sent to production)
   app.get("/api/logistics/paid-orders", async (req, res) => {
     try {
@@ -8443,11 +8609,16 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid but not yet fully sent to production
+      // ONLY show orders with productStatus = 'in_store' (ready for production)
       const paidOrders = orders.filter(order => {
         // Check payment status - order must have received some payment
         const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0; // Any payment received
+        
+        // For dropshipping workflow: only show orders with product in store
+        const productStatus = order.productStatus || 'to_buy';
+        const isProductInStore = productStatus === 'in_store';
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -8477,9 +8648,9 @@ Para mais detalhes, entre em contato conosco!`;
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
         
-        // Order is valid if it's paid, has external producers, and NOT ALL producers have been sent POs yet
+        // Order is valid if it's paid, has external producers, NOT ALL producers have been sent POs yet, AND product is in store
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
-        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs;
+        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs && isProductInStore;
 
         if (isValid) {
           console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
