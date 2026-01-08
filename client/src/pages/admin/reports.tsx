@@ -238,7 +238,23 @@ export default function AdminReports() {
     }, 0);
 
     // Contas a Pagar - incluir todas as fontes
-    const contasAPagarProdutor = producerPayments.filter((p: any) => ['pending', 'approved'].includes(p.status));
+    const contasAPagarProdutor = producerPayments.filter((p: any) => {
+      const isStatusMatch = ['pending', 'approved'].includes(p.status);
+      const isProducerMatch = producerFilter === 'all' || producerFilter === 'internal' || p.producerId === producerFilter;
+      
+      // Filtro de data para contas a pagar
+      let dateMatch = true;
+      if (dateRange && dateRange.from && dateRange.to) {
+        const itemDate = new Date(p.createdAt);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        dateMatch = itemDate >= fromDate && itemDate <= toDate;
+      }
+      
+      return isStatusMatch && isProducerMatch && dateMatch;
+    });
     const totalProdutor = contasAPagarProdutor.reduce((sum: number, p: any) => 
       sum + parseFloat(p.amount || '0'), 0
     );
@@ -1570,7 +1586,12 @@ export default function AdminReports() {
             {/* Contas a Pagar */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Contas a Pagar</CardTitle>
+                <div>
+                  <CardTitle>Contas a Pagar (Produtores)</CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {producerFilter !== 'all' ? `Filtrando por: ${producers.find((p: any) => p.id === producerFilter)?.name || producerFilter}` : 'Todos os produtores'}
+                  </p>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="outline">
