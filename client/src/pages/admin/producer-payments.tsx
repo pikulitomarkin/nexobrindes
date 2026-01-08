@@ -8,13 +8,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, DollarSign, CheckCircle, Clock, CreditCard, User, Upload, FileText, AlertCircle, Link as LinkIcon } from "lucide-react";
+import { Search, DollarSign, CheckCircle, Clock, CreditCard, User, Upload, FileText, AlertCircle, Link as LinkIcon, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
 
 export default function AdminProducerPayments() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [producerFilter, setProducerFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAssociationDialogOpen, setIsAssociationDialogOpen] = useState(false);
@@ -32,6 +35,10 @@ export default function AdminProducerPayments() {
 
   const { data: bankTransactions } = useQuery<any[]>({
     queryKey: ["/api/finance/bank-transactions"],
+  });
+
+  const { data: producers = [] } = useQuery<any[]>({
+    queryKey: ["/api/producers"],
   });
 
   const uploadOFXMutation = useMutation({
@@ -259,11 +266,23 @@ export default function AdminProducerPayments() {
 
   const filteredPayments = producerPayments?.filter((payment: any) => {
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
+    const matchesProducer = producerFilter === "all" || payment.producerId === producerFilter;
+    
+    let matchesDate = true;
+    if (dateRange?.from && dateRange?.to) {
+      const paymentDate = new Date(payment.createdAt);
+      const from = new Date(dateRange.from);
+      const to = new Date(dateRange.to);
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+      matchesDate = paymentDate >= from && paymentDate <= to;
+    }
+
     const matchesSearch = searchTerm === "" || 
       payment.producerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.product?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesProducer && matchesDate && matchesSearch;
   });
 
   // Calculate summary statistics
@@ -352,6 +371,57 @@ export default function AdminProducerPayments() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="md:col-span-1">
+          <Label className="text-sm font-medium mb-2 block">Período</Label>
+          <DatePickerWithRange 
+            date={dateRange as any} 
+            setDate={(date) => setDateRange(date as any)} 
+          />
+        </div>
+        <div className="md:col-span-1">
+          <Label className="text-sm font-medium mb-2 block">Produtor</Label>
+          <Select value={producerFilter} onValueChange={setProducerFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os produtores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os produtores</SelectItem>
+              {producers?.map((p: any) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-1">
+          <Label className="text-sm font-medium mb-2 block">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="pending">Pendente</SelectItem>
+              <SelectItem value="approved">Aprovado</SelectItem>
+              <SelectItem value="paid">Pago</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-1">
+          <Label className="text-sm font-medium mb-2 block">Buscar</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Produtor, pedido ou produto..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
