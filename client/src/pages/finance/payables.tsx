@@ -8,15 +8,17 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User, Building2 } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User, Building2, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
 
 export default function FinancePayables() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [branchFilter, setBranchFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isCreatePayableDialogOpen, setIsCreatePayableDialogOpen] = useState(false); // State for the new payable dialog
   const [selectedPayable, setSelectedPayable] = useState<any>(null);
@@ -379,6 +381,17 @@ export default function FinancePayables() {
   const filteredPayables = allPayables.filter((payable: any) => {
     const matchesStatus = statusFilter === "all" || payable.status === statusFilter;
     const matchesType = typeFilter === "all" || payable.type === typeFilter;
+    
+    let matchesDate = true;
+    if (dateRange?.from && dateRange?.to) {
+      const payableDate = new Date(payable.dueDate || payable.createdAt);
+      const from = new Date(dateRange.from);
+      const to = new Date(dateRange.to);
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+      matchesDate = payableDate >= from && payableDate <= to;
+    }
+
     const matchesSearch = searchTerm === "" || 
       payable.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payable.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -386,7 +399,7 @@ export default function FinancePayables() {
     const matchesBranch = branchFilter === "all" || 
       payable.branchId === branchFilter ||
       (branchFilter === 'matriz' && (!payable.branchId || payable.branchId === 'matriz'));
-    return matchesStatus && matchesType && matchesSearch && matchesBranch;
+    return matchesStatus && matchesType && matchesSearch && matchesBranch && matchesDate;
   });
 
   const handlePayProducer = (producerPayment: any) => {
