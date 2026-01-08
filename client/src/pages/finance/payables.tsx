@@ -620,70 +620,90 @@ export default function FinancePayables() {
       {/* Filters */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por descrição, beneficiário ou pedido..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <Label className="text-xs font-medium mb-1 block">Buscar</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar por descrição, beneficiário ou pedido..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-full md:w-auto">
+                <Label className="text-xs font-medium mb-1 block">Período</Label>
+                <DatePickerWithRange 
+                  date={dateRange as any} 
+                  setDate={(date) => setDateRange(date as any)} 
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="approved">Aprovado</SelectItem>
-                  <SelectItem value="confirmed">Confirmado</SelectItem>
-                  <SelectItem value="pending_definition">Aguardando Valor</SelectItem>
-                  <SelectItem value="defined">Valor Definido</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[140px]">
+                <Label className="text-xs font-medium mb-1 block">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="approved">Aprovado</SelectItem>
+                    <SelectItem value="confirmed">Confirmado</SelectItem>
+                    <SelectItem value="pending_definition">Aguardando Valor</SelectItem>
+                    <SelectItem value="defined">Valor Definido</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Tipos</SelectItem>
-                  <SelectItem value="producer">Produtores</SelectItem>
-                  <SelectItem value="expense">Despesas</SelectItem>
-                  <SelectItem value="commission">Comissões</SelectItem>
-                  <SelectItem value="refund">Estornos</SelectItem>
-                  <SelectItem value="manual">Manuais</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex-1 min-w-[140px]">
+                <Label className="text-xs font-medium mb-1 block">Tipo</Label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Tipos</SelectItem>
+                    <SelectItem value="producer">Produtores</SelectItem>
+                    <SelectItem value="expense">Despesas</SelectItem>
+                    <SelectItem value="commission">Comissões</SelectItem>
+                    <SelectItem value="refund">Estornos</SelectItem>
+                    <SelectItem value="manual">Manuais</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={branchFilter} onValueChange={setBranchFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Filial" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Filiais</SelectItem>
-                  <SelectItem value="matriz">
-                    <div className="flex items-center">
-                      <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
-                      Matriz
-                    </div>
-                  </SelectItem>
-                  {branches.map((branch: any) => (
-                    <SelectItem key={branch.id} value={branch.id}>
+              <div className="flex-1 min-w-[140px]">
+                <Label className="text-xs font-medium mb-1 block">Filial</Label>
+                <Select value={branchFilter} onValueChange={setBranchFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas Filiais</SelectItem>
+                    <SelectItem value="matriz">
                       <div className="flex items-center">
-                        <Building2 className="h-4 w-4 mr-2 text-blue-600" />
-                        {branch.name} - {branch.city}
+                        <Building2 className="h-4 w-4 mr-2 text-yellow-600" />
+                        Matriz
                       </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {branches.map((branch: any) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        <div className="flex items-center">
+                          <Building2 className="h-4 w-4 mr-2 text-blue-600" />
+                          {branch.name} - {branch.city}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <Button 
                 className="gradient-bg text-white"
