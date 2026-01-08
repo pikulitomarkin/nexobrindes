@@ -43,7 +43,9 @@ export default function AdminReports() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [topSortBy, setTopSortBy] = useState<'valor' | 'quantidade'>('valor');
+  const [topVendorsSort, setTopVendorsSort] = useState<'valor' | 'quantidade'>('valor');
+  const [topClientsSort, setTopClientsSort] = useState<'valor' | 'quantidade'>('valor');
+  const [topProductsSort, setTopProductsSort] = useState<'valor' | 'quantidade'>('valor');
 
   // Queries para buscar dados reais do sistema
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -401,7 +403,7 @@ export default function AdminReports() {
     }, {});
 
     return Object.values(vendorData).sort((a: any, b: any) => 
-      topSortBy === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
+      topVendorsSort === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
     ).slice(0, 10);
   };
 
@@ -417,7 +419,7 @@ export default function AdminReports() {
     }, {});
 
     return Object.values(clientData).sort((a: any, b: any) => 
-      topSortBy === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
+      topClientsSort === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
     ).slice(0, 10);
   };
 
@@ -434,7 +436,7 @@ export default function AdminReports() {
     }, {});
 
     return Object.values(productData).sort((a: any, b: any) => 
-      topSortBy === 'valor' ? b.valor - a.valor : b.quantidade - a.quantidade
+      topProductsSort === 'valor' ? b.valor - a.valor : b.quantidade - a.quantidade
     ).slice(0, 10);
   };
 
@@ -1297,16 +1299,16 @@ export default function AdminReports() {
                   <div className="flex items-center gap-2 mt-1">
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('valor')}
+                      variant={topVendorsSort === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopVendorsSort('valor')}
                       className="h-7 text-xs px-2"
                     >
                       Por Valor
                     </Button>
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('quantidade')}
+                      variant={topVendorsSort === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopVendorsSort('quantidade')}
                       className="h-7 text-xs px-2"
                     >
                       Por Pedidos
@@ -1367,16 +1369,16 @@ export default function AdminReports() {
                   <div className="flex items-center gap-2 mt-1">
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('valor')}
+                      variant={topClientsSort === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopClientsSort('valor')}
                       className="h-7 text-xs px-2"
                     >
                       Por Valor
                     </Button>
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('quantidade')}
+                      variant={topClientsSort === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopClientsSort('quantidade')}
                       className="h-7 text-xs px-2"
                     >
                       Por Pedidos
@@ -1437,16 +1439,16 @@ export default function AdminReports() {
                   <div className="flex items-center gap-2 mt-1">
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('valor')}
+                      variant={topProductsSort === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopProductsSort('valor')}
                       className="h-7 text-xs px-2"
                     >
                       Por Valor
                     </Button>
                     <Button 
                       size="sm" 
-                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
-                      onClick={() => setTopSortBy('quantidade')}
+                      variant={topProductsSort === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopProductsSort('quantidade')}
                       className="h-7 text-xs px-2"
                     >
                       Por Quantidade
@@ -1486,9 +1488,15 @@ export default function AdminReports() {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-purple-600">
-                          R$ {product.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {topProductsSort === 'valor' 
+                            ? `R$ ${product.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            : `${product.quantidade} unidades`}
                         </p>
-                        <p className="text-sm text-gray-500">{product.pedidos} vendas</p>
+                        <p className="text-sm text-gray-500">
+                          {topProductsSort === 'valor' 
+                            ? `${product.quantidade} unidades`
+                            : `R$ ${product.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        </p>
                       </div>
                     </div>
                   ))}
