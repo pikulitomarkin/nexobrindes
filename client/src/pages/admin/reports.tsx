@@ -34,7 +34,7 @@ interface DateRange {
 export default function AdminReports() {
   const { toast } = useToast();
   const [dateFilter, setDateFilter] = useState('30');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>(['all']);
   const [vendorFilter, setVendorFilter] = useState('all');
   const [producerFilter, setProducerFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -43,6 +43,7 @@ export default function AdminReports() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [topSortBy, setTopSortBy] = useState<'valor' | 'quantidade'>('valor');
 
   // Queries para buscar dados reais do sistema
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -175,7 +176,7 @@ export default function AdminReports() {
       }
 
       // Filtro de status
-      const statusMatch = statusFilter === 'all' || item.status === statusFilter;
+      const statusMatch = statusFilter.includes('all') || statusFilter.includes(item.status);
       
       // Filtro de vendedor
       const vendorMatch = vendorFilter === 'all' || item.vendorId === vendorFilter;
@@ -366,7 +367,14 @@ export default function AdminReports() {
       return acc;
     }, {});
 
-    return Object.values(statusData);
+    return Object.values(statusData).map((s: any) => ({
+      ...s,
+      statusLabel: s.status === 'pending' ? 'Pendente' : 
+                   s.status === 'confirmed' ? 'Confirmado' : 
+                   s.status === 'production' ? 'Em Produção' : 
+                   s.status === 'delivered' ? 'Entregue' : 
+                   s.status === 'cancelled' ? 'Cancelado' : s.status
+    }));
   };
 
   const getTopVendors = () => {
@@ -392,7 +400,9 @@ export default function AdminReports() {
       return acc;
     }, {});
 
-    return Object.values(vendorData).sort((a: any, b: any) => b.valor - a.valor).slice(0, 10);
+    return Object.values(vendorData).sort((a: any, b: any) => 
+      topSortBy === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
+    ).slice(0, 10);
   };
 
   const getTopClients = () => {
@@ -406,21 +416,26 @@ export default function AdminReports() {
       return acc;
     }, {});
 
-    return Object.values(clientData).sort((a: any, b: any) => b.valor - a.valor).slice(0, 10);
+    return Object.values(clientData).sort((a: any, b: any) => 
+      topSortBy === 'valor' ? b.valor - a.valor : b.pedidos - a.pedidos
+    ).slice(0, 10);
   };
 
   const getProductPerformance = () => {
     const productData = filteredOrders.reduce((acc: any, order: any) => {
       const product = order.product || 'Produto Não Identificado';
       if (!acc[product]) {
-        acc[product] = { produto: product, pedidos: 0, valor: 0 };
+        acc[product] = { produto: product, pedidos: 0, valor: 0, quantidade: 0 };
       }
       acc[product].pedidos += 1;
       acc[product].valor += parseFloat(order.totalValue);
+      acc[product].quantidade += (parseFloat(order.quantity) || 0);
       return acc;
     }, {});
 
-    return Object.values(productData).sort((a: any, b: any) => b.valor - a.valor).slice(0, 10);
+    return Object.values(productData).sort((a: any, b: any) => 
+      topSortBy === 'valor' ? b.valor - a.valor : b.quantidade - a.quantidade
+    ).slice(0, 10);
   };
 
   const handleRefresh = async () => {
@@ -458,7 +473,7 @@ export default function AdminReports() {
         case 'top-vendedores':
           data = getTopVendors();
           filename = 'top_vendedores';
-          headers = ['Vendedor', 'Quantidade de Pedidos', 'Valor Total'];
+          headers = ['Vendedor', 'Quantidade de Pedidos', 'Valor Total', 'Filial'];
           break;
         
         case 'top-clientes':
@@ -470,7 +485,7 @@ export default function AdminReports() {
         case 'top-produtos':
           data = getProductPerformance();
           filename = 'top_produtos';
-          headers = ['Produto', 'Quantidade de Vendas', 'Valor Total'];
+          headers = ['Produto', 'Quantidade de Pedidos', 'Quantidade Total', 'Valor Total'];
           break;
         
         case 'receivables':
@@ -788,20 +803,41 @@ export default function AdminReports() {
               <>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Status do Pedido</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="confirmed">Confirmado</SelectItem>
-                      <SelectItem value="production">Em Produção</SelectItem>
-                      <SelectItem value="shipped">Enviado</SelectItem>
-                      <SelectItem value="delivered">Entregue</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2 flex-wrap bg-muted/50 p-2 rounded-lg border min-h-[42px]">
+                    <span className="text-sm font-semibold px-2">Status:</span>
+                    {['all', 'pending', 'confirmed', 'production', 'shipped', 'delivered', 'cancelled'].map((status) => (
+                      <div key={status} className="flex items-center gap-2 px-2 py-1 hover:bg-muted rounded-md transition-colors">
+                        <input
+                          type="checkbox"
+                          id={`status-vendas-${status}`}
+                          checked={statusFilter.includes(status)}
+                          onChange={(e) => {
+                            if (status === 'all') {
+                              setStatusFilter(['all']);
+                            } else {
+                              let newFilters = statusFilter.filter(s => s !== 'all');
+                              if (e.target.checked) {
+                                newFilters.push(status);
+                              } else {
+                                newFilters = newFilters.filter(s => s !== status);
+                              }
+                              if (newFilters.length === 0) newFilters = ['all'];
+                              setStatusFilter(newFilters);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                        />
+                        <label htmlFor={`status-vendas-${status}`} className="text-sm font-medium cursor-pointer select-none">
+                          {status === 'all' ? 'Todos' : 
+                           status === 'pending' ? 'Pendente' : 
+                           status === 'confirmed' ? 'Confirmado' : 
+                           status === 'production' ? 'Em Produção' : 
+                           status === 'shipped' ? 'Enviado' :
+                           status === 'delivered' ? 'Entregue' : 'Cancelado'}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -887,19 +923,40 @@ export default function AdminReports() {
 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Status Financeiro</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="partial">Parcial</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
-                      <SelectItem value="overdue">Vencido</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2 flex-wrap bg-muted/50 p-2 rounded-lg border min-h-[42px]">
+                    <span className="text-sm font-semibold px-2">Status Financeiro:</span>
+                    {['all', 'pending', 'partial', 'paid', 'overdue', 'cancelled'].map((status) => (
+                      <div key={status} className="flex items-center gap-2 px-2 py-1 hover:bg-muted rounded-md transition-colors">
+                        <input
+                          type="checkbox"
+                          id={`status-fin-${status}`}
+                          checked={statusFilter.includes(status)}
+                          onChange={(e) => {
+                            if (status === 'all') {
+                              setStatusFilter(['all']);
+                            } else {
+                              let newFilters = statusFilter.filter(s => s !== 'all');
+                              if (e.target.checked) {
+                                newFilters.push(status);
+                              } else {
+                                newFilters = newFilters.filter(s => s !== status);
+                              }
+                              if (newFilters.length === 0) newFilters = ['all'];
+                              setStatusFilter(newFilters);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                        />
+                        <label htmlFor={`status-fin-${status}`} className="text-sm font-medium cursor-pointer select-none">
+                          {status === 'all' ? 'Todos' : 
+                           status === 'pending' ? 'Pendente' : 
+                           status === 'partial' ? 'Parcial' : 
+                           status === 'paid' ? 'Pago' : 
+                           status === 'overdue' ? 'Vencido' : 'Cancelado'}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -957,12 +1014,14 @@ export default function AdminReports() {
                   </Badge>
                 )}
 
-                {statusFilter !== 'all' && (
+                {statusFilter.length > 0 && !statusFilter.includes('all') && (
                   <Badge variant="outline">
-                    Status: {statusFilter === 'pending' ? 'Pendente' : 
-                            statusFilter === 'confirmed' ? 'Confirmado' : 
-                            statusFilter === 'production' ? 'Em Produção' : 
-                            statusFilter === 'delivered' ? 'Entregue' : statusFilter}
+                    Status: {statusFilter.map(s => 
+                      s === 'pending' ? 'Pendente' : 
+                      s === 'confirmed' ? 'Confirmado' : 
+                      s === 'production' ? 'Produção' : 
+                      s === 'delivered' ? 'Entregue' : s
+                    ).join(', ')}
                   </Badge>
                 )}
 
@@ -1148,7 +1207,22 @@ export default function AdminReports() {
                         name === 'receita' ? 'Receita Recebida' : 'Quantidade'
                       ]}
                     />
-                    <Legend />
+                    <Legend 
+            formatter={(value) => {
+              const labels: any = {
+                'pedidos': 'Pedidos',
+                'valor': 'Valor Total (R$)',
+                'receita': 'Receita Recebida (R$)',
+                'quantidade': 'Quantidade',
+                'vendedor': 'Vendedor',
+                'cliente': 'Cliente',
+                'produto': 'Produto',
+                'quantidade_vendas': 'Qtd. Vendas',
+                'valor_total': 'Total (R$)'
+              };
+              return labels[value] || value;
+            }}
+          />
                     <Bar yAxisId="left" dataKey="pedidos" fill="#8884d8" name="Pedidos" />
                     <Line yAxisId="right" type="monotone" dataKey="valor" stroke="#82ca9d" name="Valor" />
                     <Line yAxisId="right" type="monotone" dataKey="receita" stroke="#ffc658" name="Receita" />
@@ -1215,10 +1289,30 @@ export default function AdminReports() {
             {/* Top Vendedores */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Top Vendedores
-                </CardTitle>
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Award className="h-5 w-5 text-yellow-500" />
+                    Top Vendedores
+                  </CardTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('valor')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Valor
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('quantidade')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Pedidos
+                    </Button>
+                  </div>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="outline">
@@ -1265,10 +1359,30 @@ export default function AdminReports() {
             {/* Top Clientes */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Top Clientes
-                </CardTitle>
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    Top Clientes
+                  </CardTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('valor')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Valor
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('quantidade')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Pedidos
+                    </Button>
+                  </div>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="outline">
@@ -1315,10 +1429,30 @@ export default function AdminReports() {
             {/* Top Produtos */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Top Produtos
-                </CardTitle>
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Package className="h-5 w-5 text-purple-500" />
+                    Top Produtos
+                  </CardTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'valor' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('valor')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Valor
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={topSortBy === 'quantidade' ? 'default' : 'outline'}
+                      onClick={() => setTopSortBy('quantidade')}
+                      className="h-7 text-xs px-2"
+                    >
+                      Por Quantidade
+                    </Button>
+                  </div>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="outline">
@@ -1519,7 +1653,22 @@ export default function AdminReports() {
                       name === 'valor' ? 'Vendido' : 'Recebido'
                     ]}
                   />
-                  <Legend />
+                  <Legend 
+            formatter={(value) => {
+              const labels: any = {
+                'pedidos': 'Pedidos',
+                'valor': 'Valor Total (R$)',
+                'receita': 'Receita Recebida (R$)',
+                'quantidade': 'Quantidade',
+                'vendedor': 'Vendedor',
+                'cliente': 'Cliente',
+                'produto': 'Produto',
+                'quantidade_vendas': 'Qtd. Vendas',
+                'valor_total': 'Total (R$)'
+              };
+              return labels[value] || value;
+            }}
+          />
                   <Area 
                     type="monotone" 
                     dataKey="valor" 
@@ -1575,7 +1724,22 @@ export default function AdminReports() {
                     <XAxis dataKey="mes" />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
+                    <Legend 
+            formatter={(value) => {
+              const labels: any = {
+                'pedidos': 'Pedidos',
+                'valor': 'Valor Total (R$)',
+                'receita': 'Receita Recebida (R$)',
+                'quantidade': 'Quantidade',
+                'vendedor': 'Vendedor',
+                'cliente': 'Cliente',
+                'produto': 'Produto',
+                'quantidade_vendas': 'Qtd. Vendas',
+                'valor_total': 'Total (R$)'
+              };
+              return labels[value] || value;
+            }}
+          />
                     <Bar dataKey="pedidos" fill="#8884d8" />
                   </BarChart>
                 </ResponsiveContainer>
