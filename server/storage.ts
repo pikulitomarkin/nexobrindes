@@ -180,6 +180,8 @@ export interface IStorage {
   updateBudgetItem(itemId: string, itemData: any): Promise<any>;
   deleteBudgetItem(itemId: string): Promise<boolean>;
   deleteBudgetItems(budgetId: string): Promise<boolean>;
+  updateBudgetItemPurchaseStatus(itemId: string, purchaseStatus: string): Promise<any>;
+  checkAllItemsInStore(orderId: string): Promise<boolean>;
 
   // Budget Photos
   getBudgetPhotos(budgetId: string): Promise<any[]>;
@@ -3432,6 +3434,33 @@ export class MemStorage implements IStorage {
     const initialSize = this.budgetItems.size;
     this.budgetItems = new Map([...this.budgetItems.entries()].filter(([key, value]) => value.budgetId !== budgetId));
     return this.budgetItems.size < initialSize;
+  }
+
+  async updateBudgetItemPurchaseStatus(itemId: string, purchaseStatus: string): Promise<any> {
+    const item = this.budgetItems.get(itemId);
+    if (!item) return null;
+    
+    const updatedItem = {
+      ...item,
+      purchaseStatus,
+      updatedAt: new Date()
+    };
+    
+    this.budgetItems.set(itemId, updatedItem);
+    return updatedItem;
+  }
+
+  async checkAllItemsInStore(orderId: string): Promise<boolean> {
+    // Get order to find budgetId
+    const order = await this.getOrder(orderId);
+    if (!order || !order.budgetId) return false;
+    
+    // Get all items from the budget
+    const items = await this.getBudgetItems(order.budgetId);
+    
+    // Check if all items have purchaseStatus = 'in_store'
+    const allInStore = items.every(item => item.purchaseStatus === 'in_store');
+    return allInStore;
   }
 
   // Budget Photos methods
