@@ -1886,6 +1886,34 @@ export class PgStorage implements IStorage {
     return true;
   }
 
+  async updateBudgetItemPurchaseStatus(itemId: string, purchaseStatus: string): Promise<any> {
+    const results = await pg.update(schema.budgetItems)
+      .set({ 
+        purchaseStatus,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.budgetItems.id, itemId))
+      .returning();
+    
+    return results.length > 0 ? results[0] : null;
+  }
+
+  async checkAllItemsInStore(orderId: string): Promise<boolean> {
+    const orderResults = await pg.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+    if (orderResults.length === 0 || !orderResults[0].budgetId) return false;
+    
+    const order = orderResults[0];
+    
+    const items = await pg.select().from(schema.budgetItems)
+      .where(eq(schema.budgetItems.budgetId, order.budgetId));
+    
+    const externalItems = items.filter(item => item.producerId && item.producerId !== 'internal');
+    
+    if (externalItems.length === 0) return true;
+    
+    return externalItems.every(item => item.purchaseStatus === 'in_store');
+  }
+
   // ==================== BUDGET PHOTOS ====================
 
   async getBudgetPhotos(budgetId: string): Promise<BudgetPhoto[]> {
