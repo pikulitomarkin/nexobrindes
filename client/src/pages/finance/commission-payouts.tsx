@@ -19,10 +19,14 @@ export default function FinanceCommissionPayouts() {
   const [branchFilter, setBranchFilter] = useState("all");
   const [selectedCommission, setSelectedCommission] = useState<any>(null);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewingCommission, setViewingCommission] = useState<any>(null);
   const [selectedCommissions, setSelectedCommissions] = useState<Set<string>>(new Set());
   const [isBulkPayDialogOpen, setIsBulkPayDialogOpen] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedUser, setSelectedUser] = useState("all");
   const { toast } = useToast();
 
   // Buscar todas as comissões do sistema
@@ -47,7 +51,7 @@ export default function FinanceCommissionPayouts() {
   const markAsPaidMutation = useMutation({
     mutationFn: async (commissionId: string) => {
       const response = await fetch(`/api/commissions/${commissionId}/status`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "paid" }),
       });
@@ -71,12 +75,40 @@ export default function FinanceCommissionPayouts() {
     },
   });
 
+  // Mutation para cancelar comissão
+  const cancelCommissionMutation = useMutation({
+    mutationFn: async (commissionId: string) => {
+      const response = await fetch(`/api/commissions/${commissionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!response.ok) throw new Error("Erro ao cancelar comissão");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      setIsCancelDialogOpen(false);
+      toast({
+        title: "Sucesso!",
+        description: "Comissão cancelada com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Mutation para pagamento em lote
   const bulkMarkAsPaidMutation = useMutation({
     mutationFn: async (commissionIds: string[]) => {
       const promises = commissionIds.map(id => 
         fetch(`/api/commissions/${id}/status`, {
-          method: "PUT",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "paid" }),
         })
@@ -160,12 +192,34 @@ export default function FinanceCommissionPayouts() {
     const matchesBranch = branchFilter === "all" || 
       commission.branchId === branchFilter ||
       (branchFilter === 'matriz' && (!commission.branchId || commission.branchId === 'matriz'));
-    return matchesStatus && matchesType && matchesSearch && matchesBranch;
+    
+    // User filter
+    const matchesUser = selectedUser === "all" || 
+      commission.vendorId === selectedUser || 
+      commission.partnerId === selectedUser;
+
+    // Date range filter
+    let matchesDate = true;
+    if (startDate && commission.createdAt) {
+      matchesDate = matchesDate && new Date(commission.createdAt) >= new Date(startDate);
+    }
+    if (endDate && commission.createdAt) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && new Date(commission.createdAt) <= end;
+    }
+
+    return matchesStatus && matchesType && matchesSearch && matchesBranch && matchesUser && matchesDate;
   });
 
   const handleMarkAsPaid = (commission: any) => {
     setSelectedCommission(commission);
     setIsPayDialogOpen(true);
+  };
+
+  const handleCancelCommission = (commission: any) => {
+    setSelectedCommission(commission);
+    setIsCancelDialogOpen(true);
   };
 
   const handleViewCommission = (commission: any) => {
@@ -176,6 +230,12 @@ export default function FinanceCommissionPayouts() {
   const confirmPayment = () => {
     if (selectedCommission) {
       markAsPaidMutation.mutate(selectedCommission.id);
+    }
+  };
+
+  const confirmCancel = () => {
+    if (selectedCommission) {
+      cancelCommissionMutation.mutate(selectedCommission.id);
     }
   };
 

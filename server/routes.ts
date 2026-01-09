@@ -4780,6 +4780,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/commissions/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!['pending', 'confirmed', 'paid', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: "Status inválido" });
+      }
+
+      const updatedCommission = await storage.updateCommissionStatus(id, status);
+      if (!updatedCommission) {
+        return res.status(404).json({ error: "Comissão não encontrada" });
+      }
+
+      // Log the status change
+      if (req.user) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'UPDATE',
+            'commissions',
+            id,
+            `Status da comissão alterado para ${status}`,
+            'info',
+            { status }
+          );
+        } catch (logError) {
+          console.error('Error logging commission status change:', logError);
+        }
+      }
+
+      res.json(updatedCommission);
+    } catch (error) {
+      console.error('Error updating commission status:', error);
+      res.status(500).json({ error: "Erro ao atualizar status da comissão" });
+    }
+  });
+
+  app.patch("/api/commissions/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!['pending', 'confirmed', 'paid', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: "Status inválido" });
+      }
+
+      const updatedCommission = await storage.updateCommissionStatus(id, status);
+      if (!updatedCommission) {
+        return res.status(404).json({ error: "Comissão não encontrada" });
+      }
+
+      // Log the status change
+      if (req.user) {
+        try {
+          await storage.logUserAction(
+            req.user.id,
+            req.user.name || 'Usuário',
+            req.user.role || 'user',
+            'UPDATE',
+            'commissions',
+            id,
+            `Status da comissão alterado para ${status}`,
+            'info',
+            { status }
+          );
+        } catch (logError) {
+          console.error('Error logging commission status change:', logError);
+        }
+      }
+
+      res.json(updatedCommission);
+    } catch (error) {
+      console.error('Error updating commission status:', error);
+      res.status(500).json({ error: "Erro ao atualizar status da comissão" });
+    }
+  });
+
   // Convert quote request to official budget
   app.post("/api/quote-requests/:id/convert-to-budget", async (req, res) => {
     try {
