@@ -473,6 +473,7 @@ export const manualPayables = pgTable("manual_payables", {
   paymentNotes: text("payment_notes"),
   transactionId: text("transaction_id"),
   notes: text("notes"),
+  attachmentUrl: text("attachment_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

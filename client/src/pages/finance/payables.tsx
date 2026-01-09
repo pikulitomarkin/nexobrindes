@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User, Building2, Calendar } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingDown, AlertTriangle, Clock, Plus, CreditCard, Factory, Receipt, Users, RefreshCw, Package, User, Building2, Calendar, Upload, FileText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
@@ -20,15 +21,35 @@ export default function FinancePayables() {
   const [branchFilter, setBranchFilter] = useState("all");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
-  const [isCreatePayableDialogOpen, setIsCreatePayableDialogOpen] = useState(false); // State for the new payable dialog
+  const [isCreatePayableDialogOpen, setIsCreatePayableDialogOpen] = useState(false);
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [selectedPayable, setSelectedPayable] = useState<any>(null);
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [paymentData, setPaymentData] = useState({
     amount: "",
     method: "",
     transactionId: "",
     notes: "",
   });
+
+  const [newPayableData, setNewPayableData] = useState({
+    type: "",
+    description: "",
+    beneficiary: "",
+    amount: "",
+    dueDate: "",
+    category: "",
+    status: "pending",
+    notes: "",
+    attachmentUrl: ""
+  });
+
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [refundData, setRefundData] = useState({
     amount: "",
     notes: "",
@@ -235,6 +256,58 @@ export default function FinancePayables() {
     },
   });
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", "payables");
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Falha no upload");
+
+      const data = await response.json();
+      setNewPayableData(prev => ({ ...prev, attachmentUrl: data.url }));
+      toast({
+        title: "Sucesso",
+        description: "Nota anexada com sucesso",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer upload da nota",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAddCategory = () => {
+    if (newCategoryName.trim()) {
+      setCustomCategories(prev => [...prev, newCategoryName.trim()]);
+      setNewPayableData(prev => ({ ...prev, category: newCategoryName.trim() }));
+      setNewCategoryName("");
+      setIsAddingCategory(false);
+    }
+  };
+
+  const categories = [
+    "Fornecedores",
+    "Serviços",
+    "Produção",
+    "Despesas Operacionais",
+    "Outros",
+    ...customCategories
+  ];
+
   const handleCreatePayable = () => {
     if (newPayableData.description && newPayableData.beneficiary && newPayableData.amount && newPayableData.dueDate) {
       createPayableMutation.mutate({
@@ -243,7 +316,8 @@ export default function FinancePayables() {
         amount: parseFloat(newPayableData.amount).toFixed(2),
         dueDate: newPayableData.dueDate,
         category: newPayableData.category || 'Outros',
-        notes: newPayableData.notes
+        notes: newPayableData.notes,
+        attachmentUrl: newPayableData.attachmentUrl
       });
     }
   };
@@ -343,7 +417,8 @@ export default function FinancePayables() {
       category: payable.category,
       orderNumber: 'MANUAL',
       branchId: payable.branchId || null,
-      paidAt: payable.paidAt
+      paidAt: payable.paidAt,
+      attachmentUrl: payable.attachmentUrl
     }))
   ];
 
@@ -864,6 +939,18 @@ export default function FinancePayables() {
                             Pagar
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
+                            setSelectedPayable(payable);
+                            setIsPreviewDialogOpen(true);
+                          }}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver
+                        </Button>
                         {payable.type === 'refund' && payable.status === 'pending_definition' && (
                           <Button 
                             variant="ghost" 
@@ -1162,103 +1249,256 @@ export default function FinancePayables() {
         </DialogContent>
       </Dialog>
 
+      {/* Preview/View Payable Dialog */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Conta a Pagar</DialogTitle>
+          </DialogHeader>
+          {selectedPayable && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Beneficiário</p>
+                  <p className="text-sm font-medium">{selectedPayable.beneficiary}</p>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Valor</p>
+                  <p className="text-lg font-bold text-red-600">R$ {parseFloat(selectedPayable.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Vencimento</p>
+                  <p className="text-sm font-medium">{new Date(selectedPayable.dueDate).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Status</p>
+                  <div className="flex justify-end">{getStatusBadge(selectedPayable.status)}</div>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Descrição</p>
+                  <p className="text-sm">{selectedPayable.description}</p>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Categoria</p>
+                  <Badge variant="outline">{selectedPayable.category}</Badge>
+                </div>
+              </div>
+
+              {selectedPayable.attachmentUrl && (
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white p-2 rounded border">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Nota Fiscal / Comprovante</p>
+                        <p className="text-xs text-gray-500">Clique para visualizar ou baixar</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/objects/${selectedPayable.attachmentUrl}`} target="_blank" rel="noreferrer">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver
+                        </a>
+                      </Button>
+                      <Button size="sm" className="gradient-bg text-white" asChild>
+                        <a href={`/objects/${selectedPayable.attachmentUrl}`} download>
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixar
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedPayable.notes && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 uppercase font-semibold">Observações</p>
+                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded border italic">"{selectedPayable.notes}"</p>
+                </div>
+              )}
+
+              {selectedPayable.paidAt && (
+                <div className="pt-4 border-t">
+                  <div className="bg-green-50 p-3 rounded-lg flex items-center gap-3 border border-green-100">
+                    <div className="bg-green-500 rounded-full p-1">
+                      <CheckCircle2 className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-800">Pago em {new Date(selectedPayable.paidAt).toLocaleDateString('pt-BR')}</p>
+                      <p className="text-xs text-green-700">Método: {selectedPayable.paymentMethod?.toUpperCase()}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>Fechar</Button>
+            {selectedPayable?.status === 'pending' && (
+              <Button 
+                className="gradient-bg text-white"
+                onClick={() => {
+                  setIsPreviewDialogOpen(false);
+                  setPaymentData({
+                    amount: selectedPayable.amount,
+                    method: "",
+                    transactionId: "",
+                    notes: "",
+                  });
+                  setIsPayDialogOpen(true);
+                }}
+              >
+                Pagar Agora
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Payable Dialog */}
       <Dialog open={isCreatePayableDialogOpen} onOpenChange={setIsCreatePayableDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Criar Nova Conta a Pagar</DialogTitle>
-            <DialogDescription>Preencha os campos abaixo para adicionar uma nova conta a pagar.</DialogDescription>
+            <DialogDescription>
+              Preencha os campos abaixo para adicionar uma nova conta a pagar manualmente.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="create-payable-category">Categoria</Label>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <Label htmlFor="category">Categoria</Label>
+              <div className="flex gap-2">
                 <Select 
-                  value={newPayableData.category}
-                  onValueChange={(value) => setNewPayableData(prev => ({ ...prev, category: value }))}
+                  value={newPayableData.category} 
+                  onValueChange={(value) => {
+                    if (value === "new") {
+                      setIsAddingCategory(true);
+                    } else {
+                      setNewPayableData(prev => ({ ...prev, category: value }));
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                    <SelectItem value="Serviços">Serviços</SelectItem>
-                    <SelectItem value="Produção">Produção</SelectItem>
-                    <SelectItem value="Despesas Operacionais">Despesas Operacionais</SelectItem>
-                    <SelectItem value="Outros">Outros</SelectItem>
+                    {categories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                    <SelectItem value="new" className="text-blue-600 font-medium">+ Nova Categoria</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="create-payable-description">Descrição <span className="text-red-500">*</span></Label>
-                <Input
-                  id="create-payable-description"
-                  placeholder="Ex: Compra de insumos"
-                  value={newPayableData.description}
-                  onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
-                />
-              </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="create-payable-beneficiary">Beneficiário <span className="text-red-500">*</span></Label>
-                <Input
-                  id="create-payable-beneficiary"
-                  placeholder="Nome do fornecedor ou produtor"
-                  value={newPayableData.beneficiary}
-                  onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="create-payable-amount">Valor <span className="text-red-500">*</span></Label>
-                <Input
-                  id="create-payable-amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={newPayableData.amount}
-                  onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="create-payable-dueDate">Data de Vencimento <span className="text-red-500">*</span></Label>
-                <Input
-                  id="create-payable-dueDate"
-                  type="date"
-                  value={newPayableData.dueDate}
-                  onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="create-payable-notes">Observações</Label>
-              <Textarea
-                id="create-payable-notes"
-                placeholder="Informações adicionais sobre a conta a pagar..."
-                value={newPayableData.notes}
-                onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
-                rows={3}
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <Label htmlFor="beneficiary">Beneficiário / Fornecedor</Label>
+              <Input 
+                id="beneficiary" 
+                placeholder="Ex: Companhia de Energia" 
+                value={newPayableData.beneficiary}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
               />
             </div>
-
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsCreatePayableDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                className="gradient-bg text-white px-6"
-                onClick={handleCreatePayable}
-                disabled={!newPayableData.description || !newPayableData.beneficiary || !newPayableData.amount || !newPayableData.dueDate || createPayableMutation.isPending}
-              >
-                {createPayableMutation.isPending ? "Salvando..." : "Criar Conta a Pagar"}
-              </Button>
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Input 
+                id="description" 
+                placeholder="Ex: Conta de luz - Vencimento Dezembro" 
+                value={newPayableData.description}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <Label htmlFor="amount">Valor (R$)</Label>
+              <Input 
+                id="amount" 
+                type="number" 
+                placeholder="0.00" 
+                value={newPayableData.amount}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <Label htmlFor="dueDate">Data de Vencimento</Label>
+              <Input 
+                id="dueDate" 
+                type="date" 
+                value={newPayableData.dueDate}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Anexo (Nota Fiscal/Boleto)</Label>
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full h-24 border-dashed border-2 flex flex-col gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {newPayableData.attachmentUrl ? (
+                    <>
+                      <FileText className="h-8 w-8 text-green-500" />
+                      <span className="text-xs text-green-600 font-medium">Arquivo anexado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 text-gray-400" />
+                      <span className="text-xs text-gray-500">{isUploading ? 'Enviando...' : 'Clique para anexar arquivo'}</span>
+                    </>
+                  )}
+                </Button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  accept="image/*,.pdf"
+                />
+              </div>
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea 
+                id="notes" 
+                placeholder="Informações adicionais..." 
+                value={newPayableData.notes}
+                onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
+              />
             </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreatePayableDialogOpen(false)}>Cancelar</Button>
+            <Button className="gradient-bg text-white" onClick={handleCreatePayable} disabled={createPayableMutation.isPending}>
+              {createPayableMutation.isPending ? "Criando..." : "Criar Conta a Pagar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Category Dialog */}
+      <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="new-category">Nome da Categoria</Label>
+            <Input 
+              id="new-category" 
+              value={newCategoryName} 
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Digite o nome da categoria"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddingCategory(false)}>Cancelar</Button>
+            <Button className="gradient-bg text-white" onClick={handleAddCategory}>Adicionar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
