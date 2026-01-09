@@ -196,18 +196,6 @@ export default function FinancePayables() {
     },
   });
 
-  // State for new payable form
-  const [newPayableData, setNewPayableData] = useState({
-    type: "",
-    description: "",
-    beneficiary: "",
-    amount: "",
-    dueDate: "",
-    category: "",
-    status: "pending",
-    notes: ""
-  });
-
   // Mutation for creating a new payable
   const createPayableMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -237,7 +225,8 @@ export default function FinancePayables() {
         dueDate: "",
         category: "",
         status: "pending",
-        notes: ""
+        notes: "",
+        attachmentUrl: ""
       });
       toast({
         title: "Sucesso!",
