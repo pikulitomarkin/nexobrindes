@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, CreditCard, Calendar, Check, XCircle } from "lucide-react";
+import { Search, Eye, DollarSign, TrendingUp, Users, UserCheck, CreditCard, Calendar, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -17,9 +17,6 @@ export default function FinanceCommissionPayouts() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [branchFilter, setBranchFilter] = useState("all");
-  const [userFilter, setUserFilter] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [selectedCommission, setSelectedCommission] = useState<any>(null);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -27,6 +24,9 @@ export default function FinanceCommissionPayouts() {
   const [viewingCommission, setViewingCommission] = useState<any>(null);
   const [selectedCommissions, setSelectedCommissions] = useState<Set<string>>(new Set());
   const [isBulkPayDialogOpen, setIsBulkPayDialogOpen] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedUser, setSelectedUser] = useState("all");
   const { toast } = useToast();
 
   // Buscar todas as comissões do sistema
@@ -186,47 +186,31 @@ export default function FinanceCommissionPayouts() {
     const matchesStatus = statusFilter === "all" || commission.status === statusFilter;
     const matchesType = typeFilter === "all" || commission.type === typeFilter;
     const userName = getUserName(commission);
-    
-    // User filter
-    const matchesUser = userFilter === "all" || 
-      commission.vendorId === userFilter || 
-      commission.partnerId === userFilter;
-
-    // Date range filter
-    let matchesDate = true;
-    if (startDate || endDate) {
-      const commDate = commission.createdAt ? new Date(commission.createdAt) : null;
-      if (!commDate) {
-        matchesDate = false;
-      } else {
-        if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          if (commDate < start) matchesDate = false;
-        }
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          if (commDate > end) matchesDate = false;
-        }
-      }
-    }
-
     const matchesSearch = searchTerm === "" ||
       userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       commission.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesBranch = branchFilter === "all" || 
       commission.branchId === branchFilter ||
       (branchFilter === 'matriz' && (!commission.branchId || commission.branchId === 'matriz'));
+    
+    // User filter
+    const matchesUser = selectedUser === "all" || 
+      commission.vendorId === selectedUser || 
+      commission.partnerId === selectedUser;
+
+    // Date range filter
+    let matchesDate = true;
+    if (startDate && commission.createdAt) {
+      matchesDate = matchesDate && new Date(commission.createdAt) >= new Date(startDate);
+    }
+    if (endDate && commission.createdAt) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && new Date(commission.createdAt) <= end;
+    }
+
     return matchesStatus && matchesType && matchesSearch && matchesBranch && matchesUser && matchesDate;
   });
-
-  const uniqueUsers = commissions ? Array.from(new Set(commissions.map((c: any) => ({
-    id: c.vendorId || c.partnerId,
-    name: getUserName(c)
-  })))).filter((u: any, index, self) => 
-    u.id && index === self.findIndex((t: any) => t.id === u.id)
-  ) : [];
 
   const handleMarkAsPaid = (commission: any) => {
     setSelectedCommission(commission);
@@ -403,37 +387,7 @@ export default function FinanceCommissionPayouts() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-[150px]"
-                />
-                <span className="text-gray-500">até</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-[150px]"
-                />
-              </div>
-
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todos Usuários" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Usuários</SelectItem>
-                  {uniqueUsers.map((user: any) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+            <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
@@ -512,7 +466,6 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
-            onCancel={handleCancelCommission}
             onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
@@ -527,7 +480,6 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
-            onCancel={handleCancelCommission}
             onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
@@ -542,7 +494,6 @@ export default function FinanceCommissionPayouts() {
             getStatusBadge={getStatusBadge}
             getTypeIcon={getTypeIcon}
             onMarkAsPaid={handleMarkAsPaid}
-            onCancel={handleCancelCommission}
             onViewCommission={handleViewCommission}
             selectedCommissions={selectedCommissions}
             onSelectCommission={handleSelectCommission}
@@ -712,7 +663,6 @@ function CommissionsTable({
   getStatusBadge: (status: string) => JSX.Element;
   getTypeIcon: (type: string) => JSX.Element;
   onMarkAsPaid: (commission: any) => void;
-  onCancel: (commission: any) => void;
   onViewCommission: (commission: any) => void;
   selectedCommissions: Set<string>;
   onSelectCommission: (id: string, checked: boolean) => void;
@@ -804,26 +754,15 @@ function CommissionsTable({
                           Ver
                         </Button>
                         {['pending', 'confirmed'].includes(commission.status) && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onMarkAsPaid(commission)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Pagar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onCancel(commission)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Cancelar
-                            </Button>
-                          </>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onMarkAsPaid(commission)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pagar
+                          </Button>
                         )}
                       </div>
                     </td>
