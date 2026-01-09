@@ -8672,6 +8672,193 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Get individual items for dropshipping (product-level tracking)
+  app.get("/api/logistics/dropshipping-items", async (req, res) => {
+    try {
+      console.log("Fetching dropshipping items for logistics...");
+
+      const orders = await storage.getOrders();
+      const allItems: any[] = [];
+
+      for (const order of orders) {
+        // Order must not be cancelled
+        if (order.status === 'cancelled') continue;
+        
+        // Check payment status - order must have received some payment
+        const paidValue = parseFloat(order.paidValue || '0');
+        if (paidValue <= 0) continue;
+
+        // Get budget items for this order
+        if (!order.budgetId) continue;
+        
+        const budgetItems = await storage.getBudgetItems(order.budgetId);
+        
+        // Get client data
+        let clientName = order.contactName;
+        let clientPhone = order.contactPhone;
+        
+        if (order.clientId) {
+          let clientRecord = await storage.getClient(order.clientId);
+          if (!clientRecord) {
+            clientRecord = await storage.getClientByUserId(order.clientId);
+          }
+          if (clientRecord) {
+            if (!clientName) clientName = clientRecord.name;
+            if (!clientPhone) clientPhone = clientRecord.telefone || clientRecord.phone;
+          }
+        }
+
+        // Enrich each item with order and producer data
+        for (const item of budgetItems) {
+          // Only include items with external producers
+          if (!item.producerId || item.producerId === 'internal') continue;
+          
+          const producer = await storage.getUser(item.producerId);
+          const product = await storage.getProduct(item.productId);
+          
+          // Determine purchase status (use item-level if exists, fallback to order-level)
+          const purchaseStatus = item.purchaseStatus || order.productStatus || 'to_buy';
+          
+          allItems.push({
+            itemId: item.id,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            budgetId: order.budgetId,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            productId: item.productId,
+            productName: item.productName || product?.name || 'Produto',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            producerId: item.producerId,
+            producerName: producer?.name || 'Produtor',
+            purchaseStatus: purchaseStatus,
+            deliveryDeadline: order.deliveryDeadline || order.deadline,
+            orderCreatedAt: order.createdAt,
+            orderStatus: order.status,
+            // Additional item details
+            hasCustomization: item.hasItemCustomization || false,
+            customizationDescription: item.itemCustomizationDescription,
+            notes: item.notes,
+            productWidth: item.productWidth,
+            productHeight: item.productHeight,
+            productDepth: item.productDepth
+          });
+        }
+      }
+
+      // Sort by purchase status priority: to_buy first, then purchased, then in_store
+      const statusPriority: Record<string, number> = {
+        'pending': 0,
+        'to_buy': 1,
+        'purchased': 2,
+        'in_store': 3
+      };
+      
+      allItems.sort((a, b) => {
+        const priorityA = statusPriority[a.purchaseStatus] || 1;
+        const priorityB = statusPriority[b.purchaseStatus] || 1;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        // Secondary sort by deadline
+        if (a.deliveryDeadline && b.deliveryDeadline) {
+          return new Date(a.deliveryDeadline).getTime() - new Date(b.deliveryDeadline).getTime();
+        }
+        return 0;
+      });
+
+      console.log(`Found ${allItems.length} dropshipping items`);
+      res.json(allItems);
+    } catch (error) {
+      console.error("Error fetching dropshipping items:", error);
+      res.status(500).json({ error: "Failed to fetch dropshipping items" });
+    }
+  });
+
+  // Update individual item purchase status
+  app.patch("/api/budget-items/:itemId/purchase-status", async (req, res) => {
+    try {
+      const { itemId } = req.params;
+      const { purchaseStatus } = req.body;
+      
+      if (!['pending', 'to_buy', 'purchased', 'in_store'].includes(purchaseStatus)) {
+        return res.status(400).json({ error: "Status inválido. Use: pending, to_buy, purchased, in_store" });
+      }
+      
+      const updatedItem = await storage.updateBudgetItemPurchaseStatus(itemId, purchaseStatus);
+      
+      if (!updatedItem) {
+        return res.status(404).json({ error: "Item não encontrado" });
+      }
+      
+      // Get the budget to find the order
+      const budgets = await storage.getBudgets();
+      const budget = budgets.find(b => b.id === updatedItem.budgetId);
+      
+      if (budget) {
+        // Find the order for this budget
+        const orders = await storage.getOrders();
+        const order = orders.find(o => o.budgetId === budget.id);
+        
+        if (order) {
+          // Check if all items are now in_store
+          const allInStore = await storage.checkAllItemsInStore(order.id);
+          
+          if (allInStore && order.productStatus !== 'in_store') {
+            // Update order productStatus to 'in_store' when all items are in store
+            await storage.updateOrder(order.id, { productStatus: 'in_store' });
+            console.log(`Order ${order.orderNumber} automatically moved to 'in_store' - all items ready`);
+          }
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Status do item atualizado para ${purchaseStatus}`,
+        item: updatedItem 
+      });
+    } catch (error) {
+      console.error("Error updating item purchase status:", error);
+      res.status(500).json({ error: "Erro ao atualizar status do item" });
+    }
+  });
+
+  // Bulk update items to 'to_buy' when order receives first payment
+  app.post("/api/orders/:orderId/initialize-item-status", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+      
+      if (!order.budgetId) {
+        return res.status(400).json({ error: "Pedido não tem orçamento associado" });
+      }
+      
+      const items = await storage.getBudgetItems(order.budgetId);
+      let updatedCount = 0;
+      
+      for (const item of items) {
+        // Only update items with external producers that are still pending
+        if (item.producerId && item.producerId !== 'internal' && (!item.purchaseStatus || item.purchaseStatus === 'pending')) {
+          await storage.updateBudgetItemPurchaseStatus(item.id, 'to_buy');
+          updatedCount++;
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `${updatedCount} itens atualizados para 'to_buy'`,
+        updatedCount 
+      });
+    } catch (error) {
+      console.error("Error initializing item status:", error);
+      res.status(500).json({ error: "Erro ao inicializar status dos itens" });
+    }
+  });
+
   // Get paid orders for logistics (orders that are paid but not yet sent to production)
   app.get("/api/logistics/paid-orders", async (req, res) => {
     try {
