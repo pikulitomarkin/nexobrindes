@@ -335,6 +335,9 @@ export const budgetItems = pgTable("budget_items", {
   productWidth: decimal("product_width", { precision: 8, scale: 2 }), // Largura em cm
   productHeight: decimal("product_height", { precision: 8, scale: 2 }), // Altura em cm
   productDepth: decimal("product_depth", { precision: 8, scale: 2 }), // Profundidade em cm
+  
+  // Status de compra do produto (para controle de logística)
+  purchaseStatus: text("purchase_status").default('pending'), // 'pending', 'to_buy', 'purchased', 'in_store'
 });
 
 // Nova tabela para armazenar fotos dos orçamentos
