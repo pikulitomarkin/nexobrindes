@@ -1851,6 +1851,7 @@ export class PgStorage implements IStorage {
       itemDiscountType: schema.budgetItems.itemDiscountType,
       itemDiscountPercentage: schema.budgetItems.itemDiscountPercentage,
       itemDiscountValue: schema.budgetItems.itemDiscountValue,
+      purchaseStatus: schema.budgetItems.purchaseStatus,
       productName: schema.products.name,
     })
       .from(schema.budgetItems)
