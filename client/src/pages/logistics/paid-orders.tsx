@@ -40,42 +40,48 @@ export default function LogisticsPaidOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DropshippingItem | null>(null);
+  const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<DropshippingItem[]>({
     queryKey: ["/api/logistics/dropshipping-items"],
   });
 
-  const updateItemStatusMutation = useMutation({
-    mutationFn: async ({ itemId, purchaseStatus }: { itemId: string; purchaseStatus: string }) => {
+  const handleUpdateStatus = async (itemId: string, newStatus: string) => {
+    if (loadingItemId) return;
+    
+    setLoadingItemId(itemId);
+    try {
       const response = await fetch(`/api/budget-items/${itemId}/purchase-status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ purchaseStatus }),
+        body: JSON.stringify({ purchaseStatus: newStatus }),
       });
+      
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erro ao atualizar status');
       }
-      return response.json();
-    },
-    onSuccess: (data) => {
+      
+      const data = await response.json();
       toast({
         title: "Sucesso!",
         description: data.message,
       });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/dropshipping-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/dropshipping-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/paid-orders"] });
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "Erro",
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setLoadingItemId(null);
+    }
+  };
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
@@ -121,10 +127,6 @@ export default function LogisticsPaidOrders() {
       default:
         return <Badge>{status}</Badge>;
     }
-  };
-
-  const handleUpdateStatus = (itemId: string, newStatus: string) => {
-    updateItemStatusMutation.mutate({ itemId, purchaseStatus: newStatus });
   };
 
   const getDeadlineInfo = (item: DropshippingItem) => {
@@ -373,10 +375,10 @@ export default function LogisticsPaidOrders() {
                                     size="sm"
                                     className="bg-red-600 hover:bg-red-700"
                                     onClick={() => handleUpdateStatus(item.itemId, 'to_buy')}
-                                    disabled={updateItemStatusMutation.isPending}
+                                    disabled={loadingItemId === item.itemId}
                                     data-testid={`button-mark-to-buy-${item.itemId}`}
                                   >
-                                    <ShoppingCart className="h-4 w-4 mr-1" /> A Comprar
+                                    {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-4 w-4 mr-1" /> A Comprar</>}
                                   </Button>
                                 )}
                                 
@@ -385,10 +387,10 @@ export default function LogisticsPaidOrders() {
                                     size="sm"
                                     className="bg-yellow-600 hover:bg-yellow-700"
                                     onClick={() => handleUpdateStatus(item.itemId, 'purchased')}
-                                    disabled={updateItemStatusMutation.isPending}
+                                    disabled={loadingItemId === item.itemId}
                                     data-testid={`button-mark-purchased-${item.itemId}`}
                                   >
-                                    <Package className="h-4 w-4 mr-1" /> Comprado
+                                    {loadingItemId === item.itemId ? '...' : <><Package className="h-4 w-4 mr-1" /> Comprado</>}
                                   </Button>
                                 )}
                                 
@@ -397,10 +399,10 @@ export default function LogisticsPaidOrders() {
                                     size="sm"
                                     className="bg-green-600 hover:bg-green-700"
                                     onClick={() => handleUpdateStatus(item.itemId, 'in_store')}
-                                    disabled={updateItemStatusMutation.isPending}
+                                    disabled={loadingItemId === item.itemId}
                                     data-testid={`button-mark-in-store-${item.itemId}`}
                                   >
-                                    <Store className="h-4 w-4 mr-1" /> Na Loja
+                                    {loadingItemId === item.itemId ? '...' : <><Store className="h-4 w-4 mr-1" /> Na Loja</>}
                                   </Button>
                                 )}
                                 
@@ -494,9 +496,9 @@ export default function LogisticsPaidOrders() {
                       handleUpdateStatus(selectedItem.itemId, 'to_buy');
                       setShowItemDetailsModal(false);
                     }}
-                    disabled={updateItemStatusMutation.isPending}
+                    disabled={loadingItemId === selectedItem.itemId}
                   >
-                    <ShoppingCart className="h-4 w-4 mr-2" /> Marcar "A Comprar"
+                    {loadingItemId === selectedItem.itemId ? '...' : <><ShoppingCart className="h-4 w-4 mr-2" /> Marcar "A Comprar"</>}
                   </Button>
                 )}
                 {selectedItem.purchaseStatus === 'to_buy' && (
@@ -506,9 +508,9 @@ export default function LogisticsPaidOrders() {
                       handleUpdateStatus(selectedItem.itemId, 'purchased');
                       setShowItemDetailsModal(false);
                     }}
-                    disabled={updateItemStatusMutation.isPending}
+                    disabled={loadingItemId === selectedItem.itemId}
                   >
-                    <Package className="h-4 w-4 mr-2" /> Marcar como Comprado
+                    {loadingItemId === selectedItem.itemId ? '...' : <><Package className="h-4 w-4 mr-2" /> Marcar como Comprado</>}
                   </Button>
                 )}
                 {selectedItem.purchaseStatus === 'purchased' && (
@@ -518,9 +520,9 @@ export default function LogisticsPaidOrders() {
                       handleUpdateStatus(selectedItem.itemId, 'in_store');
                       setShowItemDetailsModal(false);
                     }}
-                    disabled={updateItemStatusMutation.isPending}
+                    disabled={loadingItemId === selectedItem.itemId}
                   >
-                    <Store className="h-4 w-4 mr-2" /> Marcar na Loja
+                    {loadingItemId === selectedItem.itemId ? '...' : <><Store className="h-4 w-4 mr-2" /> Marcar na Loja</>}
                   </Button>
                 )}
                 {selectedItem.purchaseStatus === 'in_store' && (
