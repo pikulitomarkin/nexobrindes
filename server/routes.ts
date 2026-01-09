@@ -8691,6 +8691,9 @@ Para mais detalhes, entre em contato conosco!`;
         // Get budget items for this order
         if (!order.budgetId) continue;
         
+        // Skip orders that already have productStatus = 'in_store' (they go to next stage)
+        if (order.productStatus === 'in_store') continue;
+        
         const budgetItems = await storage.getBudgetItems(order.budgetId);
         
         // Get client data
