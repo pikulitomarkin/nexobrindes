@@ -30,20 +30,20 @@ export default function FinanceCommissionPayouts() {
   const { toast } = useToast();
 
   // Buscar todas as comissões do sistema
-  const { data: commissions, isLoading } = useQuery({
+  const { data: commissions, isLoading } = useQuery<any[]>({
     queryKey: ["/api/commissions"],
   });
 
   // Buscar dados de vendedores e sócios
-  const { data: vendors } = useQuery({
+  const { data: vendors } = useQuery<any[]>({
     queryKey: ["/api/vendors"],
   });
 
-  const { data: branches = [] } = useQuery({
+  const { data: branches = [] } = useQuery<any[]>({
     queryKey: ["/api/branches"],
   });
 
-  const { data: partners } = useQuery({
+  const { data: partners } = useQuery<any[]>({
     queryKey: ["/api/partners"],
   });
 
@@ -212,14 +212,16 @@ export default function FinanceCommissionPayouts() {
     return matchesStatus && matchesType && matchesSearch && matchesBranch && matchesUser && matchesDate;
   });
 
+  // Lista de todos os usuários únicos (vendedores e sócios) que têm comissões
+  const uniqueUsers = commissions ? Array.from(new Set(commissions.map((c: any) => {
+    const id = c.vendorId || c.partnerId;
+    const name = getUserName(c);
+    return JSON.stringify({ id, name });
+  }))).map(s => JSON.parse(s as string)) : [];
+
   const handleMarkAsPaid = (commission: any) => {
     setSelectedCommission(commission);
     setIsPayDialogOpen(true);
-  };
-
-  const handleCancelCommission = (commission: any) => {
-    setSelectedCommission(commission);
-    setIsCancelDialogOpen(true);
   };
 
   const handleViewCommission = (commission: any) => {
@@ -230,12 +232,6 @@ export default function FinanceCommissionPayouts() {
   const confirmPayment = () => {
     if (selectedCommission) {
       markAsPaidMutation.mutate(selectedCommission.id);
-    }
-  };
-
-  const confirmCancel = () => {
-    if (selectedCommission) {
-      cancelCommissionMutation.mutate(selectedCommission.id);
     }
   };
 
@@ -375,57 +371,106 @@ export default function FinanceCommissionPayouts() {
       {/* Filters and Bulk Actions */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por nome ou número do pedido..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar por nome ou número do pedido..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="confirmed">Confirmada</SelectItem>
+                    <SelectItem value="paid">Paga</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Tipos</SelectItem>
+                    <SelectItem value="vendor">Vendedor</SelectItem>
+                    <SelectItem value="partner">Sócio</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Usuário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Usuários</SelectItem>
+                    {uniqueUsers.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={branchFilter} onValueChange={setBranchFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas Filiais</SelectItem>
+                    <SelectItem value="matriz">Matriz</SelectItem>
+                    {branches.map((branch: any) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name} - {branch.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="confirmed">Confirmada</SelectItem>
-                  <SelectItem value="paid">Paga</SelectItem>
-                  <SelectItem value="cancelled">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Tipos</SelectItem>
-                  <SelectItem value="vendor">Vendedor</SelectItem>
-                  <SelectItem value="partner">Sócio</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={branchFilter} onValueChange={setBranchFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filial" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Filiais</SelectItem>
-                  <SelectItem value="matriz">Matriz</SelectItem>
-                  {branches.map((branch: any) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name} - {branch.city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <span className="text-sm text-gray-500 whitespace-nowrap">Período:</span>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full md:w-[150px]"
+                />
+                <span className="text-sm text-gray-500">até</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full md:w-[150px]"
+                />
+                {(startDate || endDate || selectedUser !== "all") && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                      setSelectedUser("all");
+                    }}
+                    className="text-gray-500"
+                  >
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
           
@@ -658,7 +703,7 @@ function CommissionsTable({
   onSelectCommission,
   onSelectAll
 }: {
-  commissions: any[];
+  commissions: any[] | undefined;
   getUserName: (commission: any) => string;
   getStatusBadge: (status: string) => JSX.Element;
   getTypeIcon: (type: string) => JSX.Element;
