@@ -7264,8 +7264,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Confirming delivery for order: ${id}`);
 
+      // First, check if the order exists and has products in store
+      const order = await storage.getOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Pedido não encontrado" });
+      }
+
+      // Validate that the order has gone through the correct workflow
+      // Products must be in_store before marking as delivered
+      if (order.productStatus !== 'in_store') {
+        console.log(`Order ${id} cannot be delivered - products not in store yet (status: ${order.productStatus})`);
+        return res.status(400).json({ 
+          error: "Os produtos ainda não estão na loja. Complete a etapa de compra primeiro." 
+        });
+      }
+
       // Check all production orders for this order
       const productionOrders = await storage.getProductionOrdersByOrder(id);
+      
+      // Verify that production orders have been dispatched before delivery
+      const hasShippedOrDelivered = productionOrders.every(po => 
+        po.status === 'shipped' || po.status === 'delivered'
+      );
+      
+      if (!hasShippedOrDelivered && productionOrders.length > 0) {
+        console.log(`Order ${id} cannot be delivered - not all production orders are shipped`);
+        return res.status(400).json({ 
+          error: "Alguns produtos ainda não foram despachados. Finalize o envio primeiro." 
+        });
+      }
+      
       const allDelivered = productionOrders.every(po => po.status === 'delivered');
 
       if (allDelivered) {
