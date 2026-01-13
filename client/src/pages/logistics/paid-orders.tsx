@@ -41,6 +41,8 @@ export default function LogisticsPaidOrders() {
   const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DropshippingItem | null>(null);
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
+  const [showReadyForProductionModal, setShowReadyForProductionModal] = useState(false);
+  const [readyOrderNumber, setReadyOrderNumber] = useState("");
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<DropshippingItem[]>({
@@ -64,10 +66,17 @@ export default function LogisticsPaidOrders() {
       }
       
       const data = await response.json();
-      toast({
-        title: "Sucesso!",
-        description: data.message,
-      });
+      
+      // Check if all items are now in_store - show modal
+      if (data.allItemsReady) {
+        setReadyOrderNumber(data.orderNumber || '');
+        setShowReadyForProductionModal(true);
+      } else {
+        toast({
+          title: "Sucesso!",
+          description: data.message,
+        });
+      }
       
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/dropshipping-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/dropshipping-orders"] });
@@ -534,6 +543,41 @@ export default function LogisticsPaidOrders() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal when all items are ready for production */}
+      <Dialog open={showReadyForProductionModal} onOpenChange={setShowReadyForProductionModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-6 w-6" />
+              Pedido Pronto!
+            </DialogTitle>
+            <DialogDescription className="pt-4">
+              <div className="text-center space-y-4">
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <p className="text-lg font-medium text-green-800">
+                    Todos os produtos do pedido <span className="font-bold">{readyOrderNumber}</span> estão na loja!
+                  </p>
+                </div>
+                <p className="text-gray-600">
+                  Este pedido está sendo encaminhado para a <strong>fila de envio para produção</strong>.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Você pode encontrá-lo no Dashboard principal da Logística.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center pt-4">
+            <Button 
+              className="bg-green-600 hover:bg-green-700 px-8"
+              onClick={() => setShowReadyForProductionModal(false)}
+            >
+              OK, Entendi
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
