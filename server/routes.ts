@@ -8798,19 +8798,26 @@ Para mais detalhes, entre em contato conosco!`;
       const budgets = await storage.getBudgets();
       const budget = budgets.find(b => b.id === updatedItem.budgetId);
       
+      let allItemsReady = false;
+      let orderNumber = '';
+      
       if (budget) {
         // Find the order for this budget
         const orders = await storage.getOrders();
         const order = orders.find(o => o.budgetId === budget.id);
         
         if (order) {
+          orderNumber = order.orderNumber || '';
+          
           // Check if all items are now in_store
           const allInStore = await storage.checkAllItemsInStore(order.id);
           
           if (allInStore && order.productStatus !== 'in_store') {
             // Update order productStatus to 'in_store' when all items are in store
+            // This makes the order appear in the production queue (Dashboard)
             await storage.updateOrder(order.id, { productStatus: 'in_store' });
-            console.log(`Order ${order.orderNumber} automatically moved to 'in_store' - all items ready`);
+            allItemsReady = true;
+            console.log(`Order ${order.orderNumber} automatically moved to 'in_store' - all items ready for production queue`);
           }
         }
       }
@@ -8818,7 +8825,9 @@ Para mais detalhes, entre em contato conosco!`;
       res.json({ 
         success: true, 
         message: `Status do item atualizado para ${purchaseStatus}`,
-        item: updatedItem 
+        item: updatedItem,
+        allItemsReady,
+        orderNumber
       });
     } catch (error) {
       console.error("Error updating item purchase status:", error);
