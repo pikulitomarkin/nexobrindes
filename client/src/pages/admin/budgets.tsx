@@ -100,7 +100,7 @@ export default function AdminBudgets() {
       const searchParams = new URLSearchParams();
       if (params.search) searchParams.append('search', params.search);
       if (params.category && params.category !== "all") searchParams.append('category', params.category);
-      searchParams.append('limit', '20');
+      searchParams.append('limit', '1000'); // Buscar todos os produtos correspondentes
 
       const response = await fetch(`/api/logistics/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
