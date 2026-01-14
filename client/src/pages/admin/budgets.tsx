@@ -91,13 +91,22 @@ export default function AdminBudgets() {
     },
   });
 
-  const { data: productsData } = useQuery({
-    queryKey: ["/api/products/admin", { limit: 9999 }],
-    queryFn: async () => {
-      const response = await fetch('/api/products?limit=9999');
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ["/api/products/search", { search: budgetProductSearch, category: budgetCategoryFilter }],
+    queryFn: async ({ queryKey }) => {
+      const [, params] = queryKey as [string, any];
+      if (!params.search && params.category === "all") return { products: [], total: 0 };
+      
+      const searchParams = new URLSearchParams();
+      if (params.search) searchParams.append('search', params.search);
+      if (params.category && params.category !== "all") searchParams.append('category', params.category);
+      searchParams.append('limit', '20');
+
+      const response = await fetch(`/api/logistics/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
+    enabled: budgetProductSearch.length > 2 || budgetCategoryFilter !== "all"
   });
 
   const { data: producers } = useQuery({

@@ -1174,7 +1174,10 @@ export class PgStorage implements IStorage {
       conditions.push(
         or(
           like(schema.products.name, `%${options.search}%`),
-          like(schema.products.description, `%${options.search}%`)
+          like(schema.products.description, `%${options.search}%`),
+          like(schema.products.friendlyCode, `%${options.search}%`),
+          like(schema.products.compositeCode, `%${options.search}%`),
+          like(schema.products.externalCode, `%${options.search}%`)
         ) as any
       );
     }
