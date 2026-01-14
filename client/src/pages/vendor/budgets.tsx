@@ -131,13 +131,22 @@ export default function VendorBudgets() {
     },
   });
 
-  const { data: allProductsData } = useQuery({
-    queryKey: ["/api/products", { limit: 9999 }],
-    queryFn: async () => {
-      const response = await fetch('/api/products?limit=9999');
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ["/api/products/search", { search: budgetProductSearch, category: budgetCategoryFilter }],
+    queryFn: async ({ queryKey }) => {
+      const [, params] = queryKey as [string, any];
+      if (!params.search && params.category === "all") return { products: [], total: 0 };
+      
+      const searchParams = new URLSearchParams();
+      if (params.search) searchParams.append('search', params.search);
+      if (params.category && params.category !== "all") searchParams.append('category', params.category);
+      searchParams.append('limit', '1000'); // Buscar todos os produtos correspondentes
+
+      const response = await fetch(`/api/logistics/products?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
+    enabled: budgetProductSearch.length >= 2 || budgetCategoryFilter !== "all"
   });
 
   const { data: producers } = useQuery({
@@ -149,8 +158,7 @@ export default function VendorBudgets() {
     },
   });
 
-
-  const products = allProductsData?.products || [];
+  const products = productsData?.products || [];
 
   // Group products by producer
   const productsByProducer = products.reduce((acc, product) => {
@@ -1367,7 +1375,7 @@ export default function VendorBudgets() {
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                         <Input
-                          placeholder="Buscar produtos..."
+                          placeholder="Digite nome ou código do produto..."
                           value={budgetProductSearch}
                           onChange={(e) => setBudgetProductSearch(e.target.value)}
                           className="pl-9"
