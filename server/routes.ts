@@ -6204,7 +6204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create manual payables endpoint
   app.post("/api/finance/payables/manual", async (req, res) => {
     try {
-      const { beneficiary, description, amount, dueDate, category, notes, attachmentUrl } = req.body;
+      const { beneficiary, description, amount, dueDate, category, notes, attachmentUrl, attachmentUrl2 } = req.body;
 
       if (!beneficiary || !description || !amount || !dueDate) {
         return res.status(400).json({ error: "Campos obrigatórios não fornecidos" });
@@ -6218,7 +6218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: new Date(dueDate),
         category: category || 'Outros',
         notes: notes || null,
-        attachmentUrl: attachmentUrl || null
+        attachmentUrl: attachmentUrl || null,
+        attachmentUrl2: attachmentUrl2 || null
       });
 
       console.log(`Created manual payable: ${payable.id} - ${payable.description} - R$ ${payable.amount}`);

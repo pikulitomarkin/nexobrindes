@@ -44,7 +44,8 @@ export default function FinancePayables() {
     category: "",
     status: "pending",
     notes: "",
-    attachmentUrl: ""
+    attachmentUrl: "",
+    attachmentUrl2: ""
   });
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -226,7 +227,8 @@ export default function FinancePayables() {
         category: "",
         status: "pending",
         notes: "",
-        attachmentUrl: ""
+        attachmentUrl: "",
+        attachmentUrl2: ""
       });
       toast({
         title: "Sucesso!",
@@ -245,7 +247,7 @@ export default function FinancePayables() {
     },
   });
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, field: "attachmentUrl" | "attachmentUrl2" = "attachmentUrl") => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -263,7 +265,7 @@ export default function FinancePayables() {
       if (!response.ok) throw new Error("Falha no upload");
 
       const data = await response.json();
-      setNewPayableData(prev => ({ ...prev, attachmentUrl: data.url }));
+      setNewPayableData(prev => ({ ...prev, [field]: data.url }));
       toast({
         title: "Sucesso",
         description: "Nota anexada com sucesso",
@@ -306,7 +308,8 @@ export default function FinancePayables() {
         dueDate: newPayableData.dueDate,
         category: newPayableData.category || 'Outros',
         notes: newPayableData.notes,
-        attachmentUrl: newPayableData.attachmentUrl
+        attachmentUrl: newPayableData.attachmentUrl,
+        attachmentUrl2: newPayableData.attachmentUrl2
       });
     }
   };
@@ -407,7 +410,8 @@ export default function FinancePayables() {
       orderNumber: 'MANUAL',
       branchId: payable.branchId || null,
       paidAt: payable.paidAt,
-      attachmentUrl: payable.attachmentUrl
+      attachmentUrl: payable.attachmentUrl,
+      attachmentUrl2: payable.attachmentUrl2
     }))
   ];
 
@@ -1281,7 +1285,7 @@ export default function FinancePayables() {
                         <FileText className="h-6 w-6 text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Nota Fiscal / Comprovante</p>
+                        <p className="text-sm font-medium text-gray-900">Anexo 1</p>
                         <p className="text-xs text-gray-500">Clique para visualizar ou baixar</p>
                       </div>
                     </div>
@@ -1294,6 +1298,36 @@ export default function FinancePayables() {
                       </Button>
                       <Button size="sm" className="gradient-bg text-white" asChild>
                         <a href={`/objects/${selectedPayable.attachmentUrl}`} download>
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixar
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedPayable.attachmentUrl2 && (
+                <div className="border rounded-lg p-4 bg-gray-50 mt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white p-2 rounded border">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Anexo 2</p>
+                        <p className="text-xs text-gray-500">Clique para visualizar ou baixar</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/objects/${selectedPayable.attachmentUrl2}`} target="_blank" rel="noreferrer">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver
+                        </a>
+                      </Button>
+                      <Button size="sm" className="gradient-bg text-white" asChild>
+                        <a href={`/objects/${selectedPayable.attachmentUrl2}`} download>
                           <Download className="h-4 w-4 mr-2" />
                           Baixar
                         </a>
@@ -1421,33 +1455,56 @@ export default function FinancePayables() {
               />
             </div>
             <div className="space-y-2 col-span-2">
-              <Label>Anexo (Nota Fiscal/Boleto)</Label>
-              <div className="flex items-center gap-4">
+              <Label>Anexos (Nota Fiscal/Boleto)</Label>
+              <div className="grid grid-cols-2 gap-4">
                 <Button 
                   variant="outline" 
                   className="w-full h-24 border-dashed border-2 flex flex-col gap-2"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*,.pdf';
+                    input.onchange = (e) => handleFileUpload(e as any, "attachmentUrl");
+                    input.click();
+                  }}
                   disabled={isUploading}
                 >
                   {newPayableData.attachmentUrl ? (
                     <>
                       <FileText className="h-8 w-8 text-green-500" />
-                      <span className="text-xs text-green-600 font-medium">Arquivo anexado</span>
+                      <span className="text-xs text-green-600 font-medium">Anexo 1 OK</span>
                     </>
                   ) : (
                     <>
                       <Upload className="h-8 w-8 text-gray-400" />
-                      <span className="text-xs text-gray-500">{isUploading ? 'Enviando...' : 'Clique para anexar arquivo'}</span>
+                      <span className="text-xs text-gray-500">Anexar 1</span>
                     </>
                   )}
                 </Button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  onChange={handleFileUpload}
-                  accept="image/*,.pdf"
-                />
+                <Button 
+                  variant="outline" 
+                  className="w-full h-24 border-dashed border-2 flex flex-col gap-2"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*,.pdf';
+                    input.onchange = (e) => handleFileUpload(e as any, "attachmentUrl2");
+                    input.click();
+                  }}
+                  disabled={isUploading}
+                >
+                  {newPayableData.attachmentUrl2 ? (
+                    <>
+                      <FileText className="h-8 w-8 text-green-500" />
+                      <span className="text-xs text-green-600 font-medium">Anexo 2 OK</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 text-gray-400" />
+                      <span className="text-xs text-gray-500">Anexar 2</span>
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
             <div className="space-y-2 col-span-2">

@@ -2396,7 +2396,18 @@ export class PgStorage implements IStorage {
   }
 
   async createManualPayable(data: InsertManualPayable): Promise<ManualPayable> {
-    const results = await pg.insert(schema.manualPayables).values(data).returning();
+    const results = await pg.insert(schema.manualPayables).values({
+      beneficiary: data.beneficiary,
+      description: data.description,
+      amount: data.amount,
+      dueDate: data.dueDate,
+      category: data.category || 'Outros',
+      notes: data.notes || null,
+      attachmentUrl: data.attachmentUrl || null,
+      attachmentUrl2: (data as any).attachmentUrl2 || null,
+      status: data.status || 'pending',
+      branchId: data.branchId || null
+    }).returning();
     return results[0];
   }
 
