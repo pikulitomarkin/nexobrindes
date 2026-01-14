@@ -1937,7 +1937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/logistics/products", async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
       const search = (req.query.search as string) || '';
       const category = (req.query.category as string) || '';
       const producer = (req.query.producer as string) || '';

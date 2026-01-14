@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,18 @@ import { queryClient } from "@/lib/queryClient";
 export default function LogisticsProducts() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedProducer, setSelectedProducer] = useState("all"); // Changed default to 'all'
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const [selectedProducer, setSelectedProducer] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
@@ -58,7 +68,7 @@ export default function LogisticsProducts() {
     queryKey: ["/api/logistics/products", { 
       page: currentPage, 
       limit: pageSize,
-      search: searchTerm || undefined,
+      search: debouncedSearch || undefined,
       category: selectedCategory !== "all" ? selectedCategory : undefined,
       producer: selectedProducer !== "all" ? selectedProducer : undefined
     }],
