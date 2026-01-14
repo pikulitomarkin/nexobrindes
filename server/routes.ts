@@ -8735,10 +8735,25 @@ Para mais detalhes, entre em contato conosco!`;
           const producer = await storage.getUser(item.producerId);
           const product = await storage.getProduct(item.productId);
           
-          // Use item purchase status or default to 'to_buy'
           const purchaseStatus = item.purchaseStatus || 'to_buy';
           
-          if (status && status !== 'all' && purchaseStatus !== status) continue;
+          // Map purchaseStatus to filter status based on button logic:
+          // if status is 'to_buy', it shows button for 'purchased'
+          // if status is 'purchased', it shows button for 'in_store'
+          // if status is 'in_store', it shows no button (already in store)
+          
+          // The user says: "if the button is 'Na loja', filter those. if the button is 'Comprado', filter those. if the button is 'Para comprar', filter those."
+          // Based on the code:
+          // Item status 'to_buy' -> Button is 'Comprado' (yellow)
+          // Item status 'purchased' -> Button is 'Na loja' (green)
+          // Item status 'pending' -> Button is 'Para comprar' (red)
+          
+          let buttonStatus = '';
+          if (purchaseStatus === 'pending') buttonStatus = 'to_buy';
+          else if (purchaseStatus === 'to_buy') buttonStatus = 'purchased';
+          else if (purchaseStatus === 'purchased') buttonStatus = 'in_store';
+          
+          if (status && status !== 'all' && buttonStatus !== status) continue;
 
           allItems.push({
             itemId: item.id,
