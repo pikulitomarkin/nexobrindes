@@ -8704,6 +8704,7 @@ Para mais detalhes, entre em contato conosco!`;
   app.get("/api/logistics/dropshipping-items", async (req, res) => {
     try {
       console.log("Fetching dropshipping items for logistics...");
+      const { status } = req.query;
 
       const orders = await storage.getOrders();
       const allItems: any[] = [];
@@ -8750,6 +8751,11 @@ Para mais detalhes, entre em contato conosco!`;
           // Determine purchase status (use item-level if exists, fallback to order-level)
           const purchaseStatus = item.purchaseStatus || order.productStatus || 'to_buy';
           
+          // Apply status filter if provided
+          if (status && status !== 'all' && purchaseStatus !== status) {
+            continue;
+          }
+
           allItems.push({
             itemId: item.id,
             orderId: order.id,

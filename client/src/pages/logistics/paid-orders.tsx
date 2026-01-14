@@ -46,7 +46,16 @@ export default function LogisticsPaidOrders() {
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<DropshippingItem[]>({
-    queryKey: ["/api/logistics/dropshipping-items"],
+    queryKey: ["/api/logistics/dropshipping-items", statusFilter],
+    queryFn: async ({ queryKey }) => {
+      const filter = queryKey[1];
+      const url = filter !== "all" 
+        ? `/api/logistics/dropshipping-items?status=${filter}`
+        : "/api/logistics/dropshipping-items";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch dropshipping items");
+      return response.json();
+    }
   });
 
   const handleUpdateStatus = async (itemId: string, newStatus: string) => {
@@ -96,8 +105,6 @@ export default function LogisticsPaidOrders() {
     if (!items) return [];
     
     return items.filter((item: DropshippingItem) => {
-      if (statusFilter !== "all" && item.purchaseStatus !== statusFilter) return false;
-      
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchesSearch = 
@@ -110,7 +117,7 @@ export default function LogisticsPaidOrders() {
       
       return true;
     });
-  }, [items, statusFilter, searchTerm]);
+  }, [items, searchTerm]);
 
   const statusCounts = useMemo(() => {
     if (!items) return { pending: 0, to_buy: 0, purchased: 0, in_store: 0 };
@@ -171,7 +178,25 @@ export default function LogisticsPaidOrders() {
         <p className="text-gray-500 mt-2">Controle individual de cada produto dos pedidos pagos</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-gray-500' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+          data-testid="card-status-pending"
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Aguardando</p>
+                <p className="text-3xl font-bold text-gray-600">{statusCounts.pending}</p>
+                <p className="text-xs text-gray-400">Pendente</p>
+              </div>
+              <div className="bg-gray-100 p-3 rounded-full">
+                <Clock className="h-6 w-6 text-gray-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card 
           className={`cursor-pointer transition-all ${statusFilter === 'to_buy' ? 'ring-2 ring-red-500' : ''}`}
           onClick={() => setStatusFilter(statusFilter === 'to_buy' ? 'all' : 'to_buy')}
@@ -180,7 +205,7 @@ export default function LogisticsPaidOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Aguardando Compra</p>
+                <p className="text-sm text-gray-500">Para comprar</p>
                 <p className="text-3xl font-bold text-red-600">{statusCounts.to_buy}</p>
                 <p className="text-xs text-gray-400">Produtos a comprar</p>
               </div>
@@ -199,9 +224,9 @@ export default function LogisticsPaidOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Aguardando Chegada</p>
+                <p className="text-sm text-gray-500">Comprado</p>
                 <p className="text-3xl font-bold text-yellow-600">{statusCounts.purchased}</p>
-                <p className="text-xs text-gray-400">Produtos comprados</p>
+                <p className="text-xs text-gray-400">Aguardando chegada</p>
               </div>
               <div className="bg-yellow-100 p-3 rounded-full">
                 <Package className="h-6 w-6 text-yellow-600" />
@@ -218,7 +243,7 @@ export default function LogisticsPaidOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Na Loja</p>
+                <p className="text-sm text-gray-500">Na loja</p>
                 <p className="text-3xl font-bold text-green-600">{statusCounts.in_store}</p>
                 <p className="text-xs text-gray-400">Prontos para envio</p>
               </div>
@@ -228,26 +253,6 @@ export default function LogisticsPaidOrders() {
             </div>
           </CardContent>
         </Card>
-
-        <Card 
-          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-gray-500' : ''}`}
-          onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
-          data-testid="card-status-pending"
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Pendentes</p>
-                <p className="text-3xl font-bold text-gray-600">{statusCounts.pending}</p>
-                <p className="text-xs text-gray-400">Aguardando</p>
-              </div>
-              <div className="bg-gray-100 p-3 rounded-full">
-                <Clock className="h-6 w-6 text-gray-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
