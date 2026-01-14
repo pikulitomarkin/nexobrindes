@@ -86,7 +86,6 @@ export default function Dashboard() {
       const financeLinks = [
         { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber", color: "text-blue-600" },
         { href: "/finance/payables", icon: TrendingDown, label: "Contas a Pagar", color: "text-red-600" },
-        { href: "/finance/expenses", icon: Receipt, label: "Notas de Despesas", color: "text-orange-600" },
         { href: "/finance/commission-payouts", icon: TrendingUp, label: "Pagamentos de Comissão", color: "text-green-600" },
         { href: "/finance/payments", icon: Package, label: "Pagamentos", color: "text-purple-600" },
         { href: "/finance/reconciliation", icon: BarChart3, label: "Conciliação Bancária", color: "text-indigo-600" },

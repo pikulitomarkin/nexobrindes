@@ -462,13 +462,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             onClick={() => navigate("/finance/payables")}
           />
           <SidebarItem
-            icon={<Receipt className="h-5 w-5" />}
-            label="Notas de Despesas"
-            path="/finance/expenses"
-            isActive={pathname === "/finance/expenses"}
-            onClick={() => navigate("/finance/expenses")}
-          />
-          <SidebarItem
             icon={<TrendingUp className="h-5 w-5" />}
             label="Pagamentos de Comissão"
             path="/finance/commission-payouts"
@@ -520,13 +513,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             path="/finance/payables"
             isActive={pathname === "/finance/payables"}
             onClick={() => navigate("/finance/payables")}
-          />
-          <SidebarItem
-            icon={<Receipt className="h-5 w-5" />}
-            label="Notas de Despesas"
-            path="/finance/expenses"
-            isActive={pathname === "/finance/expenses"}
-            onClick={() => navigate("/finance/expenses")}
           />
           <SidebarItem
             icon={<TrendingUp className="h-5 w-5" />}

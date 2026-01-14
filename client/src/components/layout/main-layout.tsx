@@ -120,7 +120,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const financeNavigation = [
     { href: "/", icon: Home, label: "Dashboard" },
     { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber" },
-    { href: "/finance/expenses", icon: FileText, label: "Notas de Despesas" },
     { href: "/finance/commission-payouts", icon: Users, label: "Pagamentos de Comissão" },
     { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
     { href: "/finance/payments", icon: Package, label: "Pagamentos" },

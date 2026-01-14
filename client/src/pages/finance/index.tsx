@@ -52,14 +52,6 @@ export default function FinanceIndex() {
       bgColor: "bg-red-100"
     },
     {
-      title: "Notas de Despesas",
-      description: "Upload e controle de notas de gastos",
-      icon: Receipt,
-      href: "/finance/expenses",
-      color: "text-orange-600",
-      bgColor: "bg-orange-100"
-    },
-    {
       title: "Pagamentos de Comissão",
       description: "Gestão de pagamentos para vendedores e sócios",
       icon: Users,
@@ -141,22 +133,6 @@ export default function FinanceIndex() {
                     <p className="text-sm font-medium text-gray-600">Despesas do Mês</p>
                     <p className="text-2xl font-bold gradient-text">
                       R$ {(overview?.monthlyExpenses || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Receipt className="h-6 w-6 text-orange-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="card-hover">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Saldo Líquido</p>
-                    <p className="text-2xl font-bold gradient-text text-green-600">
-                      R$ {((overview?.monthlyRevenue || 0) - (overview?.payables || 0) - (overview?.monthlyExpenses || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
