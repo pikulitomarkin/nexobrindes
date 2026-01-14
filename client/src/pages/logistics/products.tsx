@@ -752,6 +752,7 @@ export default function LogisticsProducts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Imagem</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Tipo/Produtor</TableHead>
@@ -778,6 +779,11 @@ export default function LogisticsProducts() {
                           <Package className="h-6 w-6 text-gray-400" />
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono bg-purple-50 text-purple-700 border-purple-200">
+                        {product.code || 'S/C'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div>
