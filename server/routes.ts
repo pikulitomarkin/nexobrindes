@@ -3090,7 +3090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthlyRevenue,
         pendingPayments,
         totalOrders: orders.length,
-        totalClients: users.filter(u => u.role === 'client').length,
+        totalClients: (await storage.getClients()).length,
         totalVendors: users.filter(u => u.role === 'vendor').length,
         totalProducers: users.filter(u => u.role === 'producer').length,
         totalProducts: products.total,
