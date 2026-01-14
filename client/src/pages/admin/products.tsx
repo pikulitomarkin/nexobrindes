@@ -765,6 +765,7 @@ export default function AdminProducts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Imagem</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Tipo/Produtor</TableHead>
@@ -793,15 +794,17 @@ export default function AdminProducts() {
                       )}
                     </TableCell>
                     <TableCell>
+                      {product.code ? (
+                        <Badge variant="outline" className="font-mono text-[10px] py-0.5 px-2 text-purple-600 border-purple-200 bg-purple-50">
+                          {product.code}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{product.name}</p>
-                          {product.code && (
-                            <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 text-purple-600 border-purple-200 bg-purple-50">
-                              {product.code}
-                            </Badge>
-                          )}
-                        </div>
+                        <p className="font-medium">{product.name}</p>
                         <p className="text-sm text-gray-500 line-clamp-1">
                           {product.description}
                         </p>

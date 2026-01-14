@@ -214,8 +214,13 @@ export default function LogisticsPaidOrders() {
                   <div key={orderId} className="group">
                     <div className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${allItemsInStore ? 'bg-green-50/50' : 'bg-gray-50/50'}`}>
                       <div className="flex items-center gap-4">
-                        <div className="bg-white p-2 rounded border shadow-sm">
+                        <div className="bg-white p-2 rounded border shadow-sm flex items-center gap-3">
                           <span className="font-bold text-lg text-gray-900">{firstItem.orderNumber}</span>
+                          {firstItem.productCode && (
+                            <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 text-purple-600 border-purple-200 bg-purple-50">
+                              {firstItem.productCode}
+                            </Badge>
+                          )}
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
