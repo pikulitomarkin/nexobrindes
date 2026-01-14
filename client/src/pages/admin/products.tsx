@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,18 @@ import { queryClient } from "@/lib/queryClient";
 export default function AdminProducts() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const [selectedProducer, setSelectedProducer] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -58,7 +69,7 @@ export default function AdminProducts() {
     queryKey: ["/api/logistics/products", { 
       page: currentPage, 
       limit: pageSize,
-      search: searchTerm || undefined,
+      search: debouncedSearch || undefined,
       category: selectedCategory !== "all" ? selectedCategory : undefined,
       producer: selectedProducer !== "all" ? selectedProducer : undefined
     }],
@@ -694,8 +705,11 @@ export default function AdminProducts() {
                 />
               </div>
             </div>
-            <div className="min-w-48">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <div className="min-w-48">
+              <Select value={selectedCategory} onValueChange={(val) => {
+                setSelectedCategory(val);
+                setCurrentPage(1);
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas as categorias" />
                 </SelectTrigger>
@@ -709,7 +723,10 @@ export default function AdminProducts() {
               </Select>
             </div>
             <div className="min-w-48">
-              <Select value={selectedProducer} onValueChange={setSelectedProducer}>
+              <Select value={selectedProducer} onValueChange={(val) => {
+                setSelectedProducer(val);
+                setCurrentPage(1);
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os produtores" />
                 </SelectTrigger>
