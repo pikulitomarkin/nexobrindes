@@ -24,6 +24,7 @@ interface DropshippingItem {
   totalPrice: string;
   producerId: string;
   producerName: string;
+  productCode: string | null;
   purchaseStatus: string;
   deliveryDeadline: string;
   orderCreatedAt: string;
@@ -257,7 +258,14 @@ export default function LogisticsPaidOrders() {
                                   <Package className="h-5 w-5 text-purple-600" />
                                 </div>
                                 <div className="space-y-1">
-                                  <p className="font-semibold text-gray-900 truncate max-w-[400px]">{item.productName}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold text-gray-900 truncate max-w-[400px]">{item.productName}</p>
+                                    {item.productCode && (
+                                      <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 text-purple-600 border-purple-200 bg-purple-50">
+                                        {item.productCode}
+                                      </Badge>
+                                    )}
+                                  </div>
                                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                                     <span className="bg-gray-100 px-2 rounded font-medium text-gray-700">Qtd: {Math.round(parseFloat(item.quantity?.toString() || '0'))}</span>
                                     <span className="text-purple-600 font-medium">Produtor: {item.producerName}</span>
@@ -382,7 +390,14 @@ export default function LogisticsPaidOrders() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Produto</p>
-                  <p className="font-medium">{selectedItem.productName}</p>
+                  <p className="font-medium">
+                    {selectedItem.productName}
+                    {selectedItem.productCode && (
+                      <span className="ml-2 text-xs font-mono text-purple-600 bg-purple-50 px-1 rounded border border-purple-100">
+                        {selectedItem.productCode}
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Quantidade</p>

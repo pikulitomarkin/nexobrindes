@@ -8769,6 +8769,7 @@ Para mais detalhes, entre em contato conosco!`;
             totalPrice: item.totalPrice,
             producerId: item.producerId,
             producerName: producer?.name || 'Produtor',
+            productCode: product?.code || null,
             purchaseStatus: purchaseStatus,
             deliveryDeadline: order.deliveryDeadline || order.deadline,
             orderCreatedAt: order.createdAt,
