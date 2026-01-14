@@ -1954,8 +1954,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Logistics products result: ${result.products.length} products found, total=${result.total}`);
 
-      // Products are already enriched with producer names in storage
-      res.json(result);
+      // Map codes for frontend display
+      const mappedProducts = result.products.map((p: any) => ({
+        ...p,
+        code: p.friendlyCode || p.externalCode || p.compositeCode || p.code || null
+      }));
+
+      res.json({
+        ...result,
+        products: mappedProducts
+      });
     } catch (error) {
       console.error("Error fetching logistics products:", error);
       res.status(500).json({ error: "Failed to fetch logistics products: " + error.message });
@@ -8769,7 +8777,7 @@ Para mais detalhes, entre em contato conosco!`;
             totalPrice: item.totalPrice,
             producerId: item.producerId,
             producerName: producer?.name || 'Produtor',
-            productCode: product?.code || null,
+            productCode: product?.friendlyCode || product?.externalCode || product?.compositeCode || product?.code || item.productCode || null,
             purchaseStatus: purchaseStatus,
             deliveryDeadline: order.deliveryDeadline || order.deadline,
             orderCreatedAt: order.createdAt,
