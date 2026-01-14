@@ -8710,51 +8710,33 @@ Para mais detalhes, entre em contato conosco!`;
       const allItems: any[] = [];
 
       for (const order of orders) {
-        // Order must not be cancelled
         if (order.status === 'cancelled') continue;
-        
-        // Check payment status - order must have received some payment
         const paidValue = parseFloat(order.paidValue || '0');
         if (paidValue <= 0) continue;
-
-        // Get budget items for this order
         if (!order.budgetId) continue;
-        
-        // Skip orders that already have productStatus = 'in_store' (they go to next stage)
         if (order.productStatus === 'in_store') continue;
         
         const budgetItems = await storage.getBudgetItems(order.budgetId);
-        
-        // Get client data
         let clientName = order.contactName;
         let clientPhone = order.contactPhone;
         
         if (order.clientId) {
           let clientRecord = await storage.getClient(order.clientId);
-          if (!clientRecord) {
-            clientRecord = await storage.getClientByUserId(order.clientId);
-          }
+          if (!clientRecord) clientRecord = await storage.getClientByUserId(order.clientId);
           if (clientRecord) {
             if (!clientName) clientName = clientRecord.name;
             if (!clientPhone) clientPhone = clientRecord.telefone || clientRecord.phone;
           }
         }
 
-        // Enrich each item with order and producer data
         for (const item of budgetItems) {
-          // Only include items with external producers
           if (!item.producerId || item.producerId === 'internal') continue;
           
           const producer = await storage.getUser(item.producerId);
           const product = await storage.getProduct(item.productId);
+          const purchaseStatus = item.purchaseStatus || 'pending';
           
-          // Determine purchase status (use item-level if exists, fallback to order-level)
-          const purchaseStatus = item.purchaseStatus || order.productStatus || 'to_buy';
-          
-          // Apply status filter if provided
-          if (status && status !== 'all' && purchaseStatus !== status) {
-            continue;
-          }
+          if (status && status !== 'all' && purchaseStatus !== status) continue;
 
           allItems.push({
             itemId: item.id,
@@ -8774,7 +8756,6 @@ Para mais detalhes, entre em contato conosco!`;
             deliveryDeadline: order.deliveryDeadline || order.deadline,
             orderCreatedAt: order.createdAt,
             orderStatus: order.status,
-            // Additional item details
             hasCustomization: item.hasItemCustomization || false,
             customizationDescription: item.itemCustomizationDescription,
             notes: item.notes,
@@ -8785,22 +8766,12 @@ Para mais detalhes, entre em contato conosco!`;
         }
       }
 
-      // Sort by purchase status priority: to_buy first, then purchased, then in_store
-      const statusPriority: Record<string, number> = {
-        'pending': 0,
-        'to_buy': 1,
-        'purchased': 2,
-        'in_store': 3
-      };
-      
+      const statusPriority: Record<string, number> = { 'to_buy': 1, 'purchased': 2, 'in_store': 3 };
       allItems.sort((a, b) => {
-        const priorityA = statusPriority[a.purchaseStatus] || 1;
-        const priorityB = statusPriority[b.purchaseStatus] || 1;
+        const priorityA = statusPriority[a.purchaseStatus] || 10;
+        const priorityB = statusPriority[b.purchaseStatus] || 10;
         if (priorityA !== priorityB) return priorityA - priorityB;
-        // Secondary sort by deadline
-        if (a.deliveryDeadline && b.deliveryDeadline) {
-          return new Date(a.deliveryDeadline).getTime() - new Date(b.deliveryDeadline).getTime();
-        }
+        if (a.deliveryDeadline && b.deliveryDeadline) return new Date(a.deliveryDeadline).getTime() - new Date(b.deliveryDeadline).getTime();
         return 0;
       });
 
