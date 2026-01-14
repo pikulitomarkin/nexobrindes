@@ -117,9 +117,9 @@ export default function LogisticsPaidOrders() {
       case 'purchased':
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300"><Package className="h-3 w-3 mr-1" /> Comprado</Badge>;
       case 'in_store':
-        return <Badge className="bg-green-100 text-green-800 border-green-300"><Store className="h-3 w-3 mr-1" /> Na loja</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-200"><Store className="h-3 w-3 mr-1" /> Na loja</Badge>;
       default:
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300"><Clock className="h-3 w-3 mr-1" /> Aguardando</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300"><ShoppingCart className="h-3 w-3 mr-1" /> Para comprar</Badge>;
     }
   };
 
@@ -318,7 +318,7 @@ export default function LogisticsPaidOrders() {
                                     {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-3.5 w-3.5 mr-2" /> Para comprar</>}
                                   </Button>
                                 )}
-                                
+
                                 {item.purchaseStatus === 'to_buy' && (
                                   <Button
                                     size="sm"

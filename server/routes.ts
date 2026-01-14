@@ -8734,7 +8734,9 @@ Para mais detalhes, entre em contato conosco!`;
           
           const producer = await storage.getUser(item.producerId);
           const product = await storage.getProduct(item.productId);
-          const purchaseStatus = item.purchaseStatus || 'pending';
+          
+          // Use item purchase status or default to 'to_buy'
+          const purchaseStatus = item.purchaseStatus || 'to_buy';
           
           if (status && status !== 'all' && purchaseStatus !== status) continue;
 
@@ -8766,10 +8768,16 @@ Para mais detalhes, entre em contato conosco!`;
         }
       }
 
-      const statusPriority: Record<string, number> = { 'to_buy': 1, 'purchased': 2, 'in_store': 3 };
+      // Sort by purchase status priority: to_buy first, then purchased, then in_store
+      const statusPriority: Record<string, number> = { 
+        'to_buy': 1, 
+        'purchased': 2, 
+        'in_store': 3,
+        'pending': 1 // Fallback pending to same as to_buy
+      };
       allItems.sort((a, b) => {
-        const priorityA = statusPriority[a.purchaseStatus] || 10;
-        const priorityB = statusPriority[b.purchaseStatus] || 10;
+        const priorityA = statusPriority[a.purchaseStatus] || 1;
+        const priorityB = statusPriority[b.purchaseStatus] || 1;
         if (priorityA !== priorityB) return priorityA - priorityB;
         if (a.deliveryDeadline && b.deliveryDeadline) return new Date(a.deliveryDeadline).getTime() - new Date(b.deliveryDeadline).getTime();
         return 0;
