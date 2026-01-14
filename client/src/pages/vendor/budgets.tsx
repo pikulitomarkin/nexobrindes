@@ -1387,29 +1387,48 @@ export default function VendorBudgets() {
                       </Select>
                     </div>
 
-                    {/* Product List - ALL PRODUCTS (same as admin) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                      {(() => {
-                        const filteredProducts = products.filter((product: any) => {
-                          const matchesSearch = !budgetProductSearch ||
-                            product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                            product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                            product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
+                      {/* Product List - Only show when searching */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                        {(() => {
+                          // Only show products when user types at least 2 characters
+                          if (budgetProductSearch.length < 2 && budgetCategoryFilter === "all") {
+                            return (
+                              <div className="col-span-full text-center py-8">
+                                <Search className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <p className="text-gray-500 font-medium">
+                                  Digite o nome ou código do produto para buscar
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Mínimo 2 caracteres para iniciar a busca
+                                </p>
+                              </div>
+                            );
+                          }
 
-                          const matchesCategory = budgetCategoryFilter === "all" ||
-                            product.category === budgetCategoryFilter;
+                          // Filter products by search term (name, code, description)
+                          const filteredProducts = products.filter((product: any) => {
+                            const searchTerm = budgetProductSearch.toLowerCase();
+                            const matchesSearch = !budgetProductSearch ||
+                              product.name?.toLowerCase().includes(searchTerm) ||
+                              product.description?.toLowerCase().includes(searchTerm) ||
+                              product.id?.toLowerCase().includes(searchTerm) ||
+                              product.externalCode?.toLowerCase().includes(searchTerm) ||
+                              product.compositeCode?.toLowerCase().includes(searchTerm) ||
+                              product.friendlyCode?.toLowerCase().includes(searchTerm);
 
-                          return matchesSearch && matchesCategory;
-                        });
+                            const matchesCategory = budgetCategoryFilter === "all" ||
+                              product.category === budgetCategoryFilter;
 
-                        if (filteredProducts.length === 0) {
-                          return (
-                            <div className="col-span-full text-center py-8">
-                              <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                              <p className="text-gray-500">
-                                Nenhum produto encontrado com os filtros aplicados
-                              </p>
-                              {(budgetProductSearch || budgetCategoryFilter !== "all") && (
+                            return matchesSearch && matchesCategory;
+                          });
+
+                          if (filteredProducts.length === 0) {
+                            return (
+                              <div className="col-span-full text-center py-8">
+                                <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <p className="text-gray-500">
+                                  Nenhum produto encontrado para "{budgetProductSearch}"
+                                </p>
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1420,80 +1439,91 @@ export default function VendorBudgets() {
                                   }}
                                   className="mt-2"
                                 >
-                                  Limpar filtros
+                                  Limpar busca
                                 </Button>
-                              )}
-                            </div>
-                          );
-                        }
+                              </div>
+                            );
+                          }
 
-                        return filteredProducts.map((product: any) => (
-                          <div 
-                            key={product.id} 
-                            className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                          return filteredProducts.map((product: any) => {
+                            const productCode = product.friendlyCode || product.externalCode || product.compositeCode;
+                            return (
+                              <div 
+                                key={product.id} 
+                                className="p-2 border rounded hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedProductForProducer(product);
+                                  setShowProducerSelector(true);
+                                }}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {product.imageLink ? (
+                                    <img 
+                                      src={product.imageLink} 
+                                      alt={product.name} 
+                                      className="w-10 h-10 object-cover rounded" 
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                                      <Package className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{product.name}</p>
+                                    {productCode && (
+                                      <p className="text-xs text-purple-600 font-mono">Cód: {productCode}</p>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-xs text-green-600 font-medium">
+                                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      {product.category && (
+                                        <span className="text-xs text-gray-400">• {product.category}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      {(budgetProductSearch.length >= 2 || budgetCategoryFilter !== "all") && (
+                        <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                          <span>
+                            {(() => {
+                              const searchTerm = budgetProductSearch.toLowerCase();
+                              const filteredProducts = products.filter((product: any) => {
+                                const matchesSearch = !budgetProductSearch ||
+                                  product.name?.toLowerCase().includes(searchTerm) ||
+                                  product.description?.toLowerCase().includes(searchTerm) ||
+                                  product.id?.toLowerCase().includes(searchTerm) ||
+                                  product.externalCode?.toLowerCase().includes(searchTerm) ||
+                                  product.compositeCode?.toLowerCase().includes(searchTerm) ||
+                                  product.friendlyCode?.toLowerCase().includes(searchTerm);
+
+                                const matchesCategory = budgetCategoryFilter === "all" ||
+                                  product.category === budgetCategoryFilter;
+
+                                return matchesSearch && matchesCategory;
+                              });
+                              return `${filteredProducts.length} produto(s) encontrado(s)`;
+                            })()}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
-                              setSelectedProductForProducer(product);
-                              setShowProducerSelector(true);
+                              setBudgetProductSearch("");
+                              setBudgetCategoryFilter("all");
                             }}
                           >
-                            <div className="flex items-center gap-2">
-                              {product.imageLink ? (
-                                <img 
-                                  src={product.imageLink} 
-                                  alt={product.name} 
-                                  className="w-8 h-8 object-cover rounded" 
-                                />
-                              ) : (
-                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                  <Package className="h-4 w-4 text-gray-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{product.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
-                                {product.category && (
-                                  <p className="text-xs text-blue-600">{product.category}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
-                      <span>
-                        {(() => {
-                          const filteredProducts = products.filter((product: any) => {
-                            const matchesSearch = !budgetProductSearch ||
-                              product.name.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                              product.description?.toLowerCase().includes(budgetProductSearch.toLowerCase()) ||
-                              product.id.toLowerCase().includes(budgetProductSearch.toLowerCase());
-
-                            const matchesCategory = budgetCategoryFilter === "all" ||
-                              product.category === budgetCategoryFilter;
-
-                            return matchesSearch && matchesCategory;
-                          });
-                          return `${filteredProducts.length} produtos encontrados`;
-                        })()}
-                      </span>
-                      {(budgetProductSearch || budgetCategoryFilter !== "all") && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setBudgetProductSearch("");
-                            setBudgetCategoryFilter("all");
-                          }}
-                        >
-                          Limpar filtros
-                        </Button>
+                            Limpar busca
+                          </Button>
+                        </div>
                       )}
-                    </div>
                   </div>
 
                   {/* Producer Selector Dialog - appears after product selected */}
