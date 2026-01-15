@@ -147,7 +147,7 @@ export class PDFGenerator {
   }
 
   private addHeader(data: BudgetPDFData): void {
-    this.doc.setFontSize(12);
+    this.doc.setFontSize(30);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('ORÇAMENTO', this.pageWidth / 2, this.currentY, { align: 'center' });
 
