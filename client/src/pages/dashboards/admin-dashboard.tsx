@@ -175,9 +175,9 @@ export default function AdminDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Contas a Receber</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total a Receber</p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    R$ {financeOverview?.receivables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    R$ {financeOverview?.totalReceivables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                   </p>
                 </div>
                 <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -189,9 +189,9 @@ export default function AdminDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Contas a Pagar</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total a Pagar</p>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    R$ {financeOverview?.payables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                    R$ {financeOverview?.totalPayables?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                   </p>
                 </div>
                 <TrendingDown className="h-6 w-6 text-red-600 dark:text-red-400" />

@@ -100,7 +100,7 @@ export default function FinanceIndex() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total a Receber</p>
                     <p className="text-2xl font-bold gradient-text">
-                      R$ {(overview?.receivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(overview?.totalReceivables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -116,7 +116,7 @@ export default function FinanceIndex() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total a Pagar</p>
                     <p className="text-2xl font-bold gradient-text">
-                      R$ {(overview?.payables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(overview?.totalPayables || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
