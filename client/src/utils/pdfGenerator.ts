@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import letterheadUrl from '@assets/Folha_timbrada_Nexo2_(1).pdf_(2)_1765244657245.png';
+import letterheadUrl from '@assets/Folha_timbrada_Nexo2_(1).pdf_(4)_1768512028431.png';
 
 export interface BudgetPDFData {
   budget: {
