@@ -341,11 +341,11 @@ export default function AdminReports() {
     const monthlyData = filteredOrders.reduce((acc: any, order: any) => {
       const month = new Date(order.createdAt).toLocaleDateString('pt-BR', { year: 'numeric', month: 'short' });
       if (!acc[month]) {
-        acc[month] = { mes: month, pedidos: 0, valor: 0, receita: 0 };
+        acc[month] = { mes: month, Pedidos: 0, Valor: 0, Receita: 0 };
       }
-      acc[month].pedidos += 1;
-      acc[month].valor += parseFloat(order.totalValue);
-      acc[month].receita += parseFloat(order.paidValue || 0);
+      acc[month].Pedidos += 1;
+      acc[month].Valor += parseFloat(order.totalValue);
+      acc[month].Receita += parseFloat(order.paidValue || 0);
       return acc;
     }, {});
 
@@ -1217,33 +1217,33 @@ export default function AdminReports() {
                     <YAxis yAxisId="left" />
                     <YAxis yAxisId="right" orientation="right" />
                     <Tooltip 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: number, name: string) => [
-                        name === 'valor' || name === 'receita' ? 
+                        name === 'Valor' || name === 'Receita' ? 
                           `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
                           value,
-                        name === 'valor' ? 'Valor Total' : 
-                        name === 'receita' ? 'Receita Recebida' : 'Quantidade'
+                        name
                       ]}
                     />
                     <Legend 
-            formatter={(value) => {
-              const labels: any = {
-                'pedidos': 'Pedidos',
-                'valor': 'Valor Total (R$)',
-                'receita': 'Receita Recebida (R$)',
-                'quantidade': 'Quantidade',
-                'vendedor': 'Vendedor',
-                'cliente': 'Cliente',
-                'produto': 'Produto',
-                'quantidade_vendas': 'Qtd. Vendas',
-                'valor_total': 'Total (R$)'
-              };
-              return labels[value] || value;
-            }}
-          />
-                    <Bar yAxisId="left" dataKey="pedidos" fill="#8884d8" name="Pedidos" />
-                    <Line yAxisId="right" type="monotone" dataKey="valor" stroke="#82ca9d" name="Valor" />
-                    <Line yAxisId="right" type="monotone" dataKey="receita" stroke="#ffc658" name="Receita" />
+                      formatter={(value) => {
+                        const labels: any = {
+                          'Pedidos': 'Pedidos',
+                          'Valor': 'Valor Total (R$)',
+                          'Receita': 'Receita Recebida (R$)',
+                          'quantidade': 'Quantidade',
+                          'vendedor': 'Vendedor',
+                          'cliente': 'Cliente',
+                          'produto': 'Produto',
+                          'quantidade_vendas': 'Qtd. Vendas',
+                          'valor_total': 'Total (R$)'
+                        };
+                        return labels[value] || value;
+                      }}
+                    />
+                    <Bar yAxisId="left" dataKey="Pedidos" fill="#8884d8" name="Pedidos" />
+                    <Line yAxisId="right" type="monotone" dataKey="Valor" stroke="#82ca9d" name="Valor" />
+                    <Line yAxisId="right" type="monotone" dataKey="Receita" stroke="#ffc658" name="Receita" />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1284,8 +1284,8 @@ export default function AdminReports() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ status, quantidade, percent }) => 
-                        `${status}: ${quantidade} (${(percent * 100).toFixed(0)}%)`
+                      label={({ statusLabel, quantidade, percent }) => 
+                        `${statusLabel}: ${quantidade} (${(percent * 100).toFixed(0)}%)`
                       }
                       outerRadius={80}
                       fill="#8884d8"
@@ -1295,7 +1295,11 @@ export default function AdminReports() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      formatter={(value: any, name: any, props: any) => {
+                        return [value, props.payload.statusLabel];
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
