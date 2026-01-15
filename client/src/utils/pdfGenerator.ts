@@ -91,7 +91,7 @@ export class PDFGenerator {
   private pageWidth: number;
   private pageHeight: number;
   private margin: number = 20;
-  private topMargin: number = 60;
+  private topMargin: number = 80;
   private letterheadDataUrl: string | null = null;
   private imageCache: Map<string, string | null> = new Map();
 
@@ -539,20 +539,31 @@ export class PDFGenerator {
         if (paymentMethod) {
           this.doc.setFont('helvetica', 'bold');
           this.doc.text('Forma de Pagamento:', this.margin, this.currentY);
-          this.doc.setFont('helvetica', 'normal');
-          this.doc.text(paymentMethod.name, this.margin + 70, this.currentY);
           this.currentY += 8;
+          this.doc.setFont('helvetica', 'normal');
+          this.doc.text(paymentMethod.name, this.margin, this.currentY);
+          this.currentY += 10;
 
           if (data.budget.installments && data.budget.installments > 1) {
-            this.doc.text(`Parcelas: ${data.budget.installments}x`, this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'bold');
+            this.doc.text('Parcelas:', this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.text(`${data.budget.installments}x`, this.margin + 20, this.currentY);
             this.currentY += 8;
           }
 
           if (data.budget.downPayment && parseFloat(data.budget.downPayment) > 0) {
-            this.doc.text(`Entrada: R$ ${parseFloat(data.budget.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'bold');
+            this.doc.text('Entrada:', this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.text(`R$ ${parseFloat(data.budget.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
             this.currentY += 8;
-            this.doc.text(`Restante: R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
-            this.currentY += 8;
+
+            this.doc.setFont('helvetica', 'bold');
+            this.doc.text('Restante:', this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.text(`R$ ${parseFloat(data.remainingAmount || data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
+            this.currentY += 10;
           }
         }
       }
@@ -563,12 +574,16 @@ export class PDFGenerator {
         if (shippingMethod) {
           this.doc.setFont('helvetica', 'bold');
           this.doc.text('Método de Frete:', this.margin, this.currentY);
-          this.doc.setFont('helvetica', 'normal');
-          this.doc.text(shippingMethod.name, this.margin + 60, this.currentY);
           this.currentY += 8;
+          this.doc.setFont('helvetica', 'normal');
+          this.doc.text(shippingMethod.name, this.margin, this.currentY);
+          this.currentY += 10;
 
           if (data.budget.shippingCost) {
-            this.doc.text(`Valor do Frete: R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'bold');
+            this.doc.text('Valor do Frete:', this.margin, this.currentY);
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.text(`R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 30, this.currentY);
             this.currentY += 8;
           }
         }
@@ -580,7 +595,7 @@ export class PDFGenerator {
         this.doc.text('Juros do Cartão:', this.margin, this.currentY);
         this.doc.setFont('helvetica', 'normal');
         const interestRate = data.budget.interestRate ? `(${data.budget.interestRate}% x ${data.budget.installments || 1}x)` : '';
-        this.doc.text(`R$ ${parseFloat(data.budget.interestValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${interestRate}`, this.margin + 50, this.currentY);
+        this.doc.text(`R$ ${parseFloat(data.budget.interestValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${interestRate}`, this.margin, this.currentY);
         this.currentY += 8;
       }
 
