@@ -6734,7 +6734,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         receivables: receivables,
+        totalReceivables: orderReceivables + manualReceivablesAmount,
         payables: payables,
+        totalPayables: producers + expenses + commissions + refunds + manualPayablesAmount,
         payablesBreakdown: {
           producers: Number(producers) || 0,
           expenses: Number(expenses) || 0,
