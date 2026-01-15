@@ -147,15 +147,21 @@ export class PDFGenerator {
   }
 
   private addHeader(data: BudgetPDFData): void {
-    this.doc.setFontSize(20);
+    this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('ORÇAMENTO', this.pageWidth / 2, this.currentY, { align: 'center' });
 
     this.currentY += 15;
     this.doc.setFontSize(12);
+    this.doc.setFont('helvetica', 'normal');
+    
+    // Data em cima
+    this.doc.text(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
+    this.currentY += 8;
+    
+    // Número do orçamento embaixo da data
     this.doc.text(`Número: ${data.budget.budgetNumber}`, this.margin, this.currentY);
-    this.doc.text(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`, this.pageWidth - this.margin - 50, this.currentY);
-
+    
     if (data.budget.validUntil) {
       this.currentY += 8;
       this.doc.text(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
@@ -490,13 +496,13 @@ export class PDFGenerator {
     this.doc.setFont('helvetica', 'normal');
 
     // Subtotal
-    this.doc.text('Subtotal:', this.pageWidth - this.margin - 95, this.currentY + 5);
-    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 10);
+    this.doc.text('Subtotal:', this.margin, this.currentY + 5);
+    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + 10);
 
     // Discount if exists
     if (data.budget.hasDiscount) {
       this.doc.setTextColor(255, 100, 0); // Orange color for discount
-      this.doc.text('Desconto:', this.pageWidth - this.margin - 95, this.currentY + 15);
+      this.doc.text('Desconto:', this.margin, this.currentY + 15);
 
       let discountText = '';
       if (data.budget.discountType === 'percentage') {
@@ -506,7 +512,7 @@ export class PDFGenerator {
         discountText = `- R$ ${parseFloat(data.budget.discountValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       }
 
-      this.doc.text(discountText, this.pageWidth - this.margin - 95, this.currentY + 20);
+      this.doc.text(discountText, this.margin, this.currentY + 20);
       this.doc.setTextColor(0, 0, 0); // Reset to black
 
       this.currentY += 10; // Extra space for discount
@@ -515,8 +521,8 @@ export class PDFGenerator {
     // Total
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('TOTAL GERAL:', this.pageWidth - this.margin - 95, this.currentY + 15);
-    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.pageWidth - this.margin - 95, this.currentY + 25);
+    this.doc.text('TOTAL GERAL:', this.margin, this.currentY + 15);
+    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + 25);
 
     this.currentY += 40;
   }
