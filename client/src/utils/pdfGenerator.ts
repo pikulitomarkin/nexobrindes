@@ -330,8 +330,9 @@ export class PDFGenerator {
     } else {
       // Draw placeholder
       this.doc.setDrawColor(200);
-      this.doc.setFillColor(250, 250, 250);
-      this.doc.rect(x, y, width, height, 'FD');
+      // Removing fill to avoid white background issues
+      // this.doc.setFillColor(250, 250, 250);
+      this.doc.rect(x, y, width, height, 'D'); // Changed 'FD' (Fill + Draw) to 'D' (Draw only)
     }
   }
 
@@ -363,8 +364,9 @@ export class PDFGenerator {
     this.doc.setFont('helvetica', 'bold');
 
     // Draw header background
-    this.doc.setFillColor(240, 240, 240);
-    this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
+    // Removing fill to avoid white background issues
+    // this.doc.setFillColor(240, 240, 240);
+    // this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
 
     this.doc.text('Img', currentX + 2, this.currentY);
     currentX += colWidths[0];
@@ -389,10 +391,11 @@ export class PDFGenerator {
       this.addNewPageIfNeeded(baseRowHeight + (hasCustomization ? 15 : 0) + 5);
 
       // Draw row background (alternating)
-      if (index % 2 === 1) {
-        this.doc.setFillColor(250, 250, 250);
-        this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), baseRowHeight, 'F');
-      }
+      // Removing fill to avoid white background issues
+      // if (index % 2 === 1) {
+      //   this.doc.setFillColor(250, 250, 250);
+      //   this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), baseRowHeight, 'F');
+      // }
 
       currentX = startX;
 
@@ -479,8 +482,9 @@ export class PDFGenerator {
 
     // Draw total section
     const sectionHeight = data.budget.hasDiscount ? 40 : 20;
-    this.doc.setFillColor(240, 240, 240);
-    this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, sectionHeight, 'F');
+    // Removing fill to avoid white background issues
+    // this.doc.setFillColor(240, 240, 240);
+    // this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, sectionHeight, 'F');
 
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
