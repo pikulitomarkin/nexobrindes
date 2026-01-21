@@ -72,6 +72,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/settings", icon: Settings, label: "Configurações" },
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
+    { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV" },
     { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
     { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
   ];
@@ -89,6 +90,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
+    { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV" },
     { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
     { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
   ];

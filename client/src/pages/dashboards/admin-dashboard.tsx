@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Users, ShoppingCart, Package, TrendingUp, TrendingDown, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight } from "lucide-react";
+import { BarChart3, Users, ShoppingCart, Package, TrendingUp, TrendingDown, Factory, LogOut, DollarSign, Calendar, Eye, ArrowUpRight, Monitor } from "lucide-react";
 import { Link } from "wouter";
 
 export default function AdminDashboard() {
@@ -34,6 +34,7 @@ export default function AdminDashboard() {
     { href: "/admin/clients", icon: Users, label: "Clientes", color: "text-orange-600" },
     { href: "/admin/vendors", icon: Users, label: "Vendedores", color: "text-indigo-600" },
     { href: "/admin/finance", icon: DollarSign, label: "Financeiro", color: "text-emerald-600" },
+    { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV", color: "text-red-500" },
     { href: "/admin/fix-commissions", icon: TrendingUp, label: "Corrigir Comissões", color: "text-red-600" },
   ];
 
