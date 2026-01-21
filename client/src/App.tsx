@@ -311,6 +311,16 @@ function App() {
                       <PartnerCommissionManagement />
                     </ProtectedRoute>
                   )} />
+                  <Route path="/partner/orders" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminOrders />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/budgets" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminBudgets />
+                    </ProtectedRoute>
+                  )} />
                   <Route path="/partner/clients" component={() => (
                     <ProtectedRoute requiredRoles={["admin", "partner"]}>
                       <AdminClients />
@@ -329,6 +339,41 @@ function App() {
                   <Route path="/partner/products" component={() => (
                     <ProtectedRoute requiredRoles={["admin", "partner"]}>
                       <AdminProducts />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/branches" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminBranches />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/partners" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminPartners />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/logistics" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminLogistics />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/customizations" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminCustomizations />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/settings" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminSettings />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/reports" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminReports />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/partner/logs" component={() => (
+                    <ProtectedRoute requiredRoles={["admin", "partner"]}>
+                      <AdminLogs />
                     </ProtectedRoute>
                   )} />
 
