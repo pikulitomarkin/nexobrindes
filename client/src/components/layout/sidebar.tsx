@@ -22,6 +22,7 @@ import {
   Hammer,
   Palette,
   Building2,
+  Monitor,
 } from "lucide-react";
 
 import { useLocation } from "wouter";
@@ -254,6 +255,13 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 path="/admin/producer-payments"
                 isActive={pathname === "/admin/producer-payments"}
                 onClick={() => navigate("/admin/producer-payments")}
+              />
+              <SidebarItem
+                icon={<Monitor className="h-5 w-5" />}
+                label="Dash TV"
+                path="/admin/tv-dashboard"
+                isActive={pathname === "/admin/tv-dashboard"}
+                onClick={() => navigate("/admin/tv-dashboard")}
               />
             </>
           )}

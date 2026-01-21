@@ -31,6 +31,7 @@ import AdminCommissionSettings from "@/pages/admin/commission-settings";
 import AdminPartners from "@/pages/admin/partners";
 import AdminUsers from "@/pages/admin/users";
 import AdminReports from "@/pages/admin/reports";
+import AdminTvDashboard from "@/pages/admin/tv-dashboard";
 import AdminProducerPayments from "@/pages/admin/producer-payments";
 import AdminFinance from "@/pages/admin/finance";
 import AdminCustomizations from "@/pages/admin/customizations";
@@ -242,6 +243,11 @@ function App() {
                   <Route path="/admin/reports" component={() => (
                     <ProtectedRoute requiredRoles={["admin"]}>
                       <AdminReports />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/tv-dashboard" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminTvDashboard />
                     </ProtectedRoute>
                   )} />
                   <Route path="/admin/producer-payments" component={() => (
