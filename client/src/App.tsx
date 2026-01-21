@@ -152,6 +152,13 @@ function App() {
             <Route path="/login" component={Login} />
             <Route path="/clientes" component={ClientRegister} />
 
+            {/* TV Dashboard - Fullscreen without sidebar */}
+            <Route path="/admin/tv-dashboard" component={() => (
+              <ProtectedRoute requiredRoles={["admin"]}>
+                <AdminTvDashboard />
+              </ProtectedRoute>
+            )} />
+
             {/* Protected Routes */}
             <ProtectedRoute>
               <MainLayout>
@@ -243,11 +250,6 @@ function App() {
                   <Route path="/admin/reports" component={() => (
                     <ProtectedRoute requiredRoles={["admin"]}>
                       <AdminReports />
-                    </ProtectedRoute>
-                  )} />
-                  <Route path="/admin/tv-dashboard" component={() => (
-                    <ProtectedRoute requiredRoles={["admin"]}>
-                      <AdminTvDashboard />
                     </ProtectedRoute>
                   )} />
                   <Route path="/admin/producer-payments" component={() => (

@@ -116,9 +116,8 @@ export default function TvDashboard() {
     refetchInterval: 60000,
   });
 
-  const shuffleReports = useCallback(() => {
-    const randomIndex = Math.floor(Math.random() * REPORT_CONFIGS.length);
-    setCurrentReportIndex(randomIndex);
+  const nextReport = useCallback(() => {
+    setCurrentReportIndex((prev) => (prev + 1) % REPORT_CONFIGS.length);
     setLastUpdate(new Date());
   }, []);
 
@@ -126,11 +125,11 @@ export default function TvDashboard() {
     if (!isPlaying) return;
 
     const interval = setInterval(() => {
-      shuffleReports();
+      nextReport();
     }, REPORT_ROTATION_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [isPlaying, shuffleReports]);
+  }, [isPlaying, nextReport]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -574,8 +573,8 @@ export default function TvDashboard() {
   };
 
   return (
-    <div className={`min-h-screen bg-gray-900 text-white ${isFullscreen ? 'p-8' : 'p-6'}`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 bg-gray-900 text-white p-6 overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-xl bg-gradient-to-br ${currentReport.color}`}>
             {currentReport.icon}
@@ -619,7 +618,7 @@ export default function TvDashboard() {
           <Button
             variant="outline"
             size="lg"
-            onClick={shuffleReports}
+            onClick={nextReport}
             className="border-gray-600 text-gray-300 hover:bg-gray-800"
           >
             <Activity className="h-5 w-5 mr-2" />
@@ -637,7 +636,7 @@ export default function TvDashboard() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-4 flex-wrap">
         {REPORT_CONFIGS.map((report, index) => (
           <Button
             key={report.id}
@@ -648,8 +647,8 @@ export default function TvDashboard() {
               setLastUpdate(new Date());
             }}
             className={currentReportIndex === index 
-              ? `bg-gradient-to-r ${report.color} border-0` 
-              : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+              ? `bg-gradient-to-r ${report.color} border-0 whitespace-nowrap` 
+              : 'border-gray-600 text-gray-300 hover:bg-gray-800 whitespace-nowrap'
             }
           >
             {report.title}
@@ -657,8 +656,8 @@ export default function TvDashboard() {
         ))}
       </div>
 
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
+      <Card className="bg-gray-800 border-gray-700 flex-1 overflow-auto">
+        <CardContent className="p-6 h-full">
           {renderReport()}
         </CardContent>
       </Card>
