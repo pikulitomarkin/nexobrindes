@@ -470,7 +470,7 @@ export default function LogisticsDashboard() {
 
   // Função para calcular prioridade baseada no prazo
   const calculatePriority = (order: any) => {
-    const deadline = order.deadline || order.deliveryDeadline;
+    const deadline = order.deadline || order.deliveryDeadline || order.deliveryDate;
     if (!deadline) return { level: 'normal', daysRemaining: null, label: 'Sem prazo' };
 
     const deadlineDate = new Date(deadline);
@@ -516,6 +516,17 @@ export default function LogisticsDashboard() {
       // Status filter (multiple selection)
       const matchesSelectedStatuses = selectedStatuses.length === 0 || selectedStatuses.includes(order.status);
 
+      // Simple status filter (backward compatibility + overdue)
+      let matchesSimpleStatus = true;
+      if (statusFilter !== "all") {
+        if (statusFilter === "overdue") {
+          const priority = calculatePriority(order);
+          matchesSimpleStatus = priority.level === "overdue";
+        } else {
+          matchesSimpleStatus = order.status === statusFilter;
+        }
+      }
+
       // Priority filter
       let matchesPriority = true;
       if (priorityFilter !== "all") {
@@ -523,7 +534,7 @@ export default function LogisticsDashboard() {
         matchesPriority = priority.level === priorityFilter;
       }
 
-      return matchesSearch && matchesDateRange && matchesSelectedStatuses && matchesPriority;
+      return matchesSearch && matchesDateRange && matchesSelectedStatuses && matchesSimpleStatus && matchesPriority;
     }).sort((a: any, b: any) => {
       if (sortBy === "priority") {
         const priorityOrder = { overdue: 0, urgent: 1, warning: 2, normal: 3 };
@@ -595,7 +606,17 @@ export default function LogisticsDashboard() {
 
       // Status filter (multiple selection)
       const matchesSelectedStatuses = selectedStatuses.length === 0 || selectedStatuses.includes(order.status);
-      const matchesLegacyStatus = statusFilter === "all" || order.status === statusFilter;
+
+      // Simple status filter (backward compatibility + overdue)
+      let matchesSimpleStatus = true;
+      if (statusFilter !== "all") {
+        if (statusFilter === "overdue") {
+          const priority = calculatePriority(order);
+          matchesSimpleStatus = priority.level === "overdue";
+        } else {
+          matchesSimpleStatus = order.status === statusFilter;
+        }
+      }
 
       // Priority filter
       let matchesPriority = true;
@@ -604,7 +625,7 @@ export default function LogisticsDashboard() {
         matchesPriority = priority.level === priorityFilter;
       }
 
-      return matchesSearch && matchesDateRange && (matchesSelectedStatuses || matchesLegacyStatus) && matchesPriority;
+      return matchesSearch && matchesDateRange && (matchesSelectedStatuses || matchesSimpleStatus) && matchesPriority;
     }).sort((a: any, b: any) => {
       if (sortBy === "priority") {
         const priorityOrder = { overdue: 0, urgent: 1, warning: 2, normal: 3 };
@@ -894,6 +915,7 @@ export default function LogisticsDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="overdue">Atrasados</SelectItem>
                       <SelectItem value="pending">Pendente</SelectItem>
                       <SelectItem value="accepted">Aceito</SelectItem>
                       <SelectItem value="production">Em Produção</SelectItem>
