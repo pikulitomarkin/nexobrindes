@@ -75,6 +75,7 @@ import FinancePayments from "@/pages/finance/payments";
 import FinanceExpenses from "@/pages/finance/expenses";
 import FinanceCommissionPayouts from "@/pages/finance/commission-payouts";
 import FinanceReconciliation from "@/pages/finance/reconciliation";
+import FinanceEstornos from "@/pages/finance/estornos";
 
 // Logistics imports
 import LogisticsDashboard from "@/pages/logistics/dashboard";
@@ -424,6 +425,13 @@ function App() {
                     component={() => (
                       <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
                         <FinanceReconciliation />
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route path="/finance/estornos"
+                    component={() => (
+                      <ProtectedRoute requiredRoles={["admin", "finance", "partner"]}>
+                        <FinanceEstornos />
                       </ProtectedRoute>
                     )}
                   />

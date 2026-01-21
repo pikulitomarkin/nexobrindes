@@ -1085,7 +1085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Create a payable (conta a pagar) for the refund
+        // Create a payable (conta a pagar) for the refund with category "Estorno"
         const refundPayable = await storage.createManualPayable({
           beneficiary: clientName,
           description: `Estorno - Pedido ${order.orderNumber} cancelado`,
@@ -1094,7 +1094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           category: 'Estorno',
           status: 'pending',
           notes: `Reembolso automático gerado pelo cancelamento do pedido ${order.orderNumber}. Valor pago pelo cliente: R$ ${paidValue.toFixed(2).replace('.', ',')}`,
-        });
+          orderId: id,
+          clientId: order.clientId || null,
+          branchId: order.branchId || null,
+        } as any);
 
         console.log(`Refund payable created for order ${order.orderNumber}: R$ ${paidValue.toFixed(2)} to ${clientName}`);
 
@@ -6308,6 +6311,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing manual payable payment:", error);
       res.status(500).json({ error: "Erro ao registrar pagamento: " + error.message });
+    }
+  });
+
+  // Get estornos (refunds) - payables with category "Estorno"
+  app.get("/api/finance/estornos", async (req, res) => {
+    try {
+      const allPayables = await storage.getManualPayables();
+      const estornos = allPayables.filter((p: any) => p.category === 'Estorno');
+      
+      // Enrich with client and order info
+      const enrichedEstornos = await Promise.all(estornos.map(async (estorno: any) => {
+        let clientName = estorno.beneficiary;
+        let orderNumber = null;
+        
+        if (estorno.orderId) {
+          const order = await storage.getOrder(estorno.orderId);
+          if (order) {
+            orderNumber = order.orderNumber;
+          }
+        }
+        
+        if (estorno.clientId) {
+          const client = await storage.getClient(estorno.clientId);
+          if (client) {
+            clientName = client.name || client.nomeFantasia || client.razaoSocial || estorno.beneficiary;
+          }
+        }
+        
+        return {
+          ...estorno,
+          clientName,
+          orderNumber,
+        };
+      }));
+      
+      console.log(`Returning ${enrichedEstornos.length} estornos (refunds)`);
+      res.json(enrichedEstornos);
+    } catch (error) {
+      console.error("Error fetching estornos:", error);
+      res.status(500).json({ error: "Erro ao buscar estornos: " + error.message });
+    }
+  });
+
+  // Process estorno (mark as refunded)
+  app.post("/api/finance/estornos/:id/process", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paymentMethod, notes, transactionId } = req.body;
+
+      console.log(`Processing estorno: ${id}`, { paymentMethod, notes, transactionId });
+
+      // Update the estorno status to refunded
+      const updatedEstorno = await storage.updateManualPayable(id, {
+        status: 'refunded',
+        paidBy: 'admin-1',
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'pix',
+        paymentNotes: notes || 'Estorno processado',
+        transactionId: transactionId || null
+      });
+
+      if (!updatedEstorno) {
+        return res.status(404).json({ error: "Estorno não encontrado" });
+      }
+
+      console.log(`Estorno ${id} processed successfully`);
+
+      res.json({
+        success: true,
+        estorno: updatedEstorno,
+        message: "Estorno processado com sucesso"
+      });
+    } catch (error) {
+      console.error("Error processing estorno:", error);
+      res.status(500).json({ error: "Erro ao processar estorno: " + error.message });
     }
   });
 

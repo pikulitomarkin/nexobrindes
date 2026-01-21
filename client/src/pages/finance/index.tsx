@@ -10,7 +10,8 @@ import {
   ArrowRight,
   FileText,
   Users,
-  Factory
+  Factory,
+  RefreshCw
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -82,6 +83,14 @@ export default function FinanceIndex() {
       href: "/finance/payments",
       color: "text-purple-600",
       bgColor: "bg-purple-100"
+    },
+    {
+      title: "Estornos",
+      description: "Gestão de estornos de pedidos cancelados",
+      icon: RefreshCw,
+      href: "/finance/estornos",
+      color: "text-orange-600",
+      bgColor: "bg-orange-100"
     }
   ];
 

@@ -2406,7 +2406,9 @@ export class PgStorage implements IStorage {
       attachmentUrl: data.attachmentUrl || null,
       attachmentUrl2: (data as any).attachmentUrl2 || null,
       status: data.status || 'pending',
-      branchId: data.branchId || null
+      branchId: (data as any).branchId || null,
+      orderId: (data as any).orderId || null,
+      clientId: (data as any).clientId || null,
     }).returning();
     return results[0];
   }

@@ -469,7 +469,7 @@ export const manualPayables = pgTable("manual_payables", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   dueDate: timestamp("due_date").notNull(),
   category: text("category").notNull().default('Outros'),
-  status: text("status").notNull().default('pending'), // 'pending', 'paid', 'cancelled'
+  status: text("status").notNull().default('pending'), // 'pending', 'paid', 'cancelled', 'refunded' (for estornos)
   paidBy: varchar("paid_by").references(() => users.id),
   paidAt: timestamp("paid_at"),
   paymentMethod: text("payment_method"),
@@ -478,6 +478,9 @@ export const manualPayables = pgTable("manual_payables", {
   notes: text("notes"),
   attachmentUrl: text("attachment_url"),
   attachmentUrl2: text("attachment_url_2"),
+  branchId: varchar("branch_id").references(() => branches.id),
+  orderId: varchar("order_id"),
+  clientId: varchar("client_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
