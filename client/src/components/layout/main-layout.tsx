@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Home,
+  Monitor,
   Settings, // Added Settings icon import
   LogOut,
   ClipboardList, // Import ClipboardList if it was intended to be used elsewhere
