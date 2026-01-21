@@ -1230,8 +1230,13 @@ export default function AdminBudgets() {
                             <Label htmlFor={`admin-unit-price-${index}`}>Preço Unitário</Label>
                             <Input
                               id={`admin-unit-price-${index}`}
-                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                              disabled
+                              type="text"
+                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
+                              onChange={(e) => {
+                                const value = parseCurrencyValue(e.target.value);
+                                updateAdminBudgetItem(index, 'unitPrice', value);
+                              }}
+                              placeholder="R$ 0,00"
                             />
                           </div>
                           <div>

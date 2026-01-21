@@ -1128,8 +1128,13 @@ export default function VendorBudgets() {
                             <Label htmlFor={`unit-price-${index}`}>Preço Unitário</Label>
                             <Input
                               id={`unit-price-${index}`}
-                              value={`R$ ${item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
-                              disabled
+                              type="text"
+                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
+                              onChange={(e) => {
+                                const value = parseCurrencyValue(e.target.value);
+                                updateBudgetItem(index, 'unitPrice', value);
+                              }}
+                              placeholder="R$ 0,00"
                             />
                           </div>
                           <div>
