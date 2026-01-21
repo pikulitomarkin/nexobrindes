@@ -441,13 +441,27 @@ export default function AdminReports() {
 
   const getProductPerformance = () => {
     const productData = filteredOrders.reduce((acc: any, order: any) => {
-      const product = order.product || 'Produto Não Identificado';
-      if (!acc[product]) {
-        acc[product] = { produto: product, pedidos: 0, valor: 0, quantidade: 0 };
+      // Se o pedido tiver itens detalhados, usar os itens
+      if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+        order.items.forEach((item: any) => {
+          const productName = item.productName || 'Produto Não Identificado';
+          if (!acc[productName]) {
+            acc[productName] = { produto: productName, pedidos: 0, valor: 0, quantidade: 0 };
+          }
+          acc[productName].pedidos += 1;
+          acc[productName].valor += parseFloat(item.totalPrice || '0');
+          acc[productName].quantidade += (parseFloat(item.quantity) || 0);
+        });
+      } else {
+        // Fallback para o campo 'product' do pedido se não houver itens (retrocompatibilidade)
+        const product = order.product || 'Produto Não Identificado';
+        if (!acc[product]) {
+          acc[product] = { produto: product, pedidos: 0, valor: 0, quantidade: 0 };
+        }
+        acc[product].pedidos += 1;
+        acc[product].valor += parseFloat(order.totalValue);
+        acc[product].quantidade += (parseFloat(order.quantity) || 1);
       }
-      acc[product].pedidos += 1;
-      acc[product].valor += parseFloat(order.totalValue);
-      acc[product].quantidade += (parseFloat(order.quantity) || 0);
       return acc;
     }, {});
 
