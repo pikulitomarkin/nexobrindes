@@ -462,19 +462,34 @@ export default function TvDashboard() {
       case 'daily_sales':
         return (
           <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="dia" stroke="#9CA3AF" angle={-45} textAnchor="end" height={60} />
-                <YAxis tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
-                <Tooltip 
-                  formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
-                />
-                <Line type="monotone" dataKey="valor" stroke="#6366F1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {dailyChartData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Activity className="h-24 w-24 mx-auto text-gray-400 mb-4" />
+                  <p className="text-2xl text-gray-400">Nenhuma venda nos últimos 30 dias</p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyChartData}>
+                  <defs>
+                    <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="dia" stroke="#9CA3AF" angle={-45} textAnchor="end" height={60} />
+                  <YAxis tickFormatter={(v) => `R$ ${(v/1000).toFixed(1)}k`} stroke="#9CA3AF" />
+                  <Tooltip 
+                    formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
+                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    labelStyle={{ color: '#F9FAFB' }}
+                  />
+                  <Area type="monotone" dataKey="valor" stroke="#6366F1" strokeWidth={3} fillOpacity={1} fill="url(#colorVendas)" dot={{ r: 6, fill: '#6366F1' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         );
 
