@@ -234,17 +234,33 @@ export default function TvDashboard() {
 
   const dailySalesData: { [key: string]: number } = {};
   const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  // Inicializar todos os últimos 30 dias com zero
+  for (let i = 0; i <= 30; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    dailySalesData[key] = 0;
+  }
+
   confirmedOrders.forEach((order: any) => {
     const date = new Date(order.createdAt);
     if (date >= thirtyDaysAgo) {
       const dayKey = date.toISOString().split('T')[0];
-      dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + parseFloat(order.totalValue || '0');
+      // Só somar se a chave existir (garante que estamos dentro dos 30 dias inicializados)
+      if (dayKey in dailySalesData) {
+        dailySalesData[dayKey] += parseFloat(order.totalValue || '0');
+      } else {
+        // Caso a data seja de hoje mas não tenha sido pega no loop inicial (timezone)
+        dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + parseFloat(order.totalValue || '0');
+      }
     }
   });
   const sortedDays = Object.keys(dailySalesData).sort();
   const dailyChartData = sortedDays.map(key => ({
-    dia: new Date(key).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    dia: new Date(key + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
     valor: dailySalesData[key],
   }));
 
