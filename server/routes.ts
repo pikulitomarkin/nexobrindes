@@ -6408,13 +6408,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactionId: transactionId || null
       });
 
-      // If it's linked to an order, update the order as well
-      if (estorno.orderId) {
-        await storage.updateOrder(estorno.orderId, {
+      // Update the order - try estorno.orderId first, then the original id parameter
+      const orderIdToUpdate = estorno.orderId || id;
+      console.log(`Attempting to update order: ${orderIdToUpdate}`);
+      
+      try {
+        const orderUpdate = await storage.updateOrder(orderIdToUpdate, {
           refundedAt: new Date(),
           refundAmount: estorno.amount,
           refundNotes: notes || 'Estorno processado via financeiro'
         });
+        console.log(`Order ${orderIdToUpdate} updated successfully:`, orderUpdate ? 'yes' : 'no');
+      } catch (orderError) {
+        console.error(`Failed to update order ${orderIdToUpdate}:`, orderError);
       }
 
       console.log(`Estorno ${estorno.id} processed successfully`);
