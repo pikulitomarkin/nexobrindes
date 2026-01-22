@@ -1204,12 +1204,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update user data
-      const updatedUser = await storage.updateUser(id, {
+      const userUpdates: any = {
         name: updateData.name.trim(),
         email: updateData.email?.trim() || null,
         phone: updateData.phone?.trim() || null,
         address: updateData.address?.trim() || null,
-      });
+      };
+
+      // Se a senha foi fornecida no PUT (edição geral), vamos atualizar também
+      if (updateData.password && updateData.password.trim() !== "") {
+        userUpdates.password = updateData.password;
+      }
+
+      const updatedUser = await storage.updateUser(id, userUpdates);
 
       if (!updatedUser) {
         return res.status(404).json({ error: "Erro ao atualizar dados do vendedor" });
