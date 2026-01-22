@@ -210,9 +210,11 @@ export default function TvDashboard() {
     budget: 'Orçamento',
     pending: 'Pendente',
     confirmed: 'Confirmado',
+    production: 'Em Produção',
     in_production: 'Em Produção',
     ready: 'Pronto',
     delivered: 'Entregue',
+    shipped: 'Despachado',
     cancelled: 'Cancelado',
   };
   const ordersByStatusData = Object.entries(statusCounts).map(([status, count]) => ({
@@ -276,7 +278,7 @@ export default function TvDashboard() {
     completed: 'Concluído',
     delivered: 'Entregue',
     accepted: 'Aceito',
-    shipped: 'Enviado',
+    shipped: 'Despachado',
     ready: 'Pronto',
     cancelled: 'Cancelado',
   };
