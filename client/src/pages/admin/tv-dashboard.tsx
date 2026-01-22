@@ -156,8 +156,8 @@ export default function TvDashboard() {
     return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
   });
 
-  const totalSales = confirmedOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0);
-  const monthSales = thisMonthOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0);
+  const totalSales = confirmedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
+  const monthSales = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
   const avgTicket = confirmedOrders.length > 0 ? totalSales / confirmedOrders.length : 0;
 
   const topVendorsData = vendors
@@ -166,7 +166,7 @@ export default function TvDashboard() {
       return {
         name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
         vendas: vendorOrders.length,
-        valor: vendorOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0),
+        valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
     .sort((a: any, b: any) => b.valor - a.valor)
@@ -193,7 +193,7 @@ export default function TvDashboard() {
   confirmedOrders.forEach((order: any) => {
     const date = new Date(order.createdAt);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    monthlyRevenueData[monthKey] = (monthlyRevenueData[monthKey] || 0) + (order.totalPrice || 0);
+    monthlyRevenueData[monthKey] = (monthlyRevenueData[monthKey] || 0) + parseFloat(order.totalValue || '0');
   });
   const sortedMonths = Object.keys(monthlyRevenueData).sort().slice(-12);
   const monthlyChartData = sortedMonths.map(key => ({
@@ -226,7 +226,7 @@ export default function TvDashboard() {
       return {
         name: client.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
         pedidos: clientOrders.length,
-        valor: clientOrders.reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0),
+        valor: clientOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
     .sort((a: any, b: any) => b.valor - a.valor)
@@ -239,7 +239,7 @@ export default function TvDashboard() {
     const date = new Date(order.createdAt);
     if (date >= thirtyDaysAgo) {
       const dayKey = date.toISOString().split('T')[0];
-      dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + (order.totalPrice || 0);
+      dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + parseFloat(order.totalValue || '0');
     }
   });
   const sortedDays = Object.keys(dailySalesData).sort();
@@ -256,8 +256,13 @@ export default function TvDashboard() {
   const productionStatusLabels: { [key: string]: string } = {
     pending: 'Pendente',
     in_production: 'Em Produção',
+    production: 'Em Produção',
     completed: 'Concluído',
     delivered: 'Entregue',
+    accepted: 'Aceito',
+    shipped: 'Enviado',
+    ready: 'Pronto',
+    cancelled: 'Cancelado',
   };
   const productionStatusData = Object.entries(productionStatusCounts).map(([status, count]) => ({
     name: productionStatusLabels[status] || status,
@@ -266,16 +271,16 @@ export default function TvDashboard() {
 
   const totalReceivables = receivables
     .filter((r: any) => r.status === 'pending')
-    .reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+    .reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0);
   const paidReceivables = receivables
     .filter((r: any) => r.status === 'paid')
-    .reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+    .reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0);
 
   const branchPerformanceData = [
-    { name: 'Matriz', valor: confirmedOrders.filter((o: any) => !o.branchId || o.branchId === 'matriz').reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0) },
+    { name: 'Matriz', valor: confirmedOrders.filter((o: any) => !o.branchId || o.branchId === 'matriz').reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0) },
     ...branches.map((branch: any) => ({
       name: branch.name?.split(' ').slice(0, 2).join(' ') || 'Filial',
-      valor: confirmedOrders.filter((o: any) => o.branchId === branch.id).reduce((sum: number, o: any) => sum + (o.totalPrice || 0), 0),
+      valor: confirmedOrders.filter((o: any) => o.branchId === branch.id).reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
     })),
   ].filter(b => b.valor > 0);
 
