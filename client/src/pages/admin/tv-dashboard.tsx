@@ -269,12 +269,17 @@ export default function TvDashboard() {
     value: count,
   }));
 
+  // Total a Receber: soma do saldo restante (amount - receivedAmount) para status pending e partial
   const totalReceivables = receivables
-    .filter((r: any) => r.status === 'pending')
-    .reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0);
+    .filter((r: any) => r.status !== 'paid' && r.status !== 'cancelled')
+    .reduce((sum: number, r: any) => {
+      const amount = parseFloat(r.amount || '0');
+      const received = parseFloat(r.receivedAmount || '0');
+      return sum + Math.max(0, amount - received);
+    }, 0);
+  // Total Recebido: soma do receivedAmount de todos os recebíveis
   const paidReceivables = receivables
-    .filter((r: any) => r.status === 'paid')
-    .reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0);
+    .reduce((sum: number, r: any) => sum + parseFloat(r.receivedAmount || '0'), 0);
 
   const branchPerformanceData = [
     { name: 'Matriz', valor: confirmedOrders.filter((o: any) => !o.branchId || o.branchId === 'matriz').reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0) },
