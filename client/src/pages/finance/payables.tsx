@@ -379,16 +379,16 @@ export default function FinancePayables() {
         paidAt: commission.paidAt
       })),
 
-    // Cancelled orders with payments (refunds)
+    // Cancelled orders with refunds
     ...orders
-      .filter((order: any) => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+      .filter((order: any) => order.status === 'cancelled' && parseFloat(order.refundAmount || '0') > 0)
       .map((order: any) => ({
         id: `refund-${order.id}`,
         type: 'refund',
         dueDate: order.updatedAt,
         description: `Estorno - ${order.product}`,
-        amount: order.refundAmount || order.paidValue,
-        status: order.refundedAt ? 'paid' : (order.refundAmount ? 'defined' : 'pending_definition'),
+        amount: order.refundAmount,
+        status: order.refundedAt ? 'paid' : 'defined',
         beneficiary: order.clientName,
         category: 'Estorno',
         orderNumber: order.orderNumber,

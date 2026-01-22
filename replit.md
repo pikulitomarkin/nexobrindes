@@ -27,3 +27,18 @@ The system implements role-based access control (admin, vendor, client, producer
 - **Payment Webhooks**: Integrations for automated payment confirmation.
 - **React Query**: For efficient server state management and caching.
 - **Drizzle Kit**: For database migrations and schema management.
+
+# Recent Changes (January 2026)
+
+## Order Cancellation / Refund System
+When an order is cancelled (via PATCH /api/orders/:id/cancel):
+1. Order status is set to 'cancelled' and paidValue is reset to '0.00'
+2. The refundAmount is set to the original paidValue (if any)
+3. All related commissions are set to status='cancelled' AND amount='0.00'
+4. All accounts receivable for the order are set to receivedAmount='0.00' and status='cancelled'
+5. A manual payable (estorno) is created if the order had payments
+
+This ensures:
+- Cancelled order commissions don't count in "Total a Pagar" calculations
+- Cancelled accounts receivable don't count in "Contas a Receber" totals
+- Refund amounts are properly tracked via the refundAmount field, not paidValue

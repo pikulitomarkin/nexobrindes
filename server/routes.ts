@@ -1048,13 +1048,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Não é possível cancelar um pedido que já foi entregue" });
       }
 
-      // Update order status to cancelled
+      const paidValue = parseFloat(order.paidValue || '0');
+
+      // Update order status to cancelled and reset paid value
       await storage.updateOrder(id, {
         status: 'cancelled',
+        paidValue: '0.00',
+        refundAmount: paidValue > 0 ? paidValue.toFixed(2) : '0.00',
         updatedAt: new Date()
       });
 
-      // Cancel related commissions
+      // Cancel related commissions and set their amounts to 0
       await storage.updateCommissionsByOrderStatus(id, 'cancelled');
 
       // If order has production orders, cancel them too
@@ -1063,16 +1067,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateProductionOrderStatus(po.id, 'cancelled', 'Pedido cancelado');
       }
 
-      // Update accounts receivable status to cancelled
+      // Update accounts receivable: set receivedAmount to 0 and status to cancelled
       const receivables = await storage.getAccountsReceivableByOrder(id);
       for (const receivable of receivables) {
         await storage.updateAccountsReceivable(receivable.id, {
+          receivedAmount: '0.00',
           status: 'cancelled'
         });
       }
 
-      console.log(`Order ${id} cancelled successfully - ${receivables.length} receivables also cancelled`);
+      // Create refund payable (estorno) if order had any payments
+      if (paidValue > 0) {
+        let clientName = order.contactName || 'Cliente';
+        if (order.clientId) {
+          const client = await storage.getClient(order.clientId);
+          if (client) {
+            clientName = client.name || client.nomeFantasia || client.razaoSocial || order.contactName || 'Cliente';
+          }
+        }
 
+        // Create a payable (conta a pagar) for the refund with category "Estorno"
+        await storage.createManualPayable({
+          beneficiary: clientName,
+          description: `Estorno - Pedido ${order.orderNumber} cancelado`,
+          amount: paidValue.toFixed(2),
+          dueDate: new Date(),
+          category: 'Estorno',
+          status: 'pending',
+          notes: `Reembolso automático gerado pelo cancelamento do pedido ${order.orderNumber}. Valor pago pelo cliente: R$ ${paidValue.toFixed(2).replace('.', ',')}`,
+          orderId: id,
+          clientId: order.clientId || null,
+          branchId: order.branchId || null,
+        } as any);
+
+        console.log(`Refund payable created for order ${order.orderNumber}: R$ ${paidValue.toFixed(2)} to ${clientName}`);
+      }
+
+      console.log(`Order ${id} cancelled successfully - ${receivables.length} receivables also cancelled, commissions zeroed`);
 
       res.json({
         success: true,
@@ -6757,7 +6788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const orderReceivables = accountsReceivable
-        .filter(ar => ar.status !== 'paid')
+        .filter(ar => ar.status !== 'paid' && ar.status !== 'cancelled')
         .reduce((total, ar) => {
           const amount = parseFloat(ar.amount || '0');
           const received = parseFloat(ar.receivedAmount || '0');
@@ -6768,7 +6799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add manual receivables
       const manualReceivables = await storage.getManualReceivables();
       const manualReceivablesAmount = manualReceivables
-        .filter(receivable => receivable.status !== 'paid')
+        .filter(receivable => receivable.status !== 'paid' && receivable.status !== 'cancelled')
         .reduce((total, receivable) => {
           const amount = parseFloat(receivable.amount || '0');
           const received = parseFloat(receivable.receivedAmount || '0');
@@ -6797,13 +6828,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Commissions pending/confirmed: ${allCommissions.filter(c => ['pending', 'confirmed'].includes(c.status) && !c.paidAt).length}, total: ${commissions}`);
 
       const refunds = orders
-        .filter(order => order.status === 'cancelled' && parseFloat(order.paidValue || '0') > 0)
+        .filter(order => order.status === 'cancelled' && parseFloat(order.refundAmount || '0') > 0)
         .reduce((total, order) => {
-          const refundAmount = order.refundAmount ? parseFloat(order.refundAmount) : parseFloat(order.paidValue || '0');
-          return total + refundAmount;
+          return total + parseFloat(order.refundAmount || '0');
         }, 0);
 
-      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0).length}, total: ${refunds}`);
+      console.log(`Refunds for cancelled orders: ${orders.filter(o => o.status === 'cancelled' && parseFloat(o.refundAmount || '0') > 0).length}, total: ${refunds}`);
 
       // Incluir contas a pagar manuais
       const manualPayables = await storage.getManualPayables();

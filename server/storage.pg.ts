@@ -1017,15 +1017,22 @@ export class PgStorage implements IStorage {
 
   async updateCommissionsByOrderStatus(orderId: string, status: string): Promise<void> {
     try {
+      // When cancelling, also set the amount to 0 so it doesn't count in totals
+      const updateData: any = {
+        status: status,
+        updatedAt: new Date()
+      };
+      
+      if (status === 'cancelled') {
+        updateData.amount = '0.00';
+      }
+
       await pg
         .update(schema.commissions)
-        .set({
-          status: status,
-          updatedAt: new Date()
-        })
+        .set(updateData)
         .where(eq(schema.commissions.orderId, orderId));
 
-      console.log(`Updated commissions for order ${orderId} to status: ${status}`);
+      console.log(`Updated commissions for order ${orderId} to status: ${status}${status === 'cancelled' ? ' (amounts zeroed)' : ''}`);
     } catch (error) {
       console.error('Error updating commissions by order status:', error);
     }
