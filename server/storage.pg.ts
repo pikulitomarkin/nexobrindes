@@ -2418,6 +2418,12 @@ export class PgStorage implements IStorage {
       .orderBy(desc(schema.manualPayables.createdAt));
   }
 
+  async getManualPayable(id: string): Promise<ManualPayable | undefined> {
+    const results = await pg.select().from(schema.manualPayables)
+      .where(eq(schema.manualPayables.id, id));
+    return results[0];
+  }
+
   async updateManualPayable(id: string, updates: Partial<InsertManualPayable>): Promise<ManualPayable | undefined> {
     const results = await pg.update(schema.manualPayables)
       .set({ ...updates, updatedAt: new Date() })

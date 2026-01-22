@@ -254,6 +254,7 @@ export interface IStorage {
   // Manual Payables
   createManualPayable(data: InsertManualPayable): Promise<ManualPayable>;
   getManualPayables(): Promise<ManualPayable[]>;
+  getManualPayable(id: string): Promise<ManualPayable | undefined>;
   updateManualPayable(id: string, updates: Partial<InsertManualPayable>): Promise<ManualPayable | undefined>;
 
   // Customization Options
@@ -3750,6 +3751,10 @@ export class MemStorage implements IStorage {
   // Get manual payables
   async getManualPayables(): Promise<any[]> {
     return this.mockData.manualPayables || [];
+  }
+
+  async getManualPayable(id: string): Promise<any | undefined> {
+    return this.mockData.manualPayables?.find((p: any) => p.id === id);
   }
 
   async updateManualPayable(id: string, updates: any) {
