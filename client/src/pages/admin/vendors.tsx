@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2 } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2, Lock, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +59,78 @@ export default function AdminVendors() {
       setUserCode(generateUserCode());
     }
   }, [isCreateDialogOpen]);
+
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordChangeSchema = z.object({
+    newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+    confirmPassword: z.string().min(6, "Confirme a senha"),
+  }).refine((data) => data.newPassword === data.confirmPassword, {
+    message: "As senhas não coincidem",
+    path: ["confirmPassword"],
+  });
+
+  type PasswordChangeValues = z.infer<typeof passwordChangeSchema>;
+
+  const passwordForm = useForm<PasswordChangeValues>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: {
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
+      const response = await fetch(`/api/vendors/${id}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao alterar senha");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      setIsPasswordDialogOpen(false);
+      passwordForm.reset();
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      toast({
+        title: "Sucesso!",
+        description: "Senha do vendedor alterada com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar senha",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openPasswordDialog = (vendor: any) => {
+    setSelectedVendorId(vendor.id);
+    passwordForm.reset({
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setIsPasswordDialogOpen(true);
+  };
+
+  const onPasswordSubmit = (data: PasswordChangeValues) => {
+    if (selectedVendorId) {
+      changePasswordMutation.mutate({ id: selectedVendorId, newPassword: data.newPassword });
+    }
+  };
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["/api/vendors"],
@@ -485,6 +557,14 @@ export default function AdminVendors() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
+                        title="Alterar Senha"
+                        onClick={() => openPasswordDialog(vendor)}
+                      >
+                        <Lock className="h-4 w-4 text-yellow-600" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
                         title="Editar"
                         onClick={() => handleEditVendor(vendor)}
                       >
@@ -539,6 +619,105 @@ export default function AdminVendors() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog para alterar senha */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => {
+        setIsPasswordDialogOpen(open);
+        if (!open) {
+          setSelectedVendorId(null);
+          passwordForm.reset();
+          setShowNewPassword(false);
+          setShowConfirmPassword(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Alterar Senha do Vendedor
+            </DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para o vendedor {vendors?.find((v: any) => v.id === selectedVendorId)?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={passwordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nova Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Mínimo 6 caracteres"
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirme a Nova Senha *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Repita a nova senha"
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPasswordDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="gradient-bg text-white"
+                  disabled={changePasswordMutation.isPending}
+                >
+                  {changePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para mostrar pedidos do vendedor */}
       <Dialog open={showVendorOrders} onOpenChange={(open) => {

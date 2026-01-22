@@ -1158,6 +1158,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update vendor
+  // Endpoint específico para alteração de senha de vendedor
+  app.patch("/api/vendors/:id/password", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const vendor = await storage.getUser(id);
+      if (!vendor || vendor.role !== 'vendor') {
+        return res.status(404).json({ error: "Vendedor não encontrado" });
+      }
+
+      await storage.updateUser(id, { password: newPassword });
+      res.json({ success: true, message: "Senha alterada com sucesso" });
+    } catch (error) {
+      console.error("Error changing vendor password:", error);
+      res.status(500).json({ error: "Erro ao alterar senha: " + error.message });
+    }
+  });
+
   app.put("/api/vendors/:id", async (req, res) => {
     try {
       const { id } = req.params;
