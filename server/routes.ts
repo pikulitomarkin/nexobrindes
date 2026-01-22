@@ -7861,9 +7861,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Add to preparation array (no DB operation yet)
+        // Handle producerId - 'internal' or empty means null (no external producer)
+        const isInternal = !item.producerId || item.producerId === 'internal';
             itemsToInsert.push({
           productId: item.productId,
-          producerId: item.producerId || 'internal',
+          producerId: isInternal ? null : item.producerId,
           quantity: quantity,
           unitPrice: unitPrice.toFixed(2),
           totalPrice: totalPrice.toFixed(2),
