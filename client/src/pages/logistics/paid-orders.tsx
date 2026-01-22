@@ -120,13 +120,13 @@ export default function LogisticsPaidOrders() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'to_buy':
-        return <Badge className="bg-red-100 text-red-800 border-red-300"><ShoppingCart className="h-3 w-3 mr-1" /> Para comprar</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300 text-base px-3 py-1"><ShoppingCart className="h-4 w-4 mr-1.5" /> Para comprar</Badge>;
       case 'purchased':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300"><Package className="h-3 w-3 mr-1" /> Comprado</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-base px-3 py-1"><Package className="h-4 w-4 mr-1.5" /> Comprado</Badge>;
       case 'in_store':
-        return <Badge className="bg-green-100 text-green-800 border-green-200"><Store className="h-3 w-3 mr-1" /> Na loja</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-200 text-base px-3 py-1"><Store className="h-4 w-4 mr-1.5" /> Na loja</Badge>;
       default:
-        return <Badge className="bg-red-100 text-red-800 border-red-300"><ShoppingCart className="h-3 w-3 mr-1" /> Para comprar</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300 text-base px-3 py-1"><ShoppingCart className="h-4 w-4 mr-1.5" /> Para comprar</Badge>;
     }
   };
 
@@ -330,23 +330,23 @@ export default function LogisticsPaidOrders() {
                                 
                                 {item.purchaseStatus === 'pending' && (
                                   <Button
-                                    size="lg"
-                                    className="bg-red-600 hover:bg-red-700 text-base font-bold h-12 px-8 shadow-md"
+                                    size="sm"
+                                    className="bg-red-600 hover:bg-red-700 text-[13px] h-9 px-4"
                                     onClick={() => handleUpdateStatus(item.itemId, 'to_buy')}
                                     disabled={loadingItemId === item.itemId}
                                   >
-                                    {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-5 w-5 mr-2" /> Para comprar</>}
+                                    {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-3.5 w-3.5 mr-1.5" /> Para comprar</>}
                                   </Button>
                                 )}
 
                                 {item.purchaseStatus === 'to_buy' && (
                                   <Button
-                                    size="lg"
-                                    className="bg-yellow-600 hover:bg-yellow-700 text-base font-bold h-12 px-8 shadow-md"
+                                    size="sm"
+                                    className="bg-yellow-600 hover:bg-yellow-700 text-[13px] h-9 px-4"
                                     onClick={() => handleUpdateStatus(item.itemId, 'purchased')}
                                     disabled={loadingItemId === item.itemId}
                                   >
-                                    {loadingItemId === item.itemId ? '...' : <><Package className="h-5 w-5 mr-2" /> Comprado</>}
+                                    {loadingItemId === item.itemId ? '...' : <><Package className="h-3.5 w-3.5 mr-1.5" /> Comprado</>}
                                   </Button>
                                 )}
                                 
