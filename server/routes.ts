@@ -6362,8 +6362,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Processing estorno: ${id}`, { paymentMethod, notes, transactionId });
 
+      // First try to find by ID (UUID)
+      let estorno = await storage.getManualPayable(id);
+      
+      // If not found, it might be a refund for an order that hasn't been defined yet
+      // In that case, the ID might be the orderId
+      if (!estorno) {
+        const order = await storage.getOrder(id);
+        if (order && order.status === 'cancelled') {
+          // Check if there's already a manual payable for this order
+          const payables = await storage.getManualPayables();
+          estorno = payables.find((p: any) => p.orderId === id && p.category === 'Estorno');
+          
+          if (!estorno) {
+            // Create one on the fly if it doesn't exist but order has paidValue
+            if (parseFloat(order.paidValue || '0') > 0) {
+              const client = await storage.getClient(order.clientId);
+              estorno = await storage.createManualPayable({
+                beneficiary: client?.name || 'Cliente',
+                description: `Estorno - Pedido ${order.orderNumber} cancelado`,
+                amount: order.paidValue,
+                dueDate: new Date(),
+                category: 'Estorno',
+                orderId: order.id,
+                clientId: order.clientId,
+                branchId: order.branchId,
+                status: 'pending'
+              });
+            }
+          }
+        }
+      }
+
+      if (!estorno) {
+        return res.status(404).json({ error: "Estorno não encontrado" });
+      }
+
       // Update the estorno status to refunded
-      const updatedEstorno = await storage.updateManualPayable(id, {
+      const updatedEstorno = await storage.updateManualPayable(estorno.id, {
         status: 'refunded',
         paidBy: req.user?.id || null,
         paidAt: new Date(),
@@ -6372,11 +6408,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactionId: transactionId || null
       });
 
-      if (!updatedEstorno) {
-        return res.status(404).json({ error: "Estorno não encontrado" });
+      // If it's linked to an order, update the order as well
+      if (estorno.orderId) {
+        await storage.updateOrder(estorno.orderId, {
+          refundedAt: new Date(),
+          refundAmount: estorno.amount,
+          refundNotes: notes || 'Estorno processado via financeiro'
+        });
       }
 
-      console.log(`Estorno ${id} processed successfully`);
+      console.log(`Estorno ${estorno.id} processed successfully`);
 
       res.json({
         success: true,
