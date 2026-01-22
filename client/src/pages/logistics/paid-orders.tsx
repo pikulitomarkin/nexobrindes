@@ -122,7 +122,7 @@ export default function LogisticsPaidOrders() {
       
       return true;
     });
-  }, [items, searchTerm]);
+  }, [items, searchTerm, statusFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -175,15 +175,15 @@ export default function LogisticsPaidOrders() {
           <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
             <Filter className="h-4 w-4 text-gray-400 shrink-0" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px] border-none focus:ring-0 shadow-none">
+              <SelectTrigger className="w-full sm:w-[220px] border-none focus:ring-0 shadow-none">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="delayed">Atrasado</SelectItem>
-                <SelectItem value="to_buy">Para comprar</SelectItem>
-                <SelectItem value="purchased">Comprado</SelectItem>
-                <SelectItem value="in_store">Na loja</SelectItem>
+                <SelectItem value="delayed">Atrasados</SelectItem>
+                <SelectItem value="to_buy">Status: Aguardando Compra</SelectItem>
+                <SelectItem value="purchased">Status: Já Comprado</SelectItem>
+                <SelectItem value="in_store">Status: Na Loja</SelectItem>
               </SelectContent>
             </Select>
           </div>
