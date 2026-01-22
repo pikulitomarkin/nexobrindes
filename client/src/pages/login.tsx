@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { User, Shield, Users, Factory, DollarSign } from "lucide-react";
+import { User, Shield, Users, Factory, DollarSign, Tv } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
 
@@ -150,6 +150,12 @@ export default function Login() {
                       <div className="flex items-center">
                         <DollarSign className="h-4 w-4 mr-2" />
                         Financeiro
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="dashtv">
+                      <div className="flex items-center">
+                        <Tv className="h-4 w-4 mr-2" />
+                        TV Dashboard
                       </div>
                     </SelectItem>
                   </SelectContent>
