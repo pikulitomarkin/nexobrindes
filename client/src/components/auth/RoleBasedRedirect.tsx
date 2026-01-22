@@ -38,6 +38,9 @@ export default function RoleBasedRedirect() {
         case "logistics":
           setLocation("/logistics/dashboard");
           break;
+        case "dashtv":
+          setLocation("/dashtv");
+          break;
         default:
           setLocation("/login");
       }

@@ -159,6 +159,13 @@ function App() {
                 <AdminTvDashboard />
               </ProtectedRoute>
             )} />
+            
+            {/* Dashtv Panel - Separate login, fullscreen without sidebar */}
+            <Route path="/dashtv" component={() => (
+              <ProtectedRoute requiredRoles={["dashtv", "admin"]}>
+                <AdminTvDashboard />
+              </ProtectedRoute>
+            )} />
 
             {/* Protected Routes */}
             <ProtectedRoute>
