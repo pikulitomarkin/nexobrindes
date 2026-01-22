@@ -6290,7 +6290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the manual payable status to paid
       const updatedPayable = await storage.updateManualPayable(id, {
         status: 'paid',
-        paidBy: 'admin-1', // Could be req.user.id in real auth
+        paidBy: req.user?.id || null, // Use authenticated user ID instead of hardcoded 'admin-1'
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'manual',
         paymentNotes: notes || null,
@@ -6365,7 +6365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the estorno status to refunded
       const updatedEstorno = await storage.updateManualPayable(id, {
         status: 'refunded',
-        paidBy: 'admin-1',
+        paidBy: req.user?.id || null,
         paidAt: new Date(),
         paymentMethod: paymentMethod || 'pix',
         paymentNotes: notes || 'Estorno processado',
