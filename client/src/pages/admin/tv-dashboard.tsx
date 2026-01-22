@@ -11,7 +11,7 @@ import {
   TrendingUp, DollarSign, Users, Factory, 
   ShoppingCart, Package, Award, Target, Activity,
   Play, Pause, Maximize, Minimize, RefreshCw, Monitor,
-  ArrowUpRight, ArrowDownRight, Clock
+  ArrowUpRight, ArrowDownRight, Clock, LogOut
 } from "lucide-react";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#A855F7', '#EC4899'];
@@ -285,6 +285,12 @@ export default function TvDashboard() {
   ].filter(b => b.valor > 0);
 
   const currentReport = REPORT_CONFIGS[currentReportIndex];
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/login";
+  };
 
   const renderReport = () => {
     switch (currentReport.id) {
@@ -597,6 +603,16 @@ export default function TvDashboard() {
             {currentReportIndex + 1} / {REPORT_CONFIGS.length}
           </Badge>
           
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleLogout}
+            className="border-red-600 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+          >
+            <LogOut className="h-5 w-5 mr-2" />
+            Sair
+          </Button>
+
           <Button
             variant="outline"
             size="lg"
