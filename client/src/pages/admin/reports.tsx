@@ -229,8 +229,8 @@ export default function AdminReports() {
 
   // CÁLCULOS AVANÇADOS
   const calculateMetrics = () => {
-    // Contas a Receber
-    const contasAReceber = receivables.filter((r: any) => r.status !== 'paid');
+    // Contas a Receber - excluir pagos e cancelados (igual ao Módulo Financeiro)
+    const contasAReceber = receivables.filter((r: any) => r.status !== 'paid' && r.status !== 'cancelled');
     const totalContasAReceber = contasAReceber.reduce((sum: number, r: any) => {
       const amount = parseFloat(r.amount || '0');
       const received = parseFloat(r.receivedAmount || '0');
@@ -271,11 +271,10 @@ export default function AdminReports() {
       sum + parseFloat(c.amount || '0'), 0
     );
 
-    // Estornos de pedidos cancelados
-    const pedidosCancelados = filteredOrders.filter((o: any) => o.status === 'cancelled' && parseFloat(o.paidValue || '0') > 0);
+    // Estornos de pedidos cancelados - usar refundAmount (paidValue já foi zerado)
+    const pedidosCancelados = filteredOrders.filter((o: any) => o.status === 'cancelled' && parseFloat(o.refundAmount || '0') > 0);
     const totalEstornos = pedidosCancelados.reduce((sum: number, o: any) => {
-      const refundAmount = o.refundAmount ? parseFloat(o.refundAmount) : parseFloat(o.paidValue || '0');
-      return sum + refundAmount;
+      return sum + parseFloat(o.refundAmount || '0');
     }, 0);
 
     // Total de contas a pagar
