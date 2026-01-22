@@ -1223,15 +1223,31 @@ export default function VendorBudgets() {
                               onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
                             />
 
-                            <div className="grid grid-cols-1 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <Label>Total da Personalização</Label>
+                                <Label>Valor Unitário (R$)</Label>
                                 <Input
-                                  value={`R$ ${(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                  disabled
+                                  value={item.itemCustomizationValue > 0 ? currencyMask(item.itemCustomizationValue.toString().replace('.', ',')) : ''}
+                                  onChange={(e) => {
+                                    const value = parseCurrencyValue(e.target.value);
+                                    updateBudgetItem(index, 'itemCustomizationValue', value);
+                                  }}
+                                  placeholder="0,00"
+                                />
+                              </div>
+                              <div>
+                                <Label>Total da Personalização (R$)</Label>
+                                <Input
+                                  value={currencyMask((item.quantity * (item.itemCustomizationValue || 0)).toFixed(2).replace('.', ','))}
+                                  onChange={(e) => {
+                                    const totalValue = parseCurrencyValue(e.target.value);
+                                    const unitValue = item.quantity > 0 ? totalValue / item.quantity : 0;
+                                    updateBudgetItem(index, 'itemCustomizationValue', unitValue);
+                                  }}
+                                  placeholder="0,00"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </p>
                               </div>
                             </div>
@@ -1340,13 +1356,18 @@ export default function VendorBudgets() {
                                   </div>
                                 </div>
                                 <div>
-                                  <Label>Total da Personalização Geral</Label>
+                                  <Label>Total da Personalização Geral (R$)</Label>
                                   <Input
-                                    value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                                    disabled
+                                    value={currencyMask((item.quantity * (item.generalCustomizationValue || 0)).toFixed(2).replace('.', ','))}
+                                    onChange={(e) => {
+                                      const totalValue = parseCurrencyValue(e.target.value);
+                                      const unitValue = item.quantity > 0 ? totalValue / item.quantity : 0;
+                                      updateBudgetItem(index, 'generalCustomizationValue', unitValue);
+                                    }}
+                                    placeholder="0,00"
                                   />
                                   <p className="text-xs text-gray-500 mt-1">
-                                    {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </p>
                                 </div>
                               </div>
