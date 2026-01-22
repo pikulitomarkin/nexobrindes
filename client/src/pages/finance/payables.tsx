@@ -379,40 +379,42 @@ export default function FinancePayables() {
         paidAt: commission.paidAt
       })),
 
-    // Cancelled orders with refunds
-    ...orders
-      .filter((order: any) => order.status === 'cancelled' && parseFloat(order.refundAmount || '0') > 0)
-      .map((order: any) => ({
-        id: `refund-${order.id}`,
+    // Estornos from manual payables (category = 'Estorno')
+    ...manualPayables
+      .filter((payable: any) => payable.category === 'Estorno')
+      .map((payable: any) => ({
+        id: `refund-${payable.id}`,
         type: 'refund',
-        dueDate: order.updatedAt,
-        description: `Estorno - ${order.product}`,
-        amount: order.refundAmount,
-        status: order.refundedAt ? 'paid' : 'defined',
-        beneficiary: order.clientName,
+        dueDate: payable.dueDate,
+        description: payable.description,
+        amount: payable.amount,
+        status: payable.status === 'refunded' ? 'paid' : payable.status,
+        beneficiary: payable.beneficiary,
         category: 'Estorno',
-        orderNumber: order.orderNumber,
-        branchId: order.branchId || null,
-        originalOrder: order,
-        paidAt: order.refundedAt
+        orderNumber: payable.orderId ? 'ESTORNO' : 'MANUAL',
+        branchId: payable.branchId || null,
+        paidAt: payable.paidAt,
+        actualId: payable.id
       })),
 
-    // Manual payables (já inclui todos os status)
-    ...manualPayables.map((payable: any) => ({
-      id: `manual-${payable.id}`,
-      type: 'manual',
-      dueDate: payable.dueDate,
-      description: payable.description,
-      amount: payable.amount,
-      status: payable.status,
-      beneficiary: payable.beneficiary,
-      category: payable.category,
-      orderNumber: 'MANUAL',
-      branchId: payable.branchId || null,
-      paidAt: payable.paidAt,
-      attachmentUrl: payable.attachmentUrl,
-      attachmentUrl2: payable.attachmentUrl2
-    }))
+    // Manual payables (excluding estornos which are shown above)
+    ...manualPayables
+      .filter((payable: any) => payable.category !== 'Estorno')
+      .map((payable: any) => ({
+        id: `manual-${payable.id}`,
+        type: 'manual',
+        dueDate: payable.dueDate,
+        description: payable.description,
+        amount: payable.amount,
+        status: payable.status,
+        beneficiary: payable.beneficiary,
+        category: payable.category,
+        orderNumber: 'MANUAL',
+        branchId: payable.branchId || null,
+        paidAt: payable.paidAt,
+        attachmentUrl: payable.attachmentUrl,
+        attachmentUrl2: payable.attachmentUrl2
+      }))
   ];
 
   const getStatusBadge = (status: string, type?: string) => {
@@ -423,6 +425,7 @@ export default function FinancePayables() {
       pending_definition: { label: "Aguardando Valor", variant: "destructive" as const },
       defined: { label: "Valor Definido", variant: "secondary" as const },
       paid: { label: "Pago", variant: "default" as const },
+      refunded: { label: "Pago", variant: "default" as const },
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.pending;

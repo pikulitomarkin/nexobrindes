@@ -99,6 +99,7 @@ export const orders = pgTable("orders", {
   trackingCode: text("tracking_code"),
   // Additional notes
   refundNotes: text("refund_notes"), // Observações sobre reembolso
+  refundedAt: timestamp("refunded_at"), // Data em que o estorno foi processado
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
