@@ -330,8 +330,8 @@ export default function LogisticsPaidOrders() {
                                 
                                 {item.purchaseStatus === 'pending' && (
                                   <Button
-                                    size="sm"
-                                    className="bg-red-600 hover:bg-red-700 text-sm font-bold h-11 px-6 shadow-md"
+                                    size="lg"
+                                    className="bg-red-600 hover:bg-red-700 text-base font-bold h-12 px-8 shadow-md"
                                     onClick={() => handleUpdateStatus(item.itemId, 'to_buy')}
                                     disabled={loadingItemId === item.itemId}
                                   >
@@ -341,8 +341,8 @@ export default function LogisticsPaidOrders() {
 
                                 {item.purchaseStatus === 'to_buy' && (
                                   <Button
-                                    size="sm"
-                                    className="bg-yellow-600 hover:bg-yellow-700 text-sm font-bold h-11 px-6 shadow-md"
+                                    size="lg"
+                                    className="bg-yellow-600 hover:bg-yellow-700 text-base font-bold h-12 px-8 shadow-md"
                                     onClick={() => handleUpdateStatus(item.itemId, 'purchased')}
                                     disabled={loadingItemId === item.itemId}
                                   >
