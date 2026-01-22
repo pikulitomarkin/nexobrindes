@@ -557,9 +557,57 @@ export default function FinancePayables() {
           payableId: actualId,
           payableType: 'producer'
         });
+      } else if (selectedPayable.type === 'refund') {
+        // Handle refund payment
+        const actualId = selectedPayable.id.replace('refund-', '');
+        
+        // Use the estorno processing API if it's a refund
+        processEstornoMutation.mutate({ 
+          id: actualId, 
+          data: {
+            paymentMethod: paymentData.method,
+            notes: paymentData.notes,
+            transactionId: paymentData.transactionId
+          }
+        });
       }
     }
   };
+
+  // Add the processEstornoMutation from estornos.tsx
+  const processEstornoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await fetch(`/api/finance/estornos/${id}/process`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Erro ao processar estorno");
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsPayDialogOpen(false);
+      setSelectedPayable(null);
+      setPaymentData({ paymentMethod: "", notes: "", transactionId: "", method: "", amount: "" });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/estornos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      
+      toast({
+        title: "Estorno processado",
+        description: "O estorno foi processado com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao processar estorno.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleSetRefund = () => {
     if (selectedPayable && refundData.amount && refundData.notes) {
@@ -972,7 +1020,7 @@ export default function FinancePayables() {
                               setIsPayDialogOpen(true);
                             }}
                             size="sm"
-                            className="gradient-bg text-white h-7 px-2"
+                            className="bg-green-600 hover:bg-green-700 text-white h-7 px-2"
                           >
                             <DollarSign className="h-3 w-3 mr-1" />
                             Pagar
@@ -992,10 +1040,12 @@ export default function FinancePayables() {
       <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Pagamento Manual</DialogTitle>
+            <DialogTitle>{selectedPayable?.type === 'refund' ? 'Processar Estorno' : 'Registrar Pagamento Manual'}</DialogTitle>
             <DialogDescription>
               {selectedPayable?.type === 'producer' 
                 ? `Registrando pagamento de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary || 'Produtor'}`
+                : selectedPayable?.type === 'refund'
+                ? `Registrando estorno de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary}`
                 : `Registrando pagamento de ${selectedPayable?.type || 'item'}`}
             </DialogDescription>
           </DialogHeader>
@@ -1003,22 +1053,22 @@ export default function FinancePayables() {
             {/* Informações do serviço */}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 rounded border border-blue-200">
-                <h4 className="font-medium text-blue-900 mb-2">Informações do Serviço</h4>
+                <h4 className="font-medium text-blue-900 mb-2">Informações {selectedPayable?.type === 'refund' ? 'do Estorno' : 'do Serviço'}</h4>
                 <div className="space-y-2 text-sm">
-                  <div><strong>Produtor:</strong> {selectedPayable?.beneficiary}</div>
-                  <div><strong>Produto:</strong> {selectedPayable?.description?.replace('Pagamento Produtor - ', '') || 'N/A'}</div>
+                  <div><strong>{selectedPayable?.type === 'refund' ? 'Cliente' : 'Produtor'}:</strong> {selectedPayable?.beneficiary}</div>
+                  <div><strong>{selectedPayable?.type === 'refund' ? 'Motivo' : 'Produto'}:</strong> {selectedPayable?.description?.replace('Pagamento Produtor - ', '')?.replace('Estorno - ', '') || 'N/A'}</div>
                   <div><strong>Pedido:</strong> {selectedPayable?.orderNumber || 'N/A'}</div>
                   <div><strong>Categoria:</strong> {selectedPayable?.category}</div>
                 </div>
               </div>
 
               <div className="p-4 bg-green-50 rounded border border-green-200">
-                <h4 className="font-medium text-green-900 mb-2">Valor do Pagamento</h4>
+                <h4 className="font-medium text-green-900 mb-2">Valor do {selectedPayable?.type === 'refund' ? 'Estorno' : 'Pagamento'}</h4>
                 <div className="space-y-2">
                   <div className="text-2xl font-bold text-green-700">
                     R$ {parseFloat(selectedPayable?.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="text-sm text-green-600">Valor acordado com o produtor</div>
+                  <div className="text-sm text-green-600">Valor {selectedPayable?.type === 'refund' ? 'a ser devolvido' : 'acordado'}</div>
                 </div>
               </div>
             </div>
@@ -1032,19 +1082,19 @@ export default function FinancePayables() {
                   type="text"
                   value={selectedPayable?.type === 'producer' 
                     ? `R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
-                    : paymentData.amount}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value.replace('R$ ', '').replace(',', '.') }))}
+                    : (paymentData.amount.startsWith('R$') ? paymentData.amount : `R$ ${parseFloat(paymentData.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}
+                  onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value.replace('R$ ', '').replace('.', '').replace(',', '.') }))}
                   placeholder="0,00"
-                  disabled={selectedPayable?.type === 'producer'}
-                  className={selectedPayable?.type === 'producer' ? 'bg-gray-100' : ''}
+                  disabled={selectedPayable?.type === 'producer' || selectedPayable?.type === 'refund'}
+                  className={(selectedPayable?.type === 'producer' || selectedPayable?.type === 'refund') ? 'bg-gray-100' : ''}
                 />
-                {selectedPayable?.type === 'producer' && (
-                  <p className="text-sm text-gray-500 mt-1">Valor definido na ordem de produção</p>
+                {(selectedPayable?.type === 'producer' || selectedPayable?.type === 'refund') && (
+                  <p className="text-sm text-gray-500 mt-1">Valor definido {selectedPayable?.type === 'refund' ? 'no cancelamento' : 'na ordem de produção'}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="payment-method">Método de Pagamento <span className="text-red-500">*</span></Label>
+                <Label htmlFor="payment-method">Método de {selectedPayable?.type === 'refund' ? 'Estorno' : 'Pagamento'} <span className="text-red-500">*</span></Label>
                 <Select 
                   value={paymentData.method}
                   onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
@@ -1057,6 +1107,7 @@ export default function FinancePayables() {
                     <SelectItem value="transfer">Transferência Bancária</SelectItem>
                     <SelectItem value="cash">Dinheiro</SelectItem>
                     <SelectItem value="check">Cheque</SelectItem>
+                    <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
                     <SelectItem value="manual">Manual/Outros</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1077,7 +1128,7 @@ export default function FinancePayables() {
               <Label htmlFor="payment-notes">Observações</Label>
               <Textarea
                 id="payment-notes"
-                placeholder="Adicione observações sobre o pagamento, dados bancários utilizados, ou outras informações relevantes..."
+                placeholder="Adicione observações relevantes..."
                 value={paymentData.notes}
                 onChange={(e) => setPaymentData(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
@@ -1089,8 +1140,8 @@ export default function FinancePayables() {
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
                 <div className="text-sm text-yellow-700">
-                  <strong>Confirmação:</strong> Certifique-se de que o pagamento foi efetivamente realizado antes de registrar. 
-                  Esta ação marcará o pagamento como concluído no sistema.
+                  <strong>Confirmação:</strong> Certifique-se de que a operação foi efetivamente realizada antes de registrar. 
+                  Esta ação marcará o item como concluído no sistema.
                 </div>
               </div>
             </div>
@@ -1100,11 +1151,11 @@ export default function FinancePayables() {
                 Cancelar
               </Button>
               <Button
-                className="gradient-bg text-white px-6"
+                className="bg-green-600 hover:bg-green-700 text-white px-6"
                 onClick={handlePay}
-                disabled={!paymentData.amount || !paymentData.method || payProducerMutation.isPending || payManualPayableMutation.isPending}
+                disabled={!paymentData.method || payProducerMutation.isPending || payManualPayableMutation.isPending || processEstornoMutation.isPending}
               >
-                {payProducerMutation.isPending || payManualPayableMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+                {payProducerMutation.isPending || payManualPayableMutation.isPending || processEstornoMutation.isPending ? "Processando..." : "Confirmar"}
               </Button>
             </div>
           </div>
