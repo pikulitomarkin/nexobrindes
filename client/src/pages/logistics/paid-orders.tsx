@@ -46,12 +46,9 @@ export default function LogisticsPaidOrders() {
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<DropshippingItem[]>({
-    queryKey: ["/api/logistics/dropshipping-items", statusFilter],
-    queryFn: async ({ queryKey }) => {
-      const filter = queryKey[1];
-      const url = filter !== "all" 
-        ? `/api/logistics/dropshipping-items?status=${filter}`
-        : "/api/logistics/dropshipping-items";
+    queryKey: ["/api/logistics/dropshipping-items"],
+    queryFn: async () => {
+      const url = "/api/logistics/dropshipping-items";
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch dropshipping items");
       return response.json();
@@ -97,10 +94,20 @@ export default function LogisticsPaidOrders() {
     if (!items) return [];
     
     return items.filter((item: DropshippingItem) => {
+      // Apply status filter first
+      if (statusFilter !== "all" && statusFilter !== "delayed") {
+        if (item.purchaseStatus !== statusFilter) return false;
+      }
+
+      // Special check for delayed filter
       if (statusFilter === "delayed") {
+        if (!item.deliveryDeadline) return false;
         const deadlineDate = new Date(item.deliveryDeadline);
         const today = new Date();
+        // Item is delayed if today is AFTER the deadline
         if (deadlineDate >= today) return false;
+        // Also, if it's already in store, it's no longer "delayed" for logistics action
+        if (item.purchaseStatus === 'in_store') return false;
       }
 
       if (searchTerm) {
