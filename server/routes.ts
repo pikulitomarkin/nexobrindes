@@ -1073,40 +1073,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Order ${id} cancelled successfully - ${receivables.length} receivables also cancelled`);
 
-      // Create refund payable (estorno) if order had any payments
-      const paidValue = parseFloat(order.paidValue || '0');
-      if (paidValue > 0) {
-        // Get client name for the refund
-        let clientName = order.contactName || 'Cliente';
-        if (order.clientId) {
-          const client = await storage.getClient(order.clientId);
-          if (client) {
-            clientName = client.name || client.nomeFantasia || client.razaoSocial || order.contactName || 'Cliente';
-          }
-        }
-
-        // Create a payable (conta a pagar) for the refund with category "Estorno"
-        const refundPayable = await storage.createManualPayable({
-          beneficiary: clientName,
-          description: `Estorno - Pedido ${order.orderNumber} cancelado`,
-          amount: paidValue.toFixed(2),
-          dueDate: new Date(), // Due immediately
-          category: 'Estorno',
-          status: 'pending',
-          notes: `Reembolso automático gerado pelo cancelamento do pedido ${order.orderNumber}. Valor pago pelo cliente: R$ ${paidValue.toFixed(2).replace('.', ',')}`,
-          orderId: id,
-          clientId: order.clientId || null,
-          branchId: order.branchId || null,
-        } as any);
-
-        console.log(`Refund payable created for order ${order.orderNumber}: R$ ${paidValue.toFixed(2)} to ${clientName}`);
-
-        // Update order with refund amount
-        await storage.updateOrder(id, {
-          refundAmount: paidValue.toFixed(2),
-          refundNotes: `Estorno pendente - Conta a pagar #${refundPayable.id} criada automaticamente`
-        });
-      }
 
       res.json({
         success: true,
