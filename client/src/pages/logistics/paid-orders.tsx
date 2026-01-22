@@ -97,6 +97,12 @@ export default function LogisticsPaidOrders() {
     if (!items) return [];
     
     return items.filter((item: DropshippingItem) => {
+      if (statusFilter === "delayed") {
+        const deadlineDate = new Date(item.deliveryDeadline);
+        const today = new Date();
+        if (deadlineDate >= today) return false;
+      }
+
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchesSearch = 
@@ -167,6 +173,7 @@ export default function LogisticsPaidOrders() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="delayed">Atrasado</SelectItem>
                 <SelectItem value="to_buy">Para comprar</SelectItem>
                 <SelectItem value="purchased">Comprado</SelectItem>
                 <SelectItem value="in_store">Na loja</SelectItem>
@@ -324,22 +331,22 @@ export default function LogisticsPaidOrders() {
                                 {item.purchaseStatus === 'pending' && (
                                   <Button
                                     size="sm"
-                                    className="bg-red-600 hover:bg-red-700 text-xs h-9 px-4"
+                                    className="bg-red-600 hover:bg-red-700 text-sm font-bold h-11 px-6 shadow-md"
                                     onClick={() => handleUpdateStatus(item.itemId, 'to_buy')}
                                     disabled={loadingItemId === item.itemId}
                                   >
-                                    {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-3.5 w-3.5 mr-2" /> Para comprar</>}
+                                    {loadingItemId === item.itemId ? '...' : <><ShoppingCart className="h-5 w-5 mr-2" /> Para comprar</>}
                                   </Button>
                                 )}
 
                                 {item.purchaseStatus === 'to_buy' && (
                                   <Button
                                     size="sm"
-                                    className="bg-yellow-600 hover:bg-yellow-700 text-xs h-9 px-4"
+                                    className="bg-yellow-600 hover:bg-yellow-700 text-sm font-bold h-11 px-6 shadow-md"
                                     onClick={() => handleUpdateStatus(item.itemId, 'purchased')}
                                     disabled={loadingItemId === item.itemId}
                                   >
-                                    {loadingItemId === item.itemId ? '...' : <><Package className="h-3.5 w-3.5 mr-2" /> Comprado</>}
+                                    {loadingItemId === item.itemId ? '...' : <><Package className="h-5 w-5 mr-2" /> Comprado</>}
                                   </Button>
                                 )}
                                 
