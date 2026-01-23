@@ -535,30 +535,36 @@ export class MemStorage implements IStorage {
     try {
       // Get vendor commission settings
       const vendor = await this.getVendor(order.vendorId);
+      const vendorUser = await this.getUser(order.vendorId);
       const commissionSettings = await this.getCommissionSettings();
 
-      const vendorRate = vendor?.commissionRate || commissionSettings?.vendorCommissionRate || '10.00';
+      // Check if vendor is commissioned before creating vendor commission
+      const isVendorCommissioned = vendorUser?.isCommissioned !== false;
       const orderValue = parseFloat(order.totalValue);
-      const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
 
-      // Create vendor commission
-      const vendorCommission: Commission = {
-        id: `commission-${order.id}-vendor`,
-        vendorId: order.vendorId,
-        partnerId: null,
-        orderId: order.id,
-        percentage: vendorRate,
-        amount: vendorCommissionAmount.toFixed(2),
-        status: 'pending',
-        type: 'vendor',
-        orderValue: order.totalValue,
-        orderNumber: order.orderNumber,
-        paidAt: null,
-        deductedAt: null,
-        createdAt: new Date()
-      };
+      if (isVendorCommissioned) {
+        const vendorRate = vendor?.commissionRate || commissionSettings?.vendorCommissionRate || '10.00';
+        const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
 
-      this.commissions.set(vendorCommission.id, vendorCommission);
+        // Create vendor commission
+        const vendorCommission: Commission = {
+          id: `commission-${order.id}-vendor`,
+          vendorId: order.vendorId,
+          partnerId: null,
+          orderId: order.id,
+          percentage: vendorRate,
+          amount: vendorCommissionAmount.toFixed(2),
+          status: 'pending',
+          type: 'vendor',
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber,
+          paidAt: null,
+          deductedAt: null,
+          createdAt: new Date()
+        };
+
+        this.commissions.set(vendorCommission.id, vendorCommission);
+      }
 
       // Create partner commissions - divide equally among 3 partners
       const partnerRate = commissionSettings?.partnerCommissionRate || '15.00';
@@ -1339,7 +1345,8 @@ export class MemStorage implements IStorage {
       address: vendorData.address || null,
       specialty: vendorData.specialty || null,
       vendorId: null,
-      isActive: true
+      isActive: true,
+      isCommissioned: vendorData.isCommissioned !== false
     };
 
     this.users.set(newUser.id, newUser);

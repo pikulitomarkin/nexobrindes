@@ -137,7 +137,8 @@ export class PgStorage implements IStorage {
       address: vendorData.address || null,
       specialty: vendorData.specialty || null,
       vendorId: null,
-      isActive: true
+      isActive: true,
+      isCommissioned: vendorData.isCommissioned !== false
     });
 
     // Create vendor profile
@@ -452,6 +453,13 @@ export class PgStorage implements IStorage {
     try {
       console.log(`Calculating commissions for order ${order.orderNumber}`);
 
+      // Get vendor user to check if commissioned
+      const vendorUser = await pg
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, order.vendorId))
+        .then(rows => rows[0]);
+
       // Get vendor commission rate
       const vendor = await pg
         .select()
@@ -459,28 +467,36 @@ export class PgStorage implements IStorage {
         .where(eq(schema.vendors.userId, order.vendorId))
         .then(rows => rows[0]);
 
-      const vendorRate = vendor?.commissionRate || '10.00';
       const orderValue = parseFloat(order.totalValue);
-      const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
 
-      // Create vendor commission
-      await pg.insert(schema.commissions).values({
-        id: `commission-${order.id}-vendor`,
-        vendorId: order.vendorId,
-        partnerId: null,
-        orderId: order.id,
-        percentage: vendorRate,
-        amount: vendorCommissionAmount.toFixed(2),
-        status: 'pending',
-        type: 'vendor',
-        orderValue: order.totalValue,
-        orderNumber: order.orderNumber,
-        paidAt: null,
-        deductedAt: null,
-        createdAt: new Date()
-      });
+      // Only create vendor commission if vendor is commissioned
+      const isVendorCommissioned = vendorUser?.isCommissioned !== false;
 
-      console.log(`Created vendor commission: R$ ${vendorCommissionAmount.toFixed(2)} (${vendorRate}%) for order ${order.orderNumber}`);
+      if (isVendorCommissioned) {
+        const vendorRate = vendor?.commissionRate || '10.00';
+        const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
+
+        // Create vendor commission
+        await pg.insert(schema.commissions).values({
+          id: `commission-${order.id}-vendor`,
+          vendorId: order.vendorId,
+          partnerId: null,
+          orderId: order.id,
+          percentage: vendorRate,
+          amount: vendorCommissionAmount.toFixed(2),
+          status: 'pending',
+          type: 'vendor',
+          orderValue: order.totalValue,
+          orderNumber: order.orderNumber,
+          paidAt: null,
+          deductedAt: null,
+          createdAt: new Date()
+        });
+
+        console.log(`Created vendor commission: R$ ${vendorCommissionAmount.toFixed(2)} (${vendorRate}%) for order ${order.orderNumber}`);
+      } else {
+        console.log(`Skipping vendor commission for order ${order.orderNumber} - vendor is not commissioned`);
+      }
 
       // Get all partners for partner commissions
       const allPartners = await pg

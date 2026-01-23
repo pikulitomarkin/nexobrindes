@@ -16,7 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2, Lock, EyeOff } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2, Lock, EyeOff, DollarSign } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +30,7 @@ const vendorFormSchema = z.object({
   address: z.string().optional(),
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
   branchId: z.string().optional(),
+  isCommissioned: z.boolean().default(true),
 });
 
 // Schema for editing vendor - password is optional
@@ -161,6 +163,7 @@ export default function AdminVendors() {
       address: "",
       commissionRate: "10.00",
       branchId: "",
+      isCommissioned: true,
     },
   });
 
@@ -174,7 +177,8 @@ export default function AdminVendors() {
         password: data.password,
         userCode: userCode,
         commissionRate: data.commissionRate,
-        branchId: data.branchId === "default" ? null : data.branchId
+        branchId: data.branchId === "default" ? null : data.branchId,
+        isCommissioned: data.isCommissioned !== false
       };
       const response = await fetch("/api/vendors", {
         method: "POST",
@@ -278,6 +282,7 @@ export default function AdminVendors() {
       commissionRate: vendor.commissionRate?.toString() || "10.00",
       branchId: vendor.branchId || "",
       password: "", // Don't populate password for security
+      isCommissioned: vendor.isCommissioned !== false,
     });
     setShowEditVendor(true);
   };
@@ -432,6 +437,30 @@ export default function AdminVendors() {
                         <Input placeholder="Rua das Flores, 123, Centro, São Paulo, SP" {...field} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="isCommissioned"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-green-50">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="text-green-800 flex items-center">
+                          <DollarSign className="h-4 w-4 mr-1" />
+                          Vendedor Comissionado
+                        </FormLabel>
+                        <p className="text-xs text-green-600">
+                          Se marcado, o sistema gera comissões automaticamente para este vendedor
+                        </p>
+                      </div>
                     </FormItem>
                   )}
                 />
