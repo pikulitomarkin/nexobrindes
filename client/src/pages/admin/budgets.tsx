@@ -1226,17 +1226,12 @@ export default function AdminBudgets() {
                               required
                             />
                           </div>
-                          <div>
-                            <Label htmlFor={`admin-unit-price-${index}`}>Preço Unitário</Label>
+                          <div className="flex-1 min-w-[120px]">
+                            <Label className="text-xs">Preço Unitário (R$)</Label>
                             <Input
-                              id={`admin-unit-price-${index}`}
-                              type="text"
-                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
-                              onChange={(e) => {
-                                const value = parseCurrencyValue(e.target.value);
-                                updateAdminBudgetItem(index, 'unitPrice', value);
-                              }}
                               placeholder="R$ 0,00"
+                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
+                              onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                             />
                           </div>
                           <div>
@@ -1770,12 +1765,9 @@ export default function AdminBudgets() {
                           value={adminBudgetForm.downPayment > 0 ? currencyMask(adminBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const downPayment = parseCurrencyValue(e.target.value);
-                            // Use subtotal without shipping - shipping is paid upfront with down payment
-                            const subtotal = calculateAdminBudgetTotal();
                             setAdminBudgetForm({
                               ...adminBudgetForm,
                               downPayment,
-                              remainingAmount: Math.max(0, subtotal - downPayment)
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1832,12 +1824,9 @@ export default function AdminBudgets() {
                           value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            // Remaining amount excludes shipping - shipping is paid upfront with down payment
-                            const subtotal = calculateAdminBudgetTotal();
                             setAdminBudgetForm({
                               ...adminBudgetForm,
                               shippingCost,
-                              remainingAmount: Math.max(0, subtotal - (adminBudgetForm.downPayment || 0))
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1846,10 +1835,12 @@ export default function AdminBudgets() {
                         <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do orçamento</p>
                       </div>
                       <div>
-                        <Label>Prazo Estimado</Label>
-                        <p className="text-sm text-gray-600 mt-2">
-                          {selectedAdminShippingMethod.estimatedDays} dias úteis
-                        </p>
+                        <Label>Prazo Estimado de Entrega</Label>
+                        <Input
+                          placeholder="Ex: 15 dias"
+                          value={adminBudgetForm.deliveryDeadline}
+                          onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
+                        />
                       </div>
                     </div>
                   </div>

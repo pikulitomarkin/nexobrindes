@@ -1124,17 +1124,12 @@ export default function VendorBudgets() {
                               required
                             />
                           </div>
-                          <div>
-                            <Label htmlFor={`unit-price-${index}`}>Preço Unitário</Label>
+                          <div className="flex-1 min-w-[120px]">
+                            <Label className="text-xs">Preço Unitário (R$)</Label>
                             <Input
-                              id={`unit-price-${index}`}
-                              type="text"
-                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
-                              onChange={(e) => {
-                                const value = parseCurrencyValue(e.target.value);
-                                updateBudgetItem(index, 'unitPrice', value);
-                              }}
                               placeholder="R$ 0,00"
+                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
+                              onChange={(e) => updateBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                             />
                           </div>
                           <div>
@@ -1671,12 +1666,9 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const downPayment = parseCurrencyValue(e.target.value);
-                            // Use subtotal without shipping - shipping is paid upfront with down payment
-                            const subtotal = calculateBudgetTotal();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               downPayment,
-                              remainingAmount: Math.max(0, subtotal - downPayment)
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1733,12 +1725,9 @@ export default function VendorBudgets() {
                           value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
                           onChange={(e) => {
                             const shippingCost = parseCurrencyValue(e.target.value);
-                            // Remaining amount excludes shipping - shipping is paid upfront with down payment
-                            const subtotal = calculateBudgetTotal();
                             setVendorBudgetForm({
                               ...vendorBudgetForm,
                               shippingCost,
-                              remainingAmount: Math.max(0, subtotal - (vendorBudgetForm.downPayment || 0))
                             });
                           }}
                           placeholder="R$ 0,00"
@@ -1747,10 +1736,12 @@ export default function VendorBudgets() {
                         <p className="text-xs text-gray-500 mt-1">Valor do frete será somado ao total do orçamento</p>
                       </div>
                       <div>
-                        <Label>Prazo Estimado</Label>
-                        <p className="text-sm text-gray-600 mt-2">
-                          {selectedShippingMethod.estimatedDays} dias úteis
-                        </p>
+                        <Label>Prazo Estimado de Entrega</Label>
+                        <Input
+                          placeholder="Ex: 15 dias"
+                          value={vendorBudgetForm.deliveryDeadline}
+                          onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
+                        />
                       </div>
                     </div>
                   </div>
