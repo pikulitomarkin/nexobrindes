@@ -132,7 +132,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const logisticsNavigation = [
     { href: "/logistics/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos Pagos" },
+    { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos" },
     { href: "/logistics/production-tracking", icon: Factory, label: "Acompanhar Produção" },
     { href: "/logistics/shipments", icon: Package, label: "Despachos" },
     { href: "/logistics/products", icon: Package, label: "Produtos" },

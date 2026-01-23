@@ -680,7 +680,7 @@ export default function LogisticsDashboard() {
     switch (currentSection) {
       case 'paid-orders':
         return {
-          title: 'Pedidos Pagos - Aguardando Envio',
+          title: 'Pedidos - Aguardando Produção',
           description: 'Pedidos que receberam pagamento e estão prontos para serem enviados à produção'
         };
       case 'production-tracking':
@@ -718,7 +718,7 @@ export default function LogisticsDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-green-700">Pagos - Aguardando Envio</p>
+                    <p className="text-sm font-medium text-green-700">Aguardando Produção</p>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-green-900">{uniquePaidOrdersCount}</p>
                       <p className="text-xs text-green-600">Pedidos únicos</p>
@@ -998,13 +998,13 @@ export default function LogisticsDashboard() {
         </CardContent>
       </Card>
 
-      {/* Pedidos Pagos - Aguardando Envio para Produção */}
+      {/* Pedidos Pagos - Aguardando Produção */}
       {(currentSection === 'dashboard' || currentSection === 'paid-orders') && (
         <Card className="mb-6">
           <CardHeader className="bg-green-50">
             <CardTitle className="text-green-800 flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Pedidos Pagos - Aguardando Envio para Produção ({paidOrdersCount})
+              Pedidos Pagos - Aguardando Produção ({paidOrdersCount})
             </CardTitle>
             <p className="text-sm text-green-700 mt-2">
               Pedidos que receberam pagamento e estão prontos para serem enviados à produção
