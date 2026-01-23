@@ -1258,6 +1258,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create user
+  app.post("/api/users", async (req, res) => {
+    try {
+      const { username, password, role, name, email, phone, branchId, isCommissioned } = req.body;
+      
+      if (!username || !password || !role || !name) {
+        return res.status(400).json({ error: "Username, password, role and name are required" });
+      }
+
+      // Check if username exists
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const newUser = await storage.createUser({
+        username,
+        password,
+        role,
+        name,
+        email: email || null,
+        phone: phone || null,
+        branchId: branchId || null,
+        isCommissioned: isCommissioned !== undefined ? isCommissioned : true,
+        isActive: true
+      });
+
+      res.json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Get all users
   app.get("/api/users", async (req, res) => {
     try {

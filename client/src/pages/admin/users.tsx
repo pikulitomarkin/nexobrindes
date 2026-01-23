@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Users, ShoppingCart, Handshake, Factory, Edit, Trash2, Eye, EyeOff, RefreshCw, User, Mail, Phone, MapPin } from "lucide-react";
+import { Plus, Users, ShoppingCart, Handshake, Factory, Edit, Trash2, Eye, EyeOff, RefreshCw, User, Mail, Phone, MapPin, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -62,10 +62,19 @@ const producerFormSchema = z.object({
   address: z.string().min(5, "Endereço é obrigatório"),
 });
 
+const financeFormSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  username: z.string().min(3, "Username deve ter pelo menos 3 caracteres"),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  phone: z.string().optional(),
+});
+
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 type VendorFormValues = z.infer<typeof vendorFormSchema>;
 type PartnerFormValues = z.infer<typeof partnerFormSchema>;
 type ProducerFormValues = z.infer<typeof producerFormSchema>;
+type FinanceFormValues = z.infer<typeof financeFormSchema>;
 
 export default function AdminUsers() {
   const [location] = useLocation();
@@ -74,10 +83,12 @@ export default function AdminUsers() {
   const [isVendorDialogOpen, setIsVendorDialogOpen] = useState(false);
   const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
   const [isProducerDialogOpen, setIsProducerDialogOpen] = useState(false);
+  const [isFinanceDialogOpen, setIsFinanceDialogOpen] = useState(false);
   const [clientUserCode, setClientUserCode] = useState("");
   const [vendorUserCode, setVendorUserCode] = useState("");
   const [partnerUserCode, setPartnerUserCode] = useState("");
   const [producerUserCode, setProducerUserCode] = useState("");
+  const [financeUserCode, setFinanceUserCode] = useState("");
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -154,6 +165,17 @@ export default function AdminUsers() {
       phone: "",
       specialty: "",
       address: "",
+    },
+  });
+
+  const financeForm = useForm<FinanceFormValues>({
+    resolver: zodResolver(financeFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      username: "",
+      password: "",
+      phone: "",
     },
   });
 
@@ -277,6 +299,35 @@ export default function AdminUsers() {
     },
   });
 
+  const createFinanceMutation = useMutation({
+    mutationFn: async (data: FinanceFormValues) => {
+      const financeData = {
+        ...data,
+        role: "finance",
+        username: financeUserCode,
+      };
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(financeData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao criar usuário financeiro");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsFinanceDialogOpen(false);
+      financeForm.reset();
+      toast({
+        title: "Sucesso!",
+        description: `Usuário financeiro criado com sucesso! Código de acesso: ${financeUserCode}`,
+      });
+    },
+  });
+
   // Code generation functions
   const generateClientUserCode = () => {
     const timestamp = Date.now().toString().slice(-6);
@@ -300,6 +351,12 @@ export default function AdminUsers() {
     const timestamp = Date.now().toString().slice(-6);
     const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
     return `PRO${timestamp}${randomStr}`;
+  };
+
+  const generateFinanceUserCode = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `FIN${timestamp}${randomStr}`;
   };
 
   // Effects to generate codes when dialogs open
@@ -327,6 +384,12 @@ export default function AdminUsers() {
     }
   }, [isProducerDialogOpen]);
 
+  useEffect(() => {
+    if (isFinanceDialogOpen) {
+      setFinanceUserCode(generateFinanceUserCode());
+    }
+  }, [isFinanceDialogOpen]);
+
   // Submit handlers
   const onClientSubmit = (data: ClientFormValues) => {
     createClientMutation.mutate(data);
@@ -344,11 +407,16 @@ export default function AdminUsers() {
     createProducerMutation.mutate(data);
   };
 
+  const onFinanceSubmit = (data: FinanceFormValues) => {
+    createFinanceMutation.mutate(data);
+  };
+
   // Filter users by role
   const clients = users?.filter((u: any) => u.role === 'client') || [];
   const vendorUsers = users?.filter((u: any) => u.role === 'vendor') || [];
   const partners = users?.filter((u: any) => u.role === 'partner') || [];
   const producers = users?.filter((u: any) => u.role === 'producer') || [];
+  const financeUsers = users?.filter((u: any) => u.role === 'finance') || [];
 
   if (isLoading) {
     return (
@@ -394,7 +462,7 @@ export default function AdminUsers() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="clients" className="flex items-center">
             <Users className="h-4 w-4 mr-2" />
             Clientes ({clients.length})
@@ -410,6 +478,10 @@ export default function AdminUsers() {
           <TabsTrigger value="producers" className="flex items-center">
             <Factory className="h-4 w-4 mr-2" />
             Produtores ({producers.length})
+          </TabsTrigger>
+          <TabsTrigger value="finance" className="flex items-center">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Financeiro ({financeUsers.length})
           </TabsTrigger>
           <TabsTrigger value="overview" className="flex items-center">
             <Eye className="h-4 w-4 mr-2" />
@@ -1279,6 +1351,148 @@ export default function AdminUsers() {
         </TabsContent>
 
         {/* Visão Geral */}
+        <TabsContent value="finance">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center">
+                  <DollarSign className="h-5 w-5 mr-2" />
+                  Usuários Financeiros
+                </CardTitle>
+                <Dialog open={isFinanceDialogOpen} onOpenChange={setIsFinanceDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gradient-bg text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo Usuário Financeiro
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Cadastrar Usuário Financeiro</DialogTitle>
+                      <DialogDescription>
+                        Crie um novo acesso para o módulo financeiro.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...financeForm}>
+                      <form onSubmit={financeForm.handleSubmit(onFinanceSubmit)} className="space-y-4">
+                        <FormField
+                          control={financeForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome Completo *</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Nome do responsável" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={financeForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="financeiro@empresa.com" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormItem>
+                            <FormLabel>Username (Gerado)</FormLabel>
+                            <FormControl>
+                              <Input value={financeUserCode} readOnly className="bg-gray-50" />
+                            </FormControl>
+                          </FormItem>
+                        </div>
+                        <FormField
+                          control={financeForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Senha *</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    {...field}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                  >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button type="button" variant="outline" onClick={() => setIsFinanceDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button type="submit" className="gradient-bg text-white" disabled={createFinanceMutation.isPending}>
+                            {createFinanceMutation.isPending ? "Cadastrando..." : "Cadastrar Usuário"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4">Nome</th>
+                      <th className="text-left py-3 px-4">Usuário</th>
+                      <th className="text-left py-3 px-4">Email</th>
+                      <th className="text-left py-3 px-4">Status</th>
+                      <th className="text-right py-3 px-4">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(financeUsers) && financeUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-gray-500 italic">
+                          Nenhum usuário financeiro cadastrado.
+                        </td>
+                      </tr>
+                    ) : (
+                      financeUsers.map((u: any) => (
+                        <tr key={u.id} className="border-b hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium">{u.name}</td>
+                          <td className="py-3 px-4">{u.username}</td>
+                          <td className="py-3 px-4">{u.email || "-"}</td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Ativo</span>
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-2">
+                            <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="overview">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="card-hover">

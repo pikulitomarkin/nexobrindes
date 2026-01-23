@@ -68,6 +68,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
     { href: "/admin/partners", icon: User, label: "Sócios" },
     { href: "/admin/branches", icon: Building2, label: "Filiais" },
+    { href: "/admin/users", icon: Users, label: "Usuários" },
     { href: "/admin/logistics", icon: Package, label: "Logística" },
     { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
     { href: "/admin/settings", icon: Settings, label: "Configurações" },
