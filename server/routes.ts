@@ -1030,8 +1030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/orders/:id/cancel", async (req, res) => {
     try {
       const { id } = req.params;
+      const { reason, userId } = req.body;
 
-      console.log(`Cancelling order: ${id}`);
+      console.log(`Cancelling order: ${id}, reason: ${reason}, by: ${userId}`);
 
       // Get order to validate it exists
       const order = await storage.getOrder(id);
@@ -1055,6 +1056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'cancelled',
         paidValue: '0.00',
         refundAmount: paidValue > 0 ? paidValue.toFixed(2) : '0.00',
+        cancellationReason: reason || null,
+        cancelledBy: userId || req.user?.id || null,
         updatedAt: new Date()
       });
 

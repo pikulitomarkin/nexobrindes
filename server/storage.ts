@@ -91,7 +91,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
-  updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
+  updateOrderStatus(id: string, status: string, cancellationReason?: string, cancelledBy?: string): Promise<Order | undefined>;
   getOrdersByVendor(vendorId: string): Promise<Order[]>;
   getOrdersByClient(clientId: string): Promise<Order[]>;
   getClientsByVendor(vendorId: string): Promise<Client[]>;
@@ -1734,10 +1734,16 @@ export class MemStorage implements IStorage {
   }
 
 
-  async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
+  async updateOrderStatus(id: string, status: string, cancellationReason?: string, cancelledBy?: string): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (order) {
-      const updatedOrder = { ...order, status, updatedAt: new Date() };
+      const updatedOrder = { 
+        ...order, 
+        status, 
+        cancellationReason: cancellationReason || order.cancellationReason,
+        cancelledBy: cancelledBy || order.cancelledBy,
+        updatedAt: new Date() 
+      };
       this.orders.set(id, updatedOrder);
 
       // Process commission payments
