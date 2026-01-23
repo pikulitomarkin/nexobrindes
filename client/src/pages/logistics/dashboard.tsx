@@ -359,7 +359,7 @@ export default function LogisticsDashboard() {
     };
 
     const statusLabels = {
-      paid: "Pago - Aguardando Envio para Produção",
+      paid: "Pago - Aguardando Produção",
       confirmed: "Confirmado - Pago",
       pending: "Pendente",
       accepted: "Aceito",

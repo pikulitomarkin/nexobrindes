@@ -404,8 +404,8 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             onClick={() => navigate("/logistics/dashboard")}
           />
           <SidebarItem
-            icon={<Package className="h-5 w-5" />}
-            label="Pedidos Pagos"
+            icon={<ShoppingCart className="h-5 w-5" />}
+            label="Pedidos"
             path="/logistics/paid-orders"
             isActive={pathname === "/logistics/paid-orders"}
             onClick={() => navigate("/logistics/paid-orders")}
