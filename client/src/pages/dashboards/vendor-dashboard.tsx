@@ -9,6 +9,7 @@ import { Link } from "wouter";
 export default function VendorDashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const vendorId = user.id;
+  const isCommissioned = user.isCommissioned !== false;
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -30,6 +31,7 @@ export default function VendorDashboard() {
       if (!response.ok) throw new Error('Failed to fetch vendor commissions');
       return response.json();
     },
+    enabled: isCommissioned,
   });
 
   if (isLoading) {
@@ -73,13 +75,13 @@ export default function VendorDashboard() {
       href: "/vendor/clients",
       color: "bg-purple-500 hover:bg-purple-600",
     },
-    {
+    ...(isCommissioned ? [{
       title: "Minhas Comissões",
       description: "Acompanhar comissões e ganhos",
       icon: DollarSign,
       href: "/vendor/commissions",
       color: "bg-orange-500 hover:bg-orange-600",
-    },
+    }] : []),
   ];
 
   return (
@@ -97,7 +99,7 @@ export default function VendorDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className={`grid grid-cols-1 ${isCommissioned ? 'md:grid-cols-4' : 'md:grid-cols-2'} gap-6 mb-8`}>
         <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -115,22 +117,24 @@ export default function VendorDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Comissões Total</p>
-                <p className="text-3xl font-bold text-green-600">
-                  R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Confirmadas</p>
+        {isCommissioned && (
+          <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Comissões Total</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    R$ {totalCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Confirmadas</p>
+                </div>
+                <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-green-600" />
+                </div>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
           <CardContent className="p-6">
@@ -149,22 +153,24 @@ export default function VendorDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Comissões Pendentes</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">A receber</p>
+        {isCommissioned && (
+          <Card className="hover:shadow-lg transition-shadow border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Comissões Pendentes</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    R$ {pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">A receber</p>
+                </div>
+                <div className="h-12 w-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-orange-600" />
+                </div>
               </div>
-              <div className="h-12 w-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Quick Actions */}
