@@ -1285,6 +1285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true
       });
 
+      console.log(`User created successfully: ${username} with role ${role}`);
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);

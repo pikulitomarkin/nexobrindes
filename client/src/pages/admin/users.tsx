@@ -386,9 +386,11 @@ export default function AdminUsers() {
 
   useEffect(() => {
     if (isFinanceDialogOpen) {
-      setFinanceUserCode(generateFinanceUserCode());
+      const code = generateFinanceUserCode();
+      setFinanceUserCode(code);
+      financeForm.setValue("username", code);
     }
-  }, [isFinanceDialogOpen]);
+  }, [isFinanceDialogOpen, financeForm]);
 
   // Submit handlers
   const onClientSubmit = (data: ClientFormValues) => {
@@ -1405,7 +1407,12 @@ export default function AdminUsers() {
                           <FormItem>
                             <FormLabel>Username (Gerado)</FormLabel>
                             <FormControl>
-                              <Input value={financeUserCode} readOnly className="bg-gray-50" />
+                              <Input 
+                                {...financeForm.register("username")}
+                                value={financeUserCode} 
+                                readOnly 
+                                className="bg-gray-50" 
+                              />
                             </FormControl>
                           </FormItem>
                         </div>
