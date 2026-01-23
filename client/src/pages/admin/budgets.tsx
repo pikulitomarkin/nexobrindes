@@ -396,6 +396,17 @@ export default function AdminBudgets() {
     return subtotal + shipping + interest;
   };
 
+  // Update down payment when items or other costs change
+  useEffect(() => {
+    const total = calculateAdminTotalWithShipping();
+    const half = total / 2;
+    setAdminBudgetForm(prev => ({
+      ...prev,
+      downPayment: prev.downPayment === 0 ? half : prev.downPayment,
+      remainingAmount: Math.max(0, total - (prev.downPayment === 0 ? half : prev.downPayment))
+    }));
+  }, [adminBudgetForm.items, adminBudgetForm.shippingCost, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue, adminBudgetForm.installments]);
+
   const resetAdminBudgetForm = () => {
     setAdminBudgetForm({
       title: "",
