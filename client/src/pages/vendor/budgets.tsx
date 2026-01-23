@@ -360,16 +360,19 @@ export default function VendorBudgets() {
     return subtotal + shipping + interest;
   };
 
-  // Update down payment when items or other costs change
+  // Update down payment when items change - 50% do subtotal dos produtos (sem frete)
   useEffect(() => {
-    const total = calculateTotalWithShipping();
-    const half = total / 2;
-    setVendorBudgetForm(prev => ({
-      ...prev,
-      downPayment: prev.downPayment === 0 ? half : prev.downPayment,
-      remainingAmount: Math.max(0, total - (prev.downPayment === 0 ? half : prev.downPayment))
-    }));
-  }, [vendorBudgetForm.items, vendorBudgetForm.shippingCost, vendorBudgetForm.hasDiscount, vendorBudgetForm.discountPercentage, vendorBudgetForm.discountValue, vendorBudgetForm.installments]);
+    const subtotal = calculateBudgetTotal();
+    const half = subtotal / 2;
+    // Só atualiza automaticamente se downPayment for 0 (novo orçamento ou resetado)
+    if (vendorBudgetForm.downPayment === 0 && subtotal > 0) {
+      setVendorBudgetForm(prev => ({
+        ...prev,
+        downPayment: half,
+        remainingAmount: Math.max(0, subtotal - half)
+      }));
+    }
+  }, [vendorBudgetForm.items, vendorBudgetForm.hasDiscount, vendorBudgetForm.discountPercentage, vendorBudgetForm.discountValue]);
 
 
   const resetBudgetForm = () => {

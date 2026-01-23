@@ -396,16 +396,19 @@ export default function AdminBudgets() {
     return subtotal + shipping + interest;
   };
 
-  // Update down payment when items or other costs change
+  // Update down payment when items change - 50% do subtotal dos produtos (sem frete)
   useEffect(() => {
-    const total = calculateAdminTotalWithShipping();
-    const half = total / 2;
-    setAdminBudgetForm(prev => ({
-      ...prev,
-      downPayment: prev.downPayment === 0 ? half : prev.downPayment,
-      remainingAmount: Math.max(0, total - (prev.downPayment === 0 ? half : prev.downPayment))
-    }));
-  }, [adminBudgetForm.items, adminBudgetForm.shippingCost, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue, adminBudgetForm.installments]);
+    const subtotal = calculateAdminBudgetTotal();
+    const half = subtotal / 2;
+    // Só atualiza automaticamente se downPayment for 0 (novo orçamento ou resetado)
+    if (adminBudgetForm.downPayment === 0 && subtotal > 0) {
+      setAdminBudgetForm(prev => ({
+        ...prev,
+        downPayment: half,
+        remainingAmount: Math.max(0, subtotal - half)
+      }));
+    }
+  }, [adminBudgetForm.items, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue]);
 
   const resetAdminBudgetForm = () => {
     setAdminBudgetForm({
