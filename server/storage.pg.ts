@@ -702,12 +702,16 @@ export class PgStorage implements IStorage {
     status: string,
     notes?: string,
     deliveryDate?: string,
-    trackingCode?: string
+    trackingCode?: string,
+    cancellationReason?: string,
+    cancelledBy?: string
   ): Promise<Order | undefined> {
     const updates: any = { status };
     if (notes) updates.notes = notes;
     if (deliveryDate) updates.deliveryDeadline = new Date(deliveryDate);
     if (trackingCode) updates.trackingCode = trackingCode;
+    if (cancellationReason) updates.cancellationReason = cancellationReason;
+    if (cancelledBy) updates.cancelledBy = cancelledBy;
 
     const results = await pg.update(schema.orders)
       .set(updates)

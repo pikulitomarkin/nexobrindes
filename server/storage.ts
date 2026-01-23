@@ -91,7 +91,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
-  updateOrderStatus(id: string, status: string, cancellationReason?: string, cancelledBy?: string): Promise<Order | undefined>;
+  updateOrderStatus(id: string, status: string, notes?: string, deliveryDate?: string, trackingCode?: string, cancellationReason?: string, cancelledBy?: string): Promise<Order | undefined>;
   getOrdersByVendor(vendorId: string): Promise<Order[]>;
   getOrdersByClient(clientId: string): Promise<Order[]>;
   getClientsByVendor(vendorId: string): Promise<Client[]>;
