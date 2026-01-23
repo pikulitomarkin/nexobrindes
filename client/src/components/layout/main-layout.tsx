@@ -98,6 +98,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
   ];
 
+  const isVendorCommissioned = user.isCommissioned !== false;
+  
   const vendorNavigation = [
     { href: "/", icon: Home, label: "Dashboard" },
     { href: "/vendor/products", icon: Package, label: "Catálogo" },
@@ -105,7 +107,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/vendor/budgets", icon: FileText, label: "Orçamentos" },
     { href: "/vendor/orders", icon: ShoppingCart, label: "Pedidos" },
     { href: "/vendor/clients", icon: Users, label: "Clientes" },
-    { href: "/vendor/commissions", icon: DollarSign, label: "Comissões" },
+    ...(isVendorCommissioned ? [{ href: "/vendor/commissions", icon: DollarSign, label: "Comissões" }] : []),
     { href: "/vendor/logs", icon: ClipboardList, label: "Meus Logs" },
   ];
 

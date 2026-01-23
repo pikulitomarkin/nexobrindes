@@ -4347,6 +4347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             branchId: vendorInfo?.branchId || null,
             branchName: branch?.name || null,
             commissionRate: vendorInfo?.commissionRate || '10.00',
+            isCommissioned: vendor.isCommissioned !== false,
             isActive: vendorInfo?.isActive || true
           };
         })

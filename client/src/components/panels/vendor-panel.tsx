@@ -10,6 +10,7 @@ export default function VendorPanel() {
   const { toast } = useToast();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const vendorId = user.id; // Use actual vendor ID from logged user
+  const isCommissioned = user.isCommissioned !== false;
 
   const { data: vendorInfo, isLoading: vendorLoading } = useQuery({
     queryKey: ["/api/vendor", vendorId],
@@ -19,10 +20,10 @@ export default function VendorPanel() {
     queryKey: ["/api/orders/vendor", vendorId],
   });
 
-  // Buscar comissões do vendedor
+  // Buscar comissões do vendedor (only if commissioned)
   const { data: vendorCommissions, isLoading: commissionsLoading } = useQuery({
     queryKey: ["/api/commissions/vendor", vendorId],
-    enabled: !!vendorId,
+    enabled: !!vendorId && isCommissioned,
   });
 
   const copyToClipboard = async (text: string) => {
@@ -99,17 +100,19 @@ export default function VendorPanel() {
           </CardContent>
         </Card>
 
-        <Card className="card-hover">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Comissões</h3>
-            <p className="text-3xl font-bold gradient-text">
-              R$ {(vendorCommissions?.filter((c: any) => ['confirmed', 'paid'].includes(c.status)).reduce((sum: number, c: any) => sum + parseFloat(c.amount || '0'), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-sm text-blue-600 mt-1">
-              {vendorCommissions?.filter((c: any) => c.status === 'confirmed').length || 0} comissões confirmadas
-            </p>
-          </CardContent>
-        </Card>
+        {isCommissioned && (
+          <Card className="card-hover">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Comissões</h3>
+              <p className="text-3xl font-bold gradient-text">
+                R$ {(vendorCommissions?.filter((c: any) => ['confirmed', 'paid'].includes(c.status)).reduce((sum: number, c: any) => sum + parseFloat(c.amount || '0'), 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm text-blue-600 mt-1">
+                {vendorCommissions?.filter((c: any) => c.status === 'confirmed').length || 0} comissões confirmadas
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="card-hover">
           <CardContent className="p-6">
@@ -160,12 +163,14 @@ export default function VendorPanel() {
                 Pedidos ({vendorInfo?.confirmedOrders || 0})
               </Button>
             </Link>
-            <Link href="/vendor/commissions">
-              <Button variant="outline" className="w-full justify-start">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Comissões
-              </Button>
-            </Link>
+            {isCommissioned && (
+              <Link href="/vendor/commissions">
+                <Button variant="outline" className="w-full justify-start">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Comissões
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
 
@@ -183,12 +188,14 @@ export default function VendorPanel() {
                 Ver Meus Clientes
               </Button>
             </Link>
-            <Link href="/vendor/commissions">
-              <Button variant="outline" className="w-full justify-start">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Minhas Comissões
-              </Button>
-            </Link>
+            {isCommissioned && (
+              <Link href="/vendor/commissions">
+                <Button variant="outline" className="w-full justify-start">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Minhas Comissões
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -224,9 +231,11 @@ export default function VendorPanel() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comissão
-                  </th>
+                  {isCommissioned && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Comissão
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -247,11 +256,13 @@ export default function VendorPanel() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      R$ {(vendorCommissions?.find((c: any) => c.orderId === order.id)?.amount ? 
-                        parseFloat(vendorCommissions.find((c: any) => c.orderId === order.id).amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : 
-                        '0,00')}
-                    </td>
+                    {isCommissioned && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        R$ {(vendorCommissions?.find((c: any) => c.orderId === order.id)?.amount ? 
+                          parseFloat(vendorCommissions.find((c: any) => c.orderId === order.id).amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : 
+                          '0,00')}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(order.status)}
                     </td>

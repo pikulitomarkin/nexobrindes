@@ -82,10 +82,12 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Mock user data for now
+  // Load user from localStorage
   useEffect(() => {
-    // In a real app, you would fetch user data here
-    setUser({ id: 1, role: 'admin' }); // Example: 'admin', 'vendor', 'client', etc.
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
     setLoading(false);
   }, []);
 
@@ -305,13 +307,15 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
             isActive={pathname === "/vendor/orders"}
             onClick={() => navigate("/vendor/orders")}
           />
-          <SidebarItem
-            icon={<Calculator className="h-4 w-4" />}
-            label="Comissões"
-            path="/vendor/commissions"
-            isActive={pathname === "/vendor/commissions"}
-            onClick={() => navigate("/vendor/commissions")}
-          />
+          {user?.isCommissioned !== false && (
+            <SidebarItem
+              icon={<Calculator className="h-4 w-4" />}
+              label="Comissões"
+              path="/vendor/commissions"
+              isActive={pathname === "/vendor/commissions"}
+              onClick={() => navigate("/vendor/commissions")}
+            />
+          )}
           <SidebarItem
             icon={<FileText className="h-4 w-4" />}
             label="Solicitações de Cotação"
