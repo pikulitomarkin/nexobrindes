@@ -123,10 +123,11 @@ export default function AdminOrders() {
   });
 
   const cancelOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+    mutationFn: async ({ id, reason, userId }: { id: string, reason: string, userId: string }) => {
+      const response = await fetch(`/api/orders/${id}/cancel`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, userId })
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -457,35 +458,51 @@ export default function AdminOrders() {
                             </Button>
                           )}
                           {order.status !== 'cancelled' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            <Dialog>
+                              <DialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-800" title="Cancelar pedido">
                                   <X className="h-4 w-4" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Confirmar cancelamento</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja cancelar este pedido? Esta ação irá:
-                                    <br />• Cancelar o pedido
-                                    <br />• Remover comissões relacionadas
-                                    <br />• Atualizar valores do sistema
-                                    <br />Esta ação não pode ser desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Não Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => cancelOrderMutation.mutate(order.id)}
-                                    className="bg-orange-600 hover:bg-orange-700"
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Confirmar cancelamento</DialogTitle>
+                                  <DialogDescription>
+                                    Por favor, informe o motivo do cancelamento do pedido {order.orderNumber}.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="cancel-reason">Motivo do Cancelamento</Label>
+                                    <Textarea
+                                      id="cancel-reason"
+                                      placeholder="Descreva o motivo..."
+                                      className="h-24"
+                                      onChange={(e) => (window as any)._cancelReason = e.target.value}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-3">
+                                  <Button variant="outline" onClick={() => {}}>
+                                    Voltar
+                                  </Button>
+                                  <Button 
+                                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                                    onClick={() => {
+                                      const user = JSON.parse(localStorage.getItem("user") || "{}");
+                                      cancelOrderMutation.mutate({ 
+                                        id: order.id, 
+                                        reason: (window as any)._cancelReason,
+                                        userId: user.id 
+                                      });
+                                    }}
                                     disabled={cancelOrderMutation.isPending}
                                   >
-                                    {cancelOrderMutation.isPending ? "Cancelando..." : "Cancelar Pedido"}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                    {cancelOrderMutation.isPending ? "Cancelando..." : "Confirmar Cancelamento"}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                           )}
                         </div>
                       </td>

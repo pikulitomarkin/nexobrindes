@@ -100,6 +100,8 @@ export const orders = pgTable("orders", {
   // Additional notes
   refundNotes: text("refund_notes"), // Observações sobre reembolso
   refundedAt: timestamp("refunded_at"), // Data em que o estorno foi processado
+  cancellationReason: text("cancellation_reason"), // Motivo do cancelamento
+  cancelledBy: varchar("cancelled_by").references(() => users.id), // ID do usuário que cancelou
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
