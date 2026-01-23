@@ -42,3 +42,14 @@ This ensures:
 - Cancelled order commissions don't count in "Total a Pagar" calculations
 - Cancelled accounts receivable don't count in "Contas a Receber" totals
 - Refund amounts are properly tracked via the refundAmount field, not paidValue
+
+## Vendor Commission Control
+Vendors can now be configured as commissioned or non-commissioned:
+- The `isCommissioned` field in the users table (default: true) determines if a vendor receives automatic commissions
+- Vendor registration form includes a "Vendedor Comissionado" checkbox
+- When a vendor is marked as non-commissioned (isCommissioned = false):
+  1. No vendor commissions are generated for their orders
+  2. Partner commissions are still processed normally
+  3. Commission sections are hidden in their vendor panel
+  4. Commission links are hidden in sidebar and navigation menus
+- The commission logic in both storage.ts and storage.pg.ts checks `vendorUser.isCommissioned` before creating vendor commissions

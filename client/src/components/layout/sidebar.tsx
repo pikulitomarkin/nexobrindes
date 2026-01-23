@@ -23,6 +23,7 @@ import {
   Palette,
   Building2,
   Monitor,
+  Home,
 } from "lucide-react";
 
 import { useLocation } from "wouter";
