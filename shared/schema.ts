@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   vendorId: varchar("vendor_id"), // For clients: link to their assigned vendor
   isActive: boolean("is_active").default(true),
+  isCommissioned: boolean("is_commissioned").default(true), // For vendors: if they receive commissions
   // Producer specific fields
   specialty: text("specialty"), // For producers: their specialty
   address: text("address"), // For producers: their address
