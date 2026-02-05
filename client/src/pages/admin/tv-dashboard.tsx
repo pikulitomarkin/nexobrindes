@@ -151,7 +151,7 @@ const REPORT_CONFIGS: ReportConfig[] = [
   { id: 'monthly_revenue', title: 'Faturamento Mensal', icon: <DollarSign className="h-8 w-8" />, color: 'from-yellow-500 to-orange-600' },
   { id: 'orders_by_status', title: 'Pedidos por Status', icon: <ShoppingCart className="h-8 w-8" />, color: 'from-pink-500 to-pink-700' },
   { id: 'top_clients', title: 'Principais Clientes', icon: <Award className="h-8 w-8" />, color: 'from-cyan-500 to-cyan-700' },
-  { id: 'daily_sales', title: 'Vendas Diárias (Últimos 30 dias)', icon: <Activity className="h-8 w-8" />, color: 'from-indigo-500 to-indigo-700' },
+  { id: 'daily_sales', title: 'Vendas Diárias (Últimos 15 dias)', icon: <Activity className="h-8 w-8" />, color: 'from-indigo-500 to-indigo-700' },
   { id: 'production_status', title: 'Status da Produção', icon: <Factory className="h-8 w-8" />, color: 'from-amber-500 to-amber-700' },
   { id: 'financial_summary', title: 'Resumo Financeiro', icon: <Target className="h-8 w-8" />, color: 'from-red-500 to-red-700' },
   { id: 'branch_performance', title: 'Desempenho por Filial', icon: <Monitor className="h-8 w-8" />, color: 'from-teal-500 to-teal-700' },
@@ -362,12 +362,12 @@ export default function TvDashboard() {
     .slice(0, 8);
 
   const dailySalesData: { [key: string]: number } = {};
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setHours(0, 0, 0, 0);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const fifteenDaysAgo = new Date();
+  fifteenDaysAgo.setHours(0, 0, 0, 0);
+  fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
   
-  // Inicializar todos os últimos 30 dias com zero
-  for (let i = 0; i <= 30; i++) {
+  // Inicializar todos os últimos 15 dias com zero
+  for (let i = 0; i <= 15; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().split('T')[0];
@@ -376,7 +376,7 @@ export default function TvDashboard() {
 
   confirmedOrders.forEach((order: any) => {
     const date = new Date(order.createdAt);
-    if (date >= thirtyDaysAgo) {
+    if (date >= fifteenDaysAgo) {
       const dayKey = date.toISOString().split('T')[0];
       // Só somar se a chave existir (garante que estamos dentro dos 30 dias inicializados)
       if (dayKey in dailySalesData) {
