@@ -134,7 +134,6 @@ type ReportType =
   | 'top_clients'
   | 'daily_sales'
   | 'production_status'
-  | 'financial_summary'
   | 'branch_performance';
 
 interface ReportConfig {
@@ -153,7 +152,6 @@ const REPORT_CONFIGS: ReportConfig[] = [
   { id: 'top_clients', title: 'Principais Clientes', icon: <Award className="h-8 w-8" />, color: 'from-cyan-500 to-cyan-700' },
   { id: 'daily_sales', title: 'Vendas Diárias (Últimos 15 dias)', icon: <Activity className="h-8 w-8" />, color: 'from-indigo-500 to-indigo-700' },
   { id: 'production_status', title: 'Status da Produção', icon: <Factory className="h-8 w-8" />, color: 'from-amber-500 to-amber-700' },
-  { id: 'financial_summary', title: 'Resumo Financeiro', icon: <Target className="h-8 w-8" />, color: 'from-red-500 to-red-700' },
   { id: 'branch_performance', title: 'Desempenho por Filial', icon: <Monitor className="h-8 w-8" />, color: 'from-teal-500 to-teal-700' },
 ];
 
@@ -764,57 +762,6 @@ export default function TvDashboard() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-        );
-
-      case 'financial_summary':
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="bg-gradient-to-br from-green-500 to-green-700 text-white border-0">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-green-100 text-xl">Recebido</p>
-                    <p className="text-5xl font-bold mt-3">R$ {paidReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    <div className="flex items-center mt-2 text-green-200">
-                      <ArrowUpRight className="h-5 w-5 mr-1" />
-                      <span>Pagamentos recebidos</span>
-                    </div>
-                  </div>
-                  <DollarSign className="h-20 w-20 text-green-200 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-yellow-500 to-orange-600 text-white border-0">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-yellow-100 text-xl">A Receber</p>
-                    <p className="text-5xl font-bold mt-3">R$ {totalReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    <div className="flex items-center mt-2 text-yellow-200">
-                      <Clock className="h-5 w-5 mr-1" />
-                      <span>Pendente de recebimento</span>
-                    </div>
-                  </div>
-                  <Target className="h-20 w-20 text-yellow-200 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-blue-500 to-blue-700 text-white border-0">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-100 text-xl">Faturamento Mês</p>
-                    <p className="text-5xl font-bold mt-3">R$ {monthSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    <div className="flex items-center mt-2 text-blue-200">
-                      <TrendingUp className="h-5 w-5 mr-1" />
-                      <span>{thisMonthOrders.length} pedidos este mês</span>
-                    </div>
-                  </div>
-                  <Activity className="h-20 w-20 text-blue-200 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
           </div>
         );
 
