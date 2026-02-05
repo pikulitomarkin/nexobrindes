@@ -163,34 +163,15 @@ export default function TvDashboard() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // Buscar budgets convertidos como vendas (os dados estão nos budgets, não em orders)
-  const { data: budgets = [], refetch: refetchBudgets } = useQuery({
-    queryKey: ["/api/budgets"],
+  const { data: orders = [], refetch: refetchOrders } = useQuery({
+    queryKey: ["/api/orders"],
     queryFn: async () => {
-      const response = await fetch("/api/budgets");
-      if (!response.ok) throw new Error("Failed to fetch budgets");
+      const response = await fetch("/api/orders");
+      if (!response.ok) throw new Error("Failed to fetch orders");
       return response.json();
     },
     refetchInterval: 30000,
   });
-  
-  // Converter budgets para o formato de orders para compatibilidade com o restante do código
-  const orders = budgets
-    .filter((b: any) => b.status === 'converted')
-    .map((b: any) => ({
-      id: b.id,
-      status: 'confirmed',
-      totalValue: b.totalValue,
-      createdAt: b.createdAt,
-      vendorId: b.vendorId,
-      clientId: b.clientId,
-      branchId: b.branchId,
-      budgetItems: b.items || [],
-      items: b.items || [],
-      contactName: b.clientName || b.contactName,
-    }));
-  
-  const refetchOrders = refetchBudgets;
 
   const { data: vendors = [] } = useQuery({
     queryKey: ["/api/vendors"],
@@ -275,8 +256,7 @@ export default function TvDashboard() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Todos os orders já são budgets convertidos (vendas confirmadas)
-  const confirmedOrders = orders;
+  const confirmedOrders = orders.filter((o: any) => o.status !== 'budget' && o.status !== 'cancelled');
   const thisMonthOrders = confirmedOrders.filter((o: any) => {
     const orderDate = new Date(o.createdAt);
     const now = new Date();
@@ -345,20 +325,15 @@ export default function TvDashboard() {
     valor: monthlyRevenueData[key],
   }));
 
-  // Usar todos os budgets para o gráfico de status (não apenas os convertidos)
   const statusCounts: { [key: string]: number } = {};
-  budgets.forEach((budget: any) => {
-    const status = budget.status || 'unknown';
+  orders.forEach((order: any) => {
+    const status = order.status || 'unknown';
     if (status !== 'cancelled') {
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     }
   });
   const statusLabels: { [key: string]: string } = {
-    draft: 'Rascunho',
-    sent: 'Enviado',
-    approved: 'Aprovado',
-    converted: 'Venda Confirmada',
-    cancelled: 'Cancelado',
+    budget: 'Orçamento',
     pending: 'Pendente',
     confirmed: 'Confirmado',
     production: 'Em Produção',
