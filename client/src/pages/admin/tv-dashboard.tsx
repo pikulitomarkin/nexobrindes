@@ -165,11 +165,11 @@ export default function TvDashboard() {
       const vendorOrders = confirmedOrders.filter((o: any) => o.vendorId === vendor.id);
       return {
         name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
-        vendas: vendorOrders.length,
+        pedidos: vendorOrders.length,
         valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
-    .sort((a: any, b: any) => b.valor - a.valor)
+    .sort((a: any, b: any) => b.pedidos - a.pedidos)
     .slice(0, 8);
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number } } = {};
@@ -186,7 +186,7 @@ export default function TvDashboard() {
     }
   });
   const topProductsData = Object.values(productSalesMap)
-    .sort((a, b) => b.valor - a.valor)
+    .sort((a, b) => b.quantidade - a.quantidade)
     .slice(0, 8);
 
   const monthlyRevenueData: { [key: string]: number } = {};
@@ -204,7 +204,9 @@ export default function TvDashboard() {
   const statusCounts: { [key: string]: number } = {};
   orders.forEach((order: any) => {
     const status = order.status || 'unknown';
-    statusCounts[status] = (statusCounts[status] || 0) + 1;
+    if (status !== 'cancelled') {
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    }
   });
   const statusLabels: { [key: string]: string } = {
     budget: 'Orçamento',
@@ -215,7 +217,6 @@ export default function TvDashboard() {
     ready: 'Pronto',
     delivered: 'Entregue',
     shipped: 'Despachado',
-    cancelled: 'Cancelado',
   };
   const ordersByStatusData = Object.entries(statusCounts).map(([status, count]) => ({
     name: statusLabels[status] || status,
@@ -269,7 +270,9 @@ export default function TvDashboard() {
   const productionStatusCounts: { [key: string]: number } = {};
   productionOrders.forEach((po: any) => {
     const status = po.status || 'pending';
-    productionStatusCounts[status] = (productionStatusCounts[status] || 0) + 1;
+    if (status !== 'cancelled') {
+      productionStatusCounts[status] = (productionStatusCounts[status] || 0) + 1;
+    }
   });
   const productionStatusLabels: { [key: string]: string } = {
     pending: 'Pendente',
@@ -280,7 +283,6 @@ export default function TvDashboard() {
     accepted: 'Aceito',
     shipped: 'Despachado',
     ready: 'Pronto',
-    cancelled: 'Cancelado',
   };
   const productionStatusData = Object.entries(productionStatusCounts).map(([status, count]) => ({
     name: productionStatusLabels[status] || status,
@@ -373,14 +375,14 @@ export default function TvDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topVendorsData} layout="vertical" margin={{ left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
+                <XAxis type="number" stroke="#9CA3AF" />
                 <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={90} />
                 <Tooltip 
-                  formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Valor']}
+                  formatter={(value: any) => [value, 'Pedidos Fechados']}
                   contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
                   labelStyle={{ color: '#F9FAFB' }}
                 />
-                <Bar dataKey="valor" fill="#10B981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="pedidos" fill="#10B981" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -392,17 +394,14 @@ export default function TvDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topProductsData} layout="vertical" margin={{ left: 120 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
+                <XAxis type="number" stroke="#9CA3AF" />
                 <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={110} tick={{ fontSize: 12 }} />
                 <Tooltip 
-                  formatter={(value: any, name: string) => {
-                    if (name === 'valor') return [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Valor'];
-                    return [value, 'Quantidade'];
-                  }}
+                  formatter={(value: any) => [value, 'Quantidade Vendida']}
                   contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
                   labelStyle={{ color: '#F9FAFB' }}
                 />
-                <Bar dataKey="valor" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="quantidade" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
