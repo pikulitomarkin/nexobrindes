@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2, Lock, EyeOff, DollarSign } from "lucide-react";
+import { Plus, Edit, Eye, Phone, Mail, FileText, User, RefreshCw, Building2, Trash2, Lock, EyeOff, DollarSign, Camera, Upload, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -48,6 +48,9 @@ export default function AdminVendors() {
   const [showEditVendor, setShowEditVendor] = useState(false);
   const [showVendorOrders, setShowVendorOrders] = useState(false);
   const [userCode, setUserCode] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const { toast } = useToast();
 
   const generateUserCode = () => {
@@ -167,6 +170,37 @@ export default function AdminVendors() {
     },
   });
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadVendorPhoto = async (vendorId: string): Promise<string | null> => {
+    if (!photoFile) return null;
+    
+    const formData = new FormData();
+    formData.append('photo', photoFile);
+    
+    const response = await fetch(`/api/vendors/${vendorId}/photo`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Erro ao fazer upload da foto');
+    }
+    
+    const result = await response.json();
+    return result.photoUrl;
+  };
+
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormValues) => {
       const vendorData = {
@@ -189,12 +223,25 @@ export default function AdminVendors() {
         const error = await response.json();
         throw new Error(error.error || "Erro ao criar vendedor");
       }
-      return response.json();
+      const result = await response.json();
+      
+      // Upload photo if provided
+      if (photoFile && result.id) {
+        try {
+          await uploadVendorPhoto(result.id);
+        } catch (photoError) {
+          console.error('Error uploading photo:', photoError);
+        }
+      }
+      
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
       setIsCreateDialogOpen(false);
       form.reset();
+      setPhotoFile(null);
+      setPhotoPreview(null);
       toast({
         title: "Sucesso!",
         description: `Vendedor criado com sucesso! Código de acesso: ${userCode}`,
@@ -287,7 +334,7 @@ export default function AdminVendors() {
     setShowEditVendor(true);
   };
 
-  const onSubmit = (data: VendorEditFormValues) => {
+  const onSubmit = async (data: VendorEditFormValues) => {
     if (selectedVendorId && showEditVendor) {
       // Edit mode - remove empty password field and normalize foreign keys before mutation
       const updateData: Partial<VendorEditFormValues> = { ...data };
@@ -298,6 +345,16 @@ export default function AdminVendors() {
       if (!updateData.branchId || updateData.branchId.trim() === "" || updateData.branchId === "default") {
         updateData.branchId = null as any;
       }
+      
+      // Upload photo if provided
+      if (photoFile) {
+        try {
+          await uploadVendorPhoto(selectedVendorId);
+        } catch (photoError) {
+          console.error('Error uploading photo:', photoError);
+        }
+      }
+      
       updateVendorMutation.mutate({ id: selectedVendorId, data: updateData });
     } else {
       // Create mode - validate password is provided
@@ -366,6 +423,43 @@ export default function AdminVendors() {
                     >
                       <RefreshCw className="h-4 w-4" />
                     </Button>
+                  </div>
+                </div>
+
+                {/* Upload de Foto */}
+                <div className="flex items-center space-x-4 p-4 border rounded-lg bg-gray-50">
+                  <div className="relative">
+                    {photoPreview ? (
+                      <img 
+                        src={photoPreview} 
+                        alt="Preview" 
+                        className="w-20 h-20 rounded-full object-cover border-2 border-blue-500"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-dashed border-gray-400">
+                        <Camera className="h-8 w-8 text-gray-400" />
+                      </div>
+                    )}
+                    <label 
+                      htmlFor="photo-upload-create" 
+                      className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-600 transition-colors"
+                    >
+                      <Upload className="h-3 w-3" />
+                    </label>
+                    <input 
+                      id="photo-upload-create"
+                      type="file" 
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Foto do Vendedor</p>
+                    <p className="text-xs text-gray-500">Clique no ícone para fazer upload</p>
+                    {photoFile && (
+                      <p className="text-xs text-green-600 mt-1">{photoFile.name}</p>
+                    )}
                   </div>
                 </div>
 
@@ -916,6 +1010,54 @@ export default function AdminVendors() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Upload de Foto na Edição */}
+              <div className="flex items-center space-x-4 p-4 border rounded-lg bg-gray-50">
+                <div className="relative">
+                  {photoPreview ? (
+                    <img 
+                      src={photoPreview} 
+                      alt="Preview" 
+                      className="w-20 h-20 rounded-full object-cover border-2 border-blue-500"
+                    />
+                  ) : (
+                    (() => {
+                      const selectedVendor = (vendors as any[])?.find((v: any) => v.id === selectedVendorId);
+                      return selectedVendor?.photoUrl ? (
+                        <img 
+                          src={selectedVendor.photoUrl} 
+                          alt={selectedVendor.name}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-blue-500"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-dashed border-gray-400">
+                          <Camera className="h-8 w-8 text-gray-400" />
+                        </div>
+                      );
+                    })()
+                  )}
+                  <label 
+                    htmlFor="photo-upload-edit" 
+                    className="absolute -bottom-1 -right-1 bg-blue-500 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    <Upload className="h-3 w-3" />
+                  </label>
+                  <input 
+                    id="photo-upload-edit"
+                    type="file" 
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Foto do Vendedor</p>
+                  <p className="text-xs text-gray-500">Clique no ícone para alterar a foto</p>
+                  {photoFile && (
+                    <p className="text-xs text-green-600 mt-1">{photoFile.name}</p>
+                  )}
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
                 name="name"
