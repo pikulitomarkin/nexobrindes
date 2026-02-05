@@ -94,6 +94,14 @@ const BRAZIL_CITIES_COORDS: { [key: string]: [number, number] } = {
   "lins": [-49.7425, -21.6786],
   "são carlos": [-47.8908, -22.0175],
   "rio claro": [-47.5611, -22.4108],
+  "novo hamburgo": [-51.1306, -29.6783],
+  "são leopoldo": [-51.1478, -29.7604],
+  "gravataí": [-50.9919, -29.9428],
+  "viamão": [-51.0833, -30.0833],
+  "alvorada": [-51.0833, -29.9833],
+  "cachoeirinha": [-51.1000, -29.9500],
+  "esteio": [-51.1833, -29.8500],
+  "sapucaia do sul": [-51.1500, -29.8333],
 };
 
 const BRAZIL_GEO_URL = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson";
@@ -426,15 +434,15 @@ export default function TvDashboard() {
     return null;
   };
 
-  // Pedidos sem filial atribuída são da Matriz
+  // Pedidos sem filial atribuída são da Matriz (Novo Hamburgo - RS)
   const matrizOrders = confirmedOrders.filter((o: any) => !o.branchId);
   const matrizData = matrizOrders.length > 0 ? [{
     id: 'matriz-principal',
     name: 'Matriz',
-    city: 'São Paulo', // Cidade padrão da matriz
+    city: 'Novo Hamburgo - RS',
     valor: matrizOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
     pedidos: matrizOrders.length,
-    coordinates: BRAZIL_CITIES_COORDS["são paulo"] || [-46.6333, -23.5505],
+    coordinates: [-51.1306, -29.6783] as [number, number], // Novo Hamburgo, RS
     isHeadquarters: true,
   }] : [];
 
@@ -782,7 +790,7 @@ export default function TvDashboard() {
           if (city.includes('rio de janeiro') || city.includes('niterói')) statesWithBranches.add('RJ');
           if (city.includes('belo horizonte') || city.includes('uberlândia') || city.includes('contagem')) statesWithBranches.add('MG');
           if (city.includes('curitiba') || city.includes('londrina') || city.includes('maringá')) statesWithBranches.add('PR');
-          if (city.includes('porto alegre') || city.includes('caxias')) statesWithBranches.add('RS');
+          if (city.includes('porto alegre') || city.includes('caxias') || city.includes('novo hamburgo') || city.includes('são leopoldo') || city.includes('gravataí')) statesWithBranches.add('RS');
           if (city.includes('salvador')) statesWithBranches.add('BA');
           if (city.includes('recife')) statesWithBranches.add('PE');
           if (city.includes('fortaleza')) statesWithBranches.add('CE');
