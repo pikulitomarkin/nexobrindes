@@ -879,9 +879,31 @@ export class PgStorage implements IStorage {
   }
 
   async getOrdersByClient(clientId: string): Promise<Order[]> {
-    return await pg.select().from(schema.orders)
-      .where(eq(schema.orders.clientId, clientId))
-      .orderBy(desc(schema.orders.createdAt));
+    // Buscar budgets convertidos (que são os pedidos reais) pelo clientId
+    const budgetsAsOrders = await pg.select().from(schema.budgets)
+      .where(and(
+        eq(schema.budgets.clientId, clientId),
+        eq(schema.budgets.status, 'converted')
+      ))
+      .orderBy(desc(schema.budgets.createdAt));
+    
+    // Mapear budgets para o formato Order
+    return budgetsAsOrders.map((b: any) => ({
+      id: b.id,
+      orderNumber: b.budgetNumber || b.id.substring(0, 8),
+      clientId: b.clientId,
+      vendorId: b.vendorId,
+      status: b.orderStatus || 'pending',
+      totalValue: b.totalValue,
+      paidValue: b.paidValue || '0',
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+      branchId: b.branchId,
+      notes: b.description,
+      deliveryDate: b.deliveryDeadline,
+      shippingAddress: null,
+      refundAmount: null,
+    })) as Order[];
   }
 
   // ==================== PRODUCTION ORDERS ====================
