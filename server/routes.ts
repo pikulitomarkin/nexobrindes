@@ -1161,41 +1161,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update vendor
-  // Endpoint para upload de foto do vendedor
-  app.post("/api/vendors/:id/photo", upload.single('photo'), async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo enviado" });
-      }
-      
-      const vendor = await storage.getUser(id);
-      if (!vendor || vendor.role !== 'vendor') {
-        return res.status(404).json({ error: "Vendedor não encontrado" });
-      }
-      
-      // Upload to object storage
-      const fileName = `vendor_${id}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
-      const objectPath = await objectStorageService.uploadBuffer(
-        req.file.buffer,
-        fileName,
-        req.file.mimetype,
-        'public/vendors'
-      );
-      
-      const photoUrl = objectStorageService.getPublicUrl(objectPath);
-      
-      // Update user with photo URL
-      await storage.updateUser(id, { photoUrl });
-      
-      res.json({ success: true, photoUrl });
-    } catch (error) {
-      console.error("Error uploading vendor photo:", error);
-      res.status(500).json({ error: "Erro ao fazer upload da foto" });
-    }
-  });
-
   // Endpoint específico para alteração de senha de vendedor
   app.patch("/api/vendors/:id/password", async (req, res) => {
     try {
@@ -1247,7 +1212,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: updateData.email?.trim() || null,
         phone: updateData.phone?.trim() || null,
         address: updateData.address?.trim() || null,
-        photoUrl: updateData.photoUrl || null,
       };
 
       // Se a senha foi fornecida no PUT (edição geral), vamos atualizar também

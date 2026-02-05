@@ -267,20 +267,17 @@ export default function TvDashboard() {
   const monthSales = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
   const avgTicket = confirmedOrders.length > 0 ? totalSales / confirmedOrders.length : 0;
 
-  // Top Vendedores: conta todos pedidos NÃO cancelados (inclui budget, confirmed, etc)
-  const allActiveOrders = orders.filter((o: any) => o.status !== 'cancelled');
   const topVendorsData = vendors
     .map((vendor: any) => {
-      const vendorOrders = allActiveOrders.filter((o: any) => o.vendorId === vendor.id);
+      const vendorOrders = confirmedOrders.filter((o: any) => o.vendorId === vendor.id);
       return {
-        id: vendor.id,
-        name: vendor.name || 'N/A',
-        photoUrl: vendor.photoUrl || '',
+        name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
         pedidos: vendorOrders.length,
+        valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
     .sort((a: any, b: any) => b.pedidos - a.pedidos)
-    .slice(0, 6);
+    .slice(0, 8);
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
   confirmedOrders.forEach((order: any) => {
@@ -532,48 +529,20 @@ export default function TvDashboard() {
 
       case 'top_vendors':
         return (
-          <div className="h-[520px] flex flex-col">
-            <div className="flex-1 grid grid-cols-3 gap-6 p-6">
-              {topVendorsData.map((vendor, index) => (
-                <div 
-                  key={vendor.id} 
-                  className="relative bg-gradient-to-br rounded-xl p-5 flex flex-col items-center justify-center shadow-lg transform hover:scale-105 transition-transform"
-                  style={{ 
-                    background: `linear-gradient(135deg, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}22, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}44)`,
-                    border: `2px solid ${BRANCH_COLORS[index % BRANCH_COLORS.length]}`
-                  }}
-                >
-                  <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
-                    style={{ backgroundColor: BRANCH_COLORS[index % BRANCH_COLORS.length] }}
-                  >
-                    {index + 1}º
-                  </div>
-                  {vendor.photoUrl ? (
-                    <img 
-                      src={vendor.photoUrl} 
-                      alt={vendor.name}
-                      className="w-24 h-24 object-cover rounded-full bg-white/10 mb-3 border-3 border-white/30"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className={`w-24 h-24 rounded-full bg-white/20 flex items-center justify-center mb-3 ${vendor.photoUrl ? 'hidden' : ''}`}>
-                    <Users className="w-12 h-12 text-gray-300" />
-                  </div>
-                  <p className="text-white text-sm text-center font-semibold mb-2" title={vendor.name}>
-                    {vendor.name.length > 18 ? vendor.name.substring(0, 18) + '...' : vendor.name}
-                  </p>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold" style={{ color: BRANCH_COLORS[index % BRANCH_COLORS.length] }}>
-                      {vendor.pedidos}
-                    </p>
-                    <p className="text-gray-300 text-sm">pedidos fechados</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="h-[500px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topVendorsData} layout="vertical" margin={{ left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis type="number" stroke="#9CA3AF" />
+                <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={90} />
+                <Tooltip 
+                  formatter={(value: any) => [value, 'Pedidos Fechados']}
+                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  labelStyle={{ color: '#F9FAFB' }}
+                />
+                <Bar dataKey="pedidos" fill="#10B981" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         );
 

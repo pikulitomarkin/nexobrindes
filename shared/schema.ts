@@ -11,7 +11,6 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
-  photoUrl: text("photo_url"), // URL da foto do usuário (vendedor, produtor, etc)
   vendorId: varchar("vendor_id"), // For clients: link to their assigned vendor
   isActive: boolean("is_active").default(true),
   isCommissioned: boolean("is_commissioned").default(true), // For vendors: if they receive commissions
