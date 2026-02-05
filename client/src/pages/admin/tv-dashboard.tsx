@@ -684,20 +684,47 @@ export default function TvDashboard() {
 
       case 'top_clients':
         return (
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topClientsData} layout="vertical" margin={{ left: 100 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
-                <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={90} />
-                <Tooltip 
-                  formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Valor']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
-                />
-                <Bar dataKey="valor" fill="#06B6D4" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[520px] flex flex-col">
+            <div className="flex-1 grid grid-cols-4 gap-6 p-4">
+              {topClientsData.map((client, index) => (
+                <div 
+                  key={client.name + index} 
+                  className="relative bg-gradient-to-br rounded-xl p-6 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${COLORS[index % COLORS.length]}22, ${COLORS[index % COLORS.length]}44)`,
+                    border: `2px solid ${COLORS[index % COLORS.length]}`
+                  }}
+                >
+                  <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  >
+                    {index + 1}º
+                  </div>
+                  
+                  <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-3 border-4 border-white/20 overflow-hidden">
+                    <img 
+                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(client.name)}`} 
+                      alt={client.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  <div className="text-center w-full">
+                    <h3 className="text-xl font-bold text-white truncate mb-1">{client.name}</h3>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge variant="outline" className="bg-white/10 text-white border-white/20 text-sm py-1 px-3">
+                          {client.pedidos} pedidos
+                        </Badge>
+                      </div>
+                      <p className="text-2xl font-black text-white mt-1">
+                        R$ {client.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
