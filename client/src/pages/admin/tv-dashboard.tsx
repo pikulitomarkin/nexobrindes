@@ -117,7 +117,11 @@ const STATE_CENTERS: { [key: string]: [number, number] } = {
   "SP": [-48.5, -22.5], "SE": [-37.4, -10.9], "TO": [-48.5, -10.0]
 };
 
+// Cores para gráficos gerais
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#A855F7', '#EC4899'];
+
+// Cores vibrantes e distintas para marcadores das filiais no mapa
+const BRANCH_COLORS = ['#06D6A0', '#118AB2', '#EF476F', '#3A86FF', '#8338EC', '#FF006E', '#FB5607', '#38B000', '#073B4C', '#9D4EDD'];
 
 const REPORT_ROTATION_INTERVAL = 15000;
 
@@ -893,7 +897,7 @@ export default function TvDashboard() {
                       <g>
                         <circle
                           r={size}
-                          fill={branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length]}
+                          fill={branch.isHeadquarters ? "#F59E0B" : BRANCH_COLORS[index % BRANCH_COLORS.length]}
                           fillOpacity={0.8}
                           stroke="#fff"
                           strokeWidth={2}
@@ -928,7 +932,7 @@ export default function TvDashboard() {
                   <div 
                     key={branch.id}
                     className="bg-gray-700/50 rounded-lg p-3 border-l-4"
-                    style={{ borderColor: branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length] }}
+                    style={{ borderColor: branch.isHeadquarters ? "#F59E0B" : BRANCH_COLORS[index % BRANCH_COLORS.length] }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -939,7 +943,7 @@ export default function TvDashboard() {
                         <p className="text-gray-400 text-xs">{branch.city}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold" style={{ color: branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length] }}>
+                        <p className="text-2xl font-bold" style={{ color: branch.isHeadquarters ? "#F59E0B" : BRANCH_COLORS[index % BRANCH_COLORS.length] }}>
                           {branch.pedidos}
                         </p>
                         <p className="text-gray-400 text-xs">pedidos</p>
