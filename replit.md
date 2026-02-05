@@ -53,3 +53,39 @@ Vendors can now be configured as commissioned or non-commissioned:
   3. Commission sections are hidden in their vendor panel
   4. Commission links are hidden in sidebar and navigation menus
 - The commission logic in both storage.ts and storage.pg.ts checks `vendorUser.isCommissioned` before creating vendor commissions
+
+## Pricing System (Formação de Preço) - February 2026
+The system now includes a complete pricing engine for calculating sale prices based on cost and margin rules:
+
+### Tables
+- `pricing_settings`: Stores global pricing configuration (tax rate, commission rate, minimum margin, cash discounts)
+- `pricing_margin_tiers`: Stores tiered margins based on quantity ranges
+- `products.cost_price`: New field for product cost (used in margin calculations)
+
+### Pricing Calculation Formula (Markup Divisor)
+```
+Sale Price = Cost / (1 - Tax Rate - Commission Rate - Margin Rate)
+```
+
+### Margin Tiers (Default Configuration)
+- Qty 0-5000: 45% margin
+- Qty 5001-8000: 42% margin
+- Qty 8001-15000: 40% margin
+- Qty 15001+: 35% margin
+
+### Integration Points
+1. **Admin Pricing Page** (`/admin/pricing`): Configure tax rates, commission rates, minimum margins, and margin tiers
+2. **Budget Form**: When adding products, the system calculates:
+   - Suggested price (ideal) based on product cost and quantity-based margin
+   - Minimum price based on minimum margin (20% default)
+3. **Price Validation**: Visual indicator shows when unit price is below minimum
+4. **Toast Alert**: Warning displayed when user sets price below minimum margin
+
+### API Endpoints
+- `GET /api/pricing/settings`: Get active pricing settings
+- `PUT /api/pricing/settings/:id`: Update pricing settings
+- `GET /api/pricing/margin-tiers/:settingsId`: Get margin tiers
+- `POST /api/pricing/margin-tiers`: Create new margin tier
+- `PUT /api/pricing/margin-tiers/:id`: Update margin tier
+- `DELETE /api/pricing/margin-tiers/:id`: Delete margin tier
+- `POST /api/pricing/calculate`: Calculate price based on cost and quantity
