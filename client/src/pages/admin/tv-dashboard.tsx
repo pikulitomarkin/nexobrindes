@@ -267,15 +267,16 @@ export default function TvDashboard() {
   const monthSales = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
   const avgTicket = confirmedOrders.length > 0 ? totalSales / confirmedOrders.length : 0;
 
+  // Top Vendedores: conta todos pedidos NÃO cancelados (inclui budget, confirmed, etc)
+  const allActiveOrders = orders.filter((o: any) => o.status !== 'cancelled');
   const topVendorsData = vendors
     .map((vendor: any) => {
-      const vendorOrders = confirmedOrders.filter((o: any) => o.vendorId === vendor.id);
+      const vendorOrders = allActiveOrders.filter((o: any) => o.vendorId === vendor.id);
       return {
         id: vendor.id,
         name: vendor.name || 'N/A',
         photoUrl: vendor.photoUrl || '',
         pedidos: vendorOrders.length,
-        valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
     .sort((a: any, b: any) => b.pedidos - a.pedidos)
@@ -532,17 +533,17 @@ export default function TvDashboard() {
       case 'top_vendors':
         return (
           <div className="h-[520px] flex flex-col">
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4">
+            <div className="flex-1 grid grid-cols-3 gap-6 p-6">
               {topVendorsData.map((vendor, index) => (
                 <div 
                   key={vendor.id} 
-                  className="relative bg-gradient-to-br rounded-xl p-4 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
+                  className="relative bg-gradient-to-br rounded-xl p-5 flex flex-col items-center justify-center shadow-lg transform hover:scale-105 transition-transform"
                   style={{ 
                     background: `linear-gradient(135deg, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}22, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}44)`,
                     border: `2px solid ${BRANCH_COLORS[index % BRANCH_COLORS.length]}`
                   }}
                 >
-                  <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg"
+                  <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
                     style={{ backgroundColor: BRANCH_COLORS[index % BRANCH_COLORS.length] }}
                   >
                     {index + 1}º
@@ -551,28 +552,25 @@ export default function TvDashboard() {
                     <img 
                       src={vendor.photoUrl} 
                       alt={vendor.name}
-                      className="w-20 h-20 object-cover rounded-full bg-white/10 mb-2 border-2 border-white/30"
+                      className="w-24 h-24 object-cover rounded-full bg-white/10 mb-3 border-3 border-white/30"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                         (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
                       }}
                     />
                   ) : null}
-                  <div className={`w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-2 ${vendor.photoUrl ? 'hidden' : ''}`}>
-                    <Users className="w-10 h-10 text-gray-400" />
+                  <div className={`w-24 h-24 rounded-full bg-white/20 flex items-center justify-center mb-3 ${vendor.photoUrl ? 'hidden' : ''}`}>
+                    <Users className="w-12 h-12 text-gray-300" />
                   </div>
-                  <p className="text-white text-xs text-center font-medium line-clamp-2 mb-2" title={vendor.name}>
-                    {vendor.name.length > 20 ? vendor.name.substring(0, 20) + '...' : vendor.name}
+                  <p className="text-white text-sm text-center font-semibold mb-2" title={vendor.name}>
+                    {vendor.name.length > 18 ? vendor.name.substring(0, 18) + '...' : vendor.name}
                   </p>
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: BRANCH_COLORS[index % BRANCH_COLORS.length] }}>
+                    <p className="text-3xl font-bold" style={{ color: BRANCH_COLORS[index % BRANCH_COLORS.length] }}>
                       {vendor.pedidos}
                     </p>
-                    <p className="text-gray-400 text-xs">pedidos</p>
+                    <p className="text-gray-300 text-sm">pedidos fechados</p>
                   </div>
-                  <p className="text-gray-300 text-xs mt-1">
-                    R$ {vendor.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
                 </div>
               ))}
             </div>
