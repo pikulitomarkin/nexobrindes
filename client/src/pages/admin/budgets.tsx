@@ -310,13 +310,13 @@ export default function AdminBudgets() {
 
   // Admin budget functions - NEW FLOW
   const addProductToAdminBudget = (product: any, producerId?: string) => {
-    // Calcular preço sugerido baseado no custo e configurações de margem
+    // Usar o preço de venda do banco diretamente (já foi calculado na importação)
     const costPrice = parseFloat(product.costPrice) || 0;
-    const basePrice = parseFloat(product.basePrice);
-    const priceCalc = calculateMinimumPrice(costPrice, 1);
+    const basePrice = parseFloat(product.basePrice) || 0;
     
-    // Se há custo configurado, usar preço ideal calculado; senão usar basePrice
-    const suggestedPrice = costPrice > 0 && priceCalc.idealPrice > 0 ? priceCalc.idealPrice : basePrice;
+    // O basePrice já é o preço de venda calculado
+    // Calcular preço mínimo baseado no custo para validação de desconto
+    const priceCalc = calculateMinimumPrice(costPrice, 1);
     const minimumPrice = costPrice > 0 ? priceCalc.minimumPrice : 0;
     
     const newItem = {
@@ -324,8 +324,8 @@ export default function AdminBudgets() {
       productName: product.name,
       producerId: producerId || 'internal', // User must select producer now
       quantity: 1,
-      unitPrice: Math.round(suggestedPrice * 100) / 100,
-      totalPrice: Math.round(suggestedPrice * 100) / 100,
+      unitPrice: Math.round(basePrice * 100) / 100,
+      totalPrice: Math.round(basePrice * 100) / 100,
       costPrice: costPrice, // Guardar custo para validação
       minimumPrice: Math.round(minimumPrice * 100) / 100, // Preço mínimo para validação
       hasItemCustomization: false,
@@ -1713,16 +1713,7 @@ export default function AdminBudgets() {
                                     )}
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
-                                        R$ {(() => {
-                                          const costPrice = parseFloat(product.costPrice) || 0;
-                                          const basePrice = parseFloat(product.basePrice) || 0;
-                                          // Se tem custo, calcula preço de venda; senão usa basePrice
-                                          if (costPrice > 0 && pricingSettings) {
-                                            const priceCalc = calculateMinimumPrice(costPrice, 1);
-                                            return priceCalc.idealPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                                          }
-                                          return basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                                        })()}
+                                        R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                       </p>
                                       {product.category && (
                                         <span className="text-xs text-gray-400">• {product.category}</span>

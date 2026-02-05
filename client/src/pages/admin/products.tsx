@@ -905,21 +905,19 @@ export default function AdminProducts() {
                     <TableCell>
                       <div>
                         <p className="font-medium text-green-600">
-                          R$ {(() => {
-                            const costPrice = parseFloat(product.costPrice || product.basePrice || '0');
-                            const salePrice = calculateSalePrice(costPrice, 1);
-                            return salePrice.toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            });
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Custo: R$ {parseFloat(product.costPrice || product.basePrice || '0').toLocaleString('pt-BR', {
+                          R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                           })}
                         </p>
+                        {product.costPrice && parseFloat(product.costPrice) > 0 && (
+                          <p className="text-xs text-gray-400">
+                            Custo: R$ {parseFloat(product.costPrice).toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </p>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500">por {product.unit}</p>
                     </TableCell>
