@@ -26,6 +26,7 @@ import AdminProducers from "@/pages/admin/producers";
 import AdminLogistics from "@/pages/admin/logistics";
 import AdminProducts from "@/pages/admin/products";
 import AdminSettings from "@/pages/admin/settings";
+import AdminPricing from "@/pages/admin/pricing";
 import AdminCommissionManagement from "@/pages/admin/commission-management";
 import AdminCommissionSettings from "@/pages/admin/commission-settings";
 import AdminPartners from "@/pages/admin/partners";
@@ -233,6 +234,11 @@ function App() {
                   <Route path="/admin/settings" component={() => (
                     <ProtectedRoute requiredRoles={["admin"]}>
                       <AdminSettings />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/pricing" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminPricing />
                     </ProtectedRoute>
                   )} />
                   <Route path="/admin/commission-management" component={() => (

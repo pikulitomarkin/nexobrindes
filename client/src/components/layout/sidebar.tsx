@@ -246,6 +246,13 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 onClick={() => navigate('/finance')}
               />
               <SidebarItem
+                icon={<Calculator className="h-5 w-5" />}
+                label="Formação de Preço"
+                path="/admin/pricing"
+                isActive={pathname === '/admin/pricing'}
+                onClick={() => navigate('/admin/pricing')}
+              />
+              <SidebarItem
                 icon={<Settings className="h-5 w-5" />}
                 label="Configurações de Comissão"
                 path="/admin/commission-settings"
