@@ -11,8 +11,92 @@ import {
   TrendingUp, DollarSign, Users, Factory, 
   ShoppingCart, Package, Award, Target, Activity,
   Play, Pause, Maximize, Minimize, RefreshCw, Monitor,
-  ArrowUpRight, ArrowDownRight, Clock, LogOut
+  ArrowUpRight, ArrowDownRight, Clock, LogOut, MapPin
 } from "lucide-react";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
+
+// Coordenadas das principais cidades brasileiras
+const BRAZIL_CITIES_COORDS: { [key: string]: [number, number] } = {
+  // Capitais
+  "são paulo": [-46.6333, -23.5505],
+  "rio de janeiro": [-43.1729, -22.9068],
+  "brasília": [-47.9292, -15.7801],
+  "salvador": [-38.5108, -12.9714],
+  "fortaleza": [-38.5434, -3.7172],
+  "belo horizonte": [-43.9378, -19.9167],
+  "manaus": [-60.0217, -3.1190],
+  "curitiba": [-49.2654, -25.4284],
+  "recife": [-34.8811, -8.0476],
+  "porto alegre": [-51.2177, -30.0346],
+  "belém": [-48.5039, -1.4558],
+  "goiânia": [-49.2539, -16.6869],
+  "guarulhos": [-46.5322, -23.4538],
+  "campinas": [-47.0626, -22.9099],
+  "são luís": [-44.2825, -2.5297],
+  "maceió": [-35.7353, -9.6658],
+  "natal": [-35.2094, -5.7945],
+  "teresina": [-42.8016, -5.0920],
+  "campo grande": [-54.6162, -20.4697],
+  "joão pessoa": [-34.8631, -7.1195],
+  "cuiabá": [-56.0978, -15.6010],
+  "aracaju": [-37.0731, -10.9472],
+  "florianópolis": [-48.5482, -27.5954],
+  "vitória": [-40.2976, -20.2976],
+  "macapá": [-51.0694, 0.0349],
+  "porto velho": [-63.9004, -8.7612],
+  "boa vista": [-60.6758, 2.8235],
+  "rio branco": [-67.8076, -9.9754],
+  "palmas": [-48.3558, -10.1689],
+  // Outras cidades importantes
+  "santo andré": [-46.5322, -23.6639],
+  "osasco": [-46.7916, -23.5329],
+  "ribeirão preto": [-47.8103, -21.1775],
+  "sorocaba": [-47.4584, -23.5015],
+  "uberlândia": [-48.2772, -18.9186],
+  "contagem": [-44.0539, -19.9318],
+  "niterói": [-43.1049, -22.8833],
+  "londrina": [-51.1628, -23.3045],
+  "joinville": [-48.8456, -26.3045],
+  "juiz de fora": [-43.3503, -21.7642],
+  "blumenau": [-49.0661, -26.9194],
+  "caxias do sul": [-51.1798, -29.1634],
+  "pelotas": [-52.3422, -31.7654],
+  "canoas": [-51.1808, -29.9178],
+  "maringá": [-51.9389, -23.4205],
+  "ponta grossa": [-50.1619, -25.0950],
+  "cascavel": [-53.4631, -24.9578],
+  "santos": [-46.3289, -23.9608],
+  "são josé dos campos": [-45.8872, -23.2237],
+  "jundiaí": [-46.8844, -23.1857],
+  "piracicaba": [-47.6476, -22.7338],
+  "bauru": [-49.0606, -22.3246],
+  "limeira": [-47.4017, -22.5649],
+  "americana": [-47.3308, -22.7393],
+  "são bernardo do campo": [-46.5503, -23.6914],
+  "diadema": [-46.6228, -23.6816],
+  "mauá": [-46.4614, -23.6678],
+  "carapicuíba": [-46.8403, -23.5225],
+  "franca": [-47.4008, -20.5386],
+  "são josé do rio preto": [-49.3794, -20.8197],
+  "praia grande": [-46.4122, -24.0058],
+  "sertãozinho": [-47.9906, -21.1375],
+  "jaboticabal": [-48.3222, -21.2544],
+  "araraquara": [-48.1756, -21.7845],
+  "sumaré": [-47.2669, -22.8211],
+  "indaiatuba": [-47.2178, -23.0903],
+  "itapecerica da serra": [-46.8492, -23.7169],
+  "botucatu": [-48.4450, -22.8861],
+  "marília": [-49.9461, -22.2139],
+  "presidente prudente": [-51.3889, -22.1207],
+  "assis": [-50.4117, -22.6617],
+  "ourinhos": [-49.8708, -22.9786],
+  "jaú": [-48.5578, -22.2958],
+  "lins": [-49.7425, -21.6786],
+  "são carlos": [-47.8908, -22.0175],
+  "rio claro": [-47.5611, -22.4108],
+};
+
+const BRAZIL_GEO_URL = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#A855F7', '#EC4899'];
 
@@ -318,13 +402,32 @@ export default function TvDashboard() {
   const paidReceivables = receivables
     .reduce((sum: number, r: any) => sum + parseFloat(r.receivedAmount || '0'), 0);
 
-  const branchPerformanceData = [
-    { name: 'Matriz', valor: confirmedOrders.filter((o: any) => !o.branchId || o.branchId === 'matriz').reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0) },
-    ...branches.map((branch: any) => ({
-      name: branch.name?.split(' ').slice(0, 2).join(' ') || 'Filial',
-      valor: confirmedOrders.filter((o: any) => o.branchId === branch.id).reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-    })),
-  ].filter(b => b.valor > 0);
+  // Função para encontrar coordenadas de uma cidade
+  const getCityCoords = (city: string): [number, number] | null => {
+    if (!city) return null;
+    const normalizedCity = city.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    for (const [cityName, coords] of Object.entries(BRAZIL_CITIES_COORDS)) {
+      const normalizedCityName = cityName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (normalizedCity.includes(normalizedCityName) || normalizedCityName.includes(normalizedCity)) {
+        return coords;
+      }
+    }
+    return null;
+  };
+
+  const branchPerformanceData = branches.map((branch: any) => {
+    const branchOrders = confirmedOrders.filter((o: any) => o.branchId === branch.id);
+    const coords = getCityCoords(branch.city || branch.name || '');
+    return {
+      id: branch.id,
+      name: branch.name || 'Filial',
+      city: branch.city || '',
+      valor: branchOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+      pedidos: branchOrders.length,
+      coordinates: coords,
+      isHeadquarters: branch.isHeadquarters || false,
+    };
+  }).filter((b: any) => b.coordinates !== null);
 
   const currentReport = REPORT_CONFIGS[currentReportIndex];
 
@@ -642,21 +745,104 @@ export default function TvDashboard() {
         );
 
       case 'branch_performance':
+        const maxPedidos = Math.max(...branchPerformanceData.map((b: any) => b.pedidos), 1);
         return (
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={branchPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="name" stroke="#9CA3AF" />
-                <YAxis tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
-                <Tooltip 
-                  formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Faturamento']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
-                />
-                <Bar dataKey="valor" fill="#14B8A6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[520px] flex gap-4">
+            {/* Mapa do Brasil */}
+            <div className="flex-1 relative">
+              <ComposableMap
+                projection="geoMercator"
+                projectionConfig={{
+                  scale: 650,
+                  center: [-54, -15]
+                }}
+                style={{ width: "100%", height: "100%" }}
+              >
+                <Geographies geography={BRAZIL_GEO_URL}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => (
+                      <Geography
+                        key={geo.rsmKey}
+                        geography={geo}
+                        fill="#1F2937"
+                        stroke="#374151"
+                        strokeWidth={0.5}
+                        style={{
+                          default: { outline: "none" },
+                          hover: { fill: "#374151", outline: "none" },
+                          pressed: { outline: "none" },
+                        }}
+                      />
+                    ))
+                  }
+                </Geographies>
+                {branchPerformanceData.map((branch: any, index: number) => {
+                  if (!branch.coordinates) return null;
+                  const size = Math.max(12, (branch.pedidos / maxPedidos) * 40);
+                  return (
+                    <Marker key={branch.id} coordinates={branch.coordinates}>
+                      <g>
+                        <circle
+                          r={size}
+                          fill={branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length]}
+                          fillOpacity={0.8}
+                          stroke="#fff"
+                          strokeWidth={2}
+                          style={{ cursor: "pointer" }}
+                        />
+                        <text
+                          textAnchor="middle"
+                          y={size + 14}
+                          style={{
+                            fontFamily: "system-ui",
+                            fill: "#F9FAFB",
+                            fontSize: "10px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {branch.pedidos}
+                        </text>
+                      </g>
+                    </Marker>
+                  );
+                })}
+              </ComposableMap>
+            </div>
+            {/* Lista de filiais */}
+            <div className="w-72 bg-gray-800/50 rounded-xl p-4 overflow-y-auto">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Filiais
+              </h3>
+              <div className="space-y-3">
+                {branchPerformanceData.sort((a: any, b: any) => b.pedidos - a.pedidos).map((branch: any, index: number) => (
+                  <div 
+                    key={branch.id}
+                    className="bg-gray-700/50 rounded-lg p-3 border-l-4"
+                    style={{ borderColor: branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length] }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-white font-medium text-sm">
+                          {branch.name}
+                          {branch.isHeadquarters && <span className="ml-1 text-yellow-500">★</span>}
+                        </p>
+                        <p className="text-gray-400 text-xs">{branch.city}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold" style={{ color: branch.isHeadquarters ? "#F59E0B" : COLORS[index % COLORS.length] }}>
+                          {branch.pedidos}
+                        </p>
+                        <p className="text-gray-400 text-xs">pedidos</p>
+                      </div>
+                    </div>
+                    <p className="text-gray-300 text-xs mt-1">
+                      R$ {branch.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
