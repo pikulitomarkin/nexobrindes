@@ -409,9 +409,12 @@ export default function TvDashboard() {
     completed: 'Concluído',
     delivered: 'Entregue',
     accepted: 'Aceito',
-    shipped: 'Despachado',
+    shipped: 'Enviado',
     partial_shipped: 'Parcialmente Enviado',
     ready: 'Pronto',
+    delayed: 'Atrasado',
+    pending_acceptance: 'Aguardando Aceite',
+    logistics: 'Na Logística',
   };
   const productionStatusData = Object.entries(productionStatusCounts).map(([status, count]) => ({
     name: productionStatusLabels[status] || status,
