@@ -172,22 +172,29 @@ export default function TvDashboard() {
     .sort((a: any, b: any) => b.pedidos - a.pedidos)
     .slice(0, 8);
 
-  const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number } } = {};
+  const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
   confirmedOrders.forEach((order: any) => {
     if (order.items && Array.isArray(order.items)) {
       order.items.forEach((item: any) => {
         const productName = item.productName || 'Produto';
+        const qty = parseInt(String(item.quantity || 1), 10) || 1;
+        const price = parseFloat(String(item.unitPrice || 0)) || 0;
         if (!productSalesMap[productName]) {
-          productSalesMap[productName] = { name: productName, quantidade: 0, valor: 0 };
+          productSalesMap[productName] = { 
+            name: productName, 
+            quantidade: 0, 
+            valor: 0,
+            imageUrl: item.imageLink || item.imageUrl || ''
+          };
         }
-        productSalesMap[productName].quantidade += item.quantity || 1;
-        productSalesMap[productName].valor += (item.unitPrice || 0) * (item.quantity || 1);
+        productSalesMap[productName].quantidade += qty;
+        productSalesMap[productName].valor += price * qty;
       });
     }
   });
   const topProductsData = Object.values(productSalesMap)
     .sort((a, b) => b.quantidade - a.quantidade)
-    .slice(0, 8);
+    .slice(0, 10);
 
   const monthlyRevenueData: { [key: string]: number } = {};
   confirmedOrders.forEach((order: any) => {
@@ -390,20 +397,48 @@ export default function TvDashboard() {
 
       case 'top_products':
         return (
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProductsData} layout="vertical" margin={{ left: 120 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" stroke="#9CA3AF" />
-                <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={110} tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  formatter={(value: any) => [value, 'Quantidade Vendida']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
-                />
-                <Bar dataKey="quantidade" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[520px] flex flex-col">
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
+              {topProductsData.map((product, index) => (
+                <div 
+                  key={product.name} 
+                  className="relative bg-gradient-to-br rounded-xl p-4 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${COLORS[index % COLORS.length]}22, ${COLORS[index % COLORS.length]}44)`,
+                    border: `2px solid ${COLORS[index % COLORS.length]}`
+                  }}
+                >
+                  <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  >
+                    {index + 1}º
+                  </div>
+                  {product.imageUrl ? (
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.name}
+                      className="w-20 h-20 object-contain rounded-lg bg-white/10 mb-2"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg bg-white/10 flex items-center justify-center mb-2">
+                      <Package className="w-10 h-10 text-gray-400" />
+                    </div>
+                  )}
+                  <p className="text-white text-xs text-center font-medium line-clamp-2 mb-2" title={product.name}>
+                    {product.name.length > 30 ? product.name.substring(0, 30) + '...' : product.name}
+                  </p>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
+                      {product.quantidade}
+                    </p>
+                    <p className="text-gray-400 text-xs">unidades</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
