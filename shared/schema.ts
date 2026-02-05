@@ -284,6 +284,8 @@ export const budgets = pgTable("budgets", {
   description: text("description"),
   totalValue: decimal("total_value", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default('draft'), // 'draft', 'sent', 'approved', 'rejected', 'converted'
+  orderStatus: text("order_status").default('pending'), // 'pending', 'confirmed', 'production', 'ready', 'shipped', 'delivered' - status do pedido após conversão
+  paidValue: decimal("paid_value", { precision: 10, scale: 2 }).default('0.00'), // Valor já pago
   validUntil: timestamp("valid_until"),
   deliveryDeadline: timestamp("delivery_deadline"),
 
