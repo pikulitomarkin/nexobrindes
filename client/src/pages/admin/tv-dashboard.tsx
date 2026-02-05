@@ -252,7 +252,9 @@ export default function TvDashboard() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const confirmedOrders = orders.filter((o: any) => o.status !== 'budget' && o.status !== 'cancelled');
+  const confirmedOrders = orders.filter((o: any) => 
+    (o.status === 'converted' || (o.status !== 'budget' && o.status !== 'cancelled'))
+  );
   const thisMonthOrders = confirmedOrders.filter((o: any) => {
     const orderDate = new Date(o.createdAt);
     const now = new Date();
