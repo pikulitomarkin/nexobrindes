@@ -1451,11 +1451,15 @@ export class PgStorage implements IStorage {
     
     // Map common field names from different JSON formats
     const mapProductFields = (item: any) => {
-      return {
+      // Pegar custo do produto para cálculo de preço de venda
+        const costPrice = cleanNumericField(item.PrecoCusto || item.PrecoMinimo || item.Custo || item.costPrice || item.cost || 0);
+        
+        return {
         name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
         description: item.Descricao || item.description || item.Descricao || '',
         category: item.WebTipo || item.category || item.Categoria || 'Geral',
         basePrice: (item.PrecoVenda || item.basePrice || item.Preco || 0).toString(),
+        costPrice: costPrice || '0.00', // Custo do produto para cálculo de margem
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
         producerId: isInternal ? null : producerId,
