@@ -145,6 +145,59 @@ export default function AdminBudgets() {
     },
   });
 
+  // Configurações de precificação para cálculo de margem
+  const { data: pricingSettings } = useQuery({
+    queryKey: ["/api/pricing/settings"],
+    queryFn: async () => {
+      const response = await fetch('/api/pricing/settings');
+      if (!response.ok) return null;
+      return response.json();
+    },
+  });
+
+  const { data: marginTiers } = useQuery({
+    queryKey: ["/api/pricing/margin-tiers", pricingSettings?.id],
+    queryFn: async () => {
+      if (!pricingSettings?.id) return [];
+      const response = await fetch(`/api/pricing/margin-tiers/${pricingSettings.id}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!pricingSettings?.id,
+  });
+
+  // Função para calcular preço mínimo baseado nas configurações
+  const calculateMinimumPrice = (costPrice: number, quantity: number = 1) => {
+    if (!pricingSettings || !costPrice || costPrice <= 0) return { idealPrice: 0, minimumPrice: 0 };
+    
+    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
+    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
+    const minimumMargin = parseFloat(pricingSettings.minimumMargin) / 100 || 0.20;
+    
+    // Encontrar margem baseada na quantidade
+    let marginRate = minimumMargin;
+    if (marginTiers && marginTiers.length > 0) {
+      for (const tier of marginTiers) {
+        const minQty = tier.minQuantity || 0;
+        const maxQty = tier.maxQuantity || Number.MAX_SAFE_INTEGER;
+        if (quantity >= minQty && quantity <= maxQty) {
+          marginRate = parseFloat(tier.marginRate) / 100;
+          break;
+        }
+      }
+    }
+    
+    // Markup divisor: Preço = Custo / (1 - Taxas)
+    const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
+    const divisorMinimo = 1 - (taxRate + commissionRate + minimumMargin);
+    
+    return {
+      idealPrice: costPrice / divisorIdeal,
+      minimumPrice: costPrice / divisorMinimo,
+      marginApplied: marginRate * 100
+    };
+  };
+
   const { data: currentUser } = useQuery({
     queryKey: ["/api/auth/current"],
     queryFn: async () => {
@@ -257,13 +310,24 @@ export default function AdminBudgets() {
 
   // Admin budget functions - NEW FLOW
   const addProductToAdminBudget = (product: any, producerId?: string) => {
+    // Calcular preço sugerido baseado no custo e configurações de margem
+    const costPrice = parseFloat(product.costPrice) || 0;
+    const basePrice = parseFloat(product.basePrice);
+    const priceCalc = calculateMinimumPrice(costPrice, 1);
+    
+    // Se há custo configurado, usar preço ideal calculado; senão usar basePrice
+    const suggestedPrice = costPrice > 0 && priceCalc.idealPrice > 0 ? priceCalc.idealPrice : basePrice;
+    const minimumPrice = costPrice > 0 ? priceCalc.minimumPrice : 0;
+    
     const newItem = {
       productId: product.id,
       productName: product.name,
       producerId: producerId || 'internal', // User must select producer now
       quantity: 1,
-      unitPrice: parseFloat(product.basePrice),
-      totalPrice: parseFloat(product.basePrice),
+      unitPrice: Math.round(suggestedPrice * 100) / 100,
+      totalPrice: Math.round(suggestedPrice * 100) / 100,
+      costPrice: costPrice, // Guardar custo para validação
+      minimumPrice: Math.round(minimumPrice * 100) / 100, // Preço mínimo para validação
       hasItemCustomization: false,
       selectedCustomizationId: "",
       itemCustomizationValue: 0,
@@ -298,8 +362,28 @@ export default function AdminBudgets() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
+        
+        // Recalcular preço mínimo para a nova quantidade
+        if (item.costPrice && item.costPrice > 0) {
+          const priceCalc = calculateMinimumPrice(item.costPrice, quantity);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+        }
+        
         // Recalculate totalPrice based on all components
         item.totalPrice = calculateAdminItemTotal({ ...item, quantity });
+      } else if (field === 'unitPrice') {
+        const newPrice = parseFloat(value) || 0;
+        item.unitPrice = newPrice;
+        item.totalPrice = calculateAdminItemTotal({ ...item, unitPrice: newPrice });
+        
+        // Verificar se está abaixo do preço mínimo
+        if (item.minimumPrice && item.minimumPrice > 0 && newPrice < item.minimumPrice) {
+          toast({
+            title: "Atenção: Preço abaixo do mínimo!",
+            description: `O preço mínimo para este produto é R$ ${item.minimumPrice.toFixed(2)}. Vendas abaixo deste valor comprometem a margem de lucro.`,
+            variant: "destructive",
+          });
+        }
       } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
         // Recalculate totalPrice when customization values change
@@ -1246,7 +1330,16 @@ export default function AdminBudgets() {
                               placeholder="R$ 0,00"
                               value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
                               onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
+                              className={item.minimumPrice && item.unitPrice < item.minimumPrice ? 'border-red-500 focus:ring-red-500' : ''}
                             />
+                            {item.minimumPrice > 0 && (
+                              <p className={`text-xs mt-1 ${item.unitPrice < item.minimumPrice ? 'text-red-600 font-medium' : 'text-green-600'}`}>
+                                {item.unitPrice < item.minimumPrice 
+                                  ? `⚠️ Mín: R$ ${item.minimumPrice.toFixed(2)}`
+                                  : `✓ Mín: R$ ${item.minimumPrice.toFixed(2)}`
+                                }
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor={`admin-subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>

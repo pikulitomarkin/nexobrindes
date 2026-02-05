@@ -252,6 +252,7 @@ export const products = pgTable("products", {
   description: text("description"),
   category: text("category"),
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }).default('0.00'), // Custo do produto para cálculo de margem
   unit: text("unit").default('un'),
   isActive: boolean("is_active").default(true),
 
