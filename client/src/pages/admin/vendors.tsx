@@ -271,6 +271,8 @@ export default function AdminVendors() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       setShowEditVendor(false);
       setSelectedVendorId(null);
+      setPhotoFile(null);
+      setPhotoPreview(null);
       form.reset();
       toast({
         title: "Sucesso!",
