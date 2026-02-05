@@ -133,7 +133,6 @@ type ReportType =
   | 'orders_by_status'
   | 'top_clients'
   | 'daily_sales'
-  | 'production_status'
   | 'branch_performance';
 
 interface ReportConfig {
@@ -151,7 +150,6 @@ const REPORT_CONFIGS: ReportConfig[] = [
   { id: 'orders_by_status', title: 'Pedidos por Status', icon: <ShoppingCart className="h-8 w-8" />, color: 'from-pink-500 to-pink-700' },
   { id: 'top_clients', title: 'Principais Clientes', icon: <Award className="h-8 w-8" />, color: 'from-cyan-500 to-cyan-700' },
   { id: 'daily_sales', title: 'Vendas Diárias (Últimos 15 dias)', icon: <Activity className="h-8 w-8" />, color: 'from-indigo-500 to-indigo-700' },
-  { id: 'production_status', title: 'Status da Produção', icon: <Factory className="h-8 w-8" />, color: 'from-amber-500 to-amber-700' },
   { id: 'branch_performance', title: 'Desempenho por Filial', icon: <Monitor className="h-8 w-8" />, color: 'from-teal-500 to-teal-700' },
 ];
 
@@ -734,36 +732,6 @@ export default function TvDashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             )}
-          </div>
-        );
-
-      case 'production_status':
-        return (
-          <div className="h-[500px] flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={productionStatusData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={180}
-                  innerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                  labelLine={{ stroke: '#9CA3AF' }}
-                >
-                  {productionStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: any) => [value, 'Ordens']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
           </div>
         );
 
