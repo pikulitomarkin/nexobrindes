@@ -174,23 +174,33 @@ export default function TvDashboard() {
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
   confirmedOrders.forEach((order: any) => {
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach((item: any) => {
-        const productName = item.productName || 'Produto';
-        const qty = parseInt(String(item.quantity || 1), 10) || 1;
-        const price = parseFloat(String(item.unitPrice || 0)) || 0;
-        if (!productSalesMap[productName]) {
-          productSalesMap[productName] = { 
-            name: productName, 
-            quantidade: 0, 
-            valor: 0,
-            imageUrl: item.imageLink || item.imageUrl || ''
-          };
-        }
-        productSalesMap[productName].quantidade += qty;
-        productSalesMap[productName].valor += price * qty;
-      });
-    }
+    // Primeiro tenta pegar de budgetItems (tem a imagem do produto)
+    const itemsToUse = order.budgetItems && Array.isArray(order.budgetItems) && order.budgetItems.length > 0 
+      ? order.budgetItems 
+      : (order.items && Array.isArray(order.items) ? order.items : []);
+    
+    itemsToUse.forEach((item: any) => {
+      const productName = item.productName || item.product?.name || 'Produto';
+      const qty = parseInt(String(item.quantity || 1), 10) || 1;
+      const price = parseFloat(String(item.unitPrice || 0)) || 0;
+      // Buscar imagem: budgetItem.product.imageLink > item.imageLink > item.imageUrl
+      const imageUrl = item.product?.imageLink || item.imageLink || item.imageUrl || '';
+      
+      if (!productSalesMap[productName]) {
+        productSalesMap[productName] = { 
+          name: productName, 
+          quantidade: 0, 
+          valor: 0,
+          imageUrl: imageUrl
+        };
+      }
+      // Se ainda não tem imagem e encontramos uma, atualiza
+      if (!productSalesMap[productName].imageUrl && imageUrl) {
+        productSalesMap[productName].imageUrl = imageUrl;
+      }
+      productSalesMap[productName].quantidade += qty;
+      productSalesMap[productName].valor += price * qty;
+    });
   });
   const topProductsData = Object.values(productSalesMap)
     .sort((a, b) => b.quantidade - a.quantidade)
