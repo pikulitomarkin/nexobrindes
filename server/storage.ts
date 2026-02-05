@@ -163,6 +163,7 @@ export interface IStorage {
   searchProducts(query: string): Promise<any[]>;
   getProductsByProducer(producerId: string): Promise<any[]>;
   getProductsGroupedByProducer(): Promise<{ [key: string]: any[] }>;
+  recalculateProductPrices(): Promise<{ updated: number; errors: string[] }>;
 
   // Budgets
   getBudgets(): Promise<any[]>;

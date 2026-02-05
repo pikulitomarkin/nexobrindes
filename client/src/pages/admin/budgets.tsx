@@ -1713,7 +1713,16 @@ export default function AdminBudgets() {
                                     )}
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
-                                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {(() => {
+                                          const costPrice = parseFloat(product.costPrice) || 0;
+                                          const basePrice = parseFloat(product.basePrice) || 0;
+                                          // Se tem custo, calcula preço de venda; senão usa basePrice
+                                          if (costPrice > 0 && pricingSettings) {
+                                            const priceCalc = calculateMinimumPrice(costPrice, 1);
+                                            return priceCalc.idealPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                          }
+                                          return basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                        })()}
                                       </p>
                                       {product.category && (
                                         <span className="text-xs text-gray-400">• {product.category}</span>

@@ -1550,6 +1550,53 @@ export class PgStorage implements IStorage {
     return grouped;
   }
 
+  async recalculateProductPrices(): Promise<{ updated: number; errors: string[] }> {
+    let updated = 0;
+    const errors: string[] = [];
+    
+    try {
+      const products = await pg.select().from(schema.products);
+      
+      // Divisor padrão: 1 - 0.09 (imposto) - 0.15 (comissão) - 0.45 (margem)
+      const defaultDivisor = 0.31;
+      
+      for (const product of products) {
+        try {
+          const currentBasePrice = parseFloat(product.basePrice || '0');
+          const currentCostPrice = parseFloat(product.costPrice || '0');
+          
+          // Se já tem custo preenchido, não alterar
+          if (currentCostPrice > 0) {
+            continue;
+          }
+          
+          // Se não tem custo, usar o basePrice atual como custo (era o PrecoVenda do JSON)
+          // E calcular o novo preço de venda
+          if (currentBasePrice > 0) {
+            const costPrice = currentBasePrice;
+            const newBasePrice = costPrice / defaultDivisor;
+            
+            await pg.update(schema.products)
+              .set({
+                costPrice: costPrice.toFixed(2),
+                basePrice: newBasePrice.toFixed(2)
+              })
+              .where(eq(schema.products.id, product.id));
+            
+            updated++;
+          }
+        } catch (error: any) {
+          errors.push(`Erro ao atualizar produto "${product.name}": ${error.message}`);
+        }
+      }
+      
+      return { updated, errors };
+    } catch (error: any) {
+      errors.push(`Erro geral: ${error.message}`);
+      return { updated, errors };
+    }
+  }
+
   // ==================== BUDGETS ====================
 
   async getBudgets(): Promise<Budget[]> {
