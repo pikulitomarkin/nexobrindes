@@ -267,7 +267,7 @@ export default function TvDashboard() {
 
   const topVendorsData = vendors
     .map((vendor: any) => {
-      const vendorOrders = confirmedOrders.filter((o: any) => o.vendorId === vendor.id);
+      const vendorOrders = confirmedOrders.filter((o: any) => String(o.vendorId) === String(vendor.id));
       return {
         name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
         fullName: vendor.name || 'N/A',
@@ -351,7 +351,7 @@ export default function TvDashboard() {
 
   const topClientsData = clients
     .map((client: any) => {
-      const clientOrders = confirmedOrders.filter((o: any) => o.clientId === client.id);
+      const clientOrders = confirmedOrders.filter((o: any) => String(o.clientId) === String(client.id));
       return {
         name: client.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
         pedidos: clientOrders.length,
