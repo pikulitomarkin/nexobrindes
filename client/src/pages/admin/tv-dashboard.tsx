@@ -341,6 +341,8 @@ export default function TvDashboard() {
     ready: 'Pronto',
     delivered: 'Entregue',
     shipped: 'Despachado',
+    delayed: 'Atrasado',
+    pending_acceptance: 'Aguardando Aceite',
   };
   const ordersByStatusData = Object.entries(statusCounts).map(([status, count]) => ({
     name: statusLabels[status] || status,
@@ -407,7 +409,7 @@ export default function TvDashboard() {
     completed: 'Concluído',
     delivered: 'Entregue',
     accepted: 'Aceito',
-    shipped: 'Enviado',
+    shipped: 'Despachado',
     partial_shipped: 'Parcialmente Enviado',
     ready: 'Pronto',
     delayed: 'Atrasado',
