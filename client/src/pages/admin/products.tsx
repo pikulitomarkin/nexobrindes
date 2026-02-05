@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Plus, Upload, Search, Edit, Trash2, Package, Factory
+  Plus, Upload, Search, Edit, Trash2, Package, Factory, RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -99,6 +99,48 @@ export default function AdminProducts() {
       return response.json();
     },
   });
+
+  // Buscar configurações de preço para cálculo dinâmico
+  const { data: pricingSettings } = useQuery({
+    queryKey: ["/api/pricing/settings"],
+  });
+
+  const { data: marginTiers } = useQuery({
+    queryKey: ["/api/pricing/margin-tiers", pricingSettings?.id],
+    enabled: !!pricingSettings?.id,
+  });
+
+  // Função para calcular preço de venda baseado no custo
+  const calculateSalePrice = (costPrice: number, quantity: number = 1) => {
+    if (!pricingSettings || !costPrice || costPrice <= 0) return costPrice;
+    
+    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
+    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
+    
+    // Determinar margem baseada na quantidade
+    let marginRate = parseFloat(pricingSettings.minimumMargin) / 100 || 0.45;
+    
+    if (marginTiers && Array.isArray(marginTiers) && marginTiers.length > 0) {
+      const sortedTiers = [...marginTiers].sort((a: any, b: any) => 
+        parseInt(a.minQuantity) - parseInt(b.minQuantity)
+      );
+      
+      for (const tier of sortedTiers) {
+        const minQty = parseInt(tier.minQuantity) || 0;
+        const maxQty = tier.maxQuantity ? parseInt(tier.maxQuantity) : Infinity;
+        
+        if (quantity >= minQty && quantity <= maxQty) {
+          marginRate = parseFloat(tier.marginRate) / 100;
+          break;
+        }
+      }
+    }
+    
+    const divisor = 1 - taxRate - commissionRate - marginRate;
+    if (divisor <= 0) return costPrice;
+    
+    return costPrice / divisor;
+  };
 
   // Mutations
   const createProductMutation = useMutation({
@@ -197,6 +239,31 @@ export default function AdminProducts() {
       setImportProgress(0);
       toast({
         title: "Erro na Importação",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para recalcular preços
+  const recalculatePricesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/logistics/products/recalculate-prices", {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Erro ao recalcular preços");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Preços Recalculados",
+        description: `${data.updated} produto(s) atualizado(s).`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -344,6 +411,15 @@ export default function AdminProducts() {
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl font-semibold">Catálogo de Produtos - Administração</CardTitle>
             <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                className="bg-white/10 text-white hover:bg-white/20 border-white/20"
+                onClick={() => recalculatePricesMutation.mutate()}
+                disabled={recalculatePricesMutation.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${recalculatePricesMutation.isPending ? 'animate-spin' : ''}`} />
+                Recalcular Preços
+              </Button>
               <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="secondary" className="bg-white/10 text-white hover:bg-white/20 border-white/20">
@@ -827,12 +903,24 @@ export default function AdminProducts() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <p className="font-medium">
-                        R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </p>
+                      <div>
+                        <p className="font-medium text-green-600">
+                          R$ {(() => {
+                            const costPrice = parseFloat(product.costPrice || product.basePrice || '0');
+                            const salePrice = calculateSalePrice(costPrice, 1);
+                            return salePrice.toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            });
+                          })()}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Custo: R$ {parseFloat(product.costPrice || product.basePrice || '0').toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      </div>
                       <p className="text-sm text-gray-500">por {product.unit}</p>
                     </TableCell>
                     <TableCell>

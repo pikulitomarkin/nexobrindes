@@ -2794,6 +2794,35 @@ export class MemStorage implements IStorage {
     return grouped;
   }
 
+  async recalculateProductPrices(): Promise<{ updated: number; errors: string[] }> {
+    let updated = 0;
+    const errors: string[] = [];
+    const defaultDivisor = 0.31;
+    
+    for (const [id, product] of this.products) {
+      try {
+        const currentBasePrice = parseFloat(product.basePrice || '0');
+        const currentCostPrice = parseFloat(product.costPrice || '0');
+        
+        if (currentCostPrice > 0) continue;
+        
+        if (currentBasePrice > 0) {
+          const costPrice = currentBasePrice;
+          const newBasePrice = costPrice / defaultDivisor;
+          
+          product.costPrice = costPrice.toFixed(2);
+          product.basePrice = newBasePrice.toFixed(2);
+          this.products.set(id, product);
+          updated++;
+        }
+      } catch (error: any) {
+        errors.push(`Erro ao atualizar produto "${product.name}": ${error.message}`);
+      }
+    }
+    
+    return { updated, errors };
+  }
+
   // Budget methods
   async getBudgets(): Promise<any[]> {
     return Array.from(this.budgets.values());

@@ -2212,6 +2212,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recalculate product prices (update costPrice from existing basePrice)
+  app.post("/api/logistics/products/recalculate-prices", async (req, res) => {
+    try {
+      console.log("Recalculating product prices...");
+      const result = await storage.recalculateProductPrices();
+      console.log(`Recalculated ${result.updated} products`);
+      res.json(result);
+    } catch (error) {
+      console.error("Error recalculating product prices:", error);
+      res.status(500).json({ error: "Erro ao recalcular preços: " + error.message });
+    }
+  });
+
   // Process producer payment
   app.post("/api/finance/producer-payments/:id/pay", async (req, res) => {
     try {

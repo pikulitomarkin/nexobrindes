@@ -1452,20 +1452,16 @@ export class PgStorage implements IStorage {
     // Map common field names from different JSON formats
     const mapProductFields = (item: any) => {
       // PrecoVenda do JSON é o CUSTO do produto
-        // O preço de venda será calculado automaticamente no orçamento usando a fórmula de markup
-        const costPrice = parseFloat(item.PrecoVenda || item.basePrice || item.Preco || 0);
-        
-        // Calcular preço de venda usando markup divisor padrão
-        // Fórmula: PrecoVenda = Custo / (1 - Imposto - Comissão - Margem)
-        // Valores padrão: Imposto 9%, Comissão 15%, Margem 45% = divisor 0.31
-        const defaultDivisor = 0.31; // 1 - 0.09 - 0.15 - 0.45
-        const calculatedSalePrice = costPrice > 0 ? (costPrice / defaultDivisor) : costPrice;
-        
-        return {
+      // O preço de venda será calculado dinamicamente na exibição usando as configurações do painel
+      const costPrice = parseFloat(item.PrecoVenda || item.Preco || item.PrecoCusto || 0);
+      
+      // Armazenar custo como basePrice também para compatibilidade
+      // O preço de venda real será calculado na exibição
+      return {
         name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
         description: item.Descricao || item.description || item.Descricao || '',
         category: item.WebTipo || item.category || item.Categoria || 'Geral',
-        basePrice: calculatedSalePrice.toFixed(2), // Preço de venda calculado
+        basePrice: costPrice.toFixed(2), // Armazena o custo aqui também
         costPrice: costPrice.toFixed(2), // Custo original do JSON (PrecoVenda)
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
@@ -1551,49 +1547,25 @@ export class PgStorage implements IStorage {
   }
 
   async recalculateProductPrices(): Promise<{ updated: number; errors: string[] }> {
-    let updated = 0;
     const errors: string[] = [];
     
     try {
-      const products = await pg.select().from(schema.products);
+      // Usar SQL direto para melhor performance com muitos produtos
+      // Atualiza cost_price = base_price onde cost_price está vazio
+      const result = await pg.execute(
+        sql`UPDATE products 
+            SET cost_price = base_price
+            WHERE (cost_price = '0.00' OR cost_price IS NULL OR cost_price = '0') 
+            AND base_price IS NOT NULL 
+            AND base_price != '0' 
+            AND base_price != '0.00'`
+      );
       
-      // Divisor padrão: 1 - 0.09 (imposto) - 0.15 (comissão) - 0.45 (margem)
-      const defaultDivisor = 0.31;
-      
-      for (const product of products) {
-        try {
-          const currentBasePrice = parseFloat(product.basePrice || '0');
-          const currentCostPrice = parseFloat(product.costPrice || '0');
-          
-          // Se já tem custo preenchido, não alterar
-          if (currentCostPrice > 0) {
-            continue;
-          }
-          
-          // Se não tem custo, usar o basePrice atual como custo (era o PrecoVenda do JSON)
-          // E calcular o novo preço de venda
-          if (currentBasePrice > 0) {
-            const costPrice = currentBasePrice;
-            const newBasePrice = costPrice / defaultDivisor;
-            
-            await pg.update(schema.products)
-              .set({
-                costPrice: costPrice.toFixed(2),
-                basePrice: newBasePrice.toFixed(2)
-              })
-              .where(eq(schema.products.id, product.id));
-            
-            updated++;
-          }
-        } catch (error: any) {
-          errors.push(`Erro ao atualizar produto "${product.name}": ${error.message}`);
-        }
-      }
-      
+      const updated = result.rowCount || 0;
       return { updated, errors };
     } catch (error: any) {
       errors.push(`Erro geral: ${error.message}`);
-      return { updated, errors };
+      return { updated: 0, errors };
     }
   }
 
