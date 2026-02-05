@@ -98,6 +98,17 @@ const BRAZIL_CITIES_COORDS: { [key: string]: [number, number] } = {
 
 const BRAZIL_GEO_URL = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson";
 
+// Coordenadas centrais dos estados brasileiros para labels
+const STATE_CENTERS: { [key: string]: [number, number] } = {
+  "AC": [-70.5, -9.0], "AL": [-36.6, -9.5], "AP": [-51.0, 1.5], "AM": [-64.0, -4.0],
+  "BA": [-41.5, -12.5], "CE": [-39.5, -5.2], "DF": [-47.9, -15.8], "ES": [-40.5, -19.5],
+  "GO": [-49.5, -16.0], "MA": [-45.0, -5.0], "MT": [-55.5, -13.0], "MS": [-55.0, -21.0],
+  "MG": [-44.5, -18.5], "PA": [-53.0, -4.0], "PB": [-36.8, -7.1], "PR": [-51.5, -24.5],
+  "PE": [-37.5, -8.3], "PI": [-42.8, -7.5], "RJ": [-43.0, -22.5], "RN": [-36.5, -5.8],
+  "RS": [-53.5, -29.5], "RO": [-63.0, -10.5], "RR": [-61.0, 2.5], "SC": [-49.5, -27.5],
+  "SP": [-48.5, -22.5], "SE": [-37.4, -10.9], "TO": [-48.5, -10.0]
+};
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#A855F7', '#EC4899'];
 
 const REPORT_ROTATION_INTERVAL = 15000;
@@ -746,6 +757,16 @@ export default function TvDashboard() {
 
       case 'branch_performance':
         const maxPedidos = Math.max(...branchPerformanceData.map((b: any) => b.pedidos), 1);
+        // Cores vibrantes para cada estado
+        const stateColors: { [key: string]: string } = {
+          "AC": "#FF6B6B", "AL": "#4ECDC4", "AP": "#45B7D1", "AM": "#96CEB4",
+          "BA": "#FFEAA7", "CE": "#DDA0DD", "DF": "#98D8C8", "ES": "#F7DC6F",
+          "GO": "#BB8FCE", "MA": "#85C1E9", "MT": "#F8B500", "MS": "#00CED1",
+          "MG": "#FFB347", "PA": "#87CEEB", "PB": "#DDA0DD", "PR": "#98FB98",
+          "PE": "#F0E68C", "PI": "#E6E6FA", "RJ": "#FFD700", "RN": "#FFA07A",
+          "RS": "#90EE90", "RO": "#AFEEEE", "RR": "#DB7093", "SC": "#00FA9A",
+          "SP": "#FF6347", "SE": "#BA55D3", "TO": "#20B2AA"
+        };
         return (
           <div className="h-[520px] flex gap-4">
             {/* Mapa do Brasil */}
@@ -753,32 +774,54 @@ export default function TvDashboard() {
               <ComposableMap
                 projection="geoMercator"
                 projectionConfig={{
-                  scale: 650,
-                  center: [-54, -15]
+                  scale: 850,
+                  center: [-52, -15]
                 }}
                 style={{ width: "100%", height: "100%" }}
               >
                 <Geographies geography={BRAZIL_GEO_URL}>
                   {({ geographies }) =>
-                    geographies.map((geo) => (
-                      <Geography
-                        key={geo.rsmKey}
-                        geography={geo}
-                        fill="#1F2937"
-                        stroke="#374151"
-                        strokeWidth={0.5}
-                        style={{
-                          default: { outline: "none" },
-                          hover: { fill: "#374151", outline: "none" },
-                          pressed: { outline: "none" },
-                        }}
-                      />
-                    ))
+                    geographies.map((geo) => {
+                      const stateName = geo.properties.sigla || geo.properties.name?.substring(0, 2).toUpperCase();
+                      const color = stateColors[stateName] || "#4A5568";
+                      return (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill={color}
+                          stroke="#FFFFFF"
+                          strokeWidth={1}
+                          style={{
+                            default: { outline: "none", fillOpacity: 0.7 },
+                            hover: { fill: color, fillOpacity: 1, outline: "none" },
+                            pressed: { outline: "none" },
+                          }}
+                        />
+                      );
+                    })
                   }
                 </Geographies>
+                {/* Labels dos estados */}
+                {Object.entries(STATE_CENTERS).map(([state, coords]) => (
+                  <Marker key={`label-${state}`} coordinates={coords}>
+                    <text
+                      textAnchor="middle"
+                      style={{
+                        fontFamily: "system-ui",
+                        fill: "#1F2937",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        textShadow: "1px 1px 0 white, -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white"
+                      }}
+                    >
+                      {state}
+                    </text>
+                  </Marker>
+                ))}
+                {/* Marcadores das filiais */}
                 {branchPerformanceData.map((branch: any, index: number) => {
                   if (!branch.coordinates) return null;
-                  const size = Math.max(12, (branch.pedidos / maxPedidos) * 40);
+                  const size = Math.max(15, (branch.pedidos / maxPedidos) * 45);
                   return (
                     <Marker key={branch.id} coordinates={branch.coordinates}>
                       <g>
