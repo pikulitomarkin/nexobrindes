@@ -426,19 +426,34 @@ export default function TvDashboard() {
     return null;
   };
 
-  const branchPerformanceData = branches.map((branch: any) => {
-    const branchOrders = confirmedOrders.filter((o: any) => o.branchId === branch.id);
-    const coords = getCityCoords(branch.city || branch.name || '');
-    return {
-      id: branch.id,
-      name: branch.name || 'Filial',
-      city: branch.city || '',
-      valor: branchOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-      pedidos: branchOrders.length,
-      coordinates: coords,
-      isHeadquarters: branch.isHeadquarters || false,
-    };
-  }).filter((b: any) => b.coordinates !== null);
+  // Pedidos sem filial atribuída são da Matriz
+  const matrizOrders = confirmedOrders.filter((o: any) => !o.branchId);
+  const matrizData = matrizOrders.length > 0 ? [{
+    id: 'matriz-principal',
+    name: 'Matriz',
+    city: 'São Paulo', // Cidade padrão da matriz
+    valor: matrizOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+    pedidos: matrizOrders.length,
+    coordinates: BRAZIL_CITIES_COORDS["são paulo"] || [-46.6333, -23.5505],
+    isHeadquarters: true,
+  }] : [];
+
+  const branchPerformanceData = [
+    ...matrizData,
+    ...branches.map((branch: any) => {
+      const branchOrders = confirmedOrders.filter((o: any) => o.branchId === branch.id);
+      const coords = getCityCoords(branch.city || branch.name || '');
+      return {
+        id: branch.id,
+        name: branch.name || 'Filial',
+        city: branch.city || '',
+        valor: branchOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+        pedidos: branchOrders.length,
+        coordinates: coords,
+        isHeadquarters: branch.isHeadquarters || false,
+      };
+    }).filter((b: any) => b.coordinates !== null)
+  ];
 
   const currentReport = REPORT_CONFIGS[currentReportIndex];
 
