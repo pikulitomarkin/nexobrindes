@@ -72,6 +72,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/admin/logistics", icon: Package, label: "Logística" },
     { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
     { href: "/admin/settings", icon: Settings, label: "Configurações" },
+    { href: "/admin/pricing", icon: Calculator, label: "Formação de Preço" },
     { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
     { href: "/admin/reports", icon: FileText, label: "Relatórios" },
     { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV" },
