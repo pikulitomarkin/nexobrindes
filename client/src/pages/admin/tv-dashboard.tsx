@@ -757,16 +757,57 @@ export default function TvDashboard() {
 
       case 'branch_performance':
         const maxPedidos = Math.max(...branchPerformanceData.map((b: any) => b.pedidos), 1);
-        // Cores vibrantes para cada estado
-        const stateColors: { [key: string]: string } = {
-          "AC": "#FF6B6B", "AL": "#4ECDC4", "AP": "#45B7D1", "AM": "#96CEB4",
-          "BA": "#FFEAA7", "CE": "#DDA0DD", "DF": "#98D8C8", "ES": "#F7DC6F",
-          "GO": "#BB8FCE", "MA": "#85C1E9", "MT": "#F8B500", "MS": "#00CED1",
-          "MG": "#FFB347", "PA": "#87CEEB", "PB": "#DDA0DD", "PR": "#98FB98",
-          "PE": "#F0E68C", "PI": "#E6E6FA", "RJ": "#FFD700", "RN": "#FFA07A",
-          "RS": "#90EE90", "RO": "#AFEEEE", "RR": "#DB7093", "SC": "#00FA9A",
-          "SP": "#FF6347", "SE": "#BA55D3", "TO": "#20B2AA"
+        
+        // Detectar estados que têm filiais baseado nas cidades cadastradas
+        const statesWithBranches = new Set<string>();
+        branches.forEach((branch: any) => {
+          const city = (branch.city || '').toLowerCase();
+          // Mapear cidade para estado
+          if (city.includes('são paulo') || city.includes('campinas') || city.includes('santos') || city.includes('ribeirão') || city.includes('sorocaba')) statesWithBranches.add('SP');
+          if (city.includes('rio de janeiro') || city.includes('niterói')) statesWithBranches.add('RJ');
+          if (city.includes('belo horizonte') || city.includes('uberlândia') || city.includes('contagem')) statesWithBranches.add('MG');
+          if (city.includes('curitiba') || city.includes('londrina') || city.includes('maringá')) statesWithBranches.add('PR');
+          if (city.includes('porto alegre') || city.includes('caxias')) statesWithBranches.add('RS');
+          if (city.includes('salvador')) statesWithBranches.add('BA');
+          if (city.includes('recife')) statesWithBranches.add('PE');
+          if (city.includes('fortaleza')) statesWithBranches.add('CE');
+          if (city.includes('brasília')) statesWithBranches.add('DF');
+          if (city.includes('goiânia')) statesWithBranches.add('GO');
+          if (city.includes('manaus')) statesWithBranches.add('AM');
+          if (city.includes('belém')) statesWithBranches.add('PA');
+          if (city.includes('florianópolis') || city.includes('joinville') || city.includes('blumenau')) statesWithBranches.add('SC');
+          if (city.includes('vitória')) statesWithBranches.add('ES');
+          if (city.includes('natal')) statesWithBranches.add('RN');
+          if (city.includes('maceió')) statesWithBranches.add('AL');
+          if (city.includes('joão pessoa')) statesWithBranches.add('PB');
+          if (city.includes('aracaju')) statesWithBranches.add('SE');
+          if (city.includes('teresina')) statesWithBranches.add('PI');
+          if (city.includes('são luís')) statesWithBranches.add('MA');
+          if (city.includes('cuiabá')) statesWithBranches.add('MT');
+          if (city.includes('campo grande')) statesWithBranches.add('MS');
+          if (city.includes('palmas')) statesWithBranches.add('TO');
+          if (city.includes('macapá')) statesWithBranches.add('AP');
+          if (city.includes('boa vista')) statesWithBranches.add('RR');
+          if (city.includes('porto velho')) statesWithBranches.add('RO');
+          if (city.includes('rio branco')) statesWithBranches.add('AC');
+          // Adicionar por state se disponível
+          if (branch.state) statesWithBranches.add(branch.state.toUpperCase());
+        });
+
+        // Escala gradiente harmoniosa para estados com filiais (tons de azul/verde vibrantes)
+        const activeGradient: { [key: string]: string } = {
+          "AC": "#00D4AA", "AL": "#00B4D8", "AP": "#0096C7", "AM": "#48CAE4",
+          "BA": "#00C49A", "CE": "#00B4D8", "DF": "#2EC4B6", "ES": "#3DD5F3",
+          "GO": "#00D4AA", "MA": "#48CAE4", "MT": "#00C49A", "MS": "#00B4D8",
+          "MG": "#2EC4B6", "PA": "#0096C7", "PB": "#48CAE4", "PR": "#00D4AA",
+          "PE": "#00B4D8", "PI": "#3DD5F3", "RJ": "#FFD166", "RN": "#48CAE4",
+          "RS": "#00C49A", "RO": "#0096C7", "RR": "#48CAE4", "SC": "#2EC4B6",
+          "SP": "#EF476F", "SE": "#00B4D8", "TO": "#00D4AA"
         };
+
+        // Cor opaca para estados sem filiais
+        const inactiveColor = "#2D3748";
+        
         return (
           <div className="h-[520px] flex gap-4">
             {/* Mapa do Brasil */}
@@ -783,17 +824,19 @@ export default function TvDashboard() {
                   {({ geographies }) =>
                     geographies.map((geo) => {
                       const stateName = geo.properties.sigla || geo.properties.name?.substring(0, 2).toUpperCase();
-                      const color = stateColors[stateName] || "#4A5568";
+                      const hasBranch = statesWithBranches.has(stateName);
+                      const color = hasBranch ? (activeGradient[stateName] || "#00D4AA") : inactiveColor;
+                      const opacity = hasBranch ? 0.9 : 0.4;
                       return (
                         <Geography
                           key={geo.rsmKey}
                           geography={geo}
                           fill={color}
-                          stroke="#FFFFFF"
-                          strokeWidth={1}
+                          stroke={hasBranch ? "#FFFFFF" : "#4A5568"}
+                          strokeWidth={hasBranch ? 1.5 : 0.5}
                           style={{
-                            default: { outline: "none", fillOpacity: 0.7 },
-                            hover: { fill: color, fillOpacity: 1, outline: "none" },
+                            default: { outline: "none", fillOpacity: opacity },
+                            hover: { fill: color, fillOpacity: hasBranch ? 1 : 0.5, outline: "none" },
                             pressed: { outline: "none" },
                           }}
                         />
