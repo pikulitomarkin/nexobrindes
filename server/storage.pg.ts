@@ -138,7 +138,8 @@ export class PgStorage implements IStorage {
       specialty: vendorData.specialty || null,
       vendorId: null,
       isActive: true,
-      isCommissioned: vendorData.isCommissioned !== false
+      isCommissioned: vendorData.isCommissioned !== false,
+      photoUrl: vendorData.photoUrl || null
     });
 
     // Create vendor profile

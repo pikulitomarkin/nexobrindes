@@ -42,6 +42,7 @@ const vendorFormSchema = z.object({
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   phone: z.string().optional(),
   commissionRate: z.string().min(1, "Taxa de comissão é obrigatória"),
+  photoUrl: z.string().optional(),
 });
 
 const partnerFormSchema = z.object({
@@ -141,6 +142,7 @@ export default function AdminUsers() {
       password: "",
       phone: "",
       commissionRate: "10.00",
+      photoUrl: "",
     },
   });
 
@@ -861,6 +863,21 @@ export default function AdminUsers() {
                             )}
                           />
                         </div>
+
+                        <FormField
+                          control={vendorForm.control}
+                          name="photoUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>URL da Foto</FormLabel>
+                              <FormControl>
+                                <Input placeholder="https://exemplo.com/foto.jpg" {...field} />
+                              </FormControl>
+                              <p className="text-xs text-gray-500">Cole o link de uma foto do vendedor</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <div className="flex justify-end space-x-2 pt-4">
                           <Button

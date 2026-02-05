@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   // Producer specific fields
   specialty: text("specialty"), // For producers: their specialty
   address: text("address"), // For producers: their address
+  photoUrl: text("photo_url"), // Profile photo URL
 });
 
 export const clients = pgTable("clients", {

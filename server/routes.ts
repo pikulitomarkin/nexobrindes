@@ -4396,9 +4396,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors", async (req, res) => {
     try {
-      const { name, email, password, commissionRate, userCode, phone, address, isCommissioned } = req.body;
+      const { name, email, password, commissionRate, userCode, phone, address, isCommissioned, photoUrl } = req.body;
 
-      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate, isCommissioned });
+      console.log('Creating vendor with data:', { name, email, userCode, phone, address, commissionRate, isCommissioned, photoUrl });
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -4424,7 +4424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: userCode.trim(),
         password: password || "123456",
         commissionRate: commissionRate || '10.00',
-        isCommissioned: isCommissioned !== false
+        isCommissioned: isCommissioned !== false,
+        photoUrl: photoUrl?.trim() || null
       });
 
       // Get vendor info
