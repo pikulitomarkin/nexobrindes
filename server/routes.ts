@@ -9804,6 +9804,145 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // ==================== PRICING / FORMAÇÃO DE PREÇO ====================
+
+  // Obter configurações de preço ativas
+  app.get("/api/pricing/settings", async (req, res) => {
+    try {
+      const settings = await storage.getPricingSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching pricing settings:", error);
+      res.status(500).json({ error: "Failed to fetch pricing settings" });
+    }
+  });
+
+  // Atualizar configurações de preço
+  app.put("/api/pricing/settings/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const settings = await storage.updatePricingSettings(id, updates);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating pricing settings:", error);
+      res.status(500).json({ error: "Failed to update pricing settings" });
+    }
+  });
+
+  // Obter faixas de margem
+  app.get("/api/pricing/margin-tiers/:settingsId", async (req, res) => {
+    try {
+      const { settingsId } = req.params;
+      const tiers = await storage.getPricingMarginTiers(settingsId);
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching margin tiers:", error);
+      res.status(500).json({ error: "Failed to fetch margin tiers" });
+    }
+  });
+
+  // Criar faixa de margem
+  app.post("/api/pricing/margin-tiers", async (req, res) => {
+    try {
+      const tierData = req.body;
+      const tier = await storage.createPricingMarginTier(tierData);
+      res.json(tier);
+    } catch (error) {
+      console.error("Error creating margin tier:", error);
+      res.status(500).json({ error: "Failed to create margin tier" });
+    }
+  });
+
+  // Atualizar faixa de margem
+  app.put("/api/pricing/margin-tiers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const tier = await storage.updatePricingMarginTier(id, updates);
+      res.json(tier);
+    } catch (error) {
+      console.error("Error updating margin tier:", error);
+      res.status(500).json({ error: "Failed to update margin tier" });
+    }
+  });
+
+  // Deletar faixa de margem
+  app.delete("/api/pricing/margin-tiers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePricingMarginTier(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting margin tier:", error);
+      res.status(500).json({ error: "Failed to delete margin tier" });
+    }
+  });
+
+  // Calcular preço de venda baseado nas configurações
+  app.post("/api/pricing/calculate", async (req, res) => {
+    try {
+      const { productCost, quantity, customizationCost = 0, freightCost = 0, paymentCondition = 'standard' } = req.body;
+      
+      // Buscar configurações ativas
+      const settings = await storage.getPricingSettings();
+      if (!settings) {
+        return res.status(400).json({ error: "No pricing settings configured" });
+      }
+      
+      // Buscar faixas de margem
+      const tiers = await storage.getPricingMarginTiers(settings.id);
+      
+      // Calcular custo total
+      const totalCost = parseFloat(productCost) + parseFloat(customizationCost) + parseFloat(freightCost);
+      
+      // Encontrar margem baseada na quantidade
+      let marginRate = parseFloat(settings.minimumMargin) / 100; // Margem padrão
+      for (const tier of tiers) {
+        const minQty = tier.minQuantity || 0;
+        const maxQty = tier.maxQuantity || Number.MAX_SAFE_INTEGER;
+        if (quantity >= minQty && quantity <= maxQty) {
+          marginRate = parseFloat(tier.marginRate) / 100;
+          break;
+        }
+      }
+      
+      // Taxas fixas
+      const taxRate = parseFloat(settings.taxRate) / 100;
+      const commissionRate = parseFloat(settings.commissionRate) / 100;
+      const minimumMarginRate = parseFloat(settings.minimumMargin) / 100;
+      
+      // Cálculo do Markup Divisor
+      // Preço = Custo / (1 - Taxas)
+      const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
+      const divisorMinimo = 1 - (taxRate + commissionRate + minimumMarginRate);
+      
+      let idealPrice = totalCost / divisorIdeal;
+      const minimumPrice = totalCost / divisorMinimo;
+      
+      // Aplicar desconto por condição de pagamento
+      if (paymentCondition === 'cash') {
+        idealPrice *= (1 - parseFloat(settings.cashDiscount) / 100);
+      } else if (paymentCondition === 'cash_no_tax') {
+        idealPrice *= (1 - parseFloat(settings.cashNoTaxDiscount) / 100);
+      }
+      
+      res.json({
+        totalCost: Math.round(totalCost * 100) / 100,
+        marginApplied: marginRate * 100,
+        idealPrice: Math.round(idealPrice * 100) / 100,
+        minimumPrice: Math.round(minimumPrice * 100) / 100,
+        totalIdeal: Math.round(idealPrice * quantity * 100) / 100,
+        totalMinimum: Math.round(minimumPrice * quantity * 100) / 100,
+        taxRate: taxRate * 100,
+        commissionRate: commissionRate * 100,
+      });
+    } catch (error) {
+      console.error("Error calculating price:", error);
+      res.status(500).json({ error: "Failed to calculate price" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

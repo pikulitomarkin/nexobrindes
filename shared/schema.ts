@@ -223,6 +223,14 @@ export const branches = pgTable("branches", {
   address: text("address"),
   email: text("email"),
   phone: text("phone"),
+  // Campos de endereço detalhado
+  logradouro: text("logradouro"),
+  numero: text("numero"),
+  complemento: text("complemento"),
+  bairro: text("bairro"),
+  cep: text("cep"),
+  estado: text("estado"),
+  telefone: text("telefone"),
   isHeadquarters: boolean("is_headquarters").default(false), // Para identificar a matriz
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -304,6 +312,14 @@ export const budgets = pgTable("budgets", {
   discountType: text("discount_type").default('percentage'), // 'percentage' or 'value'
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default('0.00'),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default('0.00'),
+
+  // Campos de pagamento e entrega
+  paymentMethodId: varchar("payment_method_id").references(() => paymentMethods.id),
+  shippingMethodId: varchar("shipping_method_id").references(() => shippingMethods.id),
+  installments: integer("installments").default(1),
+  downPayment: decimal("down_payment", { precision: 10, scale: 2 }).default('0.00'),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -610,6 +626,33 @@ export const logBackups = pgTable("log_backups", {
   createdBy: varchar("created_by").references(() => users.id).default('system'),
 });
 
+// ==================== PRICING / FORMAÇÃO DE PREÇO ====================
+
+// Configurações gerais de precificação
+export const pricingSettings = pgTable("pricing_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().default('Configuração Padrão'),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).notNull().default('9.00'), // Imposto Simples (ex: 9%)
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull().default('15.00'), // Comissão (ex: 15%)
+  minimumMargin: decimal("minimum_margin", { precision: 5, scale: 2 }).notNull().default('20.00'), // Margem mínima de segurança (ex: 20%)
+  cashDiscount: decimal("cash_discount", { precision: 5, scale: 2 }).notNull().default('5.00'), // Desconto à vista (ex: 5%)
+  cashNoTaxDiscount: decimal("cash_no_tax_discount", { precision: 5, scale: 2 }).notNull().default('12.00'), // Desconto à vista sem imposto (ex: 12%)
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Faixas de margem por quantidade (escada de margens)
+export const pricingMarginTiers = pgTable("pricing_margin_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingsId: varchar("settings_id").references(() => pricingSettings.id).notNull(),
+  minQuantity: integer("min_quantity").notNull().default(0), // Quantidade mínima da faixa
+  maxQuantity: integer("max_quantity"), // Quantidade máxima (null = ilimitado)
+  marginRate: decimal("margin_rate", { precision: 5, scale: 2 }).notNull(), // Margem de lucro (ex: 45%)
+  displayOrder: integer("display_order").notNull().default(0), // Ordem de exibição
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -645,6 +688,8 @@ export const insertQuoteRequestItemSchema = createInsertSchema(quoteRequestItems
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({ id: true, createdAt: true });
 export const insertLogBackupSchema = createInsertSchema(logBackups).omit({ id: true, createdAt: true });
+export const insertPricingSettingsSchema = createInsertSchema(pricingSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPricingMarginTierSchema = createInsertSchema(pricingMarginTiers).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -715,6 +760,10 @@ export type SystemLog = typeof systemLogs.$inferSelect;
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 export type LogBackup = typeof logBackups.$inferSelect;
 export type InsertLogBackup = z.infer<typeof insertLogBackupSchema>;
+export type PricingSettings = typeof pricingSettings.$inferSelect;
+export type InsertPricingSettings = z.infer<typeof insertPricingSettingsSchema>;
+export type PricingMarginTier = typeof pricingMarginTiers.$inferSelect;
+export type InsertPricingMarginTier = z.infer<typeof insertPricingMarginTierSchema>;
 
 export interface ExpenseNote {
   id: string;

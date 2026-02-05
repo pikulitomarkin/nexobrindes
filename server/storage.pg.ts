@@ -3078,6 +3078,49 @@ export class PgStorage implements IStorage {
       console.error('Failed to log user action (non-blocking):', error);
     }
   }
+
+  // ==================== PRICING / FORMAÇÃO DE PREÇO ====================
+
+  async getPricingSettings(): Promise<any> {
+    const results = await pg.select().from(schema.pricingSettings)
+      .where(eq(schema.pricingSettings.isActive, true))
+      .limit(1);
+    return results[0] || null;
+  }
+
+  async updatePricingSettings(id: string, updates: any): Promise<any> {
+    const results = await pg.update(schema.pricingSettings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.pricingSettings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async getPricingMarginTiers(settingsId: string): Promise<any[]> {
+    return await pg.select().from(schema.pricingMarginTiers)
+      .where(eq(schema.pricingMarginTiers.settingsId, settingsId))
+      .orderBy(schema.pricingMarginTiers.displayOrder);
+  }
+
+  async createPricingMarginTier(tierData: any): Promise<any> {
+    const results = await pg.insert(schema.pricingMarginTiers)
+      .values(tierData)
+      .returning();
+    return results[0];
+  }
+
+  async updatePricingMarginTier(id: string, updates: any): Promise<any> {
+    const results = await pg.update(schema.pricingMarginTiers)
+      .set(updates)
+      .where(eq(schema.pricingMarginTiers.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deletePricingMarginTier(id: string): Promise<void> {
+    await pg.delete(schema.pricingMarginTiers)
+      .where(eq(schema.pricingMarginTiers.id, id));
+  }
 }
 
 // Export singleton instance
