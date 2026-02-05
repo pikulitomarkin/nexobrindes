@@ -1451,15 +1451,22 @@ export class PgStorage implements IStorage {
     
     // Map common field names from different JSON formats
     const mapProductFields = (item: any) => {
-      // Pegar custo do produto para cálculo de preço de venda
-        const costPrice = cleanNumericField(item.PrecoCusto || item.PrecoMinimo || item.Custo || item.costPrice || item.cost || 0);
+      // PrecoVenda do JSON é o CUSTO do produto
+        // O preço de venda será calculado automaticamente no orçamento usando a fórmula de markup
+        const costPrice = parseFloat(item.PrecoVenda || item.basePrice || item.Preco || 0);
+        
+        // Calcular preço de venda usando markup divisor padrão
+        // Fórmula: PrecoVenda = Custo / (1 - Imposto - Comissão - Margem)
+        // Valores padrão: Imposto 9%, Comissão 15%, Margem 45% = divisor 0.31
+        const defaultDivisor = 0.31; // 1 - 0.09 - 0.15 - 0.45
+        const calculatedSalePrice = costPrice > 0 ? (costPrice / defaultDivisor) : costPrice;
         
         return {
         name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
         description: item.Descricao || item.description || item.Descricao || '',
         category: item.WebTipo || item.category || item.Categoria || 'Geral',
-        basePrice: (item.PrecoVenda || item.basePrice || item.Preco || 0).toString(),
-        costPrice: costPrice || '0.00', // Custo do produto para cálculo de margem
+        basePrice: calculatedSalePrice.toFixed(2), // Preço de venda calculado
+        costPrice: costPrice.toFixed(2), // Custo original do JSON (PrecoVenda)
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
         producerId: isInternal ? null : producerId,
