@@ -266,6 +266,7 @@ export class PgStorage implements IStorage {
   // ==================== ORDERS ====================
 
   async getOrders(): Promise<Order[]> {
+    // First get orders from orders table
     const orders = await pg.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
 
     // Enrich with budget items if budgetId exists
@@ -277,7 +278,66 @@ export class PgStorage implements IStorage {
       return { ...order, items: [] } as any;
     }));
 
-    return enrichedOrders;
+    // Also get converted budgets and map them to Order format
+    const convertedBudgets = await pg.select().from(schema.budgets)
+      .where(eq(schema.budgets.status, 'converted'))
+      .orderBy(desc(schema.budgets.createdAt));
+
+    const budgetOrders = await Promise.all(convertedBudgets.map(async (budget) => {
+      const items = await this.getBudgetItems(budget.id);
+      
+      // Map budget fields to order format
+      return {
+        id: budget.id,
+        orderNumber: budget.budgetNumber.replace('ORC-', 'PED-'), // Convert budget number to order format
+        clientId: budget.clientId,
+        vendorId: budget.vendorId,
+        branchId: budget.branchId,
+        budgetId: budget.id,
+        product: budget.title,
+        description: budget.description,
+        totalValue: budget.totalValue,
+        paidValue: budget.paidValue || '0',
+        refundAmount: '0',
+        status: 'confirmed', // Converted budgets are confirmed orders
+        productStatus: 'to_buy',
+        deadline: budget.deliveryDeadline,
+        contactName: budget.contactName,
+        contactPhone: budget.contactPhone,
+        contactEmail: budget.contactEmail,
+        deliveryType: budget.deliveryType,
+        deliveryDeadline: budget.deliveryDeadline,
+        paymentMethodId: budget.paymentMethodId,
+        shippingMethodId: budget.shippingMethodId,
+        installments: budget.installments,
+        downPayment: budget.downPayment,
+        remainingAmount: budget.remainingAmount,
+        shippingCost: budget.shippingCost,
+        hasDiscount: budget.hasDiscount,
+        discountType: budget.discountType,
+        discountPercentage: budget.discountPercentage,
+        discountValue: budget.discountValue,
+        hasCustomization: budget.hasCustomization,
+        customizationPercentage: budget.customizationPercentage,
+        customizationValue: budget.customizationValue,
+        customizationDescription: budget.customizationDescription,
+        createdAt: budget.createdAt,
+        updatedAt: budget.updatedAt,
+        items,
+      } as any;
+    }));
+
+    // Combine both sources, removing duplicates by id
+    const allOrders = [...enrichedOrders, ...budgetOrders];
+    const uniqueOrders = allOrders.filter((order, index, self) =>
+      index === self.findIndex((o) => o.id === order.id)
+    );
+
+    return uniqueOrders.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
