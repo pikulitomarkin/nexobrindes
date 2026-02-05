@@ -9893,9 +9893,10 @@ Para mais detalhes, entre em contato conosco!`;
   });
 
   // Calcular preço de venda baseado nas configurações
+  // Nota: Frete e personalização são cobrados separadamente no orçamento
   app.post("/api/pricing/calculate", async (req, res) => {
     try {
-      const { productCost, quantity, customizationCost = 0, freightCost = 0, paymentCondition = 'standard' } = req.body;
+      const { productCost, quantity, paymentCondition = 'standard' } = req.body;
       
       // Buscar configurações ativas
       const settings = await storage.getPricingSettings();
@@ -9906,8 +9907,8 @@ Para mais detalhes, entre em contato conosco!`;
       // Buscar faixas de margem
       const tiers = await storage.getPricingMarginTiers(settings.id);
       
-      // Calcular custo total
-      const totalCost = parseFloat(productCost) + parseFloat(customizationCost) + parseFloat(freightCost);
+      // Custo do produto (frete e personalização são cobrados separadamente)
+      const totalCost = parseFloat(productCost);
       
       // Encontrar margem baseada na quantidade
       let marginRate = parseFloat(settings.minimumMargin) / 100; // Margem padrão

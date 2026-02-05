@@ -67,8 +67,6 @@ export default function AdminPricing() {
   const [calcForm, setCalcForm] = useState({
     productCost: "",
     quantity: "",
-    customizationCost: "",
-    freightCost: "",
     paymentCondition: "standard",
   });
 
@@ -219,8 +217,6 @@ export default function AdminPricing() {
     calculatePriceMutation.mutate({
       productCost: parseFloat(calcForm.productCost),
       quantity: parseInt(calcForm.quantity),
-      customizationCost: calcForm.customizationCost ? parseFloat(calcForm.customizationCost) : 0,
-      freightCost: calcForm.freightCost ? parseFloat(calcForm.freightCost) : 0,
       paymentCondition: calcForm.paymentCondition,
     });
   };
@@ -386,31 +382,6 @@ export default function AdminPricing() {
                   placeholder="1"
                   value={calcForm.quantity}
                   onChange={(e) => setCalcForm({ ...calcForm, quantity: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="customizationCost">Custo Personalização (R$)</Label>
-                <Input
-                  id="customizationCost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={calcForm.customizationCost}
-                  onChange={(e) => setCalcForm({ ...calcForm, customizationCost: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="freightCost">Custo Frete (R$)</Label>
-                <Input
-                  id="freightCost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={calcForm.freightCost}
-                  onChange={(e) => setCalcForm({ ...calcForm, freightCost: e.target.value })}
                 />
               </div>
             </div>
