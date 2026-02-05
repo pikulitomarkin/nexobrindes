@@ -271,13 +271,15 @@ export default function TvDashboard() {
     .map((vendor: any) => {
       const vendorOrders = confirmedOrders.filter((o: any) => o.vendorId === vendor.id);
       return {
-        name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
+        id: vendor.id,
+        name: vendor.name || 'N/A',
+        photoUrl: vendor.photoUrl || '',
         pedidos: vendorOrders.length,
         valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
     .sort((a: any, b: any) => b.pedidos - a.pedidos)
-    .slice(0, 8);
+    .slice(0, 6);
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
   confirmedOrders.forEach((order: any) => {
@@ -529,20 +531,51 @@ export default function TvDashboard() {
 
       case 'top_vendors':
         return (
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topVendorsData} layout="vertical" margin={{ left: 100 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" stroke="#9CA3AF" />
-                <YAxis type="category" dataKey="name" stroke="#9CA3AF" width={90} />
-                <Tooltip 
-                  formatter={(value: any) => [value, 'Pedidos Fechados']}
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F9FAFB' }}
-                />
-                <Bar dataKey="pedidos" fill="#10B981" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[520px] flex flex-col">
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4">
+              {topVendorsData.map((vendor, index) => (
+                <div 
+                  key={vendor.id} 
+                  className="relative bg-gradient-to-br rounded-xl p-4 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}22, ${BRANCH_COLORS[index % BRANCH_COLORS.length]}44)`,
+                    border: `2px solid ${BRANCH_COLORS[index % BRANCH_COLORS.length]}`
+                  }}
+                >
+                  <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg"
+                    style={{ backgroundColor: BRANCH_COLORS[index % BRANCH_COLORS.length] }}
+                  >
+                    {index + 1}º
+                  </div>
+                  {vendor.photoUrl ? (
+                    <img 
+                      src={vendor.photoUrl} 
+                      alt={vendor.name}
+                      className="w-20 h-20 object-cover rounded-full bg-white/10 mb-2 border-2 border-white/30"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-2 ${vendor.photoUrl ? 'hidden' : ''}`}>
+                    <Users className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <p className="text-white text-xs text-center font-medium line-clamp-2 mb-2" title={vendor.name}>
+                    {vendor.name.length > 20 ? vendor.name.substring(0, 20) + '...' : vendor.name}
+                  </p>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold" style={{ color: BRANCH_COLORS[index % BRANCH_COLORS.length] }}>
+                      {vendor.pedidos}
+                    </p>
+                    <p className="text-gray-400 text-xs">pedidos</p>
+                  </div>
+                  <p className="text-gray-300 text-xs mt-1">
+                    R$ {vendor.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
