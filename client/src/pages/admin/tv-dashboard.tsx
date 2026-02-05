@@ -701,12 +701,8 @@ export default function TvDashboard() {
                     {index + 1}º
                   </div>
                   
-                  <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-3 border-4 border-white/20 overflow-hidden">
-                    <img 
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(client.name)}`} 
-                      alt={client.name}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-3 border-4 border-white/20">
+                    <ShoppingCart className="w-10 h-10 text-white opacity-80" />
                   </div>
 
                   <div className="text-center w-full">
