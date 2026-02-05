@@ -341,18 +341,69 @@ export class PgStorage implements IStorage {
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
+    // First try to find in orders table
     const results = await pg.select().from(schema.orders).where(eq(schema.orders.id, id));
     const order = results[0];
 
-    if (!order) return undefined;
-
-    // Enrich with budget items
-    if (order.budgetId) {
-      const items = await this.getBudgetItems(order.budgetId);
-      return { ...order, items } as any;
+    if (order) {
+      // Enrich with budget items
+      if (order.budgetId) {
+        const items = await this.getBudgetItems(order.budgetId);
+        return { ...order, items } as any;
+      }
+      return { ...order, items: [] } as any;
     }
 
-    return { ...order, items: [] } as any;
+    // If not found, try to find in converted budgets
+    const budgetResults = await pg.select().from(schema.budgets)
+      .where(eq(schema.budgets.id, id));
+    const budget = budgetResults[0];
+
+    if (budget && budget.status === 'converted') {
+      const items = await this.getBudgetItems(budget.id);
+      
+      // Map budget fields to order format
+      return {
+        id: budget.id,
+        orderNumber: budget.budgetNumber.replace('ORC-', 'PED-').replace('BUD-', 'PED-'),
+        clientId: budget.clientId,
+        vendorId: budget.vendorId,
+        branchId: budget.branchId,
+        budgetId: budget.id,
+        product: budget.title,
+        description: budget.description,
+        totalValue: budget.totalValue,
+        paidValue: budget.paidValue || '0',
+        refundAmount: '0',
+        status: 'confirmed',
+        productStatus: 'to_buy',
+        deadline: budget.deliveryDeadline,
+        contactName: budget.contactName,
+        contactPhone: budget.contactPhone,
+        contactEmail: budget.contactEmail,
+        deliveryType: budget.deliveryType,
+        deliveryDeadline: budget.deliveryDeadline,
+        paymentMethodId: budget.paymentMethodId,
+        shippingMethodId: budget.shippingMethodId,
+        installments: budget.installments,
+        downPayment: budget.downPayment,
+        remainingAmount: budget.remainingAmount,
+        shippingCost: budget.shippingCost,
+        hasDiscount: budget.hasDiscount,
+        discountType: budget.discountType,
+        discountPercentage: budget.discountPercentage,
+        discountValue: budget.discountValue,
+        hasCustomization: budget.hasCustomization,
+        customizationPercentage: budget.customizationPercentage,
+        customizationValue: budget.customizationValue,
+        customizationDescription: budget.customizationDescription,
+        createdAt: budget.createdAt,
+        updatedAt: budget.updatedAt,
+        items,
+      } as any;
+    }
+
+    return undefined;
   }
 
   async createOrder(orderData: InsertOrder): Promise<Order> {
@@ -2129,8 +2180,52 @@ export class PgStorage implements IStorage {
   // ==================== ACCOUNTS RECEIVABLE ====================
 
   async getAccountsReceivable(): Promise<AccountsReceivable[]> {
-    return await pg.select().from(schema.accountsReceivable)
+    // Get existing accounts receivable from database
+    const existingAR = await pg.select().from(schema.accountsReceivable)
       .orderBy(desc(schema.accountsReceivable.createdAt));
+
+    // Also generate accounts receivable from converted budgets that don't have AR entries
+    const convertedBudgets = await pg.select().from(schema.budgets)
+      .where(eq(schema.budgets.status, 'converted'));
+    
+    // Get payment info for budgets
+    const paymentInfos = await pg.select().from(schema.budgetPaymentInfo);
+    const paymentInfoMap = new Map(paymentInfos.map(pi => [pi.budgetId, pi]));
+
+    // Create virtual AR entries for converted budgets
+    const budgetARs: AccountsReceivable[] = [];
+    for (const budget of convertedBudgets) {
+      // Skip if already has AR entry
+      if (existingAR.some(ar => ar.orderId === budget.id)) continue;
+      
+      const paymentInfo = paymentInfoMap.get(budget.id);
+      const totalValue = parseFloat(budget.totalValue || '0');
+      const paidValue = parseFloat(budget.paidValue || '0');
+      const remainingAmount = totalValue - paidValue;
+      
+      if (remainingAmount > 0) {
+        budgetARs.push({
+          id: `ar-${budget.id}`,
+          orderId: budget.id,
+          clientId: budget.clientId,
+          vendorId: budget.vendorId,
+          branchId: budget.branchId,
+          amount: budget.totalValue,
+          receivedAmount: budget.paidValue || '0',
+          status: paidValue >= totalValue ? 'paid' : (paidValue > 0 ? 'partial' : 'pending'),
+          dueDate: budget.deliveryDeadline,
+          description: budget.title,
+          createdAt: budget.createdAt,
+          updatedAt: budget.updatedAt,
+        } as any);
+      }
+    }
+
+    return [...existingAR, ...budgetARs].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
   }
 
   async getAccountsReceivableByOrder(orderId: string): Promise<AccountsReceivable[]> {
