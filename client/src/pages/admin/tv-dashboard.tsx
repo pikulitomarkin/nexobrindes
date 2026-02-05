@@ -394,20 +394,23 @@ export default function TvDashboard() {
   }));
 
   const productionStatusCounts: { [key: string]: number } = {};
-  productionOrders.forEach((po: any) => {
-    const status = po.status || 'pending';
+  // Usar os pedidos (orders) para status de produção
+  orders.forEach((order: any) => {
+    const status = order.status || 'pending';
     if (status !== 'cancelled') {
       productionStatusCounts[status] = (productionStatusCounts[status] || 0) + 1;
     }
   });
   const productionStatusLabels: { [key: string]: string } = {
     pending: 'Pendente',
+    confirmed: 'Confirmado',
     in_production: 'Em Produção',
     production: 'Em Produção',
     completed: 'Concluído',
     delivered: 'Entregue',
     accepted: 'Aceito',
     shipped: 'Despachado',
+    partial_shipped: 'Parcialmente Enviado',
     ready: 'Pronto',
   };
   const productionStatusData = Object.entries(productionStatusCounts).map(([status, count]) => ({
