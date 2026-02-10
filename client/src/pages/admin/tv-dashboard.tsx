@@ -201,6 +201,16 @@ export default function TvDashboard() {
     refetchInterval: 60000,
   });
 
+  const { data: allBudgets = [] } = useQuery({
+    queryKey: ["/api/budgets"],
+    queryFn: async () => {
+      const response = await fetch("/api/budgets");
+      if (!response.ok) throw new Error("Failed to fetch budgets");
+      return response.json();
+    },
+    refetchInterval: 60000,
+  });
+
   const { data: productionOrders = [] } = useQuery({
     queryKey: ["/api/production-orders"],
     queryFn: async () => {
@@ -347,10 +357,15 @@ export default function TvDashboard() {
   }));
 
   const statusCounts: { [key: string]: number } = {};
-  confirmedSales.forEach((sale: any) => {
-    statusCounts['converted'] = (statusCounts['converted'] || 0) + 1;
+  allBudgets.forEach((budget: any) => {
+    const status = budget.status || 'draft';
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
   const statusLabels: { [key: string]: string } = {
+    draft: 'Rascunho',
+    sent: 'Enviado',
+    approved: 'Aprovado',
+    rejected: 'Rejeitado',
     converted: 'Convertido',
     pending: 'Pendente',
     confirmed: 'Confirmado',
