@@ -166,22 +166,23 @@ export default function AdminBudgets() {
     enabled: !!pricingSettings?.id,
   });
 
-  // Função para calcular preço mínimo baseado nas configurações
-  const calculateMinimumPrice = (costPrice: number, quantity: number = 1) => {
-    if (!pricingSettings || !costPrice || costPrice <= 0) return { idealPrice: 0, minimumPrice: 0 };
+  // Função para calcular preço ideal e mínimo baseado na faixa de faturamento
+  const calculatePriceFromCost = (costPrice: number, budgetRevenue: number = 0) => {
+    if (!pricingSettings || !costPrice || costPrice <= 0) return { idealPrice: 0, minimumPrice: 0, marginApplied: 0, minimumMarginApplied: 0 };
     
     const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
     const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
-    const minimumMargin = parseFloat(pricingSettings.minimumMargin) / 100 || 0.20;
     
-    // Encontrar margem baseada na quantidade
-    let marginRate = minimumMargin;
+    // Encontrar faixa baseada no faturamento do orçamento
+    let marginRate = 0.28;
+    let minMarginRate = 0.20;
     if (marginTiers && marginTiers.length > 0) {
       for (const tier of marginTiers) {
-        const minQty = tier.minQuantity || 0;
-        const maxQty = tier.maxQuantity || Number.MAX_SAFE_INTEGER;
-        if (quantity >= minQty && quantity <= maxQty) {
+        const minRev = parseFloat(tier.minRevenue) || 0;
+        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Number.MAX_SAFE_INTEGER;
+        if (budgetRevenue >= minRev && budgetRevenue <= maxRev) {
           marginRate = parseFloat(tier.marginRate) / 100;
+          minMarginRate = parseFloat(tier.minimumMarginRate) / 100;
           break;
         }
       }
@@ -189,12 +190,13 @@ export default function AdminBudgets() {
     
     // Markup divisor: Preço = Custo / (1 - Taxas)
     const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
-    const divisorMinimo = 1 - (taxRate + commissionRate + minimumMargin);
+    const divisorMinimo = 1 - (taxRate + commissionRate + minMarginRate);
     
     return {
       idealPrice: costPrice / divisorIdeal,
       minimumPrice: costPrice / divisorMinimo,
-      marginApplied: marginRate * 100
+      marginApplied: marginRate * 100,
+      minimumMarginApplied: minMarginRate * 100
     };
   };
 
@@ -312,8 +314,11 @@ export default function AdminBudgets() {
   const addProductToAdminBudget = (product: any, producerId?: string) => {
     const costPrice = parseFloat(product.costPrice) || 0;
     
-    // Calcular preço ideal e mínimo usando a fórmula de markup
-    const priceCalc = calculateMinimumPrice(costPrice, 1);
+    // Calcular preço ideal e mínimo usando a fórmula de markup (faixa padrão, revenue 0)
+    const currentRevenue = adminBudgetForm.items.reduce((total: number, item: any) => {
+      return total + (item.unitPrice * item.quantity);
+    }, 0);
+    const priceCalc = calculatePriceFromCost(costPrice, currentRevenue);
     const idealPrice = costPrice > 0 ? Math.round(priceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice) || 0;
     const minimumPrice = costPrice > 0 ? Math.round(priceCalc.minimumPrice * 100) / 100 : 0;
     
@@ -361,9 +366,13 @@ export default function AdminBudgets() {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
         
-        // Recalcular preço ideal e mínimo para a nova quantidade (margem muda por faixa)
+        // Recalcular preço ideal e mínimo baseado no faturamento atual
         if (item.costPrice && item.costPrice > 0) {
-          const priceCalc = calculateMinimumPrice(item.costPrice, quantity);
+          const currentRevenue = prev.items.reduce((total: number, it: any, i: number) => {
+            const qty = i === index ? quantity : it.quantity;
+            return total + (it.unitPrice * qty);
+          }, 0);
+          const priceCalc = calculatePriceFromCost(item.costPrice, currentRevenue);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
           item.unitPrice = Math.round(priceCalc.idealPrice * 100) / 100;
         }

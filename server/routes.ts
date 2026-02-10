@@ -9896,54 +9896,47 @@ Para mais detalhes, entre em contato conosco!`;
   // Nota: Frete e personalização são cobrados separadamente no orçamento
   app.post("/api/pricing/calculate", async (req, res) => {
     try {
-      const { productCost, quantity, paymentCondition = 'standard' } = req.body;
+      const { productCost, quantity, revenue = 0, paymentCondition = 'standard' } = req.body;
       
-      // Buscar configurações ativas
       const settings = await storage.getPricingSettings();
       if (!settings) {
         return res.status(400).json({ error: "No pricing settings configured" });
       }
       
-      // Buscar faixas de margem
       const tiers = await storage.getPricingMarginTiers(settings.id);
-      
-      // Custo do produto (frete e personalização são cobrados separadamente)
       const totalCost = parseFloat(productCost);
+      const revenueValue = parseFloat(revenue) || 0;
       
-      // Encontrar margem baseada na quantidade
-      let marginRate = parseFloat(settings.minimumMargin) / 100; // Margem padrão
+      // Encontrar faixa baseada no faturamento
+      let marginRate = 0.28;
+      let minMarginRate = 0.20;
       for (const tier of tiers) {
-        const minQty = tier.minQuantity || 0;
-        const maxQty = tier.maxQuantity || Number.MAX_SAFE_INTEGER;
-        if (quantity >= minQty && quantity <= maxQty) {
+        const minRev = parseFloat(tier.minRevenue as string) || 0;
+        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue as string) : Number.MAX_SAFE_INTEGER;
+        if (revenueValue >= minRev && revenueValue <= maxRev) {
           marginRate = parseFloat(tier.marginRate) / 100;
+          minMarginRate = parseFloat(tier.minimumMarginRate as string) / 100;
           break;
         }
       }
       
-      // Taxas fixas
       const taxRate = parseFloat(settings.taxRate) / 100;
       const commissionRate = parseFloat(settings.commissionRate) / 100;
-      const minimumMarginRate = parseFloat(settings.minimumMargin) / 100;
       
-      // Cálculo do Markup Divisor
-      // Preço = Custo / (1 - Taxas)
       const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
-      const divisorMinimo = 1 - (taxRate + commissionRate + minimumMarginRate);
+      const divisorMinimo = 1 - (taxRate + commissionRate + minMarginRate);
       
       let idealPrice = totalCost / divisorIdeal;
       const minimumPrice = totalCost / divisorMinimo;
       
-      // Aplicar desconto por condição de pagamento
       if (paymentCondition === 'cash') {
         idealPrice *= (1 - parseFloat(settings.cashDiscount) / 100);
-      } else if (paymentCondition === 'cash_no_tax') {
-        idealPrice *= (1 - parseFloat(settings.cashNoTaxDiscount) / 100);
       }
       
       res.json({
         totalCost: Math.round(totalCost * 100) / 100,
         marginApplied: marginRate * 100,
+        minimumMarginApplied: minMarginRate * 100,
         idealPrice: Math.round(idealPrice * 100) / 100,
         minimumPrice: Math.round(minimumPrice * 100) / 100,
         totalIdeal: Math.round(idealPrice * quantity * 100) / 100,

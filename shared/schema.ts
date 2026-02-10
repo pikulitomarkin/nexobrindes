@@ -633,24 +633,27 @@ export const logBackups = pgTable("log_backups", {
 export const pricingSettings = pgTable("pricing_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().default('Configuração Padrão'),
-  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).notNull().default('9.00'), // Imposto Simples (ex: 9%)
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull().default('15.00'), // Comissão (ex: 15%)
-  minimumMargin: decimal("minimum_margin", { precision: 5, scale: 2 }).notNull().default('20.00'), // Margem mínima de segurança (ex: 20%)
-  cashDiscount: decimal("cash_discount", { precision: 5, scale: 2 }).notNull().default('5.00'), // Desconto à vista (ex: 5%)
-  cashNoTaxDiscount: decimal("cash_no_tax_discount", { precision: 5, scale: 2 }).notNull().default('12.00'), // Desconto à vista sem imposto (ex: 12%)
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).notNull().default('9.00'),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull().default('15.00'),
+  minimumMargin: decimal("minimum_margin", { precision: 5, scale: 2 }).notNull().default('20.00'),
+  cashDiscount: decimal("cash_discount", { precision: 5, scale: 2 }).notNull().default('5.00'),
+  cashNoTaxDiscount: decimal("cash_no_tax_discount", { precision: 5, scale: 2 }).notNull().default('12.00'),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Faixas de margem por quantidade (escada de margens)
+// Faixas de margem por faturamento (escada de margens)
 export const pricingMarginTiers = pgTable("pricing_margin_tiers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   settingsId: varchar("settings_id").references(() => pricingSettings.id).notNull(),
-  minQuantity: integer("min_quantity").notNull().default(0), // Quantidade mínima da faixa
-  maxQuantity: integer("max_quantity"), // Quantidade máxima (null = ilimitado)
-  marginRate: decimal("margin_rate", { precision: 5, scale: 2 }).notNull(), // Margem de lucro (ex: 45%)
-  displayOrder: integer("display_order").notNull().default(0), // Ordem de exibição
+  minQuantity: integer("min_quantity").notNull().default(0),
+  maxQuantity: integer("max_quantity"),
+  minRevenue: decimal("min_revenue", { precision: 12, scale: 2 }).notNull().default('0'),
+  maxRevenue: decimal("max_revenue", { precision: 12, scale: 2 }),
+  marginRate: decimal("margin_rate", { precision: 5, scale: 2 }).notNull(),
+  minimumMarginRate: decimal("minimum_margin_rate", { precision: 5, scale: 2 }).notNull().default('20.00'),
+  displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

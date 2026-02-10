@@ -27,13 +27,17 @@ interface MarginTier {
   settingsId: string;
   minQuantity: number;
   maxQuantity: number | null;
+  minRevenue: string;
+  maxRevenue: string | null;
   marginRate: string;
+  minimumMarginRate: string;
   displayOrder: number;
 }
 
 interface CalculationResult {
   totalCost: number;
   marginApplied: number;
+  minimumMarginApplied: number;
   idealPrice: number;
   minimumPrice: number;
   totalIdeal: number;
@@ -51,21 +55,21 @@ export default function AdminPricing() {
   const [settingsForm, setSettingsForm] = useState({
     taxRate: "",
     commissionRate: "",
-    minimumMargin: "",
     cashDiscount: "",
   });
 
   const [tierForm, setTierForm] = useState({
-    minQuantity: 0,
-    maxQuantity: "",
+    minRevenue: "",
+    maxRevenue: "",
     marginRate: "",
+    minimumMarginRate: "",
     displayOrder: 1,
   });
 
   const [calcForm, setCalcForm] = useState({
     productCost: "",
     quantity: "",
-    paymentCondition: "standard",
+    revenue: "",
   });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<PricingSettings>({
@@ -176,16 +180,17 @@ export default function AdminPricing() {
   });
 
   const resetTierForm = () => {
-    setTierForm({ minQuantity: 0, maxQuantity: "", marginRate: "", displayOrder: 1 });
+    setTierForm({ minRevenue: "", maxRevenue: "", marginRate: "", minimumMarginRate: "", displayOrder: 1 });
     setEditingTier(null);
   };
 
   const handleEditTier = (tier: MarginTier) => {
     setEditingTier(tier);
     setTierForm({
-      minQuantity: tier.minQuantity,
-      maxQuantity: tier.maxQuantity?.toString() || "",
+      minRevenue: tier.minRevenue?.toString() || "0",
+      maxRevenue: tier.maxRevenue?.toString() || "",
       marginRate: tier.marginRate,
+      minimumMarginRate: tier.minimumMarginRate || "20.00",
       displayOrder: tier.displayOrder,
     });
     setTierDialogOpen(true);
@@ -193,10 +198,13 @@ export default function AdminPricing() {
 
   const handleSaveTier = () => {
     const data = {
-      minQuantity: tierForm.minQuantity,
-      maxQuantity: tierForm.maxQuantity ? parseInt(tierForm.maxQuantity) : null,
+      minRevenue: tierForm.minRevenue || "0",
+      maxRevenue: tierForm.maxRevenue || null,
       marginRate: tierForm.marginRate,
+      minimumMarginRate: tierForm.minimumMarginRate,
       displayOrder: tierForm.displayOrder,
+      minQuantity: 0,
+      maxQuantity: null,
     };
 
     if (editingTier) {
@@ -207,15 +215,15 @@ export default function AdminPricing() {
   };
 
   const handleCalculate = () => {
-    if (!calcForm.productCost || !calcForm.quantity) {
-      toast({ title: "Atenção", description: "Informe custo e quantidade", variant: "destructive" });
+    if (!calcForm.productCost) {
+      toast({ title: "Atenção", description: "Informe o custo do produto", variant: "destructive" });
       return;
     }
 
     calculatePriceMutation.mutate({
       productCost: parseFloat(calcForm.productCost),
-      quantity: parseInt(calcForm.quantity),
-      paymentCondition: calcForm.paymentCondition,
+      quantity: parseInt(calcForm.quantity) || 1,
+      revenue: parseFloat(calcForm.revenue) || 0,
     });
   };
 
@@ -223,7 +231,6 @@ export default function AdminPricing() {
     updateSettingsMutation.mutate({
       taxRate: settingsForm.taxRate || settings?.taxRate,
       commissionRate: settingsForm.commissionRate || settings?.commissionRate,
-      minimumMargin: settingsForm.minimumMargin || settings?.minimumMargin,
       cashDiscount: settingsForm.cashDiscount || settings?.cashDiscount,
     });
   };
@@ -289,21 +296,6 @@ export default function AdminPricing() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="minimumMargin">Margem Mínima (%)</Label>
-              <Input
-                id="minimumMargin"
-                type="number"
-                step="0.01"
-                placeholder={settings?.minimumMargin || "20.00"}
-                value={settingsForm.minimumMargin}
-                onChange={(e) => setSettingsForm({ ...settingsForm, minimumMargin: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">
-                Bloqueia vendas abaixo desta margem
-              </p>
-            </div>
-
             <Separator />
 
             <div className="space-y-2">
@@ -328,7 +320,6 @@ export default function AdminPricing() {
               <div className="grid grid-cols-2 gap-1 text-muted-foreground">
                 <span>Imposto: {settings?.taxRate}%</span>
                 <span>Comissão: {settings?.commissionRate}%</span>
-                <span>Margem Mín: {settings?.minimumMargin}%</span>
                 <span>Desc. À Vista: {settings?.cashDiscount}%</span>
               </div>
             </div>
@@ -346,7 +337,7 @@ export default function AdminPricing() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="productCost">Custo do Produto (R$)</Label>
                 <Input
@@ -366,6 +357,17 @@ export default function AdminPricing() {
                   placeholder="1"
                   value={calcForm.quantity}
                   onChange={(e) => setCalcForm({ ...calcForm, quantity: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revenue">Faturamento (R$)</Label>
+                <Input
+                  id="revenue"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={calcForm.revenue}
+                  onChange={(e) => setCalcForm({ ...calcForm, revenue: e.target.value })}
                 />
               </div>
             </div>
@@ -390,6 +392,10 @@ export default function AdminPricing() {
                     <div>
                       <span className="text-muted-foreground">Margem Aplicada:</span>
                       <span className="ml-2 font-medium">{calcResult.marginApplied}%</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Margem Mínima:</span>
+                      <span className="ml-2 font-medium">{calcResult.minimumMarginApplied}%</span>
                     </div>
                   </div>
                   <Separator className="my-3" />
@@ -422,10 +428,10 @@ export default function AdminPricing() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Layers className="w-5 h-5" />
-                Faixas de Margem por Quantidade
+                Faixas de Margem por Faturamento
               </CardTitle>
               <CardDescription>
-                Defina margens diferentes baseadas na quantidade vendida
+                Defina margens diferentes baseadas no valor total do orçamento (faturamento)
               </CardDescription>
             </div>
             <Dialog open={tierDialogOpen} onOpenChange={setTierDialogOpen}>
@@ -439,34 +445,36 @@ export default function AdminPricing() {
                 <DialogHeader>
                   <DialogTitle>{editingTier ? "Editar Faixa" : "Nova Faixa de Margem"}</DialogTitle>
                   <DialogDescription>
-                    Configure a margem para uma faixa de quantidade
+                    Configure a margem para uma faixa de faturamento
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="minQuantity">Quantidade Mínima</Label>
+                      <Label htmlFor="minRevenue">Faturamento Mínimo (R$)</Label>
                       <Input
-                        id="minQuantity"
+                        id="minRevenue"
                         type="number"
-                        value={tierForm.minQuantity}
-                        onChange={(e) => setTierForm({ ...tierForm, minQuantity: parseInt(e.target.value) || 0 })}
+                        step="0.01"
+                        value={tierForm.minRevenue}
+                        onChange={(e) => setTierForm({ ...tierForm, minRevenue: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="maxQuantity">Quantidade Máxima</Label>
+                      <Label htmlFor="maxRevenue">Faturamento Máximo (R$)</Label>
                       <Input
-                        id="maxQuantity"
+                        id="maxRevenue"
                         type="number"
+                        step="0.01"
                         placeholder="Ilimitado"
-                        value={tierForm.maxQuantity}
-                        onChange={(e) => setTierForm({ ...tierForm, maxQuantity: e.target.value })}
+                        value={tierForm.maxRevenue}
+                        onChange={(e) => setTierForm({ ...tierForm, maxRevenue: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="marginRate">Margem (%)</Label>
+                      <Label htmlFor="marginRate">Margem de Lucro (%)</Label>
                       <Input
                         id="marginRate"
                         type="number"
@@ -476,14 +484,24 @@ export default function AdminPricing() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="displayOrder">Ordem</Label>
+                      <Label htmlFor="minimumMarginRate">Margem Mínima (%)</Label>
                       <Input
-                        id="displayOrder"
+                        id="minimumMarginRate"
                         type="number"
-                        value={tierForm.displayOrder}
-                        onChange={(e) => setTierForm({ ...tierForm, displayOrder: parseInt(e.target.value) || 1 })}
+                        step="0.01"
+                        value={tierForm.minimumMarginRate}
+                        onChange={(e) => setTierForm({ ...tierForm, minimumMarginRate: e.target.value })}
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="displayOrder">Ordem</Label>
+                    <Input
+                      id="displayOrder"
+                      type="number"
+                      value={tierForm.displayOrder}
+                      onChange={(e) => setTierForm({ ...tierForm, displayOrder: parseInt(e.target.value) || 1 })}
+                    />
                   </div>
                 </div>
                 <DialogFooter>
@@ -506,8 +524,9 @@ export default function AdminPricing() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Faixa de Quantidade</TableHead>
-                  <TableHead>Margem</TableHead>
+                  <TableHead>Faixa de Faturamento (R$)</TableHead>
+                  <TableHead>Margem de Lucro</TableHead>
+                  <TableHead>Margem Mínima</TableHead>
                   <TableHead>Ordem</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -515,7 +534,7 @@ export default function AdminPricing() {
               <TableBody>
                 {marginTiers?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       Nenhuma faixa de margem configurada
                     </TableCell>
                   </TableRow>
@@ -524,13 +543,19 @@ export default function AdminPricing() {
                     <TableRow key={tier.id}>
                       <TableCell>
                         <Badge variant="outline" className="font-mono">
-                          {tier.minQuantity.toLocaleString()} - {tier.maxQuantity ? tier.maxQuantity.toLocaleString() : "∞"}
+                          R$ {parseFloat(tier.minRevenue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 0 })} - {tier.maxRevenue ? `R$ ${parseFloat(tier.maxRevenue).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : "∞"}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                           <Percent className="w-3 h-3 mr-1" />
                           {tier.marginRate}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                          <Percent className="w-3 h-3 mr-1" />
+                          {tier.minimumMarginRate}%
                         </Badge>
                       </TableCell>
                       <TableCell>{tier.displayOrder}</TableCell>
@@ -564,10 +589,13 @@ export default function AdminPricing() {
               Fórmula de Cálculo (Markup Divisor)
             </p>
             <code className="block bg-white dark:bg-gray-800 p-2 rounded text-xs">
-              Preço de Venda = Custo Total / (1 - Imposto% - Comissão% - Margem%)
+              Preço de Venda = Custo do Produto / (1 - Imposto% - Comissão% - Margem%)
             </code>
             <p className="text-muted-foreground mt-2">
-              Exemplo: Custo R$ 10 / (1 - 0.09 - 0.15 - 0.45) = R$ 32,26
+              Exemplo: Custo R$ 10 / (1 - 0.11 - 0.04 - 0.28) = R$ 17,54
+            </p>
+            <p className="text-muted-foreground mt-1">
+              A margem é selecionada automaticamente pela faixa de faturamento do orçamento
             </p>
           </div>
         </CardContent>
