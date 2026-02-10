@@ -431,12 +431,23 @@ export default function AdminBudgets() {
     );
 
     if (adminBudgetForm.hasDiscount && !allAtMinimum) {
+      let discountAmount = 0;
       if (adminBudgetForm.discountType === 'percentage') {
-        const discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
-        return Math.max(0, subtotal - discountAmount);
+        discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
       } else if (adminBudgetForm.discountType === 'value') {
-        return Math.max(0, subtotal - adminBudgetForm.discountValue);
+        discountAmount = adminBudgetForm.discountValue;
       }
+
+      const minimumTotal = adminBudgetForm.items.reduce((total, item: any) => {
+        const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
+        let itemMin = minPrice * item.quantity;
+        if (item.hasItemCustomization) itemMin += item.quantity * (parseFloat(item.itemCustomizationValue) || 0);
+        if (item.hasGeneralCustomization) itemMin += item.quantity * (parseFloat(item.generalCustomizationValue) || 0);
+        return total + itemMin;
+      }, 0);
+
+      const discountedTotal = Math.max(0, subtotal - discountAmount);
+      return Math.max(minimumTotal, discountedTotal);
     }
 
     return subtotal;
@@ -491,19 +502,18 @@ export default function AdminBudgets() {
     return subtotal + shipping + interest;
   };
 
-  // Update down payment when items change - 50% do subtotal dos produtos (sem frete)
+  // Update down payment when items/shipping change - 50% do total do pedido (subtotal + frete)
   useEffect(() => {
-    const subtotal = calculateAdminBudgetTotal();
-    const half = subtotal / 2;
-    // Só atualiza automaticamente se downPayment for 0 (novo orçamento ou resetado)
-    if (adminBudgetForm.downPayment === 0 && subtotal > 0) {
+    const totalWithShipping = calculateAdminTotalWithShipping();
+    const half = Math.round(totalWithShipping * 100 / 2) / 100;
+    if (adminBudgetForm.downPayment === 0 && totalWithShipping > 0) {
       setAdminBudgetForm(prev => ({
         ...prev,
         downPayment: half,
-        remainingAmount: Math.max(0, subtotal - half)
+        remainingAmount: Math.max(0, totalWithShipping - half)
       }));
     }
-  }, [adminBudgetForm.items, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue]);
+  }, [adminBudgetForm.items, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue, adminBudgetForm.shippingCost]);
 
   useEffect(() => {
     if (adminBudgetForm.hasDiscount && adminBudgetForm.items.length > 0) {
@@ -564,6 +574,7 @@ export default function AdminBudgets() {
       const interestRate = selectedAdminPaymentMethod?.type === 'credit_card' ? parseFloat(selectedAdminPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
+        vendorId: data.vendorId || currentUser?.id || "",
         totalValue: calculateAdminTotalWithShipping().toFixed(2),
         interestRate: interestRate,
         interestValue: interestValue.toFixed(2)
@@ -595,6 +606,7 @@ export default function AdminBudgets() {
       const interestRate = selectedAdminPaymentMethod?.type === 'credit_card' ? parseFloat(selectedAdminPaymentMethod?.installmentInterest || '0') : 0;
       const budgetData = {
         ...data,
+        vendorId: data.vendorId || currentUser?.id || "",
         totalValue: calculateAdminTotalWithShipping().toFixed(2),
         interestRate: interestRate,
         interestValue: interestValue.toFixed(2)
@@ -2094,6 +2106,37 @@ export default function AdminBudgets() {
                             }
                           })()}
                         </p>
+                        {(() => {
+                          const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
+                            const base = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                            const custVal = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                            const genCustVal = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                            return total + base + custVal + genCustVal;
+                          }, 0);
+                          const minimumTotal = adminBudgetForm.items.reduce((total, item: any) => {
+                            const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
+                            let itemMin = minPrice * (parseInt(item.quantity) || 1);
+                            if (item.hasItemCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0);
+                            if (item.hasGeneralCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0);
+                            return total + itemMin;
+                          }, 0);
+                          let discountAmt = 0;
+                          if (adminBudgetForm.discountType === 'percentage') {
+                            discountAmt = (itemsSubtotal * (parseFloat(adminBudgetForm.discountPercentage) || 0)) / 100;
+                          } else {
+                            discountAmt = parseFloat(adminBudgetForm.discountValue) || 0;
+                          }
+                          const discountedTotal = itemsSubtotal - discountAmt;
+                          if (discountedTotal < minimumTotal && adminBudgetForm.items.length > 0) {
+                            const maxDiscountPct = ((itemsSubtotal - minimumTotal) / itemsSubtotal * 100);
+                            return (
+                              <p className="text-xs text-red-600 mt-1">
+                                Desconto limitado ao preço mínimo. Máximo: {maxDiscountPct.toFixed(1)}%
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </div>
