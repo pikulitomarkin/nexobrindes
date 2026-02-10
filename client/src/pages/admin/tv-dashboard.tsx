@@ -816,8 +816,8 @@ export default function TvDashboard() {
                           key={geo.rsmKey}
                           geography={geo}
                           fill={getStateColor(stateAbbr)}
-                          stroke="#334155"
-                          strokeWidth={0.5}
+                          stroke="#0f172a"
+                          strokeWidth={0.8}
                           style={{
                             default: { outline: 'none' },
                             hover: { outline: 'none', fill: '#facc15', cursor: 'pointer' },
