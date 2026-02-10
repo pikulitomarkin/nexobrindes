@@ -1717,6 +1717,12 @@ export default function AdminBudgets() {
 
                           return filteredProducts.map((product: any) => {
                             const productCode = product.friendlyCode || product.externalCode || product.compositeCode;
+                            const costPrice = parseFloat(product.costPrice) || 0;
+                            const currentRevenue = adminBudgetForm.items.reduce((total: number, item: any) => {
+                              return total + (item.unitPrice * item.quantity);
+                            }, 0);
+                            const listingPriceCalc = calculatePriceFromCost(costPrice, currentRevenue);
+                            const displayPrice = costPrice > 0 ? Math.round(listingPriceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice || '0');
                             return (
                               <div 
                                 key={product.id} 
@@ -1745,7 +1751,7 @@ export default function AdminBudgets() {
                                     )}
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
-                                        R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {displayPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                       </p>
                                       {product.category && (
                                         <span className="text-xs text-gray-400">• {product.category}</span>
