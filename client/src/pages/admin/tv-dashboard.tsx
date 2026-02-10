@@ -262,8 +262,32 @@ export default function TvDashboard() {
   });
 
   const totalSales = confirmedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
-  const monthSales = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
   const avgTicket = confirmedOrders.length > 0 ? totalSales / confirmedOrders.length : 0;
+
+  // Cálculos Temporais
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  // Início da semana (domingo)
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const yearOrders = confirmedOrders.filter((o: any) => new Date(o.createdAt).getFullYear() === currentYear);
+  const monthOrders = confirmedOrders.filter((o: any) => {
+    const d = new Date(o.createdAt);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  });
+  const weekOrders = confirmedOrders.filter((o: any) => new Date(o.createdAt) >= startOfWeek);
+
+  const yearSales = yearOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
+  const monthSales = monthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
+  const weekSales = weekOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
+
+  const yearAvgTicket = yearOrders.length > 0 ? yearSales / yearOrders.length : 0;
+  const monthAvgTicket = monthOrders.length > 0 ? monthSales / monthOrders.length : 0;
+  const weekAvgTicket = weekOrders.length > 0 ? weekSales / weekOrders.length : 0;
 
   const topVendorsData = vendors
     .map((vendor: any) => {
@@ -487,48 +511,81 @@ export default function TvDashboard() {
     switch (currentReport.id) {
       case 'sales_overview':
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-gradient-to-br from-blue-500 to-blue-700 text-white border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ANUAL */}
+            <Card className="bg-gradient-to-br from-blue-600 to-blue-800 text-white border-0 shadow-2xl">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <p className="text-blue-100 text-xl font-medium">Anual ({currentYear})</p>
+                  <Award className="h-10 w-10 text-blue-200 opacity-80" />
+                </div>
+                <div className="space-y-4">
                   <div>
-                    <p className="text-blue-100 text-lg">Total de Vendas</p>
-                    <p className="text-4xl font-bold mt-2">R$ {totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-4xl font-black">R$ {yearSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-blue-200 text-sm mt-1 uppercase tracking-wider">Total de Vendas</p>
                   </div>
-                  <TrendingUp className="h-16 w-16 text-blue-200 opacity-50" />
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-blue-400/30">
+                    <div>
+                      <p className="text-2xl font-bold">{yearOrders.length}</p>
+                      <p className="text-blue-200 text-xs uppercase">Pedidos</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">R$ {yearAvgTicket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      <p className="text-blue-200 text-xs uppercase">Ticket Médio</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-green-500 to-green-700 text-white border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+
+            {/* MENSAL */}
+            <Card className="bg-gradient-to-br from-green-600 to-green-800 text-white border-0 shadow-2xl">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <p className="text-green-100 text-xl font-medium">Mensal ({now.toLocaleDateString('pt-BR', { month: 'long' })})</p>
+                  <TrendingUp className="h-10 w-10 text-green-200 opacity-80" />
+                </div>
+                <div className="space-y-4">
                   <div>
-                    <p className="text-green-100 text-lg">Vendas Este Mês</p>
-                    <p className="text-4xl font-bold mt-2">R$ {monthSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-4xl font-black">R$ {monthSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-green-200 text-sm mt-1 uppercase tracking-wider">Total de Vendas</p>
                   </div>
-                  <DollarSign className="h-16 w-16 text-green-200 opacity-50" />
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-green-400/30">
+                    <div>
+                      <p className="text-2xl font-bold">{monthOrders.length}</p>
+                      <p className="text-green-200 text-xs uppercase">Pedidos</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">R$ {monthAvgTicket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      <p className="text-green-200 text-xs uppercase">Ticket Médio</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-purple-500 to-purple-700 text-white border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-100 text-lg">Total de Pedidos</p>
-                    <p className="text-4xl font-bold mt-2">{confirmedOrders.length}</p>
-                  </div>
-                  <ShoppingCart className="h-16 w-16 text-purple-200 opacity-50" />
+
+            {/* SEMANAL */}
+            <Card className="bg-gradient-to-br from-purple-600 to-purple-800 text-white border-0 shadow-2xl">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <p className="text-purple-100 text-xl font-medium">Semanal</p>
+                  <Activity className="h-10 w-10 text-purple-200 opacity-80" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-orange-500 to-orange-700 text-white border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+                <div className="space-y-4">
                   <div>
-                    <p className="text-orange-100 text-lg">Ticket Médio</p>
-                    <p className="text-4xl font-bold mt-2">R$ {avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-4xl font-black">R$ {weekSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-purple-200 text-sm mt-1 uppercase tracking-wider">Total de Vendas</p>
                   </div>
-                  <Target className="h-16 w-16 text-orange-200 opacity-50" />
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-purple-400/30">
+                    <div>
+                      <p className="text-2xl font-bold">{weekOrders.length}</p>
+                      <p className="text-purple-200 text-xs uppercase">Pedidos</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">R$ {weekAvgTicket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      <p className="text-purple-200 text-xs uppercase">Ticket Médio</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
