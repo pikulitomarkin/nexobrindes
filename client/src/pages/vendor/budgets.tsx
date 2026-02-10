@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -198,6 +198,57 @@ export default function VendorBudgets() {
     },
   });
 
+  const { data: pricingSettings } = useQuery({
+    queryKey: ["/api/pricing/settings"],
+    queryFn: async () => {
+      const response = await fetch('/api/pricing/settings');
+      if (!response.ok) return null;
+      return response.json();
+    },
+  });
+
+  const { data: marginTiers } = useQuery({
+    queryKey: ["/api/pricing/margin-tiers", pricingSettings?.id],
+    queryFn: async () => {
+      if (!pricingSettings?.id) return [];
+      const response = await fetch(`/api/pricing/margin-tiers/${pricingSettings.id}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!pricingSettings?.id,
+  });
+
+  const calculatePriceFromCost = (costPrice: number, budgetRevenue: number = 0) => {
+    if (!pricingSettings || !costPrice || costPrice <= 0) return { idealPrice: 0, minimumPrice: 0, marginApplied: 0, minimumMarginApplied: 0 };
+    
+    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
+    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
+    
+    let marginRate = 0.28;
+    let minMarginRate = 0.20;
+    if (marginTiers && marginTiers.length > 0) {
+      for (const tier of marginTiers) {
+        const minRev = parseFloat(tier.minRevenue) || 0;
+        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Number.MAX_SAFE_INTEGER;
+        if (budgetRevenue >= minRev && budgetRevenue <= maxRev) {
+          marginRate = parseFloat(tier.marginRate) / 100;
+          minMarginRate = parseFloat(tier.minimumMarginRate) / 100;
+          break;
+        }
+      }
+    }
+    
+    const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
+    const divisorMinimo = 1 - (taxRate + commissionRate + minMarginRate);
+    
+    return {
+      idealPrice: costPrice / divisorIdeal,
+      minimumPrice: costPrice / divisorMinimo,
+      marginApplied: marginRate * 100,
+      minimumMarginApplied: minMarginRate * 100
+    };
+  };
+
   const categories: string[] = ['all', ...new Set((products || []).map((product: any) => product.category).filter(Boolean))];
 
   // Helper variables for selected payment and shipping methods
@@ -223,13 +274,24 @@ export default function VendorBudgets() {
 
   // Budget functions
   const addProductToBudget = (product: any, producerId?: string) => {
+    const costPrice = parseFloat(product.costPrice) || 0;
+    
+    const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
+      return total + (item.unitPrice * item.quantity);
+    }, 0);
+    const priceCalc = calculatePriceFromCost(costPrice, currentRevenue);
+    const idealPrice = costPrice > 0 ? Math.round(priceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice) || 0;
+    const minimumPrice = costPrice > 0 ? Math.round(priceCalc.minimumPrice * 100) / 100 : 0;
+    
     const newItem = {
       productId: product.id,
       productName: product.name,
-      producerId: producerId || product.producerId || 'internal', // Ensure producerId is captured
+      producerId: producerId || product.producerId || 'internal',
       quantity: 1,
-      unitPrice: parseFloat(product.basePrice),
-      totalPrice: parseFloat(product.basePrice),
+      unitPrice: idealPrice,
+      totalPrice: idealPrice,
+      costPrice: costPrice,
+      minimumPrice: minimumPrice,
       hasItemCustomization: false,
       selectedCustomizationId: "",
       itemCustomizationValue: 0,
@@ -243,7 +305,6 @@ export default function VendorBudgets() {
       itemDiscountType: "percentage",
       itemDiscountPercentage: 0,
       itemDiscountValue: 0,
-      // General Customization Fields
       hasGeneralCustomization: false,
       generalCustomizationName: "",
       generalCustomizationValue: 0,
@@ -252,6 +313,8 @@ export default function VendorBudgets() {
       ...prev,
       items: [...prev.items, newItem]
     }));
+    setSelectedProductForProducer(null);
+    setShowProducerSelector(false);
   };
 
   const updateBudgetItem = (index: number, field: string, value: any) => {
@@ -262,8 +325,30 @@ export default function VendorBudgets() {
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
-        // Recalculate totalPrice based on all components
-        item.totalPrice = calculateItemTotal({ ...item, quantity });
+        
+        if (item.costPrice && item.costPrice > 0) {
+          const currentRevenue = prev.items.reduce((total: number, it: any, i: number) => {
+            const qty = i === index ? quantity : it.quantity;
+            return total + (it.unitPrice * qty);
+          }, 0);
+          const priceCalc = calculatePriceFromCost(item.costPrice, currentRevenue);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+          item.unitPrice = Math.round(priceCalc.idealPrice * 100) / 100;
+        }
+        
+        item.totalPrice = calculateItemTotal({ ...item, quantity, unitPrice: item.unitPrice });
+      } else if (field === 'unitPrice') {
+        const newPrice = parseFloat(value) || 0;
+        item.unitPrice = newPrice;
+        item.totalPrice = calculateItemTotal({ ...item, unitPrice: newPrice });
+        
+        if (item.minimumPrice && item.minimumPrice > 0 && newPrice < item.minimumPrice) {
+          toast({
+            title: "Atenção",
+            description: `Preço abaixo do mínimo permitido (R$ ${item.minimumPrice.toFixed(2)})`,
+            variant: "destructive"
+          });
+        }
       } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
         // Recalculate totalPrice when customization values change
@@ -298,14 +383,28 @@ export default function VendorBudgets() {
       return total + calculateItemTotal(item);
     }, 0);
 
-    // Apply general discount
-    if (vendorBudgetForm.hasDiscount) {
+    const allAtMinimum = vendorBudgetForm.items.length > 0 && vendorBudgetForm.items.every(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+    );
+
+    if (vendorBudgetForm.hasDiscount && !allAtMinimum) {
+      let discountAmount = 0;
       if (vendorBudgetForm.discountType === 'percentage') {
-        const discountAmount = (subtotal * vendorBudgetForm.discountPercentage) / 100;
-        return Math.max(0, subtotal - discountAmount);
+        discountAmount = (subtotal * vendorBudgetForm.discountPercentage) / 100;
       } else if (vendorBudgetForm.discountType === 'value') {
-        return Math.max(0, subtotal - vendorBudgetForm.discountValue);
+        discountAmount = vendorBudgetForm.discountValue;
       }
+
+      const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
+        const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
+        let itemMin = minPrice * item.quantity;
+        if (item.hasItemCustomization) itemMin += item.quantity * (parseFloat(item.itemCustomizationValue) || 0);
+        if (item.hasGeneralCustomization) itemMin += item.quantity * (parseFloat(item.generalCustomizationValue) || 0);
+        return total + itemMin;
+      }, 0);
+
+      const discountedTotal = Math.max(0, subtotal - discountAmount);
+      return Math.max(minimumTotal, discountedTotal);
     }
 
     return subtotal;
@@ -360,20 +459,38 @@ export default function VendorBudgets() {
     return subtotal + shipping + interest;
   };
 
-  // Update down payment when items change - 50% do subtotal dos produtos (sem frete)
   useEffect(() => {
-    const subtotal = calculateBudgetTotal();
-    const half = subtotal / 2;
-    // Só atualiza automaticamente se downPayment for 0 (novo orçamento ou resetado)
-    if (vendorBudgetForm.downPayment === 0 && subtotal > 0) {
+    const totalWithShipping = calculateTotalWithShipping();
+    const half = Math.round(totalWithShipping * 100 / 2) / 100;
+    if (vendorBudgetForm.downPayment === 0 && totalWithShipping > 0) {
       setVendorBudgetForm(prev => ({
         ...prev,
         downPayment: half,
-        remainingAmount: Math.max(0, subtotal - half)
+        remainingAmount: Math.max(0, totalWithShipping - half)
       }));
     }
-  }, [vendorBudgetForm.items, vendorBudgetForm.hasDiscount, vendorBudgetForm.discountPercentage, vendorBudgetForm.discountValue]);
+  }, [vendorBudgetForm.items, vendorBudgetForm.hasDiscount, vendorBudgetForm.discountPercentage, vendorBudgetForm.discountValue, vendorBudgetForm.shippingCost]);
 
+  useEffect(() => {
+    if (vendorBudgetForm.hasDiscount && vendorBudgetForm.items.length > 0) {
+      const allAtMinimum = vendorBudgetForm.items.every(
+        (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+      );
+      if (allAtMinimum) {
+        setVendorBudgetForm(prev => ({
+          ...prev,
+          hasDiscount: false,
+          discountPercentage: 0,
+          discountValue: 0,
+        }));
+        toast({
+          title: "Desconto removido",
+          description: "Todos os produtos estão no preço mínimo. O desconto foi desabilitado automaticamente.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [vendorBudgetForm.items]);
 
   const resetBudgetForm = () => {
     setVendorBudgetForm({
@@ -1145,6 +1262,12 @@ export default function VendorBudgets() {
                               value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
                               onChange={(e) => updateBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                             />
+                            {item.minimumPrice > 0 && item.unitPrice >= item.minimumPrice && (
+                              <p className="text-xs text-green-600">✓ Mín: R$ {item.minimumPrice.toFixed(2)}</p>
+                            )}
+                            {item.minimumPrice > 0 && item.unitPrice < item.minimumPrice && (
+                              <p className="text-xs text-red-600">✗ Abaixo do mín: R$ {item.minimumPrice.toFixed(2)}</p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor={`subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
@@ -1490,6 +1613,12 @@ export default function VendorBudgets() {
 
                           return filteredProducts.map((product: any) => {
                             const productCode = product.friendlyCode || product.externalCode || product.compositeCode;
+                            const costPrice = parseFloat(product.costPrice) || 0;
+                            const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
+                              return total + (item.unitPrice * item.quantity);
+                            }, 0);
+                            const listingPriceCalc = calculatePriceFromCost(costPrice, currentRevenue);
+                            const displayPrice = costPrice > 0 ? Math.round(listingPriceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice || '0');
                             return (
                               <div 
                                 key={product.id} 
@@ -1518,7 +1647,7 @@ export default function VendorBudgets() {
                                     )}
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
-                                        R$ {parseFloat(product.basePrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {displayPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                       </p>
                                       {product.category && (
                                         <span className="text-xs text-gray-400">• {product.category}</span>
@@ -1843,6 +1972,37 @@ export default function VendorBudgets() {
                         </p>
                       </div>
                     </div>
+                    {(() => {
+                      const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
+                        const base = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
+                        const custVal = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                        const genCustVal = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                        return total + base + custVal + genCustVal;
+                      }, 0);
+                      const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
+                        const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
+                        let itemMin = minPrice * (parseInt(item.quantity) || 1);
+                        if (item.hasItemCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0);
+                        if (item.hasGeneralCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0);
+                        return total + itemMin;
+                      }, 0);
+                      let discountAmt = 0;
+                      if (vendorBudgetForm.discountType === 'percentage') {
+                        discountAmt = (itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100;
+                      } else {
+                        discountAmt = parseFloat(vendorBudgetForm.discountValue) || 0;
+                      }
+                      const discountedTotal = itemsSubtotal - discountAmt;
+                      if (discountedTotal < minimumTotal && vendorBudgetForm.items.length > 0) {
+                        const maxDiscountPct = ((itemsSubtotal - minimumTotal) / itemsSubtotal * 100);
+                        return (
+                          <p className="text-xs text-red-600 mt-1">
+                            Desconto limitado ao preço mínimo. Máximo: {maxDiscountPct.toFixed(1)}%
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
               </div>
