@@ -289,19 +289,25 @@ export default function TvDashboard() {
   const monthAvgTicket = monthOrders.length > 0 ? monthSales / monthOrders.length : 0;
   const weekAvgTicket = weekOrders.length > 0 ? weekSales / weekOrders.length : 0;
 
-  const topVendorsData = vendors
-    .map((vendor: any) => {
-      const vendorOrders = confirmedOrders.filter((o: any) => String(o.vendorId) === String(vendor.id));
-      return {
-        name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
-        fullName: vendor.name || 'N/A',
-        pedidos: vendorOrders.length,
-        valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-        photoUrl: vendor.photoUrl || null,
-      };
-    })
-    .sort((a: any, b: any) => b.pedidos - a.pedidos)
-    .slice(0, 6);
+  const getTopVendors = (ordersList: any[]) => {
+    return vendors
+      .map((vendor: any) => {
+        const vendorOrders = ordersList.filter((o: any) => String(o.vendorId) === String(vendor.id));
+        return {
+          name: vendor.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
+          fullName: vendor.name || 'N/A',
+          pedidos: vendorOrders.length,
+          valor: vendorOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+          photoUrl: vendor.photoUrl || null,
+        };
+      })
+      .sort((a: any, b: any) => b.pedidos - a.pedidos)
+      .slice(0, 6);
+  };
+
+  const topVendorsYear = getTopVendors(yearOrders);
+  const topVendorsMonth = getTopVendors(monthOrders);
+  const topVendorsWeek = getTopVendors(weekOrders);
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
   confirmedOrders.forEach((order: any) => {
@@ -594,47 +600,79 @@ export default function TvDashboard() {
 
       case 'top_vendors':
         return (
-          <div className="h-[520px] flex flex-col">
-            <div className="flex-1 grid grid-cols-3 gap-6 p-4">
-              {topVendorsData.map((vendor, index) => (
-                <div 
-                  key={vendor.name} 
-                  className="relative bg-gradient-to-br rounded-xl p-6 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
-                  style={{ 
-                    background: `linear-gradient(135deg, ${COLORS[index % COLORS.length]}22, ${COLORS[index % COLORS.length]}44)`,
-                    border: `2px solid ${COLORS[index % COLORS.length]}`
-                  }}
-                >
-                  <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  >
-                    {index + 1}º
-                  </div>
-                  {vendor.photoUrl ? (
-                    <img 
-                      src={vendor.photoUrl} 
-                      alt={vendor.name}
-                      className="w-24 h-24 object-cover rounded-full bg-white/10 mb-3 border-4 border-white/20"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className={`w-24 h-24 rounded-full bg-white/10 flex items-center justify-center mb-3 border-4 border-white/20 ${vendor.photoUrl ? 'hidden' : ''}`}>
-                    <Users className="w-12 h-12 text-gray-400" />
-                  </div>
-                  <p className="text-white text-lg text-center font-semibold mb-2" title={vendor.fullName}>
-                    {vendor.name}
-                  </p>
-                  <div className="text-center">
-                    <p className="text-4xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
-                      {vendor.pedidos}
-                    </p>
-                    <p className="text-gray-400 text-sm">pedidos</p>
-                  </div>
+          <div className="h-[520px] flex flex-col gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+              {/* Vendedores Semanal */}
+              <div className="flex flex-col bg-slate-900/40 rounded-2xl p-4 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-4 px-2">
+                  <Activity className="h-5 w-5 text-purple-400" />
+                  <h3 className="text-purple-100 font-bold uppercase tracking-wider text-sm">Top Vendedores (Semanal)</h3>
                 </div>
-              ))}
+                <div className="space-y-3 flex-1 overflow-hidden">
+                  {topVendorsWeek.map((vendor, index) => (
+                    <div key={vendor.name + 'week'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
+                      <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                        {index + 1}º
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
+                        <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-purple-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vendedores Mensal */}
+              <div className="flex flex-col bg-slate-900/40 rounded-2xl p-4 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-4 px-2">
+                  <TrendingUp className="h-5 w-5 text-green-400" />
+                  <h3 className="text-green-100 font-bold uppercase tracking-wider text-sm">Top Vendedores (Mensal)</h3>
+                </div>
+                <div className="space-y-3 flex-1 overflow-hidden">
+                  {topVendorsMonth.map((vendor, index) => (
+                    <div key={vendor.name + 'month'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
+                      <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-xs">
+                        {index + 1}º
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
+                        <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-green-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vendedores Anual */}
+              <div className="flex flex-col bg-slate-900/40 rounded-2xl p-4 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-4 px-2">
+                  <Award className="h-5 w-5 text-blue-400" />
+                  <h3 className="text-blue-100 font-bold uppercase tracking-wider text-sm">Top Vendedores (Anual)</h3>
+                </div>
+                <div className="space-y-3 flex-1 overflow-hidden">
+                  {topVendorsYear.map((vendor, index) => (
+                    <div key={vendor.name + 'year'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                        {index + 1}º
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
+                        <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-blue-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         );
