@@ -310,24 +310,22 @@ export default function AdminBudgets() {
 
   // Admin budget functions - NEW FLOW
   const addProductToAdminBudget = (product: any, producerId?: string) => {
-    // Usar o preço de venda do banco diretamente (já foi calculado na importação)
     const costPrice = parseFloat(product.costPrice) || 0;
-    const basePrice = parseFloat(product.basePrice) || 0;
     
-    // O basePrice já é o preço de venda calculado
-    // Calcular preço mínimo baseado no custo para validação de desconto
+    // Calcular preço ideal e mínimo usando a fórmula de markup
     const priceCalc = calculateMinimumPrice(costPrice, 1);
-    const minimumPrice = costPrice > 0 ? priceCalc.minimumPrice : 0;
+    const idealPrice = costPrice > 0 ? Math.round(priceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice) || 0;
+    const minimumPrice = costPrice > 0 ? Math.round(priceCalc.minimumPrice * 100) / 100 : 0;
     
     const newItem = {
       productId: product.id,
       productName: product.name,
-      producerId: producerId || 'internal', // User must select producer now
+      producerId: producerId || 'internal',
       quantity: 1,
-      unitPrice: Math.round(basePrice * 100) / 100,
-      totalPrice: Math.round(basePrice * 100) / 100,
-      costPrice: costPrice, // Guardar custo para validação
-      minimumPrice: Math.round(minimumPrice * 100) / 100, // Preço mínimo para validação
+      unitPrice: idealPrice,
+      totalPrice: idealPrice,
+      costPrice: costPrice,
+      minimumPrice: minimumPrice,
       hasItemCustomization: false,
       selectedCustomizationId: "",
       itemCustomizationValue: 0,
@@ -363,14 +361,15 @@ export default function AdminBudgets() {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
         
-        // Recalcular preço mínimo para a nova quantidade
+        // Recalcular preço ideal e mínimo para a nova quantidade (margem muda por faixa)
         if (item.costPrice && item.costPrice > 0) {
           const priceCalc = calculateMinimumPrice(item.costPrice, quantity);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+          item.unitPrice = Math.round(priceCalc.idealPrice * 100) / 100;
         }
         
         // Recalculate totalPrice based on all components
-        item.totalPrice = calculateAdminItemTotal({ ...item, quantity });
+        item.totalPrice = calculateAdminItemTotal({ ...item, quantity, unitPrice: item.unitPrice });
       } else if (field === 'unitPrice') {
         const newPrice = parseFloat(value) || 0;
         item.unitPrice = newPrice;
