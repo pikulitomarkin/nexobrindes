@@ -611,14 +611,21 @@ export default function TvDashboard() {
                 <div className="space-y-3 flex-1 overflow-hidden">
                   {topVendorsWeek.map((vendor, index) => (
                     <div key={vendor.name + 'week'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                      <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                      <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs shrink-0">
                         {index + 1}º
                       </div>
-                      <div className="flex-1">
+                      <div className="w-10 h-10 rounded-full border-2 border-purple-500/30 overflow-hidden shrink-0 bg-slate-700 flex items-center justify-center">
+                        {vendor.photoUrl ? (
+                          <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Users className="h-5 w-5 text-slate-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
                         <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className="text-purple-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                       </div>
                     </div>
@@ -635,14 +642,21 @@ export default function TvDashboard() {
                 <div className="space-y-3 flex-1 overflow-hidden">
                   {topVendorsMonth.map((vendor, index) => (
                     <div key={vendor.name + 'month'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                      <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-xs">
+                      <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-xs shrink-0">
                         {index + 1}º
                       </div>
-                      <div className="flex-1">
+                      <div className="w-10 h-10 rounded-full border-2 border-green-500/30 overflow-hidden shrink-0 bg-slate-700 flex items-center justify-center">
+                        {vendor.photoUrl ? (
+                          <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Users className="h-5 w-5 text-slate-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
                         <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className="text-green-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                       </div>
                     </div>
@@ -659,14 +673,21 @@ export default function TvDashboard() {
                 <div className="space-y-3 flex-1 overflow-hidden">
                   {topVendorsYear.map((vendor, index) => (
                     <div key={vendor.name + 'year'} className="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                      <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
                         {index + 1}º
                       </div>
-                      <div className="flex-1">
+                      <div className="w-10 h-10 rounded-full border-2 border-blue-500/30 overflow-hidden shrink-0 bg-slate-700 flex items-center justify-center">
+                        {vendor.photoUrl ? (
+                          <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Users className="h-5 w-5 text-slate-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{vendor.name}</p>
                         <p className="text-slate-400 text-[10px] uppercase">{vendor.pedidos} pedidos</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className="text-blue-300 font-bold text-sm">R$ {vendor.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
                       </div>
                     </div>
