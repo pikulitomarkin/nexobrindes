@@ -418,8 +418,11 @@ export default function AdminBudgets() {
       return total + calculateAdminItemTotal(item);
     }, 0);
 
-    // Apply general discount
-    if (adminBudgetForm.hasDiscount) {
+    const allAtMinimum = adminBudgetForm.items.length > 0 && adminBudgetForm.items.every(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+    );
+
+    if (adminBudgetForm.hasDiscount && !allAtMinimum) {
       if (adminBudgetForm.discountType === 'percentage') {
         const discountAmount = (subtotal * adminBudgetForm.discountPercentage) / 100;
         return Math.max(0, subtotal - discountAmount);
@@ -493,6 +496,27 @@ export default function AdminBudgets() {
       }));
     }
   }, [adminBudgetForm.items, adminBudgetForm.hasDiscount, adminBudgetForm.discountPercentage, adminBudgetForm.discountValue]);
+
+  useEffect(() => {
+    if (adminBudgetForm.hasDiscount && adminBudgetForm.items.length > 0) {
+      const allAtMinimum = adminBudgetForm.items.every(
+        (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+      );
+      if (allAtMinimum) {
+        setAdminBudgetForm(prev => ({
+          ...prev,
+          hasDiscount: false,
+          discountPercentage: 0,
+          discountValue: 0,
+        }));
+        toast({
+          title: "Desconto removido",
+          description: "Todos os produtos estão no preço mínimo. O desconto foi desabilitado automaticamente.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [adminBudgetForm.items]);
 
   const resetAdminBudgetForm = () => {
     setAdminBudgetForm({
@@ -1957,17 +1981,40 @@ export default function AdminBudgets() {
               {/* Discount Section */}
               <Separator />
               <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="admin-has-discount"
-                    checked={adminBudgetForm.hasDiscount}
-                    onCheckedChange={(checked) => setAdminBudgetForm({ ...adminBudgetForm, hasDiscount: checked })}
-                  />
-                  <Label htmlFor="admin-has-discount" className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Aplicar Desconto
-                  </Label>
-                </div>
+                {(() => {
+                  const allItemsAtMinimum = adminBudgetForm.items.length > 0 && adminBudgetForm.items.every(
+                    (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+                  );
+                  return (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="admin-has-discount"
+                          checked={adminBudgetForm.hasDiscount}
+                          onCheckedChange={(checked) => {
+                            if (checked && allItemsAtMinimum) {
+                              toast({
+                                title: "Desconto não permitido",
+                                description: "Todos os produtos já estão no preço mínimo. Não é possível aplicar desconto.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setAdminBudgetForm({ ...adminBudgetForm, hasDiscount: checked });
+                          }}
+                          disabled={allItemsAtMinimum}
+                        />
+                        <Label htmlFor="admin-has-discount" className="flex items-center gap-2">
+                          <Percent className="h-4 w-4" />
+                          Aplicar Desconto
+                        </Label>
+                        {allItemsAtMinimum && (
+                          <span className="text-xs text-red-500 ml-2">Produtos já no preço mínimo</span>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {adminBudgetForm.hasDiscount && (
                   <div className="bg-orange-50 p-4 rounded-lg space-y-3">

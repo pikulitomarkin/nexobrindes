@@ -19,7 +19,6 @@ interface PricingSettings {
   commissionRate: string;
   minimumMargin: string;
   cashDiscount: string;
-  cashNoTaxDiscount: string;
   isActive: boolean;
 }
 
@@ -54,7 +53,6 @@ export default function AdminPricing() {
     commissionRate: "",
     minimumMargin: "",
     cashDiscount: "",
-    cashNoTaxDiscount: "",
   });
 
   const [tierForm, setTierForm] = useState({
@@ -227,7 +225,6 @@ export default function AdminPricing() {
       commissionRate: settingsForm.commissionRate || settings?.commissionRate,
       minimumMargin: settingsForm.minimumMargin || settings?.minimumMargin,
       cashDiscount: settingsForm.cashDiscount || settings?.cashDiscount,
-      cashNoTaxDiscount: settingsForm.cashNoTaxDiscount || settings?.cashNoTaxDiscount,
     });
   };
 
@@ -309,29 +306,16 @@ export default function AdminPricing() {
 
             <Separator />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cashDiscount">Desconto À Vista (%)</Label>
-                <Input
-                  id="cashDiscount"
-                  type="number"
-                  step="0.01"
-                  placeholder={settings?.cashDiscount || "5.00"}
-                  value={settingsForm.cashDiscount}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, cashDiscount: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cashNoTaxDiscount">Desconto À Vista S/Nota (%)</Label>
-                <Input
-                  id="cashNoTaxDiscount"
-                  type="number"
-                  step="0.01"
-                  placeholder={settings?.cashNoTaxDiscount || "12.00"}
-                  value={settingsForm.cashNoTaxDiscount}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, cashNoTaxDiscount: e.target.value })}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="cashDiscount">Desconto À Vista (%)</Label>
+              <Input
+                id="cashDiscount"
+                type="number"
+                step="0.01"
+                placeholder={settings?.cashDiscount || "5.00"}
+                value={settingsForm.cashDiscount}
+                onChange={(e) => setSettingsForm({ ...settingsForm, cashDiscount: e.target.value })}
+              />
             </div>
 
             <Button onClick={handleSaveSettings} className="w-full" disabled={updateSettingsMutation.isPending}>
