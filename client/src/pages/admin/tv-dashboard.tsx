@@ -130,6 +130,7 @@ type ReportType =
   | 'top_vendors' 
   | 'top_products'
   | 'monthly_revenue'
+  | 'revenue_by_state'
   | 'orders_by_status'
   | 'top_clients'
   | 'daily_sales'
@@ -147,6 +148,7 @@ const REPORT_CONFIGS: ReportConfig[] = [
   { id: 'top_vendors', title: 'Top Vendedores', icon: <Users className="h-8 w-8" />, color: 'from-green-500 to-green-700' },
   { id: 'top_products', title: 'Produtos Mais Vendidos', icon: <Package className="h-8 w-8" />, color: 'from-purple-500 to-purple-700' },
   { id: 'monthly_revenue', title: 'Faturamento Mensal', icon: <DollarSign className="h-8 w-8" />, color: 'from-yellow-500 to-orange-600' },
+  { id: 'revenue_by_state', title: 'Faturamento por Estado', icon: <MapPin className="h-8 w-8" />, color: 'from-emerald-500 to-emerald-700' },
   { id: 'orders_by_status', title: 'Pedidos por Status', icon: <ShoppingCart className="h-8 w-8" />, color: 'from-pink-500 to-pink-700' },
   { id: 'top_clients', title: 'Principais Clientes', icon: <Award className="h-8 w-8" />, color: 'from-cyan-500 to-cyan-700' },
   { id: 'daily_sales', title: 'Vendas Diárias (Últimos 15 dias)', icon: <Activity className="h-8 w-8" />, color: 'from-indigo-500 to-indigo-700' },
@@ -159,11 +161,11 @@ export default function TvDashboard() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const { data: orders = [], refetch: refetchOrders } = useQuery({
-    queryKey: ["/api/orders"],
+  const { data: sales = [], refetch: refetchSales } = useQuery({
+    queryKey: ["/api/tv-dashboard/sales"],
     queryFn: async () => {
-      const response = await fetch("/api/orders");
-      if (!response.ok) throw new Error("Failed to fetch orders");
+      const response = await fetch("/api/tv-dashboard/sales");
+      if (!response.ok) throw new Error("Failed to fetch sales");
       return response.json();
     },
     refetchInterval: 30000,
@@ -252,34 +254,25 @@ export default function TvDashboard() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const confirmedOrders = orders.filter((o: any) => 
-    (o.status === 'converted' || (o.status !== 'budget' && o.status !== 'cancelled'))
-  );
-  const thisMonthOrders = confirmedOrders.filter((o: any) => {
-    const orderDate = new Date(o.createdAt);
-    const now = new Date();
-    return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
-  });
+  const confirmedSales = sales;
 
-  const totalSales = confirmedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
-  const avgTicket = confirmedOrders.length > 0 ? totalSales / confirmedOrders.length : 0;
+  const totalSalesValue = confirmedSales.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
+  const avgTicket = confirmedSales.length > 0 ? totalSalesValue / confirmedSales.length : 0;
 
-  // Cálculos Temporais
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
   
-  // Início da semana (domingo)
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
 
-  const yearOrders = confirmedOrders.filter((o: any) => new Date(o.createdAt).getFullYear() === currentYear);
-  const monthOrders = confirmedOrders.filter((o: any) => {
+  const yearOrders = confirmedSales.filter((o: any) => new Date(o.createdAt).getFullYear() === currentYear);
+  const monthOrders = confirmedSales.filter((o: any) => {
     const d = new Date(o.createdAt);
     return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
   });
-  const weekOrders = confirmedOrders.filter((o: any) => new Date(o.createdAt) >= startOfWeek);
+  const weekOrders = confirmedSales.filter((o: any) => new Date(o.createdAt) >= startOfWeek);
 
   const yearSales = yearOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
   const monthSales = monthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0);
@@ -301,7 +294,8 @@ export default function TvDashboard() {
           photoUrl: vendor.photoUrl || null,
         };
       })
-      .sort((a: any, b: any) => b.pedidos - a.pedidos)
+      .filter((v: any) => v.pedidos > 0)
+      .sort((a: any, b: any) => b.valor - a.valor)
       .slice(0, 6);
   };
 
@@ -310,33 +304,30 @@ export default function TvDashboard() {
   const topVendorsWeek = getTopVendors(weekOrders);
 
   const productSalesMap: { [key: string]: { name: string; quantidade: number; valor: number; imageUrl: string } } = {};
-  confirmedOrders.forEach((order: any) => {
-    // Primeiro tenta pegar de budgetItems (tem a imagem do produto)
-    const itemsToUse = order.budgetItems && Array.isArray(order.budgetItems) && order.budgetItems.length > 0 
-      ? order.budgetItems 
-      : (order.items && Array.isArray(order.items) ? order.items : []);
+  confirmedSales.forEach((sale: any) => {
+    const items = sale.budgetItems && Array.isArray(sale.budgetItems) ? sale.budgetItems : [];
+    const productsInOrder = new Set<string>();
     
-    itemsToUse.forEach((item: any) => {
-      const productName = item.productName || item.product?.name || 'Produto';
-      const qty = parseInt(String(item.quantity || 1), 10) || 1;
-      const price = parseFloat(String(item.unitPrice || 0)) || 0;
-      // Buscar imagem: budgetItem.product.imageLink > item.imageLink > item.imageUrl
-      const imageUrl = item.product?.imageLink || item.imageLink || item.imageUrl || '';
+    items.forEach((item: any) => {
+      const productName = item.productName || 'Produto';
+      const imageUrl = item.imageLink || '';
       
-      if (!productSalesMap[productName]) {
-        productSalesMap[productName] = { 
-          name: productName, 
-          quantidade: 0, 
-          valor: 0,
-          imageUrl: imageUrl
-        };
+      if (!productsInOrder.has(productName)) {
+        productsInOrder.add(productName);
+        if (!productSalesMap[productName]) {
+          productSalesMap[productName] = { 
+            name: productName, 
+            quantidade: 0, 
+            valor: 0,
+            imageUrl: imageUrl
+          };
+        }
+        if (!productSalesMap[productName].imageUrl && imageUrl) {
+          productSalesMap[productName].imageUrl = imageUrl;
+        }
+        productSalesMap[productName].quantidade += 1;
+        productSalesMap[productName].valor += parseFloat(String(item.unitPrice || 0)) * parseFloat(String(item.quantity || 1));
       }
-      // Se ainda não tem imagem e encontramos uma, atualiza
-      if (!productSalesMap[productName].imageUrl && imageUrl) {
-        productSalesMap[productName].imageUrl = imageUrl;
-      }
-      productSalesMap[productName].quantidade += qty;
-      productSalesMap[productName].valor += price * qty;
     });
   });
   const topProductsData = Object.values(productSalesMap)
@@ -344,10 +335,10 @@ export default function TvDashboard() {
     .slice(0, 10);
 
   const monthlyRevenueData: { [key: string]: number } = {};
-  confirmedOrders.forEach((order: any) => {
-    const date = new Date(order.createdAt);
+  confirmedSales.forEach((sale: any) => {
+    const date = new Date(sale.createdAt);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    monthlyRevenueData[monthKey] = (monthlyRevenueData[monthKey] || 0) + parseFloat(order.totalValue || '0');
+    monthlyRevenueData[monthKey] = (monthlyRevenueData[monthKey] || 0) + parseFloat(sale.totalValue || '0');
   });
   const sortedMonths = Object.keys(monthlyRevenueData).sort().slice(-12);
   const monthlyChartData = sortedMonths.map(key => ({
@@ -356,14 +347,11 @@ export default function TvDashboard() {
   }));
 
   const statusCounts: { [key: string]: number } = {};
-  orders.forEach((order: any) => {
-    const status = order.status || 'unknown';
-    if (status !== 'cancelled') {
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    }
+  confirmedSales.forEach((sale: any) => {
+    statusCounts['converted'] = (statusCounts['converted'] || 0) + 1;
   });
   const statusLabels: { [key: string]: string } = {
-    budget: 'Orçamento',
+    converted: 'Convertido',
     pending: 'Pendente',
     confirmed: 'Confirmado',
     production: 'Em Produção',
@@ -381,13 +369,14 @@ export default function TvDashboard() {
 
   const topClientsData = clients
     .map((client: any) => {
-      const clientOrders = confirmedOrders.filter((o: any) => String(o.clientId) === String(client.id));
+      const clientSales = confirmedSales.filter((o: any) => String(o.clientId) === String(client.id));
       return {
         name: client.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
-        pedidos: clientOrders.length,
-        valor: clientOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+        pedidos: clientSales.length,
+        valor: clientSales.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
       };
     })
+    .filter((c: any) => c.pedidos > 0)
     .sort((a: any, b: any) => b.valor - a.valor)
     .slice(0, 8);
 
@@ -396,7 +385,6 @@ export default function TvDashboard() {
   fifteenDaysAgo.setHours(0, 0, 0, 0);
   fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
   
-  // Inicializar todos os últimos 15 dias com zero
   for (let i = 0; i <= 15; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -404,16 +392,14 @@ export default function TvDashboard() {
     dailySalesData[key] = 0;
   }
 
-  confirmedOrders.forEach((order: any) => {
-    const date = new Date(order.createdAt);
+  confirmedSales.forEach((sale: any) => {
+    const date = new Date(sale.createdAt);
     if (date >= fifteenDaysAgo) {
       const dayKey = date.toISOString().split('T')[0];
-      // Só somar se a chave existir (garante que estamos dentro dos 30 dias inicializados)
       if (dayKey in dailySalesData) {
-        dailySalesData[dayKey] += parseFloat(order.totalValue || '0');
+        dailySalesData[dayKey] += parseFloat(sale.totalValue || '0');
       } else {
-        // Caso a data seja de hoje mas não tenha sido pega no loop inicial (timezone)
-        dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + parseFloat(order.totalValue || '0');
+        dailySalesData[dayKey] = (dailySalesData[dayKey] || 0) + parseFloat(sale.totalValue || '0');
       }
     }
   });
@@ -421,34 +407,6 @@ export default function TvDashboard() {
   const dailyChartData = sortedDays.map(key => ({
     dia: new Date(key + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
     valor: dailySalesData[key],
-  }));
-
-  const productionStatusCounts: { [key: string]: number } = {};
-  // Usar os pedidos (orders) para status de produção
-  orders.forEach((order: any) => {
-    const status = order.status || 'pending';
-    if (status !== 'cancelled') {
-      productionStatusCounts[status] = (productionStatusCounts[status] || 0) + 1;
-    }
-  });
-  const productionStatusLabels: { [key: string]: string } = {
-    pending: 'Pendente',
-    confirmed: 'Confirmado',
-    in_production: 'Em Produção',
-    production: 'Em Produção',
-    completed: 'Concluído',
-    delivered: 'Entregue',
-    accepted: 'Aceito',
-    shipped: 'Despachado',
-    partial_shipped: 'Parcialmente Enviado',
-    ready: 'Pronto',
-    delayed: 'Atrasado',
-    pending_acceptance: 'Aguardando Aceite',
-    logistics: 'Na Logística',
-  };
-  const productionStatusData = Object.entries(productionStatusCounts).map(([status, count]) => ({
-    name: productionStatusLabels[status] || status,
-    value: count,
   }));
 
   // Total a Receber: soma do saldo restante (amount - receivedAmount) para status pending e partial
@@ -476,34 +434,99 @@ export default function TvDashboard() {
     return null;
   };
 
-  // Pedidos sem filial atribuída são da Matriz (Novo Hamburgo - RS)
-  const matrizOrders = confirmedOrders.filter((o: any) => !o.branchId);
-  const matrizData = matrizOrders.length > 0 ? [{
+  const matrizSales = confirmedSales.filter((o: any) => !o.branchId);
+  const matrizData = matrizSales.length > 0 ? [{
     id: 'matriz-principal',
     name: 'Matriz',
     city: 'Novo Hamburgo - RS',
-    valor: matrizOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-    pedidos: matrizOrders.length,
-    coordinates: [-51.1306, -29.6783] as [number, number], // Novo Hamburgo, RS
+    valor: matrizSales.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+    pedidos: matrizSales.length,
+    coordinates: [-51.1306, -29.6783] as [number, number],
     isHeadquarters: true,
   }] : [];
 
   const branchPerformanceData = [
     ...matrizData,
     ...branches.map((branch: any) => {
-      const branchOrders = confirmedOrders.filter((o: any) => o.branchId === branch.id);
+      const branchSales = confirmedSales.filter((o: any) => o.branchId === branch.id);
       const coords = getCityCoords(branch.city || branch.name || '');
       return {
         id: branch.id,
         name: branch.name || 'Filial',
         city: branch.city || '',
-        valor: branchOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-        pedidos: branchOrders.length,
+        valor: branchSales.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
+        pedidos: branchSales.length,
         coordinates: coords,
         isHeadquarters: branch.isHeadquarters || false,
       };
     }).filter((b: any) => b.coordinates !== null)
   ];
+
+  const CITY_TO_STATE: { [key: string]: string } = {
+    'são paulo': 'SP', 'sao paulo': 'SP', 'sp': 'SP', 'guarulhos': 'SP', 'campinas': 'SP',
+    'santos': 'SP', 'são josé dos campos': 'SP', 'sorocaba': 'SP', 'ribeirão preto': 'SP',
+    'rio de janeiro': 'RJ', 'niterói': 'RJ', 'rj': 'RJ',
+    'belo horizonte': 'MG', 'uberlândia': 'MG', 'contagem': 'MG', 'mg': 'MG',
+    'curitiba': 'PR', 'londrina': 'PR', 'maringá': 'PR', 'pr': 'PR',
+    'porto alegre': 'RS', 'novo hamburgo': 'RS', 'caxias do sul': 'RS', 'canoas': 'RS',
+    'são leopoldo': 'RS', 'gravataí': 'RS', 'pelotas': 'RS', 'rs': 'RS',
+    'florianópolis': 'SC', 'joinville': 'SC', 'blumenau': 'SC', 'sc': 'SC',
+    'salvador': 'BA', 'ba': 'BA', 'fortaleza': 'CE', 'ce': 'CE',
+    'recife': 'PE', 'pe': 'PE', 'brasília': 'DF', 'df': 'DF',
+    'manaus': 'AM', 'am': 'AM', 'belém': 'PA', 'pa': 'PA',
+    'goiânia': 'GO', 'go': 'GO', 'vitória': 'ES', 'es': 'ES',
+    'natal': 'RN', 'rn': 'RN', 'maceió': 'AL', 'al': 'AL',
+    'são luís': 'MA', 'ma': 'MA', 'teresina': 'PI', 'pi': 'PI',
+    'campo grande': 'MS', 'ms': 'MS', 'cuiabá': 'MT', 'mt': 'MT',
+    'joão pessoa': 'PB', 'pb': 'PB', 'aracaju': 'SE', 'se': 'SE',
+    'palmas': 'TO', 'to': 'TO', 'macapá': 'AP', 'ap': 'AP',
+    'porto velho': 'RO', 'ro': 'RO', 'boa vista': 'RR', 'rr': 'RR',
+    'rio branco': 'AC', 'ac': 'AC',
+  };
+
+  const getStateFromSale = (sale: any): string => {
+    if (sale.clientState) return sale.clientState.toUpperCase();
+    const city = (sale.clientCity || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (city && CITY_TO_STATE[city]) return CITY_TO_STATE[city];
+    for (const [key, state] of Object.entries(CITY_TO_STATE)) {
+      const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (city.includes(normalizedKey) || normalizedKey.includes(city)) return state;
+    }
+    return 'RS';
+  };
+
+  const stateRevenueMap: { [key: string]: { valor: number; pedidos: number } } = {};
+  confirmedSales.forEach((sale: any) => {
+    const state = getStateFromSale(sale);
+    if (!stateRevenueMap[state]) {
+      stateRevenueMap[state] = { valor: 0, pedidos: 0 };
+    }
+    stateRevenueMap[state].valor += parseFloat(sale.totalValue || '0');
+    stateRevenueMap[state].pedidos += 1;
+  });
+
+  const maxStateRevenue = Math.max(...Object.values(stateRevenueMap).map(s => s.valor), 1);
+
+  const getStateColor = (stateAbbr: string): string => {
+    const data = stateRevenueMap[stateAbbr];
+    if (!data || data.valor === 0) return '#1e293b';
+    const intensity = Math.min(data.valor / maxStateRevenue, 1);
+    if (intensity > 0.7) return '#16a34a';
+    if (intensity > 0.4) return '#22c55e';
+    if (intensity > 0.2) return '#4ade80';
+    if (intensity > 0.05) return '#86efac';
+    return '#bbf7d0';
+  };
+
+  const STATE_ABBR_MAP: { [key: string]: string } = {
+    "Acre": "AC", "Alagoas": "AL", "Amapá": "AP", "Amazonas": "AM", "Bahia": "BA",
+    "Ceará": "CE", "Distrito Federal": "DF", "Espírito Santo": "ES", "Goiás": "GO",
+    "Maranhão": "MA", "Mato Grosso": "MT", "Mato Grosso do Sul": "MS", "Minas Gerais": "MG",
+    "Pará": "PA", "Paraíba": "PB", "Paraná": "PR", "Pernambuco": "PE", "Piauí": "PI",
+    "Rio de Janeiro": "RJ", "Rio Grande do Norte": "RN", "Rio Grande do Sul": "RS",
+    "Rondônia": "RO", "Roraima": "RR", "Santa Catarina": "SC", "São Paulo": "SP",
+    "Sergipe": "SE", "Tocantins": "TO"
+  };
 
   const currentReport = REPORT_CONFIGS[currentReportIndex];
 
@@ -737,7 +760,7 @@ export default function TvDashboard() {
                     <p className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
                       {product.quantidade}
                     </p>
-                    <p className="text-gray-400 text-xs">unidades</p>
+                    <p className="text-gray-400 text-xs">pedidos</p>
                   </div>
                 </div>
               ))}
@@ -767,6 +790,93 @@ export default function TvDashboard() {
                 <Area type="monotone" dataKey="valor" stroke="#F59E0B" fill="url(#colorRevenue)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        );
+
+      case 'revenue_by_state':
+        return (
+          <div className="h-[520px] flex">
+            <div className="flex-1 relative">
+              <ComposableMap
+                projection="geoMercator"
+                projectionConfig={{
+                  scale: 600,
+                  center: [-54, -15],
+                }}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <Geographies geography={BRAZIL_GEO_URL}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => {
+                      const stateName = geo.properties.name || geo.properties.NAME;
+                      const stateAbbr = STATE_ABBR_MAP[stateName] || '';
+                      const data = stateRevenueMap[stateAbbr];
+                      return (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill={getStateColor(stateAbbr)}
+                          stroke="#334155"
+                          strokeWidth={0.5}
+                          style={{
+                            default: { outline: 'none' },
+                            hover: { outline: 'none', fill: '#facc15', cursor: 'pointer' },
+                            pressed: { outline: 'none' },
+                          }}
+                        />
+                      );
+                    })
+                  }
+                </Geographies>
+                {Object.entries(STATE_CENTERS).map(([abbr, coords]) => {
+                  const data = stateRevenueMap[abbr];
+                  if (!data || data.valor === 0) return null;
+                  return (
+                    <Marker key={abbr} coordinates={coords}>
+                      <text
+                        textAnchor="middle"
+                        fill="#fff"
+                        fontSize={8}
+                        fontWeight="bold"
+                        style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+                      >
+                        {abbr}
+                      </text>
+                      <text
+                        textAnchor="middle"
+                        y={12}
+                        fill="#fbbf24"
+                        fontSize={7}
+                        fontWeight="bold"
+                        style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+                      >
+                        R$ {data.valor >= 1000 ? `${(data.valor / 1000).toFixed(1)}k` : data.valor.toFixed(0)}
+                      </text>
+                    </Marker>
+                  );
+                })}
+              </ComposableMap>
+            </div>
+            <div className="w-72 p-4 space-y-3 overflow-auto">
+              <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-3">Ranking por Estado</h3>
+              {Object.entries(stateRevenueMap)
+                .sort(([, a], [, b]) => b.valor - a.valor)
+                .map(([state, data], index) => (
+                  <div key={state} className="flex items-center gap-3 bg-slate-800/60 p-3 rounded-xl border border-white/5">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0"
+                      style={{ backgroundColor: getStateColor(state), color: '#fff' }}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm">{state}</p>
+                      <p className="text-slate-400 text-[10px] uppercase">{data.pedidos} pedidos</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-emerald-300 font-bold text-sm">R$ {data.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
         );
 
@@ -1092,7 +1202,7 @@ export default function TvDashboard() {
             variant="outline"
             size="lg"
             onClick={() => {
-              refetchOrders();
+              refetchSales();
               setLastUpdate(new Date());
             }}
             className="border-gray-600 text-gray-300 hover:bg-gray-800"

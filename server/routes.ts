@@ -3787,6 +3787,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/tv-dashboard/sales", async (req, res) => {
+    try {
+      const budgets = await storage.getBudgets();
+      const convertedBudgets = budgets.filter(b => b.status === 'converted');
+
+      const salesData = await Promise.all(
+        convertedBudgets.map(async (budget) => {
+          let vendorName = 'Vendedor';
+          if (budget.vendorId) {
+            const vendor = await storage.getUser(budget.vendorId);
+            vendorName = vendor?.name || vendorName;
+          }
+
+          let clientCity = '';
+          let clientState = '';
+          if (budget.clientId) {
+            const client = await storage.getClient(budget.clientId);
+            if (client) {
+              clientCity = client.cidade || '';
+            }
+          }
+
+          let branchState = '';
+          let branchCity = '';
+          if (budget.branchId) {
+            const branch = await storage.getBranch(budget.branchId);
+            if (branch) {
+              branchState = branch.estado || '';
+              branchCity = branch.city || '';
+              if (!clientCity) clientCity = branchCity;
+            }
+          }
+
+          const items = await storage.getBudgetItems(budget.id);
+          const budgetItems = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              return {
+                productId: item.productId,
+                productName: product?.name || 'Produto',
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                imageLink: product?.imageLink || ''
+              };
+            })
+          );
+
+          return {
+            id: budget.id,
+            vendorId: budget.vendorId,
+            vendorName,
+            branchId: budget.branchId || null,
+            clientId: budget.clientId || null,
+            contactName: budget.contactName || '',
+            totalValue: budget.totalValue,
+            status: budget.status,
+            createdAt: budget.createdAt,
+            budgetItems,
+            clientCity,
+            clientState: branchState || clientState,
+          };
+        })
+      );
+
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching TV dashboard sales:", error);
+      res.status(500).json({ error: "Failed to fetch TV dashboard sales" });
+    }
+  });
+
   app.get("/api/orders/vendor/:vendorId", async (req, res) => {
     try {
       const { vendorId } = req.params;
@@ -4392,6 +4463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             address: vendor.address,
             username: vendor.username,
             userCode: vendor.username,
+            photoUrl: vendor.photoUrl || null,
             branchId: vendorInfo?.branchId || null,
             branchName: branch?.name || null,
             commissionRate: vendorInfo?.commissionRate || '10.00',

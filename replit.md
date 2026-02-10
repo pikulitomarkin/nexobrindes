@@ -93,3 +93,12 @@ The tier is selected based on the total budget value (faturamento), not item qua
 - `PUT /api/pricing/margin-tiers/:id`: Update margin tier
 - `DELETE /api/pricing/margin-tiers/:id`: Delete margin tier
 - `POST /api/pricing/calculate`: Calculate price based on cost, quantity, and revenue
+
+## TV Dashboard Data Source (February 2026)
+The TV Dashboard (`/admin/tv-dashboard`) uses converted budgets as the primary sales data source, NOT the orders table (which may be empty). 
+- **API**: `GET /api/tv-dashboard/sales` returns all converted budgets enriched with vendor name, budget items, client city/state, and branch data
+- **Sales = Converted Budgets**: All temporal calculations (annual, monthly, weekly) filter converted budgets by `createdAt`
+- **Top Vendors**: Ranked by total sales value (valor), showing weekly/monthly/annual breakdowns with vendor photos
+- **Products Counting**: Counts 1 per order/budget that contains the product (not quantity sum)
+- **Revenue by State**: Uses Brazil map with state-level coloring; derives state from branch.estado → client city → default RS
+- **Branch Performance**: Sales without branchId default to Matriz (Novo Hamburgo - RS)
