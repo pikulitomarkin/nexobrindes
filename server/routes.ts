@@ -1626,6 +1626,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })));
       }
 
+      if (budgetData.requiresApproval) {
+        budgetData.status = 'awaiting_approval';
+      }
+
       // Create budget with processed data
       const newBudget = await storage.createBudget({
         ...budgetData,
@@ -7888,6 +7892,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/budgets/awaiting-approval", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Acesso restrito a administradores" });
+      }
+      const allBudgets = await storage.getBudgets();
+      const awaitingBudgets = allBudgets
+        .filter((b: any) => b.status === 'awaiting_approval')
+        .sort((a: any, b: any) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+
+      const enrichedBudgets = await Promise.all(
+        awaitingBudgets.map(async (budget: any) => {
+          try {
+            let vendorName = 'Vendedor não encontrado';
+            if (budget.vendorId) {
+              const vendor = await storage.getUser(budget.vendorId);
+              vendorName = vendor?.name || vendorName;
+            }
+
+            let clientName = budget.contactName || 'Cliente não informado';
+            if (!clientName && budget.clientId) {
+              const client = await storage.getClient(budget.clientId);
+              if (client) {
+                clientName = client.name;
+              }
+            }
+
+            const items = await storage.getBudgetItems(budget.id);
+
+            return {
+              ...budget,
+              vendorName,
+              clientName,
+              itemCount: items.length,
+              items
+            };
+          } catch (err) {
+            console.error(`Error enriching awaiting budget ${budget.id}:`, err);
+            return {
+              ...budget,
+              vendorName: 'Erro ao carregar',
+              clientName: budget.contactName || 'Cliente não informado',
+              itemCount: 0,
+              items: []
+            };
+          }
+        })
+      );
+
+      console.log(`Found ${enrichedBudgets.length} budgets awaiting approval`);
+      res.json(enrichedBudgets);
+    } catch (error) {
+      console.error("Error fetching budgets awaiting approval:", error);
+      res.status(500).json({ error: "Erro ao buscar orçamentos aguardando aprovação" });
+    }
+  });
+
   app.get("/api/budgets/:id", async (req, res) => {
     try {
       const budget = await storage.getBudget(req.params.id);
@@ -7953,6 +8018,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove items from metadata payload to prevent DB column corruption
       const budgetMetadata = { ...budgetData };
       delete budgetMetadata.items;
+      
+      // Handle requiresApproval flag for budget approval workflow
+      if (Object.prototype.hasOwnProperty.call(budgetMetadata, 'requiresApproval')) {
+        const existingBudget = await storage.getBudget(budgetId);
+        if (budgetMetadata.requiresApproval) {
+          budgetMetadata.status = 'awaiting_approval';
+        } else if (existingBudget && (existingBudget.status === 'not_approved' || existingBudget.status === 'awaiting_approval')) {
+          budgetMetadata.status = 'draft';
+        }
+        delete budgetMetadata.requiresApproval;
+      }
       
       // FIX: Convert 'matriz' branchId to null (matriz is not a valid FK)
       if (budgetMetadata.branchId === 'matriz') {
@@ -8159,6 +8235,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/budgets/:id/admin-approve", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Acesso restrito a administradores" });
+      }
+      const { id } = req.params;
+      const budget = await storage.getBudget(id);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: 'admin_approved',
+        updatedAt: new Date().toISOString()
+      });
+
+      console.log(`Budget ${id} approved by admin`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error admin-approving budget:", error);
+      res.status(500).json({ error: "Erro ao aprovar orçamento pelo admin" });
+    }
+  });
+
+  app.post("/api/budgets/:id/admin-reject", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Acesso restrito a administradores" });
+      }
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const budget = await storage.getBudget(id);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: 'not_approved',
+        adminRejectionReason: reason || null,
+        updatedAt: new Date().toISOString()
+      });
+
+      console.log(`Budget ${id} not approved by admin. Reason: ${reason || 'N/A'}`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("Error admin-rejecting budget:", error);
+      res.status(500).json({ error: "Erro ao rejeitar orçamento pelo admin" });
+    }
+  });
+
   // Convert approved budget to order
   app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
     try {
@@ -8174,6 +8303,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Converting budget ${id} to order with client: ${clientId} and delivery date: ${deliveryDate}`);
+
+      const budget = await storage.getBudget(id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      const allowedStatuses = ['approved', 'admin_approved'];
+      if (budget.status && !allowedStatuses.includes(budget.status)) {
+        return res.status(400).json({ error: `Orçamento com status '${budget.status}' não pode ser convertido. Status permitidos: aprovado, aprovado pelo admin.` });
+      }
 
       // CRITICAL FIX: Convert deliveryDate string to Date object for Drizzle
       const deliveryDateObj = new Date(deliveryDate);
@@ -9611,10 +9750,13 @@ Para mais detalhes, entre em contato conosco!`;
       const vendorId = req.params.vendorId;
       const budgets = await storage.getBudgetsByVendor(vendorId);
 
-      // Count approved budgets waiting to be converted to orders
-      const approvedBudgets = budgets.filter((budget: any) => budget.status === 'approved');
+      const pendingBudgets = budgets.filter((budget: any) => 
+        budget.status === 'approved' || 
+        budget.status === 'admin_approved' || 
+        budget.status === 'not_approved'
+      );
 
-      res.json({ count: approvedBudgets.length });
+      res.json({ count: pendingBudgets.length });
     } catch (error) {
       console.error('Error fetching pending actions:', error);
       res.status(500).json({ error: "Internal server error" });

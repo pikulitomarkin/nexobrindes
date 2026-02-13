@@ -461,8 +461,8 @@ export default function VendorBudgets() {
 
   useEffect(() => {
     const totalWithShipping = calculateTotalWithShipping();
-    const half = Math.round(totalWithShipping * 100 / 2) / 100;
-    if (vendorBudgetForm.downPayment === 0 && totalWithShipping > 0) {
+    if (totalWithShipping > 0) {
+      const half = Math.round(totalWithShipping * 100 / 2) / 100;
       setVendorBudgetForm(prev => ({
         ...prev,
         downPayment: half,
@@ -912,11 +912,16 @@ export default function VendorBudgets() {
       return;
     }
 
+    const hasBelowMinimum = vendorBudgetForm.items.some(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice < item.minimumPrice
+    );
+
+    const formData = { ...vendorBudgetForm, requiresApproval: hasBelowMinimum };
 
     if (isEditMode) {
-      updateBudgetMutation.mutate(vendorBudgetForm);
+      updateBudgetMutation.mutate(formData);
     } else {
-      createBudgetMutation.mutate(vendorBudgetForm);
+      createBudgetMutation.mutate(formData);
     }
   };
 
@@ -934,25 +939,31 @@ export default function VendorBudgets() {
   });
 
   const getStatusBadge = (status: string) => {
-    const statusClasses = {
+    const statusClasses: Record<string, string> = {
       draft: "status-badge status-pending",
       sent: "status-badge status-confirmed",
       approved: "status-badge status-production",
       rejected: "status-badge status-cancelled",
       converted: "status-badge status-completed",
+      awaiting_approval: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium",
+      admin_approved: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      not_approved: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
     };
 
-    const statusLabels = {
+    const statusLabels: Record<string, string> = {
       draft: "Rascunho",
       sent: "Enviado",
       approved: "Aprovado",
       rejected: "Rejeitado",
       converted: "Convertido",
+      awaiting_approval: "Aguardando Autorização",
+      admin_approved: "Autorizado",
+      not_approved: "Não Autorizado",
     };
 
     return (
-      <span className={statusClasses[status as keyof typeof statusClasses] || "status-badge"}>
-        {statusLabels[status as keyof typeof statusLabels] || status}
+      <span className={statusClasses[status] || "status-badge"}>
+        {statusLabels[status] || status}
       </span>
     );
   };
@@ -1994,10 +2005,9 @@ export default function VendorBudgets() {
                       }
                       const discountedTotal = itemsSubtotal - discountAmt;
                       if (discountedTotal < minimumTotal && vendorBudgetForm.items.length > 0) {
-                        const maxDiscountPct = ((itemsSubtotal - minimumTotal) / itemsSubtotal * 100);
                         return (
-                          <p className="text-xs text-red-600 mt-1">
-                            Desconto limitado ao preço mínimo. Máximo: {maxDiscountPct.toFixed(1)}%
+                          <p className="text-xs text-orange-600 mt-1 font-semibold">
+                            ⚠️ Desconto abaixo do preço mínimo - Requer autorização do administrador
                           </p>
                         );
                       }
@@ -2146,7 +2156,7 @@ export default function VendorBudgets() {
               <div>
                 <p className="text-xs md:text-sm font-medium text-gray-600">Aprovados</p>
                 <p className="text-xl md:text-3xl font-bold gradient-text">
-                  {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'converted').length || 0}
+                  {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'admin_approved' || b.status === 'converted').length || 0}
                 </p>
               </div>
               <div className="w-8 h-8 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -2187,6 +2197,9 @@ export default function VendorBudgets() {
                   <SelectItem value="approved">Aprovado</SelectItem>
                   <SelectItem value="rejected">Rejeitado</SelectItem>
                   <SelectItem value="converted">Convertido</SelectItem>
+                  <SelectItem value="awaiting_approval">Aguardando Autorização</SelectItem>
+                  <SelectItem value="admin_approved">Autorizado</SelectItem>
+                  <SelectItem value="not_approved">Não Autorizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2200,14 +2213,14 @@ export default function VendorBudgets() {
           </div>
 
           {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
-          {budgets?.filter((budget: any) => budget.status === 'approved').length > 0 && (
+          {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
             <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
               <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
                 <Bell className="h-5 w-5" />
                 🔔 Solicitações Pendentes - Orçamentos Aprovados pelo Cliente
               </h3>
               <div className="space-y-2">
-                {budgets.filter((budget: any) => budget.status === 'approved').map((budget: any) => (
+                {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
                   <div key={budget.id} className="bg-white p-3 rounded border flex justify-between items-center">
                     <div>
                       <p className="font-medium">{budget.title}</p>
@@ -2222,16 +2235,33 @@ export default function VendorBudgets() {
                       >
                         Ver Detalhes
                       </Button>
-                      <Button 
-                        size="sm"
-                        className="gradient-bg text-white"
-                        onClick={() => {
-                          setBudgetToConvert(budget.id);
-                          setConvertDialogOpen(true);
-                        }}
-                      >
-                        🏷️ Converter em Pedido
-                      </Button>
+                      {(budget.status === 'approved' || budget.status === 'admin_approved') && (
+                        <Button 
+                          size="sm"
+                          className="gradient-bg text-white"
+                          onClick={() => {
+                            setBudgetToConvert(budget.id);
+                            setConvertDialogOpen(true);
+                          }}
+                        >
+                          🏷️ Converter em Pedido
+                        </Button>
+                      )}
+                      {budget.status === 'not_approved' && (
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          className="text-orange-600 border-orange-300"
+                          onClick={() => handleEditBudget(budget)}
+                        >
+                          ✏️ Editar e Reenviar
+                        </Button>
+                      )}
+                      {budget.status === 'awaiting_approval' && (
+                        <span className="text-xs text-orange-600 font-medium px-2 py-1 bg-orange-50 rounded">
+                          Aguardando autorização do admin
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2347,7 +2377,7 @@ export default function VendorBudgets() {
                             Enviar
                           </Button>
                         )}
-                        {budget.status !== 'converted' && (
+                        {(budget.status === 'approved' || budget.status === 'admin_approved') && (
                           <Button
                             className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => {
@@ -2358,6 +2388,18 @@ export default function VendorBudgets() {
                           >
                             <ShoppingCart className="h-4 w-4 mr-2" />
                             Converter
+                          </Button>
+                        )}
+                        {budget.status === 'not_approved' && (
+                          <Button
+                            variant="outline"
+                            className="text-orange-600 border-orange-300"
+                            onClick={() => {
+                              setViewBudgetDialogOpen(false);
+                              handleEditBudget(budget);
+                            }}
+                          >
+                            ✏️ Editar e Reenviar
                           </Button>
                         )}
                         <Button
@@ -2802,7 +2844,7 @@ export default function VendorBudgets() {
                   </Button>
                 )}
 
-                {budgetToView.status !== 'converted' && (
+                {(budgetToView.status === 'approved' || budgetToView.status === 'admin_approved') && (
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {
@@ -2812,6 +2854,18 @@ export default function VendorBudgets() {
                   >
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     Converter
+                  </Button>
+                )}
+                {budgetToView.status === 'not_approved' && (
+                  <Button
+                    variant="outline"
+                    className="text-orange-600 border-orange-300"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleEditBudget(budgetToView);
+                    }}
+                  >
+                    ✏️ Editar e Reenviar
                   </Button>
                 )}
 

@@ -24,6 +24,7 @@ import {
   Building2,
   Monitor,
   Home,
+  AlertTriangle,
 } from "lucide-react";
 
 import { useLocation } from "wouter";
@@ -92,7 +93,6 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
     setLoading(false);
   }, []);
 
-  // Buscar notifications para vendedor
   const { data: pendingActions } = useQuery({
     queryKey: ["/api/vendor/pending-actions", user?.id],
     queryFn: async () => {
@@ -103,7 +103,19 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
       return data.count || 0;
     },
     enabled: !!user?.id && user?.role === 'vendor',
-    refetchInterval: 10000, // Atualiza a cada 10 segundos
+    refetchInterval: 10000,
+  });
+
+  const { data: pendingApprovals } = useQuery({
+    queryKey: ["/api/budgets/awaiting-approval"],
+    queryFn: async () => {
+      if (!user?.id || user.role !== 'admin') return [];
+      const response = await fetch("/api/budgets/awaiting-approval");
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!user?.id && user?.role === 'admin',
+    refetchInterval: 15000,
   });
 
   const menuItems = [
@@ -223,6 +235,14 @@ export default function Sidebar({ activePanel, onPanelChange }: SidebarProps) {
                 path="/admin/budgets"
                 isActive={pathname === '/admin/budgets'}
                 onClick={() => navigate('/admin/budgets')}
+              />
+              <SidebarItem
+                icon={<AlertTriangle className="h-5 w-5" />}
+                label="Para Autorização"
+                path="/admin/budget-approvals"
+                isActive={pathname === '/admin/budget-approvals'}
+                onClick={() => navigate('/admin/budget-approvals')}
+                badge={Array.isArray(pendingApprovals) ? pendingApprovals.length : undefined}
               />
               <SidebarItem
                 icon={<ShoppingCart className="h-5 w-5" />}

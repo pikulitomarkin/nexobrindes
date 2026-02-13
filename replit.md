@@ -94,6 +94,27 @@ The tier is selected based on the total budget value (faturamento), not item qua
 - `DELETE /api/pricing/margin-tiers/:id`: Delete margin tier
 - `POST /api/pricing/calculate`: Calculate price based on cost, quantity, and revenue
 
+## Budget Approval Workflow (February 2026)
+When vendors submit budgets with prices below the minimum price (from pricing tiers), the budget requires admin authorization before conversion.
+
+### Status Flow
+- `draft` → vendor creates budget with compliant prices → normal flow
+- `draft` → vendor creates budget with below-minimum prices → `awaiting_approval`
+- `awaiting_approval` → admin approves → `admin_approved` → vendor can convert to order
+- `awaiting_approval` → admin rejects (with optional reason) → `not_approved` → vendor edits and resubmits
+- `not_approved` → vendor edits budget → if still below minimum → `awaiting_approval` (back to admin)
+- `not_approved` → vendor edits budget → if prices now compliant → `draft` (normal flow)
+
+### API Endpoints
+- `GET /api/budgets/awaiting-approval` (admin-only): List all budgets pending authorization
+- `POST /api/budgets/:id/admin-approve` (admin-only): Authorize a budget
+- `POST /api/budgets/:id/admin-reject` (admin-only): Reject with optional reason
+- Budget creation/update: `requiresApproval` flag in request body triggers `awaiting_approval` status
+
+### UI Pages
+- **Admin**: `/admin/budget-approvals` - "Para Autorização" page with approve/reject actions and badge in sidebar
+- **Vendor**: Budget list shows new statuses, convert button only for 'approved'/'admin_approved', edit option for 'not_approved'
+
 ## TV Dashboard Data Source (February 2026)
 The TV Dashboard (`/admin/tv-dashboard`) uses converted budgets as the primary sales data source, NOT the orders table (which may be empty). 
 - **API**: `GET /api/tv-dashboard/sales` returns all converted budgets enriched with vendor name, budget items, client city/state, and branch data

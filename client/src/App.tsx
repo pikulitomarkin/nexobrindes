@@ -38,6 +38,7 @@ import AdminFinance from "@/pages/admin/finance";
 import AdminCustomizations from "@/pages/admin/customizations";
 import AdminBranches from "@/pages/admin/branches";
 import AdminLogs from "@/pages/admin/logs";
+import AdminBudgetApprovals from "@/pages/admin/budget-approvals";
 
 // Vendor imports
 import VendorOrders from "@/pages/vendor/orders";
@@ -194,6 +195,11 @@ function App() {
                   <Route path="/admin/budgets" component={() => (
                     <ProtectedRoute requiredRoles={["admin"]}>
                       <AdminBudgets />
+                    </ProtectedRoute>
+                  )} />
+                  <Route path="/admin/budget-approvals" component={() => (
+                    <ProtectedRoute requiredRoles={["admin"]}>
+                      <AdminBudgetApprovals />
                     </ProtectedRoute>
                   )} />
                   <Route path="/admin/clients" component={() => (

@@ -12,15 +12,16 @@ import {
   X,
   Home,
   Monitor,
-  Settings, // Added Settings icon import
+  Settings,
   LogOut,
-  ClipboardList, // Import ClipboardList if it was intended to be used elsewhere
+  ClipboardList,
   MessageCircle,
-  BarChart3, // Added BarChart3 icon
-  Calculator, // Added Calculator icon
-  User, // Added User icon
-  Building2, // Added Building2 icon
-  TrendingUp // Added TrendingUp icon
+  BarChart3,
+  Calculator,
+  User,
+  Building2,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { href: "/", icon: Home, label: "Dashboard" },
     { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
     { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
+    { href: "/admin/budget-approvals", icon: AlertTriangle, label: "Para Autorização" },
     { href: "/admin/products", icon: Package, label: "Produtos" },
     { href: "/admin/producers", icon: Factory, label: "Produtores" },
     { href: "/admin/clients", icon: Users, label: "Clientes" },

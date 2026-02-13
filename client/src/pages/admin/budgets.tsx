@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -505,8 +505,8 @@ export default function AdminBudgets() {
   // Update down payment when items/shipping change - 50% do total do pedido (subtotal + frete)
   useEffect(() => {
     const totalWithShipping = calculateAdminTotalWithShipping();
-    const half = Math.round(totalWithShipping * 100 / 2) / 100;
-    if (adminBudgetForm.downPayment === 0 && totalWithShipping > 0) {
+    if (totalWithShipping > 0) {
+      const half = Math.round(totalWithShipping * 100 / 2) / 100;
       setAdminBudgetForm(prev => ({
         ...prev,
         downPayment: half,
@@ -1007,10 +1007,16 @@ export default function AdminBudgets() {
       return;
     }
 
+    const hasBelowMinimum = adminBudgetForm.items.some(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice < item.minimumPrice
+    );
+
+    const formData = { ...adminBudgetForm, requiresApproval: hasBelowMinimum };
+
     if (isEditMode) {
-      updateAdminBudgetMutation.mutate(adminBudgetForm);
+      updateAdminBudgetMutation.mutate(formData);
     } else {
-      createAdminBudgetMutation.mutate(adminBudgetForm);
+      createAdminBudgetMutation.mutate(formData);
     }
   };
 
@@ -1028,25 +1034,31 @@ export default function AdminBudgets() {
   });
 
   const getStatusBadge = (status: string) => {
-    const statusClasses = {
+    const statusClasses: Record<string, string> = {
       draft: "status-badge status-pending",
       sent: "status-badge status-confirmed",
       approved: "status-badge status-production",
       rejected: "status-badge status-cancelled",
       converted: "status-badge status-completed",
+      awaiting_approval: "bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium",
+      admin_approved: "bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium",
+      not_approved: "bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium",
     };
 
-    const statusLabels = {
+    const statusLabels: Record<string, string> = {
       draft: "Rascunho",
       sent: "Enviado",
       approved: "Aprovado",
       rejected: "Rejeitado",
       converted: "Convertido",
+      awaiting_approval: "Aguardando Autorização",
+      admin_approved: "Autorizado",
+      not_approved: "Não Autorizado",
     };
 
     return (
-      <span className={statusClasses[status as keyof typeof statusClasses] || "status-badge"}>
-        {statusLabels[status as keyof typeof statusLabels] || status}
+      <span className={statusClasses[status] || "status-badge"}>
+        {statusLabels[status] || status}
       </span>
     );
   };
@@ -2128,10 +2140,9 @@ export default function AdminBudgets() {
                           }
                           const discountedTotal = itemsSubtotal - discountAmt;
                           if (discountedTotal < minimumTotal && adminBudgetForm.items.length > 0) {
-                            const maxDiscountPct = ((itemsSubtotal - minimumTotal) / itemsSubtotal * 100);
                             return (
-                              <p className="text-xs text-red-600 mt-1">
-                                Desconto limitado ao preço mínimo. Máximo: {maxDiscountPct.toFixed(1)}%
+                              <p className="text-xs text-orange-600 mt-1 font-semibold">
+                                ⚠️ Desconto abaixo do preço mínimo - Orçamento será enviado para autorização
                               </p>
                             );
                           }
@@ -2323,6 +2334,9 @@ export default function AdminBudgets() {
               <SelectItem value="approved">Aprovado</SelectItem>
               <SelectItem value="rejected">Rejeitado</SelectItem>
               <SelectItem value="converted">Convertido</SelectItem>
+              <SelectItem value="awaiting_approval">Aguardando Autorização</SelectItem>
+              <SelectItem value="admin_approved">Autorizado</SelectItem>
+              <SelectItem value="not_approved">Não Autorizado</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2336,14 +2350,14 @@ export default function AdminBudgets() {
       </div>
 
       {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
-      {budgets?.filter((budget: any) => budget.status === 'approved').length > 0 && (
+      {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
         <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
           <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            🔔 Solicitações Pendentes - Orçamentos Aprovados pelo Cliente
+            🔔 Solicitações Pendentes - Orçamentos Aprovados
           </h3>
           <div className="space-y-2">
-            {budgets.filter((budget: any) => budget.status === 'approved').map((budget: any) => (
+            {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
               <div key={budget.id} className="bg-white p-3 rounded border flex justify-between items-center">
                 <div>
                   <p className="font-medium">{budget.title}</p>
@@ -2492,7 +2506,7 @@ export default function AdminBudgets() {
                             Enviar
                           </Button>
                         )}
-                        {budget.status !== 'converted' && (
+                        {budget.status !== 'converted' && budget.status !== 'awaiting_approval' && budget.status !== 'not_approved' && (
                           <Button
                             className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => {
@@ -2504,6 +2518,9 @@ export default function AdminBudgets() {
                             <ShoppingCart className="h-4 w-4 mr-2" />
                             Converter
                           </Button>
+                        )}
+                        {budget.status === 'awaiting_approval' && (
+                          <span className="text-xs text-orange-600 font-semibold">⚠️ Aguardando Autorização</span>
                         )}
                       </div>
                     </td>
@@ -2798,7 +2815,7 @@ export default function AdminBudgets() {
                   </Button>
                 )}
 
-                {budgetToView.status !== 'converted' && (
+                {budgetToView.status !== 'converted' && budgetToView.status !== 'awaiting_approval' && budgetToView.status !== 'not_approved' && (
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {
@@ -2809,6 +2826,12 @@ export default function AdminBudgets() {
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     Converter
                   </Button>
+                )}
+                {budgetToView.status === 'awaiting_approval' && (
+                  <p className="text-sm text-orange-600 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Aguardando autorização - Preço abaixo do mínimo
+                  </p>
                 )}
 
                 <Button
