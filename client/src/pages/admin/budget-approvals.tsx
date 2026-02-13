@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import {
   CheckCircle,
   XCircle,
@@ -23,6 +24,13 @@ import {
   Package,
   User,
   DollarSign,
+  Truck,
+  CreditCard,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  FileText,
 } from "lucide-react";
 
 export default function AdminBudgetApprovals() {
@@ -249,111 +257,281 @@ export default function AdminBudgetApprovals() {
       )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Detalhes do Orçamento #{selectedBudget?.budgetNumber}
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <FileText className="h-5 w-5 text-orange-500" />
+              Orçamento #{selectedBudget?.budgetNumber}
             </DialogTitle>
           </DialogHeader>
-          {selectedBudget && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Título</label>
-                  <p className="text-gray-900">{selectedBudget.title}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Vendedor</label>
-                  <p className="text-gray-900">{selectedBudget.vendorName || "N/A"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Cliente</label>
-                  <p className="text-gray-900">{selectedBudget.contactName || selectedBudget.clientName || "N/A"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Valor Total</label>
-                  <p className="text-gray-900 font-semibold">{formatCurrency(selectedBudget.totalValue || selectedBudget.valor || 0)}</p>
-                </div>
-              </div>
+          {selectedBudget && (() => {
+            const subtotal = selectedBudget.items?.reduce((sum: number, item: any) => sum + parseFloat(item.totalPrice || 0), 0) || 0;
+            const shippingCost = parseFloat(selectedBudget.shippingCost || 0);
+            const downPayment = parseFloat(selectedBudget.downPayment || 0);
+            const remainingAmount = parseFloat(selectedBudget.remainingAmount || 0);
+            const totalValue = parseFloat(selectedBudget.totalValue || 0);
+            const hasDiscount = selectedBudget.hasDiscount;
+            const discountPercentage = parseFloat(selectedBudget.discountPercentage || 0);
+            const discountValue = parseFloat(selectedBudget.discountValue || 0);
+            const discountAmount = selectedBudget.discountType === 'percentage' ? (subtotal * discountPercentage / 100) : discountValue;
 
-              {selectedBudget.items && selectedBudget.items.length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500 mb-2 block">
-                    Itens do Orçamento
-                  </label>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left p-3">Produto</th>
-                          <th className="text-right p-3">Qtd</th>
-                          <th className="text-right p-3">Preço Unit.</th>
-                          <th className="text-right p-3">Preço Mín.</th>
-                          <th className="text-right p-3">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedBudget.items.map((item: any, idx: number) => {
-                          const isBelowMin = item.minimumPrice > 0 && parseFloat(item.unitPrice) < parseFloat(item.minimumPrice);
-                          return (
-                            <tr key={idx} className={`border-t ${isBelowMin ? "bg-red-50" : ""}`}>
-                              <td className="p-3">
-                                {item.productName}
-                                {isBelowMin && (
-                                  <span className="ml-2 text-xs text-red-600 font-medium">
-                                    Abaixo do mínimo
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-3 text-right">{item.quantity}</td>
-                              <td className={`p-3 text-right ${isBelowMin ? "text-red-600 font-semibold" : ""}`}>
-                                {formatCurrency(item.unitPrice)}
-                              </td>
-                              <td className="p-3 text-right text-gray-500">
-                                {item.minimumPrice ? formatCurrency(item.minimumPrice) : "-"}
-                              </td>
-                              <td className="p-3 text-right">{formatCurrency(item.totalPrice)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+            return (
+              <div className="space-y-5">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-sm text-orange-800 font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Este orçamento possui produtos com preço abaixo do mínimo permitido e necessita de autorização para prosseguir.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Título</label>
+                    <p className="text-gray-900 font-semibold">{selectedBudget.title}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</label>
+                    <p className="text-gray-900">{selectedBudget.vendorName || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Data</label>
+                    <p className="text-gray-900">{formatDate(selectedBudget.createdAt)}</p>
                   </div>
                 </div>
-              )}
 
-              {selectedBudget.observations && (
+                <Separator />
+
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Observações</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded">{selectedBudget.observations}</p>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Dados do Cliente
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 rounded-lg p-3">
+                    <div>
+                      <label className="text-xs text-gray-500">Nome</label>
+                      <p className="text-sm font-medium">{selectedBudget.contactName || selectedBudget.clientName || "N/A"}</p>
+                    </div>
+                    {selectedBudget.contactPhone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 text-gray-400" />
+                        <div>
+                          <label className="text-xs text-gray-500">Telefone</label>
+                          <p className="text-sm">{selectedBudget.contactPhone}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedBudget.contactEmail && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="h-3 w-3 text-gray-400" />
+                        <div>
+                          <label className="text-xs text-gray-500">E-mail</label>
+                          <p className="text-sm">{selectedBudget.contactEmail}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <DialogFooter>
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    approveMutation.mutate(selectedBudget.id);
-                    setDetailsOpen(false);
-                  }}
-                  disabled={approveMutation.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Autorizar
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setDetailsOpen(false);
-                    handleRejectClick(selectedBudget);
-                  }}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Não Autorizar
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
+                <Separator />
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Itens do Orçamento ({selectedBudget.items?.length || 0} produto{(selectedBudget.items?.length || 0) !== 1 ? "s" : ""})
+                  </h4>
+                  {selectedBudget.items && selectedBudget.items.length > 0 && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="text-left p-3 font-semibold">Produto</th>
+                            <th className="text-right p-3 font-semibold">Qtd</th>
+                            <th className="text-right p-3 font-semibold">Custo</th>
+                            <th className="text-right p-3 font-semibold">Preço Mín.</th>
+                            <th className="text-right p-3 font-semibold">Preço Unit.</th>
+                            <th className="text-right p-3 font-semibold">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedBudget.items.map((item: any, idx: number) => {
+                            const unitPrice = parseFloat(item.unitPrice);
+                            const minPrice = parseFloat(item.minimumPrice || 0);
+                            const costPrice = parseFloat(item.costPrice || 0);
+                            const isBelowMin = minPrice > 0 && unitPrice < minPrice;
+                            const diffPercent = minPrice > 0 ? ((unitPrice - minPrice) / minPrice * 100).toFixed(1) : null;
+                            return (
+                              <tr key={idx} className={`border-t ${isBelowMin ? "bg-red-50" : ""}`}>
+                                <td className="p-3">
+                                  <span className="font-medium">{item.productName}</span>
+                                  {isBelowMin && (
+                                    <span className="block text-xs text-red-600 font-semibold mt-0.5">
+                                      {diffPercent}% abaixo do mínimo
+                                    </span>
+                                  )}
+                                  {item.hasItemCustomization && (
+                                    <span className="block text-xs text-blue-600 mt-0.5">
+                                      + Personalização: {formatCurrency(item.itemCustomizationValue)}
+                                    </span>
+                                  )}
+                                  {item.hasGeneralCustomization && (
+                                    <span className="block text-xs text-blue-600 mt-0.5">
+                                      + {item.generalCustomizationName}: {formatCurrency(item.generalCustomizationValue)}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3 text-right">{parseFloat(item.quantity).toLocaleString('pt-BR')}</td>
+                                <td className="p-3 text-right text-gray-500">{costPrice > 0 ? formatCurrency(costPrice) : "-"}</td>
+                                <td className="p-3 text-right text-gray-500 font-medium">{minPrice > 0 ? formatCurrency(minPrice) : "-"}</td>
+                                <td className={`p-3 text-right font-semibold ${isBelowMin ? "text-red-600" : "text-gray-900"}`}>
+                                  {formatCurrency(unitPrice)}
+                                </td>
+                                <td className="p-3 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Entrega e Frete
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Tipo de Entrega:</span>
+                        <span className="font-medium">{selectedBudget.deliveryType === 'pickup' ? 'Retirada' : selectedBudget.deliveryType === 'delivery' ? 'Entrega' : selectedBudget.deliveryType}</span>
+                      </div>
+                      {selectedBudget.shippingMethodName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Método de Frete:</span>
+                          <span className="font-medium">{selectedBudget.shippingMethodName}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Valor do Frete:</span>
+                        <span className="font-medium">{formatCurrency(shippingCost)}</span>
+                      </div>
+                      {selectedBudget.deliveryDeadline && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Prazo de Entrega:</span>
+                          <span className="font-medium">{formatDate(selectedBudget.deliveryDeadline)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Pagamento
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+                      {selectedBudget.paymentMethodName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Forma de Pagamento:</span>
+                          <span className="font-medium">{selectedBudget.paymentMethodName}</span>
+                        </div>
+                      )}
+                      {selectedBudget.installments > 1 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Parcelas:</span>
+                          <span className="font-medium">{selectedBudget.installments}x</span>
+                        </div>
+                      )}
+                      {downPayment > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Entrada:</span>
+                          <span className="font-medium text-green-700">{formatCurrency(downPayment)}</span>
+                        </div>
+                      )}
+                      {remainingAmount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Restante:</span>
+                          <span className="font-medium">{formatCurrency(remainingAmount)}</span>
+                        </div>
+                      )}
+                      {selectedBudget.validUntil && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Válido até:</span>
+                          <span className="font-medium">{formatDate(selectedBudget.validUntil)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="bg-gray-100 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Resumo Financeiro
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Subtotal dos Produtos:</span>
+                      <span className="font-medium">{formatCurrency(subtotal)}</span>
+                    </div>
+                    {hasDiscount && discountAmount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Desconto ({selectedBudget.discountType === 'percentage' ? `${discountPercentage}%` : 'valor fixo'}):</span>
+                        <span className="font-medium">- {formatCurrency(discountAmount)}</span>
+                      </div>
+                    )}
+                    {shippingCost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Frete:</span>
+                        <span className="font-medium">{formatCurrency(shippingCost)}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Valor Total:</span>
+                      <span className="text-green-700">{formatCurrency(totalValue)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedBudget.description && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Observações</label>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1">{selectedBudget.description}</p>
+                  </div>
+                )}
+
+                <DialogFooter className="gap-2 pt-2">
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      approveMutation.mutate(selectedBudget.id);
+                      setDetailsOpen(false);
+                    }}
+                    disabled={approveMutation.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Autorizar Orçamento
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setDetailsOpen(false);
+                      handleRejectClick(selectedBudget);
+                    }}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Não Autorizar
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

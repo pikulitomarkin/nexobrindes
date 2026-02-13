@@ -7925,12 +7925,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const items = await storage.getBudgetItems(budget.id);
 
+            const pricingSettings = await storage.getPricingSettings();
+            const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
+
+            const enrichedItems = await Promise.all(items.map(async (item: any) => {
+              try {
+                const product = await storage.getProduct(item.productId);
+                const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+
+                let minimumPrice = 0;
+                if (costPrice > 0 && pricingSettings) {
+                  const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+                  const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+                  const budgetTotal = parseFloat(budget.totalValue || '0');
+                  const matchingTier = marginTiers
+                    .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
+                    .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
+                  if (matchingTier) {
+                    const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
+                    const divisor = 1 - taxRate - commissionRate - minMarginRate;
+                    if (divisor > 0) {
+                      minimumPrice = costPrice / divisor;
+                    }
+                  }
+                }
+
+                return {
+                  ...item,
+                  productName: item.productName || product?.name || 'Produto não encontrado',
+                  costPrice,
+                  minimumPrice: Math.round(minimumPrice * 100) / 100,
+                };
+              } catch {
+                return { ...item, costPrice: 0, minimumPrice: 0 };
+              }
+            }));
+
+            let paymentMethodName = '';
+            if (budget.paymentMethodId) {
+              try {
+                const pms = await storage.getPaymentMethods();
+                const pm = pms.find((p: any) => p.id === budget.paymentMethodId);
+                paymentMethodName = pm?.name || '';
+              } catch {}
+            }
+
+            let shippingMethodName = '';
+            if (budget.shippingMethodId) {
+              try {
+                const sms = await storage.getShippingMethods();
+                const sm = sms.find((s: any) => s.id === budget.shippingMethodId);
+                shippingMethodName = sm?.name || '';
+              } catch {}
+            }
+
             return {
               ...budget,
               vendorName,
               clientName,
-              itemCount: items.length,
-              items
+              paymentMethodName,
+              shippingMethodName,
+              itemCount: enrichedItems.length,
+              items: enrichedItems
             };
           } catch (err) {
             console.error(`Error enriching awaiting budget ${budget.id}:`, err);
