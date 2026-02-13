@@ -488,7 +488,7 @@ export default function LogisticsProducts() {
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                           <div>
-                            <Label htmlFor="basePrice">Preço Base (R$)</Label>
+                            <Label htmlFor="basePrice">Preço (R$)</Label>
                             <Input
                               id="basePrice"
                               type="number"
