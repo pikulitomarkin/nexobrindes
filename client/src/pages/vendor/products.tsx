@@ -402,7 +402,7 @@ export default function VendorProducts() {
                       <span data-testid="text-dialog-product-category">{selectedProduct.category || "Não informado"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Preço Base:</span>
+                      <span className="text-gray-600">Preço:</span>
                       <span className="font-semibold" data-testid="text-dialog-product-price">
                         R$ {parseFloat(selectedProduct.basePrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>

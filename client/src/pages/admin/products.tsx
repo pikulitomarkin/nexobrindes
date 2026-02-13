@@ -111,28 +111,31 @@ export default function AdminProducts() {
   });
 
   // Função para calcular preço de venda baseado no custo
-  const calculateSalePrice = (costPrice: number, quantity: number = 1) => {
+  const calculateSalePrice = (costPrice: number, revenue: number = 0) => {
     if (!pricingSettings || !costPrice || costPrice <= 0) return costPrice;
     
-    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
-    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
+    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0;
+    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0;
     
-    // Determinar margem baseada na quantidade
-    let marginRate = parseFloat(pricingSettings.minimumMargin) / 100 || 0.45;
+    let marginRate = 0.28;
     
     if (marginTiers && Array.isArray(marginTiers) && marginTiers.length > 0) {
       const sortedTiers = [...marginTiers].sort((a: any, b: any) => 
-        parseInt(a.minQuantity) - parseInt(b.minQuantity)
+        parseFloat(a.minRevenue || '0') - parseFloat(b.minRevenue || '0')
       );
       
       for (const tier of sortedTiers) {
-        const minQty = parseInt(tier.minQuantity) || 0;
-        const maxQty = tier.maxQuantity ? parseInt(tier.maxQuantity) : Infinity;
+        const minRev = parseFloat(tier.minRevenue || '0');
+        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Infinity;
         
-        if (quantity >= minQty && quantity <= maxQty) {
+        if (revenue >= minRev && revenue <= maxRev) {
           marginRate = parseFloat(tier.marginRate) / 100;
           break;
         }
+      }
+      
+      if (revenue === 0 && sortedTiers.length > 0) {
+        marginRate = parseFloat(sortedTiers[0].marginRate) / 100;
       }
     }
     
@@ -905,14 +908,23 @@ export default function AdminProducts() {
                     <TableCell>
                       <div>
                         <p className="font-medium text-green-600">
-                          R$ {parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
+                          R$ {(() => {
+                            const cost = parseFloat(product.costPrice || '0');
+                            if (cost > 0) {
+                              return calculateSalePrice(cost).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              });
+                            }
+                            return parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            });
+                          })()}
                         </p>
                         {product.costPrice && parseFloat(product.costPrice) > 0 && (
                           <p className="text-xs text-gray-400">
-                            Custo: R$ {parseFloat(product.costPrice).toLocaleString('pt-BR', {
+                            Custo R$ {parseFloat(product.costPrice).toLocaleString('pt-BR', {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2
                             })}
