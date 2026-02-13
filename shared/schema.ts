@@ -322,6 +322,8 @@ export const budgets = pgTable("budgets", {
   remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default('0.00'),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default('0.00'),
 
+  adminRejectionReason: text("admin_rejection_reason"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
