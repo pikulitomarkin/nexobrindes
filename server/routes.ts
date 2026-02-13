@@ -7892,7 +7892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/budgets/awaiting-approval", async (req, res) => {
+  app.get("/api/budgets/awaiting-approval", requireAuth, async (req, res) => {
     try {
       if (!req.user || req.user.role !== 'admin') {
         return res.status(403).json({ error: "Acesso restrito a administradores" });
@@ -8235,7 +8235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:id/admin-approve", async (req, res) => {
+  app.post("/api/budgets/:id/admin-approve", requireAuth, async (req, res) => {
     try {
       if (!req.user || req.user.role !== 'admin') {
         return res.status(403).json({ error: "Acesso restrito a administradores" });
@@ -8260,7 +8260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/:id/admin-reject", async (req, res) => {
+  app.post("/api/budgets/:id/admin-reject", requireAuth, async (req, res) => {
     try {
       if (!req.user || req.user.role !== 'admin') {
         return res.status(403).json({ error: "Acesso restrito a administradores" });
