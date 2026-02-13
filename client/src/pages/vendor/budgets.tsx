@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X } from "lucide-react";
+import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, Percent, Trash2, Edit, Factory, Bell, X, Clock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
@@ -2154,13 +2154,13 @@ export default function VendorBudgets() {
           <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-gray-600">Aprovados</p>
-                <p className="text-xl md:text-3xl font-bold gradient-text">
-                  {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'admin_approved' || b.status === 'converted').length || 0}
+                <p className="text-xs md:text-sm font-medium text-gray-600">Aguardando Autorização</p>
+                <p className="text-xl md:text-3xl font-bold text-orange-600">
+                  {budgets?.filter((b: any) => b.status === 'awaiting_approval').length || 0}
                 </p>
               </div>
-              <div className="w-8 h-8 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Eye className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-4 w-4 md:h-6 md:w-6 text-orange-600" />
               </div>
             </div>
           </CardContent>
@@ -2170,13 +2170,13 @@ export default function VendorBudgets() {
           <CardContent className="p-3 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-sm md:text-lg font-bold gradient-text">
-                  R$ {budgets?.reduce((total: number, b: any) => total + parseFloat(b.totalValue), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                <p className="text-xs md:text-sm font-medium text-gray-600">Aprovados</p>
+                <p className="text-xl md:text-3xl font-bold gradient-text">
+                  {budgets?.filter((b: any) => b.status === 'approved' || b.status === 'admin_approved' || b.status === 'converted').length || 0}
                 </p>
               </div>
-              <div className="w-8 h-8 md:w-12 md:h-12 gradient-bg rounded-lg flex items-center justify-center">
-                <span className="text-white text-xs md:text-base font-bold">R$</span>
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Eye className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -2212,20 +2212,112 @@ export default function VendorBudgets() {
             </div>
           </div>
 
-          {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
-          {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
+          {/* Seção de Orçamentos Aguardando Autorização do Admin */}
+          {budgets?.filter((budget: any) => budget.status === 'awaiting_approval').length > 0 && (
             <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
               <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                🔔 Solicitações Pendentes - Orçamentos Aprovados pelo Cliente
+                <Clock className="h-5 w-5" />
+                ⏳ Aguardando Autorização do Administrador
               </h3>
+              <p className="text-sm text-orange-700 mb-3">
+                Estes orçamentos possuem itens com preço abaixo do mínimo e precisam de autorização do administrador antes de serem convertidos em pedido.
+              </p>
               <div className="space-y-2">
-                {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
-                  <div key={budget.id} className="bg-white p-3 rounded border flex justify-between items-center">
+                {budgets.filter((budget: any) => budget.status === 'awaiting_approval').map((budget: any) => (
+                  <div key={budget.id} className="bg-white p-3 rounded border border-orange-200 flex justify-between items-center">
                     <div>
                       <p className="font-medium">{budget.title}</p>
                       <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      <p className="text-sm text-green-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewBudget(budget)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver Detalhes
+                      </Button>
+                      <span className="text-xs text-orange-600 font-medium px-3 py-1.5 bg-orange-100 rounded-full flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Aguardando autorização
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Seção de Orçamentos Não Autorizados pelo Admin */}
+          {budgets?.filter((budget: any) => budget.status === 'not_approved').length > 0 && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-bold text-red-800 mb-3 flex items-center gap-2">
+                <X className="h-5 w-5" />
+                ❌ Orçamentos Não Autorizados
+              </h3>
+              <p className="text-sm text-red-700 mb-3">
+                Estes orçamentos foram rejeitados pelo administrador. Edite os preços para atender ao mínimo exigido e reenvie para nova análise.
+              </p>
+              <div className="space-y-2">
+                {budgets.filter((budget: any) => budget.status === 'not_approved').map((budget: any) => (
+                  <div key={budget.id} className="bg-white p-3 rounded border border-red-200 flex justify-between items-center">
+                    <div className="flex-1">
+                      <p className="font-medium">{budget.title}</p>
+                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                      <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      {budget.adminRejectionReason && (
+                        <div className="mt-2 p-2 bg-red-100 rounded text-sm">
+                          <span className="font-medium text-red-800">Motivo da rejeição:</span>
+                          <p className="text-red-700">{budget.adminRejectionReason}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewBudget(budget)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                        onClick={() => handleEditBudget(budget)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar e Reenviar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
+          {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                🔔 Orçamentos Aprovados - Prontos para Conversão
+              </h3>
+              <div className="space-y-2">
+                {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
+                  <div key={budget.id} className="bg-white p-3 rounded border border-green-200 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{budget.title}</p>
+                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                      <p className="text-sm text-green-600 font-medium">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      {budget.status === 'admin_approved' && (
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full mt-1 inline-block">
+                          Autorizado pelo Admin
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -2235,33 +2327,17 @@ export default function VendorBudgets() {
                       >
                         Ver Detalhes
                       </Button>
-                      {(budget.status === 'approved' || budget.status === 'admin_approved') && (
-                        <Button 
-                          size="sm"
-                          className="gradient-bg text-white"
-                          onClick={() => {
-                            setBudgetToConvert(budget.id);
-                            setConvertDialogOpen(true);
-                          }}
-                        >
-                          🏷️ Converter em Pedido
-                        </Button>
-                      )}
-                      {budget.status === 'not_approved' && (
-                        <Button 
-                          size="sm"
-                          variant="outline"
-                          className="text-orange-600 border-orange-300"
-                          onClick={() => handleEditBudget(budget)}
-                        >
-                          ✏️ Editar e Reenviar
-                        </Button>
-                      )}
-                      {budget.status === 'awaiting_approval' && (
-                        <span className="text-xs text-orange-600 font-medium px-2 py-1 bg-orange-50 rounded">
-                          Aguardando autorização do admin
-                        </span>
-                      )}
+                      <Button 
+                        size="sm"
+                        className="gradient-bg text-white"
+                        onClick={() => {
+                          setBudgetToConvert(budget.id);
+                          setConvertDialogOpen(true);
+                        }}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-1" />
+                        Converter em Pedido
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -2336,6 +2412,11 @@ export default function VendorBudgets() {
                             {budget.clientObservations}
                           </div>
                         )}
+                        {budget.status === 'not_approved' && budget.adminRejectionReason && (
+                          <div className="text-xs p-1 rounded bg-red-100 text-red-700 max-w-[200px] truncate" title={budget.adminRejectionReason}>
+                            Motivo: {budget.adminRejectionReason}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -2379,28 +2460,33 @@ export default function VendorBudgets() {
                         )}
                         {(budget.status === 'approved' || budget.status === 'admin_approved') && (
                           <Button
+                            size="sm"
                             className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => {
-                              setViewBudgetDialogOpen(false);
                               handleConvertClick(budget.id);
                             }}
                             data-testid={`button-convert-${budget.id}`}
                           >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            <ShoppingCart className="h-4 w-4 mr-1" />
                             Converter
                           </Button>
                         )}
                         {budget.status === 'not_approved' && (
                           <Button
-                            variant="outline"
-                            className="text-orange-600 border-orange-300"
-                            onClick={() => {
-                              setViewBudgetDialogOpen(false);
-                              handleEditBudget(budget);
-                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={() => handleEditBudget(budget)}
                           >
-                            ✏️ Editar e Reenviar
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
                           </Button>
+                        )}
+                        {budget.status === 'awaiting_approval' && (
+                          <span className="text-xs text-orange-500 px-2 py-1 bg-orange-50 rounded-full flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Aguardando
+                          </span>
                         )}
                         <Button
                           variant="ghost"
@@ -2433,6 +2519,47 @@ export default function VendorBudgets() {
 
           {budgetToView && (
             <div className="space-y-6">
+              {/* Approval Status Alerts */}
+              {budgetToView.status === 'awaiting_approval' && (
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-orange-800">Aguardando Autorização do Administrador</p>
+                    <p className="text-sm text-orange-700 mt-1">
+                      Este orçamento possui itens com preço abaixo do mínimo permitido. A conversão em pedido está bloqueada até a autorização do administrador.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {budgetToView.status === 'not_approved' && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <X className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-red-800">Orçamento Não Autorizado</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      O administrador rejeitou este orçamento. Edite os preços para atender ao mínimo exigido e reenvie para nova análise.
+                    </p>
+                    {budgetToView.adminRejectionReason && (
+                      <div className="mt-2 p-2 bg-red-100 rounded">
+                        <span className="font-medium text-red-800 text-sm">Motivo da rejeição:</span>
+                        <p className="text-red-700 text-sm mt-0.5">{budgetToView.adminRejectionReason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {budgetToView.status === 'admin_approved' && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+                  <ShoppingCart className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-green-800">Orçamento Autorizado pelo Administrador</p>
+                    <p className="text-sm text-green-700 mt-1">
+                      Este orçamento foi autorizado mesmo com preços abaixo do mínimo. Você pode convertê-lo em pedido.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Budget Header */}              
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div>
@@ -2865,8 +2992,15 @@ export default function VendorBudgets() {
                       handleEditBudget(budgetToView);
                     }}
                   >
-                    ✏️ Editar e Reenviar
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar e Reenviar
                   </Button>
+                )}
+                {budgetToView.status === 'awaiting_approval' && (
+                  <span className="text-sm text-orange-600 font-medium px-3 py-2 bg-orange-50 rounded-lg flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Conversão bloqueada - aguardando autorização
+                  </span>
                 )}
 
                 <Button
