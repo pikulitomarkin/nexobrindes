@@ -69,7 +69,6 @@ export default function AdminPricing() {
   const [calcForm, setCalcForm] = useState({
     productCost: "",
     quantity: "",
-    revenue: "",
   });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<PricingSettings>({
@@ -223,7 +222,7 @@ export default function AdminPricing() {
     calculatePriceMutation.mutate({
       productCost: parseFloat(calcForm.productCost),
       quantity: parseInt(calcForm.quantity) || 1,
-      revenue: parseFloat(calcForm.revenue) || 0,
+      revenue: 0,
     });
   };
 
@@ -337,7 +336,7 @@ export default function AdminPricing() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="productCost">Custo do Produto (R$)</Label>
                 <Input
@@ -357,17 +356,6 @@ export default function AdminPricing() {
                   placeholder="1"
                   value={calcForm.quantity}
                   onChange={(e) => setCalcForm({ ...calcForm, quantity: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="revenue">Faturamento (R$)</Label>
-                <Input
-                  id="revenue"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={calcForm.revenue}
-                  onChange={(e) => setCalcForm({ ...calcForm, revenue: e.target.value })}
                 />
               </div>
             </div>
