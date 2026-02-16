@@ -313,12 +313,12 @@ export default function AdminBudgets() {
   // Admin budget functions - NEW FLOW
   const addProductToAdminBudget = (product: any, producerId?: string) => {
     const costPrice = parseFloat(product.costPrice) || 0;
-    const basePrice = parseFloat(product.basePrice) || 0;
     
     const currentRevenue = adminBudgetForm.items.reduce((total: number, item: any) => {
       return total + (item.unitPrice * item.quantity);
     }, 0);
     const priceCalc = calculatePriceFromCost(costPrice, currentRevenue);
+    const idealPrice = costPrice > 0 ? Math.round(priceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice) || 0;
     const minimumPrice = costPrice > 0 ? Math.round(priceCalc.minimumPrice * 100) / 100 : 0;
     
     const newItem = {
@@ -326,8 +326,8 @@ export default function AdminBudgets() {
       productName: product.name,
       producerId: producerId || 'internal',
       quantity: 1,
-      unitPrice: basePrice,
-      totalPrice: basePrice,
+      unitPrice: idealPrice,
+      totalPrice: idealPrice,
       costPrice: costPrice,
       minimumPrice: minimumPrice,
       hasItemCustomization: false,
