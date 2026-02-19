@@ -1629,12 +1629,17 @@ export default function VendorBudgets() {
                                   )}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{product.name}</p>
-                                    {productCode && (
+                                    {product.friendlyCode ? (
+                                      <p className="text-xs text-purple-600 font-mono">Cód: {product.friendlyCode}</p>
+                                    ) : productCode && (
                                       <p className="text-xs text-purple-600 font-mono">Cód: {productCode}</p>
                                     )}
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
-                                        R$ {displayPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        R$ {(() => {
+                                          const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
+                                          return sale.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                        })()}
                                       </p>
                                       {product.category && (
                                         <span className="text-xs text-gray-400">• {product.category}</span>
