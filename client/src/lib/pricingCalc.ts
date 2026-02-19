@@ -138,7 +138,7 @@ export function getProductSalePrice(
   }
 
   if (hasBase && Math.abs(cost - base) < 0.0001) {
-    return { price: roundMoney(base), source: 'base' as const };
+    return { price: roundMoney(base), source: 'json' as const };
   }
 
   const details = calculatePriceFromCost(cost, budgetRevenue, pricingSettings, marginTiers);
