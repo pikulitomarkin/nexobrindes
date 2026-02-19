@@ -1454,15 +1454,14 @@ export class PgStorage implements IStorage {
       // PrecoVenda do JSON é o CUSTO do produto
       // O preço de venda será calculado dinamicamente na exibição usando as configurações do painel
       const costPrice = parseFloat(item.PrecoVenda || item.Preco || item.PrecoCusto || 0);
+      const salePrice = parseFloat(item.salePrice || item.PrecoFinal || 0);
       
-      // Armazenar custo como basePrice também para compatibilidade
-      // O preço de venda real será calculado na exibição
       return {
         name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
         description: item.Descricao || item.description || item.Descricao || '',
         category: item.WebTipo || item.category || item.Categoria || 'Geral',
-        basePrice: costPrice.toFixed(2), // Armazena o custo aqui também
-        costPrice: costPrice.toFixed(2), // Custo original do JSON (PrecoVenda)
+        basePrice: salePrice > 0 ? salePrice.toFixed(2) : "0.00", 
+        costPrice: costPrice.toFixed(2), // Custo original do JSON
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
         producerId: isInternal ? null : producerId,

@@ -1,0 +1,104 @@
+Entendi SIM, Débora — e essa sua observação muda um ponto crucial:
+
+✅ **No seu fluxo, quando importa JSON, o valor vem como *custo* e o sistema deve exibir apenas o *preço de venda* (já com a fórmula aplicada).**
+Ou seja: **no sistema, “Preço” visível = preço final de venda**, não custo.
+
+### O que eu encontrei no ZIP (e por que isso ainda pode estar errado)
+
+Hoje, no backend, a importação **não preenche `costPrice`**. Ela só faz:
+
+* `basePrice = productData.basePrice || "0.00"`
+* e chama `createProduct(...)`
+
+Ou seja: se no seu JSON você manda o “preço de custo” dentro de `basePrice`, o sistema está salvando custo em `basePrice` e deixando `costPrice` vazio. Aí, pela regra atual do `getProductSalePrice`, quando `costPrice` está vazio ele usa `basePrice` como “preço final”… e **mostra o custo** (errado para o seu modelo). ✅
+
+---
+
+## Correção certa para o seu modelo (JSON = custo → sistema mostra venda)
+
+### ✅ Ajuste 1 — Importação: jogar custo no `costPrice`
+
+No `server/storage.pg.ts`, dentro de `importProducts(...)`, troque o “cleanedProductData” para:
+
+* Se vier `costPrice`, usa ele.
+* Se **não** vier `costPrice` mas vier `basePrice`, **trata `basePrice` como custo** e grava em `costPrice`.
+* E zera/omite `basePrice` (ou deixa “0.00”), porque o “preço que aparece” será calculado.
+
+**Patch sugerido (mínimo e direto):**
+
+```ts
+const incomingBase = cleanNumericField(productData.basePrice);
+const incomingCost = cleanNumericField(productData.costPrice);
+
+const cleanedProductData = {
+  ...productData,
+  weight: cleanNumericField(productData.weight),
+  height: cleanNumericField(productData.height),
+  width: cleanNumericField(productData.width),
+  depth: cleanNumericField(productData.depth),
+
+  // ✅ REGRA: JSON traz custo
+  costPrice: incomingCost ?? incomingBase ?? "0.00",
+
+  // ✅ basePrice deixa vazio/zero (não é o preço exibido)
+  basePrice: cleanNumericField(productData.salePrice) ?? "0.00",
+};
+```
+
+> Se você não tiver `salePrice` no JSON, deixa `"0.00"` mesmo.
+
+Isso faz o sistema ficar exatamente do jeito que você descreveu: **importa custo → calcula venda → exibe venda**.
+
+---
+
+### ✅ Ajuste 2 — Bug pequeno no pricingCalc (tem um typo)
+
+No seu `client/src/lib/pricingCalc.ts`, tem isto:
+
+```ts
+if (hasBase && Math.abs(cost - base) < 0.0001) {
+  return { price: roundMoney(base), source: 'json' as const };
+}
+```
+
+Esse `source: 'json'` tá errado. Tem que ser `source: 'base'`.
+
+Corrige para:
+
+```ts
+if (hasBase && Math.abs(cost - base) < 0.0001) {
+  return { price: roundMoney(base), source: 'base' as const };
+}
+```
+
+---
+
+## O que isso resolve na prática
+
+* **Produtos (Admin)**: deixa de mostrar custo importado como “preço”.
+* **Orçamentos (Admin/Vendedor)**: ao adicionar o item, o preço vem da mesma lógica e fica consistente.
+* **Sem inflação**: a proteção `cost==base` continua impedindo “markup em cima de markup” para os produtos contaminados.
+
+---
+
+## Prompt curto pra você colar no Replit (ele só aplica, sem inventar)
+
+```text
+Aplique estas duas correções exatamente:
+
+1) server/storage.pg.ts -> importProducts():
+- O JSON que importo traz PREÇO DE CUSTO.
+- Hoje vocês gravam isso em basePrice e não preenchem costPrice.
+- Corrija para gravar o custo em costPrice:
+  costPrice = productData.costPrice ?? productData.basePrice ?? "0.00"
+- E deixe basePrice como "0.00" (ou use salePrice se existir no JSON).
+
+2) client/src/lib/pricingCalc.ts:
+- Trocar source:'json' para source:'base' no caso costPrice == basePrice.
+
+Depois:
+- Reimporte 1 produto de teste
+- Confirme que em Produtos aparece o PREÇO DE VENDA (calculado), e não o custo.
+```
+
+Se você quiser, eu também te digo **o melhor jeito de migrar os 92% contaminados** sem perder dados (porque hoje seu banco está com custo e venda misturados).
