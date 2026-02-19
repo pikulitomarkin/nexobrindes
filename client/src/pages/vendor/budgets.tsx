@@ -948,6 +948,22 @@ export default function VendorBudgets() {
       itemDiscountValue: toNumber(item.itemDiscountValue),
     }));
 
+    // Calculate total value for the budget
+    const subtotal = itemsArray.reduce((sum, item) => {
+      let itemPrice = item.unitPrice;
+      itemPrice += item.itemCustomizationValue;
+      itemPrice += item.generalCustomizationValue;
+      
+      if (item.hasItemDiscount) {
+        const discountAmount = item.itemDiscountType === "percentage" 
+          ? (itemPrice * item.itemDiscountPercentage) / 100 
+          : item.itemDiscountValue;
+        itemPrice -= discountAmount;
+      }
+      
+      return sum + (Math.max(0, itemPrice) * item.quantity);
+    }, 0);
+
     const hasBelowMinimum = itemsArray.some(
       (item: any) => item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice
     );
