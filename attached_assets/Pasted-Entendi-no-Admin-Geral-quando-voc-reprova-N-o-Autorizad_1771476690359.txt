@@ -1,0 +1,102 @@
+Entendi: **no Admin Geral**, quando você **reprova / “Não Autorizado”**, esse orçamento **some do fluxo de edição** (não aparece pra editar de novo), enquanto no **Vendedor** vocês já fizeram o “volta pra rascunho/editável”.
+
+Isso quase sempre é **filtro de status + ações da lista** no `admin/budgets.tsx` (e às vezes também no endpoint que lista budgets pro admin).
+
+### O que tem que acontecer (regra)
+
+* Orçamento criado no Admin Geral e reprovado (`not_approved`) **precisa continuar aparecendo na lista** e ter ação **Editar**.
+* E quando você editar e salvar (se corrigiu valores), ele:
+
+  * volta pra `draft` (se não precisa aprovação)
+  * ou volta pra `awaiting_approval` (se ainda precisa)
+
+---
+
+## Onde corrigir (arquivos)
+
+✅ **1) `client/src/pages/admin/budgets.tsx`**
+Aqui tem 2 lugares pra mexer:
+
+### A) Filtro da lista / query
+
+Procure algo como:
+
+* `statusFilter`
+* `filteredBudgets`
+* `budgets.filter(...)`
+* ou `getBudgets({ status: ... })`
+
+E garanta que `not_approved` **não está sendo excluído**.
+
+Exemplo de bug típico:
+
+```ts
+const visible = budgets.filter(b => b.status !== "not_approved");
+```
+
+ou
+
+```ts
+const visibleStatuses = ["draft","sent","approved","awaiting_approval"]; // faltou not_approved
+```
+
+✅ Corrigir para incluir `not_approved`.
+
+### B) Botão/ação “Editar”
+
+Na tabela da lista, em “AÇÕES”, provavelmente tem algo assim:
+
+```tsx
+{budget.status === "draft" && (
+  <button onClick={() => handleEditBudget(budget)}>Editar</button>
+)}
+```
+
+✅ Troque para:
+
+```tsx
+{(budget.status === "draft" || budget.status === "not_approved") && (
+  <button onClick={() => handleEditBudget(budget)}>Editar</button>
+)}
+```
+
+> Isso replica o fluxo do vendedor.
+
+---
+
+✅ **2) (se necessário) `server/routes.ts` – GET /api/budgets**
+Se o backend estiver filtrando por status (às vezes o admin list endpoint só traz alguns), então a UI nunca vai ver `not_approved`.
+
+Procure no `GET /api/budgets` ou `storage.getBudgets(...)` se tem filtro do tipo:
+
+* “não trazer reprovados”
+* ou só trazer alguns status
+
+✅ Ajustar para o admin trazer todos, ou pelo menos incluir `not_approved`.
+
+---
+
+## Prompt pronto pra você colar no Replit Agent
+
+```text
+No Admin Geral, orçamentos com status "not_approved" estão sumindo da lista e não dá pra editar.
+
+Corrigir para ter o mesmo fluxo do vendedor:
+1) client/src/pages/admin/budgets.tsx
+- Garantir que a lista NÃO filtre/exclua status "not_approved".
+- Incluir "not_approved" nos status visíveis do filtro/listagem.
+- Mostrar ação "Editar" também quando status for "not_approved" (não só draft).
+
+2) Se mesmo assim não aparecer:
+- Verificar server/routes.ts (GET /api/budgets) e storage.getBudgets:
+  não filtrar "not_approved" para admin.
+  Admin deve receber budgets reprovados para poder editar e reenviar para aprovação.
+
+Depois testar:
+- Criar orçamento no admin -> deixar abaixo do mínimo -> vai para awaiting_approval
+- Reprovar -> status not_approved
+- Voltar na lista Admin -> deve aparecer e ter Editar
+- Editar e salvar -> deve voltar para draft ou awaiting_approval conforme mínimo.
+```
+
+Se você quiser, eu consigo te dizer o trecho exato “onde mexer” se você me mandar só **um print do código** (ou colar aqui) do bloco da tabela de ações em `admin/budgets.tsx` (a parte que decide mostrar “Editar / Enviar / Converter”).

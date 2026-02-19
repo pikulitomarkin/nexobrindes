@@ -2500,7 +2500,7 @@ export default function AdminBudgets() {
                           <Eye className="h-4 w-4 mr-1" />
                           Ver
                         </Button>
-                        {(budget.status === 'draft' || budget.status === 'sent') && (
+                        {(budget.status === 'draft' || budget.status === 'sent' || budget.status === 'not_approved') && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2827,6 +2827,20 @@ export default function AdminBudgets() {
                   <FileText className="h-4 w-4 mr-2" />
                   {generatePDFMutation.isPending ? 'Gerando...' : 'Baixar PDF'}
                 </Button>
+
+                {(budgetToView.status === 'not_approved') && (
+                  <Button
+                    variant="outline"
+                    className="text-orange-600 hover:text-orange-900"
+                    onClick={() => {
+                      setViewBudgetDialogOpen(false);
+                      handleEditBudget(budgetToView);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
 
                 {(budgetToView.status === 'draft' || budgetToView.status === 'sent') && (
                   <Button
