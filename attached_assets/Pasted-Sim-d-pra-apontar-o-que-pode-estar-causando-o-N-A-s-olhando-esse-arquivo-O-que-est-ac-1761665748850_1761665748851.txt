@@ -1,0 +1,64 @@
+Sim — dá pra apontar o que pode estar causando o “N/A” só olhando esse arquivo.
+
+### O que está acontecendo
+
+* A listagem mostra `client.userCode` e, se vier `undefined`, cai para `"N/A"`. Isso está aqui na lista e também no modal de detalhes. Se a API estiver retornando o código com **outro nome de campo** (ex.: `code`, `loginCode`, `accessCode`) ou **registros antigos** não tiverem esse campo salvo, a UI exibirá `N/A`. 
+
+* No cadastro, você **gera** um `userCode` e envia no body do `POST`. Se o back-end **não persistir** esse atributo (ou persistir com outro nome), na hora de listar não vai aparecer.
+
+### Ajustes rápidos no front (mais resiliente)
+
+1. **Tolerar chaves alternativas** ao exibir o código (cobre API antigas/variantes):
+
+```tsx
+// dentro do map de clients, antes do JSX
+const code =
+  (client as any).userCode ??
+  (client as any).code ??
+  (client as any).loginCode ??
+  (client as any).accessCode ??
+  null;
+```
+
+E onde renderiza:
+
+```tsx
+<span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+  {code ?? 'N/A'}
+</span>
+```
+
+Faça o mesmo no modal de detalhes e no bloco “Código de Login” do modal de edição.
+
+2. **Garantir que sempre exista um código ao salvar** (fallback se por algum motivo o state não estiver preenchido):
+
+```tsx
+const createClientMutation = useMutation({
+  mutationFn: async (data: ClientFormValues) => {
+    const finalCode = userCode || generateUserCode();
+    const clientData = { ...data, userCode: finalCode };
+    const response = await fetch("/api/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clientData),
+    });
+    if (!response.ok) throw new Error("Erro ao criar cliente");
+    return response.json();
+  },
+  // ...
+});
+```
+
+### Verificações no back-end (provável causa-raiz)
+
+* **Confirme o nome do campo** na tabela/coleção: está como `userCode` mesmo?
+* **Confira o DTO/serializer do GET /api/clients**: ele inclui `userCode` na resposta?
+* **Migre registros antigos** que não tenham `userCode` (popular via script) ou permita nulo e exiba com o fallback acima.
+
+### Como testar em 1 minuto
+
+1. Cadastrar um cliente novo → verificar no **payload do POST** (Network) que vai `userCode`.
+2. Conferir a resposta do **GET /api/clients**: existe o campo `userCode`? Se vier outro nome, o fallback do front já cobre.
+3. Se clientes antigos seguirem com `N/A`, é normal — eles não tinham o campo; você pode rodar uma migração para gerar e salvar.
+
+Se quiser, me manda o handler do `POST /api/clients` e o shape do `GET /api/clients` que eu ajusto o contrato certinho nos dois lados.

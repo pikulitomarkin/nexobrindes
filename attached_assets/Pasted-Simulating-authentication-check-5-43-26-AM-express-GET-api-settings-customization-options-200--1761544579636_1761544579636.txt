@@ -1,0 +1,450 @@
+Simulating authentication check...
+5:43:26 AM [express] GET /api/settings/customization-options 200 in 1ms :: [{"id":"custom-1","name":…
+Validando personalizações dos itens do orçamento: [
+  {
+    "productId": "product-1",
+    "productName": "Mesa de Jantar Clássica",
+    "producerId": "producer-1",
+    "quantity": 1,
+    "unitPrice": 2500,
+    "totalPrice": 2722,
+    "hasItemCustomization": true,
+    "selectedCustomizationId": "",
+    "itemCustomizationValue": 0,
+    "itemCustomizationDescription": "",
+    "additionalCustomizationNotes": "",
+    "customizationPhoto": "",
+    "productWidth": "",
+    "productHeight": "",
+    "productDepth": "",
+    "hasItemDiscount": false,
+    "itemDiscountType": "percentage",
+    "itemDiscountPercentage": 0,
+    "itemDiscountValue": 0,
+    "hasGeneralCustomization": true,
+    "generalCustomizationName": "Débora da Costa Manso",
+    "generalCustomizationValue": 222
+  }
+]
+Item: hasItemCustomization=true, selectedCustomizationId=, quantity=1
+[CREATE BUDGET] Received 1 items from frontend
+[CREATE BUDGET] Items received: [{"productId":"product-1","producerId":"producer-1","quantity":1,"hasGeneralCustomization":true,"generalCustomizationName":"Débora da Costa Manso"}]
+[CREATE BUDGET] Processing 1 unique budget items (filtered from 1)
+5:44:04 AM [express] POST /api/budgets 200 in 2ms :: {"id":"budget-1761543844665-4fu0q38l8","budgetN…
+5:44:04 AM [express] GET /api/budgets/vendor/vendor-1 200 in 1ms :: [{"id":"budget-1761543844665-4fu…
+Converting budget budget-1761543844665-4fu0q38l8 to order for client client-1
+Budget items for conversion: 2
+Removing duplicate budget item:  (product-1-producer-1-1-2500)
+Filtered 2 items down to 1 unique items
+Budget budget-1761543844665-4fu0q38l8 conversion - Recalculated total: R$ 2846.00 (original: R$ 2846.00)
+[CREATE RECEIVABLE] Order PED-1761543848600: totalValue=2846.00, paidValue=0.00, downPayment=1000, shippingCost=124
+[CREATE RECEIVABLE] Created receivable ar-e720ba83-ed72-4976-a682-5380cae7c277: amount=2846.00, minimumPayment=1124.00, status=pending
+Created vendor commission: 284.60 for order PED-1761543848600
+Created 3 partner commissions: 142.30 each (total: 426.90) for order PED-1761543848600
+Budget budget-1761543844665-4fu0q38l8 converted to order e720ba83-ed72-4976-a682-5380cae7c277
+5:44:08 AM [express] POST /api/budgets/budget-1761543844665-4fu0q38l8/convert-to-order 200 in 3ms ::…
+5:44:08 AM [express] GET /api/budgets/vendor/vendor-1 200 in 1ms :: [{"id":"budget-1761543844665-4fu…
+Login attempt: { username: 'admin', preferredRole: 'admin' }
+Found user: { id: 'admin-1', username: 'admin', role: 'admin' }
+Login successful for: admin role: admin
+5:44:16 AM [express] POST /api/auth/login 200 in 4ms :: {"success":true,"user":{"id":"admin-1","user…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:44:21 AM [express] GET /api/auth/verify 200 in 1ms :: {"user":{"id":"admin-1","username":"admin","…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:44:21 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"admin-1","username":"admin","…
+Storage: getProducts called with options: { page: 1, limit: 20, search: '', category: '', producer: '' }
+Storage: Total products in storage: 8
+Storage: Initial query has 8 products
+Storage: Sample products: [
+  {
+    id: 'product-1',
+    name: 'Mesa de Jantar Clássica',
+    category: 'Móveis',
+    producerId: 'producer-1',
+    isActive: true
+  },
+  {
+    id: 'product-2',
+    name: 'Cadeira Estofada',
+    category: 'Móveis',
+    producerId: 'producer-1',
+    isActive: true
+  },
+  {
+    id: 'product-3',
+    name: 'Estante Modular',
+    category: 'Móveis',
+    producerId: 'internal',
+    isActive: true
+  }
+]
+Storage: After active filter: 8 products
+Storage: Returning 8 products (page 1/1)
+5:44:22 AM [express] GET /api/dashboard/stats 200 in 1ms :: {"ordersToday":1,"inProduction":0,"month…
+Storage: getProducerPayments returning 0 payments: []
+Overview calculation - Data counts: {
+  orders: 1,
+  payments: 0,
+  commissions: 4,
+  productionOrders: 0,
+  expenseNotes: 0,
+  producerPayments: 0
+}
+Returning 1 order receivables and 0 manual receivables
+Producer payments pending/approved: 0, total: 0
+Expenses approved not reimbursed: 0, total: 0
+Commissions pending/confirmed: 1, total: 284.6
+Refunds for cancelled orders: 0, total: 0
+Found 0 manual payables: []
+Manual payables total: 0
+Payables breakdown: {
+  producers: 0,
+  expenses: 0,
+  commissions: 284.6,
+  refunds: 0,
+  manual: 0,
+  total: 284.6
+}
+5:44:22 AM [express] GET /api/finance/overview 200 in 13ms :: {"receivables":2846,"payables":284.6,"…
+5:44:22 AM [express] GET /api/orders 200 in 7ms :: [{"orderNumber":"PED-1761543848600","budgetId":"b…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:44:23 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"admin-1","username":"admin","…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:44:26 AM [express] GET /api/auth/verify 304 in 0ms :: {"user":{"id":"admin-1","username":"admin","…
+Returning 1 order receivables and 0 manual receivables
+Returning 1 total receivables to frontend
+5:44:27 AM [express] GET /api/finance/receivables 200 in 1ms :: [{"id":"ar-e720ba83-ed72-4976-a682-5…
+Processing receivables payment: {
+  id: 'ar-e720ba83-ed72-4976-a682-5380cae7c277',
+  amount: '1124.00',
+  method: 'pix',
+  transactionId: 'MANUAL-1761543882763'
+}
+Returning 1 order receivables and 0 manual receivables
+Returning 1 order receivables and 0 manual receivables
+Updating receivable ar-e720ba83-ed72-4976-a682-5380cae7c277 with updates: { receivedAmount: '1124.00', status: 'partial' }
+Receivable ar-e720ba83-ed72-4976-a682-5380cae7c277 not found for update
+Payment processed successfully: {
+  orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+  amount: '1124.00',
+  method: 'pix',
+  status: 'confirmed',
+  transactionId: 'MANUAL-1761543882763',
+  notes: '',
+  paidAt: 2025-10-27T05:44:49.081Z,
+  id: 'fd055be6-4498-4e39-b109-ae0400535580',
+  createdAt: 2025-10-27T05:44:49.081Z,
+  reconciliationStatus: 'manual',
+  bankTransactionId: null
+}
+5:44:49 AM [express] POST /api/receivables/ar-e720ba83-ed72-4976-a682-5380cae7c277/payment 200 in 2m…
+Returning 1 order receivables and 0 manual receivables
+Returning 1 total receivables to frontend
+5:44:49 AM [express] GET /api/finance/receivables 200 in 0ms :: [{"id":"ar-e720ba83-ed72-4976-a682-5…
+Returning 1 order receivables and 0 manual receivables
+Returning 1 total receivables to frontend
+5:44:49 AM [express] GET /api/finance/receivables 304 in 1ms :: [{"id":"ar-e720ba83-ed72-4976-a682-5…
+Login attempt: { username: 'logistica1', preferredRole: 'logistics' }
+Found user: { id: 'logistics-1', username: 'logistica1', role: 'logistics' }
+Login successful for: logistica1 role: logistics
+5:45:38 AM [express] POST /api/auth/login 200 in 1ms :: {"success":true,"user":{"id":"logistics-1","…
+Verifying token: bG9naXN0aWNzLTE6bG9n...
+Decoded token: logistics-1:logistica1:1761543938152
+Token parts - userId: logistics-1 username: logistica1 timestamp: 1761543938152
+User found: logistics-1 - logistica1
+Token verification successful for user: logistica1
+5:45:42 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"logistics-1","username":"logi…
+Verifying token: bG9naXN0aWNzLTE6bG9n...
+Decoded token: logistics-1:logistica1:1761543938152
+Token parts - userId: logistics-1 username: logistica1 timestamp: 1761543938152
+User found: logistics-1 - logistica1
+Token verification successful for user: logistica1
+5:45:42 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"logistics-1","username":"logi…
+Returning 0 enriched production orders
+5:45:42 AM [express] GET /api/production-orders 200 in 1ms :: []
+Fetching paid orders ready for production...
+Storage: Getting paid orders ready for production...
+Storage: Found 1 total orders
+Storage: Order PED-1761543848600 is ready for production - Total: 2846, Paid: 1124, Status: confirmed
+Storage: Found 1 paid orders ready for production
+Found 1 paid orders ready for production
+5:45:42 AM [express] GET /api/logistics/paid-orders 200 in 5ms :: [{"orderNumber":"PED-1761543848600…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:45:47 AM [express] GET /api/auth/verify 304 in 0ms :: {"user":{"id":"admin-1","username":"admin","…
+Verifying token: YWRtaW4tMTphZG1pbjox...
+Decoded token: admin-1:admin:1761543856031
+Token parts - userId: admin-1 username: admin timestamp: 1761543856031
+User found: admin-1 - admin
+Token verification successful for user: admin
+5:45:47 AM [express] GET /api/auth/verify 304 in 0ms :: {"user":{"id":"admin-1","username":"admin","…
+Fetching paid orders ready for production...
+Storage: Getting paid orders ready for production...
+Storage: Found 1 total orders
+Storage: Order PED-1761543848600 is ready for production - Total: 2846, Paid: 1124, Status: confirmed
+Storage: Found 1 paid orders ready for production
+Found 1 paid orders ready for production
+5:45:47 AM [express] GET /api/logistics/paid-orders 200 in 0ms :: [{"orderNumber":"PED-1761543848600…
+Returning 0 enriched production orders
+5:45:48 AM [express] GET /api/production-orders 304 in 1ms :: []
+Sending order e720ba83-ed72-4976-a682-5380cae7c277 to production. Producer filter: producer-1
+Order e720ba83-ed72-4976-a682-5380cae7c277 has 2 total items
+Items grouped by producer: [ 'producer-1' ]
+Removing duplicate production item: product-1 for producer producer-1
+Producer producer-1 has 1 unique items (filtered from 2)
+Created production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd for producer Marcenaria Santos with 2 items
+5:45:49 AM [express] POST /api/orders/e720ba83-ed72-4976-a682-5380cae7c277/send-to-production 200 in…
+Fetching paid orders ready for production...
+Storage: Getting paid orders ready for production...
+Storage: Found 1 total orders
+Storage: Found 0 paid orders ready for production
+Found 0 paid orders ready for production
+5:45:49 AM [express] GET /api/logistics/paid-orders 200 in 1ms :: []
+Returning 1 enriched production orders
+5:45:49 AM [express] GET /api/production-orders 200 in 1ms :: [{"orderId":"e720ba83-ed72-4976-a682-5…
+Login attempt: { username: 'produtor1', preferredRole: '' }
+Found user: { id: 'producer-1', username: 'produtor1', role: 'producer' }
+Login successful for: produtor1 role: producer
+5:45:55 AM [express] POST /api/auth/login 200 in 1ms :: {"success":true,"user":{"id":"producer-1","u…
+Verifying token: cHJvZHVjZXItMTpwcm9k...
+Decoded token: producer-1:produtor1:1761543955439
+Token parts - userId: producer-1 username: produtor1 timestamp: 1761543955439
+User found: producer-1 - produtor1
+Token verification successful for user: produtor1
+5:45:59 AM [express] GET /api/auth/verify 200 in 1ms :: {"user":{"id":"producer-1","username":"produ…
+Verifying token: cHJvZHVjZXItMTpwcm9k...
+Decoded token: producer-1:produtor1:1761543955439
+Token parts - userId: producer-1 username: produtor1 timestamp: 1761543955439
+User found: producer-1 - produtor1
+Token verification successful for user: produtor1
+5:46:00 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"producer-1","username":"produ…
+Fetching production orders for producer: producer-1
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'pending'
+  }
+]
+Found 1 production orders for producer producer-1
+Returning 1 enriched production orders for producer producer-1
+5:46:00 AM [express] GET /api/production-orders/producer/producer-1 200 in 1ms :: [{"orderId":"e720b…
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'pending'
+  }
+]
+Storage: getProducerPaymentsByProducer for producer-1 returning 0 payments: []
+5:46:00 AM [express] GET /api/producer/producer-1/stats 304 in 3ms :: {"activeOrders":0,"pendingOrde…
+Storage: Updating production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd with value 800.00, notes: undefined, lockValue: false
+Storage: Updated production order: {
+  orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+  producerId: 'producer-1',
+  status: 'pending',
+  deadline: 2025-10-30T00:00:00.000Z,
+  deliveryDeadline: null,
+  shippingAddress: 'Endereço não informado',
+  orderDetails: '{"orderNumber":"PED-1761543848600","product":"Orçamento teste9 - Produção: Marcenaria Santos","description":null,"totalValue":"5444.00","deadline":"2025-10-30T00:00:00.000Z","clientDetails":{"name":"Eduardo De P B Costa e Silva","phone":"(81) 99991-6471","email":"recriarme@gmail.com"},"shippingAddress":"Endereço não informado","items":[{"id":"budget-item-1761543844665-3s7n10ao8","budgetId":"budget-1761543844665-4fu0q38l8","productId":"product-1","productName":"Mesa de Jantar Clássica","producerId":"producer-1","quantity":1,"unitPrice":2500,"totalPrice":2722,"hasItemCustomization":true,"selectedCustomizationId":null,"itemCustomizationValue":0,"itemCustomizationDescription":"","additionalCustomizationNotes":"","customizationPhoto":"","hasGeneralCustomization":true,"generalCustomizationName":"Débora da Costa Manso","generalCustomizationValue":222,"productWidth":null,"productHeight":null,"productDepth":null,"hasItemDiscount":false,"itemDiscountType":"percentage","itemDiscountPercentage":0,"itemDiscountValue":0,"createdAt":"2025-10-27T05:44:04.665Z","updatedAt":"2025-10-27T05:44:04.665Z"}],"photos":[],"producerId":"producer-1","producerName":"Marcenaria Santos"}',
+  producerValue: '800.00',
+  producerValueLocked: false,
+  id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+  acceptedAt: null,
+  completedAt: null,
+  notes: null,
+  hasUnreadNotes: false,
+  lastNoteAt: null,
+  trackingCode: null,
+  producerNotes: null,
+  producerPaymentStatus: 'pending'
+}
+Storage: Created new producer payment for order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd
+Updated producer value for production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd to R$ 800.00 - payment will be created when marked as ready
+5:46:09 AM [express] PATCH /api/production-orders/dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd/value 200 in …
+Fetching production orders for producer: producer-1
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'pending'
+  }
+]
+Found 1 production orders for producer producer-1
+Returning 1 enriched production orders for producer producer-1
+5:46:09 AM [express] GET /api/production-orders/producer/producer-1 200 in 2ms :: [{"orderId":"e720b…
+Updating production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status to: accepted
+Production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status updated successfully to: accepted
+5:46:13 AM [express] PATCH /api/production-orders/dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd/status 200 in…
+Fetching production orders for producer: producer-1
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'accepted'
+  }
+]
+Found 1 production orders for producer producer-1
+Returning 1 enriched production orders for producer producer-1
+5:46:14 AM [express] GET /api/production-orders/producer/producer-1 200 in 1ms :: [{"orderId":"e720b…
+Updating production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status to: production
+Production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status updated successfully to: production
+5:46:17 AM [express] PATCH /api/production-orders/dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd/status 200 in…
+Fetching production orders for producer: producer-1
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'production'
+  }
+]
+Found 1 production orders for producer producer-1
+Returning 1 enriched production orders for producer producer-1
+5:46:17 AM [express] GET /api/production-orders/producer/producer-1 200 in 7ms :: [{"orderId":"e720b…
+Updating production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status to: ready
+Production order dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd status updated successfully to: ready
+5:46:19 AM [express] PATCH /api/production-orders/dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd/status 200 in…
+Fetching production orders for producer: producer-1
+Storage: Getting production orders for producer: producer-1
+Storage: Found 1 production orders for producer producer-1: [
+  {
+    id: 'dd25cac2-5f1c-4f9d-ac3c-dc2f553229dd',
+    orderId: 'e720ba83-ed72-4976-a682-5380cae7c277',
+    status: 'ready'
+  }
+]
+Found 1 production orders for producer producer-1
+Returning 1 enriched production orders for producer producer-1
+5:46:20 AM [express] GET /api/production-orders/producer/producer-1 200 in 1ms :: [{"orderId":"e720b…
+Fetching producer payments for producer: producer-1
+Storage: getProducerPaymentsByProducer for producer-1 returning 1 payments: [
+  {
+    id: 'fac4ac64-5ee5-4b9c-b088-542a44f02733',
+    amount: '800.00',
+    status: 'pending'
+  }
+]
+Found 1 producer payments for producer producer-1
+Returning 1 enriched producer payments for producer producer-1
+5:46:24 AM [express] GET /api/finance/producer-payments/producer/producer-1 200 in 1ms :: [{"id":"fa…
+Login attempt: { username: 'logistica1', preferredRole: 'logistics' }
+Found user: { id: 'logistics-1', username: 'logistica1', role: 'logistics' }
+Login successful for: logistica1 role: logistics
+5:46:33 AM [express] POST /api/auth/login 200 in 1ms :: {"success":true,"user":{"id":"logistics-1","…
+Verifying token: bG9naXN0aWNzLTE6bG9n...
+Decoded token: logistics-1:logistica1:1761543993333
+Token parts - userId: logistics-1 username: logistica1 timestamp: 1761543993333
+User found: logistics-1 - logistica1
+Token verification successful for user: logistica1
+5:46:37 AM [express] GET /api/auth/verify 200 in 1ms :: {"user":{"id":"logistics-1","username":"logi…
+Verifying token: bG9naXN0aWNzLTE6bG9n...
+Decoded token: logistics-1:logistica1:1761543993333
+Token parts - userId: logistics-1 username: logistica1 timestamp: 1761543993333
+User found: logistics-1 - logistica1
+Token verification successful for user: logistica1
+5:46:37 AM [express] GET /api/auth/verify 304 in 1ms :: {"user":{"id":"logistics-1","username":"logi…
+Returning 1 enriched production orders
+5:46:38 AM [express] GET /api/production-orders 200 in 1ms :: [{"orderId":"e720ba83-ed72-4976-a682-5…
+Fetching paid orders ready for production...
+Storage: Getting paid orders ready for production...
+Storage: Found 1 total orders
+Storage: Found 0 paid orders ready for production
+Found 0 paid orders ready for production
+5:46:38 AM [express] GET /api/logistics/paid-orders 304 in 1ms :: []
+Order e720ba83-ed72-4976-a682-5380cae7c277 dispatched with tracking: BR123333333
+5:46:46 AM [express] POST /api/logistics/dispatch-order 200 in 1ms :: {"success":true,"message":"Ped…
+Returning 1 enriched production orders
+5:46:46 AM [express] GET /api/production-orders 200 in 1ms :: [{"orderId":"e720ba83-ed72-4976-a682-5…
+5:47:05 AM [vite] hmr update /src/pages/client/orders.tsx, /src/index.css?v=xbDFPhbGE92L2kRdw8s3l
+5:47:06 AM [vite] hmr update /src/pages/logistics/dashboard.tsx, /src/index.css?v=xbDFPhbGE92L2kRdw8s3l
+5:47:06 AM [vite] Internal server error: /home/runner/workspace/client/src/pages/logistics/dashboard.tsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (1051:8)
+
+  1049 |           </CardContent>
+  1050 |         </Card>
+> 1051 |         </>
+       |         ^
+  1052 |       )}
+  1053 |
+  1054 |
+  Plugin: vite:react-babel
+  File: /home/runner/workspace/client/src/pages/logistics/dashboard.tsx:1051:8
+  1049|            </CardContent>
+  1050|          </Card>
+  1051|          </>
+     |          ^
+  1052|        )}
+  1053|  
+      at toParseError (/home/runner/workspace/node_modules/@babel/parser/src/parse-error.ts:95:45)
+      at raise (/home/runner/workspace/node_modules/@babel/parser/src/tokenizer/index.ts:1497:19)
+      at jsxParseElementAt (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:543:20)
+      at jsxParseElement (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:559:19)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:573:21)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:714:23)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:401:23)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at fn (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3588:23)
+      at tryParse (/home/runner/workspace/node_modules/@babel/parser/src/parser/util.ts:174:20)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3587:20)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:252:12)
+      at allowInAnd (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3117:12)
+      at parseMaybeAssignAllowIn (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:251:17)
+      at parseParenAndDistinguishExpression (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:1771:16)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:1131:21)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:583:22)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:714:23)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOpBaseRightExpr (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:569:12)
+      at parseExprOpRightExpr (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:554:21)
+      at parseExprOp (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:485:27)
+      at parseExprOp (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:2797:20)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:407:17)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3607:22)
+      at parseExpressionBase (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:221:23)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:212:39)
+      at allowInAnd (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3117:12)
+      at parseExpression (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:212:17)
+      at jsxParseExpressionContainer (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:376:33)
+      at jsxParseElementAt (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:500:24)
+      at jsxParseElement (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:559:19)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:573:21)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:714:23)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:401:23)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)

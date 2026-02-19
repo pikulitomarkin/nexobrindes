@@ -1,0 +1,146 @@
+beleza, Débora — cola **exatamente** o prompt abaixo no Agente do Replit. Ele foi feito pra **migrar sozinho** pro Postgres (Drizzle + Neon/Supabase), com **travas de segurança**, gerar/adaptar código, criar migrações, rodar testes de fumaça e abrir PR. É “manda-e-anda” — e se algo falhar, o agente deve **corrigir até passar** antes do PR.
+
+---
+
+### PROMPT PARA O AGENTE DO REPLIT (colar como uma mensagem única)
+
+**Missão:** Migrar este projeto de storage mock/in-memory para **Postgres via Drizzle**, deixando os fluxos principais 100% persistidos no banco, com testes de fumaça automatizados e PR pronto para merge.
+
+**Contexto do repo:**
+
+* Existe `shared/schema.ts` com tabelas Drizzle (pgTable/decimal/timestamp/uuid).
+* Hoje `server/db.ts` exporta `storage` (mock).
+* Queremos trocar para um adapter Postgres com **mesma interface**.
+* Dispomos de **cópia do sistema** (fork/sandbox).
+* **NÃO TOCAR** em produção até o OK final.
+
+---
+
+#### Regras de Ouro (obrigatórias)
+
+1. Trabalhe **apenas** neste fork/sandbox.
+2. Use **`DATABASE_URL` de homolog** do arquivo `.env` do sandbox (eu já vou colocar).
+3. **Não apague dados.** **Não** altere secrets/variáveis de produção.
+4. Qualquer ação destrutiva → **peça minha confirmação** antes.
+5. Ao final, **abra um PR** com todas as mudanças + instruções.
+
+---
+
+#### Objetivos Técnicos
+
+1. **Conectar Postgres (Drizzle + Neon/Supabase):**
+
+   * Criar `server/pgClient.ts` com `drizzle-orm/neon-http` + `@neondatabase/serverless` e import do `schema`.
+   * Usar `process.env.DATABASE_URL`; se ausente, lançar erro claro.
+   * Assumir que usaremos `pgcrypto` para `gen_random_uuid()`; se a migração falhar por isso, imprimir instrução SQL a ser executada:
+     `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
+
+2. **Adapter Postgres:**
+
+   * Criar/atualizar `server/storage.pg.ts` implementando **o mesmo contrato** do `IStorage` atual (veja `server/storage.ts`), cobrindo no mínimo:
+
+     * `users`, `clients`, `orders`, `payments`
+     * **e também**: `productionOrders`, `commissions`, `budgets`, `budgetItems`, `budgetPhotos`, `paymentMethods`, `shippingMethods`
+   * Cada método deve usar Drizzle (`select/insert/update`) e **manter a mesma assinatura e semântica** já usada pelo app.
+
+3. **Money/DECIMAL seguro:**
+
+   * Criar `server/money.ts` com Decimal.js (instalar dependência) para somas/subtrações de **valores decimais**.
+   * **Proibir `parseFloat` em dinheiro**; padronizar uso do helper em todas as atualizações de totais (ex.: `paidValue`, `refundAmount`, etc.).
+
+4. **Export do DB unificado (sem quebrar imports existentes):**
+
+   * Em `server/db.ts`, exportar o adapter como `db` (ex.: `export { pgStorage as db } from "./storage.pg"`), além de reexportar `eq/desc/sql` e os tipos/tabelas do `schema` como já é feito hoje.
+   * Se existirem trechos no projeto que usam query builder direto, também exportar `export { pg as query } from "./pgClient"`.
+
+5. **Migrações Drizzle:**
+
+   * Rodar `npx drizzle-kit generate` e `npx drizzle-kit push`.
+   * Se falhar por extensão UUID, imprimir instrução para eu executar no banco e **tentar novamente**.
+
+6. **Seeds mínimos:**
+
+   * Criar `server/seed.ts` que só cria um usuário admin padrão **se** a tabela estiver vazia.
+
+7. **Corrigir duplicidades de build**:
+
+   * Caso existam erros do tipo “símbolo já declarado / múltiplas exports” (p.ex. `registerRoutes`, `upload`, `requireAuth`) em `server/routes.ts`, **resolver refactorizando** para ter **apenas uma** definição/`export`. O build deve compilar limpo.
+
+8. **Testes de Fumaça automatizados (sem frameworks pesados):**
+
+   * Criar `scripts/smoke.sh` (bash) com `set -e` que:
+
+     1. Sobe o servidor (em segundo plano) com `NODE_ENV=development`.
+     2. Faz requisições HTTP reais (via `curl`) que validem o pipeline:
+
+        * Criar usuário admin (se não existir) ou logar.
+        * Criar `client`.
+        * Criar `order` para esse client.
+        * Criar `budget` + `budgetItems` associados.
+        * Registrar `payment` (e verificar que `paidValue` do `order` aumentou).
+        * Criar/atualizar `productionOrders` (alterar status e conferir).
+        * Criar `commissions` (se o negócio assim prevê) e conferir retorno.
+     3. Checar respostas (status 2xx e chaves esperadas no JSON).
+     4. Derrubar o servidor no final.
+   * No README, documentar como rodar: `bash scripts/smoke.sh`.
+
+9. **Documentação e PR:**
+
+   * Adicionar `README_MIGRATION.md` com:
+
+     * Variáveis de ambiente (`DATABASE_URL`, `NODE_ENV`).
+     * Extensão `pgcrypto` necessária.
+     * Comandos: `npm i decimal.js`, `drizzle-kit generate/push`, `tsx server/seed.ts`.
+     * Como rodar local, como executar `scripts/smoke.sh`.
+     * **Cutover**: apontar `DATABASE_URL` de produção e repetir `drizzle-kit push`.
+     * **Rollback**: voltar `server/db.ts` ao mock e remover `DATABASE_URL` (passo a passo).
+   * Abrir **Pull Request** com: diffs, logs de migração, resultado do `scripts/smoke.sh` (copiar saída), e checklist marcado.
+
+---
+
+#### Comandos que você (Agente) pode executar
+
+* Instalar dependências necessárias: `npm i decimal.js`
+* Migrações: `npx drizzle-kit generate && npx drizzle-kit push`
+* Seeds: `npx tsx server/seed.ts`
+* Rodar servidor: `NODE_ENV=development npx tsx server/index.ts`
+* Teste de fumaça: `bash scripts/smoke.sh`
+* Criar/editar arquivos e abrir PR
+
+---
+
+#### Critérios de Aceite (o PR só pode ser aberto quando tudo abaixo estiver verde)
+
+* Build compila **sem** erros/duplicidades.
+* `drizzle-kit push` aplicado no banco de **homolog**.
+* `scripts/smoke.sh` roda **sem falhas**, validando:
+
+  * CRUD de **users/clients/orders/payments**
+  * **budgets/budgetItems/budgetPhotos**
+  * **productionOrders** (troca de status)
+  * **commissions** (criação/consulta conforme regra do projeto)
+  * Atualização correta de **totais/paidValue** (DECIMAL via helper)
+* `README_MIGRATION.md` atualizado com cutover/rollback e comandos.
+* PR aberto com as mudanças e logs dos passos.
+
+---
+
+#### Proibido
+
+* Editar secrets/variáveis de **produção**.
+* Rodar `DROP` ou comandos destrutivos sem minha aprovação.
+* Introduzir bibliotecas grandes de teste; usar `curl`/bash é suficiente aqui.
+
+**Fim do prompt.**
+
+---
+
+### Como você usa isso agora
+
+1. No **fork** (ou cópia) do seu Replit, coloque no `.env` a **DATABASE_URL de homolog**.
+2. Abra o **Agente do Replit** e cole o prompt acima.
+3. Deixa ele rodar. Se pedir para executar `CREATE EXTENSION pgcrypto`, você roda isso **uma vez** na sua DB de homolog e manda ele continuar.
+4. Quando ele abrir o PR, você revisa diffs e checa o log do `scripts/smoke.sh`.
+5. Estando verde, faz **cutover**: aponta `DATABASE_URL` da **produção**, roda `npx drizzle-kit push` em prod, sobe e faz um mini-smoke (criar cliente/pedido/pagamento real de teste).
+
+Se quiser, eu também posso te entregar aqui um **`scripts/smoke.sh`** pronto (com endpoints genéricos) pra ele só adaptar as rotas. Quer?

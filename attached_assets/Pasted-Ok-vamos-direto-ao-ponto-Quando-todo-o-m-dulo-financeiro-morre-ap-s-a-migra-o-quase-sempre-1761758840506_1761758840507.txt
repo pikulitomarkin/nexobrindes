@@ -1,0 +1,144 @@
+Ok, vamos direto ao ponto. Quando **todo o módulo financeiro “morre”** após a migração, quase sempre é combinação de 3 coisas:
+
+1. **Esquema do Postgres ≠ `shared/schema.ts`** (colunas faltando)
+2. **Adapter/rotas ainda usando o mock** ou não aplicando os defaults de pagamento
+3. **Pré-requisitos do fluxo** não atendidos (ex.: *método de pagamento* inexistente → o front envia `method = null` e o backend quebra / ignora)
+
+A correção rápida e certeira é este check-list (segue com comandos e patches):
+
+---
+
+## 0) Confirme se você está falando com a MESMA DB
+
+* O `DATABASE_URL` usado pelo servidor **é o mesmo** que você usa para rodar `drizzle-kit push`?
+  Se não for o mesmo, o app vê uma tabela sem colunas e vai falhar tudo.
+
+---
+
+## 1) Sincronize o esquema (faltam colunas no `payments` e cia.)
+
+Rode **nesta mesma DB**:
+
+```bash
+npx drizzle-kit generate
+npx drizzle-kit push
+```
+
+Se preferir SQL rápido (enquanto isso), rode:
+
+```sql
+-- payments: garantir colunas usadas pelo código
+ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS reconciliation_status text NOT NULL DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS bank_transaction_id varchar;
+
+-- (faça o mesmo para qualquer "column does not exist" que aparecer: veja a msg, adicione com NOT NULL/DEFAULT conforme está no schema.ts)
+```
+
+> Se surgir erro de `gen_random_uuid`, rode:
+> `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
+
+---
+
+## 2) Garanta **métodos de pagamento** ativos
+
+Na tua UI o campo “Método” aparece — se não houver nenhum método cadastrado, o front envia `null` e o backend rejeita/silencia. Crie um método simples:
+
+```sql
+INSERT INTO payment_methods (id, name, type, is_active, created_at)
+VALUES (gen_random_uuid(), 'PIX', 'pix', true, now());
+```
+
+(ou use o endpoint/tela de “Métodos de Pagamento” e ative pelo sistema)
+
+---
+
+## 3) Garanta que o back realmente usa o Postgres
+
+Abra `server/db.ts` e confirme que **NÃO** exporta mais o mock:
+
+```ts
+// certo:
+export { pgStorage as db } from "./storage.pg";
+```
+
+Se estiver exportando `storage`/mock, o dashboard nunca vai refletir os pagamentos.
+
+---
+
+## 4) Patch em `createPayment` (defaults + atualização coerente)
+
+Mesmo com o schema certo, o “Receber pagamento” precisa gravar como **confirmado** e marcar `paidAt`; se ficar “pending”, o dashboard costuma **não** somar.
+
+No `server/storage.pg.ts`, ajuste o método **`createPayment`** para algo assim:
+
+```ts
+async createPayment(payment: InsertPayment): Promise<Payment> {
+  // defaults seguros
+  const payload = {
+    ...payment,
+    status: payment.status ?? 'confirmed',   // <- confirmado ao receber
+    paidAt: payment.paidAt ?? new Date(),    // <- marca data
+    createdAt: new Date(),
+  };
+
+  // transação: insere pagamento e atualiza total pago do pedido
+  const [newPayment] = await pg.insert(schema.payments).values(payload).returning();
+
+  const order = await this.getOrder(newPayment.orderId);
+  if (order) {
+    const newPaidValue = addMoney(order.paidValue || "0.00", newPayment.amount);
+    // (opcional) clamp para não passar do total:
+    // const clamped = compareMoney(newPaidValue, order.totalValue) > 0 ? toMoneyString(order.totalValue) : newPaidValue;
+    await this.updateOrder(order.id, { paidValue: newPaidValue });
+  }
+
+  return newPayment;
+}
+```
+
+> Se houver um endpoint “**Confirmar recebimento**” que chama `updatePaymentStatus`, garanta que ele muda para `'confirmed'` e preenche `paidAt`.
+
+---
+
+## 5) Dashboard / Contas a receber — regras de agregação
+
+O dashboard geralmente soma **somente pagamentos `status='confirmed'`**.
+Então, depois do patch acima, ao **Receber Pagamento**:
+
+* grava `status='confirmed'`
+* atualiza `orders.paid_value`
+* o dashboard sobe automaticamente
+
+Se o dashboard ainda não subir:
+
+* verifique a query do dashboard (em `routes.ts`): ela filtra por `status='confirmed'`? Está consultando as tabelas novas?
+* **dica de teste rápido**: faça um `SELECT * FROM payments ORDER BY created_at DESC;` e veja se o registro apareceu com método, status e paidAt.
+
+---
+
+## 6) Teste de fumaça ultra-rápido
+
+Faça este mini-roteiro (pode ser via telas):
+
+1. Cadastre/ative **1 método de pagamento** (ex.: PIX).
+2. Crie um **orçamento** → **converta para pedido**.
+3. Em **Contas a Receber**, clique **Receber**:
+
+   * “Valor Recebido” > 0
+   * “Método” = PIX (ou o que cadastrou)
+   * Confirmar → deve gravar sem erro
+4. Atualize a tela do dashboard: os **totais** devem mudar; o pedido deve ter `paidValue` atualizado.
+
+Se qualquer passo falhar com erro de coluna, repita o **Passo 1** (migração/SQL) para aquela coluna faltante — é sinal de que a tabela não está totalmente sincronizada com o `schema.ts`.
+
+---
+
+### Resumo do “onde está o erro” no seu caso
+
+* **Schema não aplicado** (vimos a falta de `reconciliation_status` → quebra geral de pagamentos).
+* **Método de pagamento** possivelmente `null` (dropdown sem opções) → backend rejeita.
+* **Status/paidAt** não setados como “confirmado” ao receber → dashboard não soma.
+
+Aplique os 6 passos acima e isso volta a andar.
+Se quiser, me diga se você prefere que eu gere **um SQL único** que sincronize todas as colunas críticas de `payments`, `accounts_receivable`, `payment_allocations` e eu já te mando o script completo pra colar no editor do banco.

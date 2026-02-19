@@ -1,0 +1,40 @@
+Preciso que você me ajude a DIAGNOSTICAR (sem refatorar agora) uma divergência/inflação na formação de preço no projeto ERPProdutormigrar. Responda com evidências (trechos de código, valores reais e logs curtos) para eu enviar ao meu consultor (ChatGPT) que vai fazer o patch.
+
+CONTEXTO / REGRA
+Preço de venda = Custo do Produto / (1 - Imposto% - Comissão% - Margem%).
+A Margem% vem das Faixas de Margem por Faturamento (tiers) conforme o total do orçamento.
+O preço exibido em Produtos (Admin) deve ser o MESMO preço aplicado ao adicionar no Orçamento (Admin e Vendedor). Estou achando “caro”.
+
+O QUE VOCÊ DEVE FAZER (PASSO ÚNICO, MAS COMPLETO):
+1) Encontre e cole os trechos exatos (arquivo + função) onde o preço é calculado/exibido em:
+   a) client/src/pages/admin/products.tsx (lista/preview de preço)
+   b) client/src/pages/admin/budgets.tsx (quando adiciona produto ao orçamento e/or item do orçamento)
+   c) client/src/pages/vendor/budgets.tsx (mesma coisa)
+   d) Qualquer util/endpoint de backend que calcule preço (ex.: /api/pricing/calculate)
+   -> Para cada um, descreva em 2 linhas: quais campos usa (costPrice/basePrice) e qual fórmula aplica.
+
+2) Verifique se existe rotina que “migra” ou “recalcula” preços no banco, especialmente algo que faça:
+   - cost_price = base_price quando cost_price está 0/NULL
+   - ou qualquer update em massa envolvendo cost_price/base_price
+   Procure por: recalculate, migrate, update cost, base_price, cost_price, pricing.
+   -> Cole a função/rota exata e diga quando é chamada (manual? cron? botão? startup?).
+
+3) Faça um diagnóstico com DADOS REAIS (IMPORTANTE):
+   - Pegue 3 produtos reais do banco (ou do seed) e imprima: id, name, basePrice, costPrice.
+   - Diga quantos produtos estão com costPrice == basePrice (se possível, conte).
+   - Pegue as pricing settings atuais (taxRate, commissionRate, discount/cash se existir) e imprima os valores.
+   - Pegue as margin tiers atuais (faixas, margem lucro, margem mínima, order) e imprima.
+
+4) Prove a matemática em 1 exemplo:
+   - Escolha 1 desses produtos e calcule manualmente:
+     costPrice, tax, commission, margin, divisor e salePrice final (com 2 casas).
+   - Compare:
+     a) preço mostrado na lista de Produtos
+     b) preço aplicado ao adicionar no Orçamento (Admin)
+     c) preço aplicado ao adicionar no Orçamento (Vendedor)
+   -> Se diferir, diga exatamente qual parte do cálculo/inputs difere.
+
+5) Não faça refatoração ainda. Apenas responda com:
+   - “CAUSA MAIS PROVÁVEL” (1 parágrafo)
+   - “EVIDÊNCIAS” (bullets com prints/valores e trechos)
+   - “ONDE CORRIGIR” (lista de arquivos/funções que precisam unificar)

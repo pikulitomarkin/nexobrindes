@@ -1,0 +1,305 @@
+import React, { useState } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  Users,
+  ShoppingCart,
+  Package,
+  Factory,
+  CreditCard,
+  FileText,
+  DollarSign,
+  Menu,
+  X,
+  Home,
+  Monitor,
+  Settings,
+  LogOut,
+  ClipboardList,
+  MessageCircle,
+  BarChart3,
+  Calculator,
+  User,
+  Building2,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Logo } from "@/components/ui/logo";
+
+interface MainLayoutProps {
+  children: React.ReactNode;
+}
+
+export default function MainLayout({ children }: MainLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [currentRole, setCurrentRole] = useState(user.role || "admin");
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    toast({
+      title: "Logout realizado com sucesso",
+      description: "Você foi desconectado do sistema.",
+    });
+    setLocation("/login");
+  };
+
+  const roleOptions = [
+    { value: "admin", label: "Administrador" },
+    { value: "vendor", label: "Vendedor" },
+    { value: "client", label: "Cliente" },
+    { value: "producer", label: "Produtor" },
+    { value: "finance", label: "Financeiro" },
+    { value: "logistics", label: "Logística" },
+    { value: "partner", label: "Sócio" }, // Added partner role
+  ];
+
+  // Define navigation items for each role
+  const adminNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/admin/orders", icon: ShoppingCart, label: "Pedidos" },
+    { href: "/admin/budgets", icon: Calculator, label: "Orçamentos" },
+    { href: "/admin/budget-approvals", icon: AlertTriangle, label: "Para Autorização" },
+    { href: "/admin/products", icon: Package, label: "Produtos" },
+    { href: "/admin/producers", icon: Factory, label: "Produtores" },
+    { href: "/admin/clients", icon: Users, label: "Clientes" },
+    { href: "/admin/vendors", icon: ShoppingCart, label: "Vendedores" },
+    { href: "/admin/partners", icon: User, label: "Sócios" },
+    { href: "/admin/branches", icon: Building2, label: "Filiais" },
+    { href: "/admin/users", icon: Users, label: "Usuários" },
+    { href: "/admin/logistics", icon: Package, label: "Logística" },
+    { href: "/admin/customizations", icon: Settings, label: "Personalizações" },
+    { href: "/admin/settings", icon: Settings, label: "Configurações" },
+    { href: "/admin/pricing", icon: Calculator, label: "Formação de Preço" },
+    { href: "/admin/commission-management", icon: DollarSign, label: "Gestão de Comissões" },
+    { href: "/admin/reports", icon: FileText, label: "Relatórios" },
+    { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV" },
+    { href: "/admin/logs", icon: ClipboardList, label: "Logs do Sistema" },
+    { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+  ];
+
+  const partnerNavigation = [
+    { href: "/partner/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/partner/commission-management", icon: DollarSign, label: "Minhas Comissões" },
+    { href: "/partner/orders", icon: ShoppingCart, label: "Pedidos" },
+    { href: "/partner/budgets", icon: Calculator, label: "Orçamentos" },
+    { href: "/partner/products", icon: Package, label: "Produtos" },
+    { href: "/partner/producers", icon: Factory, label: "Produtores" },
+    { href: "/partner/clients", icon: Users, label: "Clientes" },
+    { href: "/partner/vendors", icon: ShoppingCart, label: "Vendedores" },
+    { href: "/partner/partners", icon: User, label: "Sócios" },
+    { href: "/partner/branches", icon: Building2, label: "Filiais" },
+    { href: "/partner/logistics", icon: Package, label: "Logística" },
+    { href: "/partner/customizations", icon: Settings, label: "Personalizações" },
+    { href: "/partner/settings", icon: Settings, label: "Configurações" },
+    { href: "/partner/reports", icon: FileText, label: "Relatórios" },
+    { href: "/admin/tv-dashboard", icon: Monitor, label: "Dash TV" },
+    { href: "/partner/logs", icon: ClipboardList, label: "Logs do Sistema" },
+    { href: "/finance", icon: DollarSign, label: "Módulo Financeiro" },
+  ];
+
+  const isVendorCommissioned = user.isCommissioned !== false;
+  
+  const vendorNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/vendor/products", icon: Package, label: "Catálogo" },
+    { href: "/vendor/quote-requests", icon: MessageCircle, label: "Solicitações" },
+    { href: "/vendor/budgets", icon: FileText, label: "Orçamentos" },
+    { href: "/vendor/orders", icon: ShoppingCart, label: "Pedidos" },
+    { href: "/vendor/clients", icon: Users, label: "Clientes" },
+    ...(isVendorCommissioned ? [{ href: "/vendor/commissions", icon: DollarSign, label: "Comissões" }] : []),
+    { href: "/vendor/logs", icon: ClipboardList, label: "Meus Logs" },
+  ];
+
+  const clientNavigation = [
+    { href: "/client/dashboard", icon: BarChart3, label: "Dashboard" },
+    { href: "/client/products", icon: Package, label: "Catálogo" },
+    { href: "/client/orders", icon: ShoppingCart, label: "Meus Pedidos" },
+    { href: "/client/budgets", icon: Calculator, label: "Meus Orçamentos" },
+    { href: "/client/profile", icon: User, label: "Meu Perfil" },
+  ];
+
+  const producerNavigation = [
+    { href: "/producer/production-dashboard", icon: Home, label: "Painel de Produção" },
+    { href: "/producer/receivables", icon: CreditCard, label: "Contas a Receber" },
+  ];
+
+  const financeNavigation = [
+    { href: "/", icon: Home, label: "Dashboard" },
+    { href: "/finance/receivables", icon: DollarSign, label: "Contas a Receber" },
+    { href: "/finance/commission-payouts", icon: Users, label: "Pagamentos de Comissão" },
+    { href: "/finance/reconciliation", icon: CreditCard, label: "Conciliação Bancária" },
+    { href: "/finance/payments", icon: Package, label: "Pagamentos" },
+  ];
+
+  const logisticsNavigation = [
+    { href: "/logistics/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/logistics/paid-orders", icon: DollarSign, label: "Pedidos" },
+    { href: "/logistics/production-tracking", icon: Factory, label: "Acompanhar Produção" },
+    { href: "/logistics/shipments", icon: Package, label: "Despachos" },
+    { href: "/logistics/products", icon: Package, label: "Produtos" },
+    { href: "/logistics/producers", icon: Factory, label: "Produtores" },
+  ];
+
+  const getMenuItems = () => {
+    switch (currentRole) {
+      case "admin":
+        return adminNavigation;
+      case "partner":
+        return partnerNavigation;
+      case "vendor":
+        return vendorNavigation;
+      case "client":
+        return clientNavigation;
+      case "producer":
+        return producerNavigation;
+      case "finance":
+        return financeNavigation;
+      case "logistics":
+        return logisticsNavigation;
+      default:
+        return [];
+    }
+  };
+
+  const menuItems = getMenuItems();
+
+  // Define role labels
+  const roleLabels = {
+    admin: "Administrador",
+    vendor: "Vendedor",
+    client: "Cliente",
+    producer: "Produtor",
+    partner: "Sócio",
+    finance: "Financeiro",
+    logistics: "Logística"
+  };
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar with gradient */}
+      <div className={`
+        w-64 bg-gradient-to-br from-blue-600 via-blue-700 to-teal-500 shadow-2xl flex-shrink-0
+        fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/20 bg-white flex-shrink-0">
+            <Logo size="sm" variant="full" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden text-gray-600 hover:bg-gray-100 p-1"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          </div>
+
+          {/* User Info */}
+          <div className="p-4 sm:p-6 border-b border-white/20 flex-shrink-0">
+            <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
+              {user.name || "Usuário"}
+            </div>
+            <div className="text-xs text-white/70 truncate">
+              {roleLabels[currentRole as keyof typeof roleLabels] || "Usuário"}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-4 sm:p-6 overflow-y-auto">
+            <ul className="space-y-1 sm:space-y-2">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.href;
+
+                return (
+                  <li key={item.href}>
+                    <Link href={item.href}>
+                      <div
+                        className={`
+                          flex items-center px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer
+                          ${isActive
+                            ? 'bg-white text-blue-600 shadow-lg'
+                            : 'text-white/90 hover:bg-white/10 hover:text-white'
+                          }
+                        `}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <Icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
+                        <span className="truncate text-xs sm:text-sm">{item.label}</span>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-white/20 flex-shrink-0">
+            <div className="text-xs text-white/70 text-center">
+              {roleOptions.find(role => role.value === currentRole)?.label}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="bg-white shadow-sm border-b px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden p-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+              </Button>
+              <div className="lg:hidden">
+                <Logo size="sm" variant="icon" />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">
+                {roleOptions.find(role => role.value === currentRole)?.label}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-red-600 hover:border-red-300 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm"
+              >
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
+          <div className="max-w-full overflow-x-auto">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,104 @@
+Beleza — aqui vai um texto **pronto pra você colar no Replit Agent**, explicando **exatamente o que foi feito** e **o que ele precisa aplicar** (sem mandar o projeto todo).
+
+---
+
+## Prompt/instrução para o Replit aplicar as mudanças
+
+```text
+Quero que você aplique um patch para corrigir a formação de preço e garantir consistência entre:
+- Admin > Produtos (preço exibido)
+- Admin > Orçamentos (preço ao adicionar item)
+- Vendedor > Orçamentos (preço ao adicionar item)
+
+PROBLEMA (CAUSA)
+92% dos produtos estão com costPrice == basePrice, então o sistema estava aplicando markup divisor em cima de preço já pronto (juros sobre juros), inflando valores.
+
+REGRA NOVA (SEGURA)
+1) Se costPrice estiver 0/nulo OU costPrice == basePrice:
+   -> tratar basePrice como preço FINAL e NÃO aplicar fórmula novamente.
+2) Só aplicar fórmula (salePrice = costPrice / divisor) quando costPrice for um custo REAL diferente de basePrice.
+
+OBJETIVO
+O preço mostrado em Produtos precisa ser o mesmo preço aplicado ao adicionar o produto em Orçamentos (admin e vendedor).
+
+ALTERAÇÕES APLICADAS (PASSO A PASSO)
+
+PASSO 1 — Criar util único de cálculo no FRONT
+Crie o arquivo:
+client/src/lib/pricingCalc.ts
+
+Esse util deve exportar uma função do tipo:
+getProductSalePrice({
+  costPrice,
+  basePrice,
+  taxRate,
+  commissionRate,
+  marginTiers,
+  revenueTotal
+})
+
+Comportamento:
+- Escolhe a tier de margem correta pelo revenueTotal
+- Calcula divisor = 1 - tax - commission - margin
+- Se (costPrice <= 0) OU (basePrice > 0 e costPrice == basePrice):
+    retorna { salePrice: basePrice, source: "base" }
+  senão:
+    retorna { salePrice: costPrice/divisor arredondado 2 casas, source: "computed" }
+
+Sem usar "||" pra fallback (use isNaN pra validar taxas).
+
+PASSO 2 — Admin Produtos deve usar o util
+Em:
+client/src/pages/admin/products.tsx
+
+Troque a lógica de preview/cálculo de preço para usar getProductSalePrice(...) com revenueTotal = 0.
+Assim o preço exibido respeita a regra “não recalcular se cost==base”.
+
+PASSO 3 — Admin Orçamentos deve usar o mesmo util ao adicionar item
+Em:
+client/src/pages/admin/budgets.tsx
+
+No fluxo de “adicionar produto ao orçamento”:
+- Determine currentRevenue (total do orçamento)
+- Calcule o unitPrice usando getProductSalePrice(..., revenueTotal=currentRevenue)
+- Se a função retornar source="base", não aplicar recálculo de markup por faturamento (porque já é preço final).
+- Se source="computed", pode manter recálculo por faturamento normalmente.
+
+PASSO 4 — Vendedor Orçamentos idem
+Em:
+client/src/pages/vendor/budgets.tsx
+
+Faça exatamente a mesma mudança do admin:
+- unitPrice vem do getProductSalePrice(...)
+- não recalcular markup se source="base"
+
+PASSO 5 — Corrigir a rotina “Recalcular Preços” (não destruir custo)
+Em:
+server/storage.pg.ts (função recalculateProductPrices)
+
+ANTES: atualizava cost_price = base_price quando cost_price era 0/nulo (isso contaminou custos).
+AGORA: NUNCA sobrescrever cost_price.
+Se precisar preencher algo, só preencher base_price quando estiver vazio, usando cost_price como origem (opcional).
+O importante é: remover qualquer update em massa que iguale cost_price e base_price.
+
+VERIFICAÇÃO (TESTE RÁPIDO)
+1) Pegue 1 produto e anote o preço exibido em Admin > Produtos.
+2) Adicione o mesmo produto num orçamento no Admin -> unitPrice deve ser igual ao exibido em Produtos.
+3) Faça o mesmo no painel do Vendedor -> unitPrice deve ser igual também.
+4) Confirme que produtos com costPrice==basePrice NÃO inflaram.
+
+APLIQUE AS MUDANÇAS e mostre:
+- arquivos alterados
+- trechos modificados
+- e confirme que a rota de “recalcular preços” não muda mais o cost_price.
+```
+
+---
+
+## Como você usa isso
+
+1. Abre o Replit → Agent
+2. Cola esse texto acima
+3. Manda executar
+
+Se o Agent responder com dúvidas (ex.: “onde estão as tiers / settings?”), você cola aqui a resposta dele e eu ajusto a instrução ou já te dou o patch exato pra ele aplicar.
