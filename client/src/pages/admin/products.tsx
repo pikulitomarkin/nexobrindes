@@ -874,9 +874,9 @@ export default function AdminProducts() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {product.code ? (
+                      {product.friendlyCode ? (
                         <Badge variant="outline" className="font-mono text-[10px] py-0.5 px-2 text-purple-600 border-purple-200 bg-purple-50">
-                          {product.code}
+                          {product.friendlyCode}
                         </Badge>
                       ) : (
                         <span className="text-gray-400 text-xs">-</span>
