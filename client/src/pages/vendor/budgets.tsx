@@ -517,8 +517,16 @@ export default function VendorBudgets() {
       if (!response.ok) throw new Error("Erro ao criar orçamento");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.setQueryData(["/api/budgets/vendor", vendorId], (old: any) => {
+        if (!old) return [data];
+        const exists = old.find((b: any) => b.id === data.id);
+        if (exists) {
+          return old.map((b: any) => b.id === data.id ? data : b);
+        }
+        return [data, ...old];
+      });
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");
@@ -548,8 +556,12 @@ export default function VendorBudgets() {
       if (!response.ok) throw new Error("Erro ao atualizar orçamento");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/vendor", vendorId] });
+      queryClient.setQueryData(["/api/budgets/vendor", vendorId], (old: any) => {
+        if (!old) return [data];
+        return old.map((b: any) => b.id === data.id ? data : b);
+      });
       setIsBudgetDialogOpen(false);
       resetBudgetForm();
       setBudgetProductSearch("");

@@ -64,7 +64,7 @@ export default function AdminBudgets() {
   });
 
   const { data: budgets, isLoading } = useQuery({
-    queryKey: ["/api/budgets/admin"],
+    queryKey: ["/api/budgets"],
     queryFn: async () => {
       const response = await fetch('/api/budgets');
       if (!response.ok) throw new Error('Failed to fetch budgets');
@@ -560,8 +560,16 @@ export default function AdminBudgets() {
       if (!response.ok) throw new Error("Erro ao criar orçamento");
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.setQueryData(["/api/budgets"], (old: any) => {
+        if (!old) return [data];
+        const exists = old.find((b: any) => b.id === data.id);
+        if (exists) {
+          return old.map((b: any) => b.id === data.id ? data : b);
+        }
+        return [data, ...old];
+      });
       setIsCreateDialogOpen(false);
       resetAdminBudgetForm();
       setBudgetProductSearch("");
@@ -592,8 +600,12 @@ export default function AdminBudgets() {
       if (!response.ok) throw new Error("Erro ao atualizar orçamento");
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.setQueryData(["/api/budgets"], (old: any) => {
+        if (!old) return [data];
+        return old.map((b: any) => b.id === data.id ? data : b);
+      });
       setIsCreateDialogOpen(false);
       resetAdminBudgetForm();
       setBudgetProductSearch("");
@@ -617,7 +629,11 @@ export default function AdminBudgets() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      queryClient.setQueryData(["/api/budgets"], (old: any) => {
+        if (!old) return old;
+        return old.filter((b: any) => b.id !== budgetId);
+      });
       toast({
         title: "Sucesso!",
         description: "Orçamento excluído com sucesso",
@@ -652,7 +668,7 @@ export default function AdminBudgets() {
     },
     onSuccess: () => {
       // Invalidar múltiplas queries para garantir atualização
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/receivables"] });
@@ -688,7 +704,7 @@ export default function AdminBudgets() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/admin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       if (data.whatsappUrl) {
         window.open(data.whatsappUrl, '_blank');
       }
