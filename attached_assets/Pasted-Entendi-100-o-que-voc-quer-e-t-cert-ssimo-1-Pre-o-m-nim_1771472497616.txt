@@ -1,0 +1,154 @@
+Entendi 100% o que você quer (e tá certíssimo):
+
+1. **“Preço mínimo” NÃO pode ficar aparecendo sempre.**
+   Ele só deve aparecer **quando o vendedor digitar um valor abaixo do mínimo** (ex.: digitou 25 e o mínimo é 28). Se estiver acima, fica **silencioso**.
+
+2. **Fluxo de aprovação** (abaixo do mínimo) tem que funcionar e **na edição não pode zerar nada**.
+   Hoje, no seu `vendor/budgets.tsx`, o bug do “zerado” acontece porque na edição ele faz `parseFloat(...) || 0` em campos que às vezes vêm como `"R$ 43,95"` ou `"43,95"` (com vírgula). `parseFloat("R$ 43,95")` vira `NaN` → cai no `|| 0` → **zera tudo**.
+
+Abaixo vai exatamente **o que você manda pro Replit aplicar** (passo a passo, com onde olhar e o que alterar).
+
+---
+
+## ✅ PATCH 1 — “Preço mínimo” só aparece quando estiver abaixo
+
+**Arquivo:** `client/src/pages/vendor/budgets.tsx`
+**Trecho atual (você tem isso hoje):**
+
+```tsx
+{item.minimumPrice > 0 && item.unitPrice >= item.minimumPrice && (
+  <p className="text-xs text-green-600">✓ Mín: R$ {item.minimumPrice.toFixed(2)}</p>
+)}
+{item.minimumPrice > 0 && item.unitPrice < item.minimumPrice && (
+  <p className="text-xs text-red-600">✗ Abaixo do mín: R$ {item.minimumPrice.toFixed(2)}</p>
+)}
+```
+
+✅ **Trocar por isso (somente aparece quando estiver abaixo):**
+
+```tsx
+{item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice && (
+  <p className="text-xs text-red-600">
+    ✗ Abaixo do mínimo: R$ {item.minimumPrice.toFixed(2)}
+  </p>
+)}
+```
+
+> Resultado: se o vendedor está no preço normal, **não aparece nada**. Só aparece quando ele “força” abaixo do mínimo.
+
+---
+
+## ✅ PATCH 2 — Corrigir edição “zerando tudo” (parseFloat quebrando com vírgula / R$)
+
+**Arquivo:** `client/src/pages/vendor/budgets.tsx`
+**Função:** `handleEditBudget` (onde monta `itemsArray`)
+
+### 2.1) Criar helper de conversão (logo acima do handleEditBudget)
+
+Cole isso perto do topo do componente (antes de `handleEditBudget`):
+
+```ts
+const toNumber = (v: any) => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+  const s = String(v)
+    .replace("R$", "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")   // remove separador de milhar
+    .replace(",", ".");   // vírgula decimal
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+```
+
+### 2.2) Trocar os parseFloat / parseInt que derrubam pra 0
+
+Dentro do `.map((item) => { ... })` em `itemsArray`, troque estes campos:
+
+**ANTES:**
+
+```ts
+quantity: parseInt(item.quantity) || 1,
+unitPrice: parseFloat(item.unitPrice) || 0,
+totalPrice: parseFloat(item.totalPrice) || 0,
+itemCustomizationValue: parseFloat(item.itemCustomizationValue) || 0,
+generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
+itemDiscountPercentage: parseFloat(item.itemDiscountPercentage) || 0,
+itemDiscountValue: parseFloat(item.itemDiscountValue) || 0,
+```
+
+✅ **DEPOIS (robusto com “R$”, vírgula, etc):**
+
+```ts
+quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+unitPrice: toNumber(item.unitPrice),
+totalPrice: toNumber(item.totalPrice),
+itemCustomizationValue: toNumber(item.itemCustomizationValue),
+generalCustomizationValue: toNumber(item.generalCustomizationValue),
+itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+itemDiscountValue: toNumber(item.itemDiscountValue),
+```
+
+> Isso mata o bug do “zerou tudo” na raiz.
+
+---
+
+## ✅ PATCH 3 — Garantir que o fluxo de aprovação está consistente na edição
+
+### O que precisa conferir (e ajustar se necessário)
+
+No mesmo arquivo `vendor/budgets.tsx`, já existe esta lógica:
+
+* Se algum item ficar abaixo do mínimo → `requiresApproval = true`
+* No backend, no `PUT /api/budgets/:id`, quando `requiresApproval` true → status vira `awaiting_approval`
+
+✅ Isso está certo.
+
+**Mas** depois que o admin rejeita (`not_approved`) e o vendedor edita, você precisa garantir que:
+
+* ao **corrigir os preços** e salvar, o `requiresApproval` volte false
+* e o backend devolva o status pra `draft` (o código já faz isso)
+
+✅ No seu backend isso já está aqui e está correto:
+
+```ts
+if (budgetMetadata.requiresApproval) {
+  budgetMetadata.status = 'awaiting_approval';
+} else if (existingBudget && (existingBudget.status === 'not_approved' || existingBudget.status === 'awaiting_approval')) {
+  budgetMetadata.status = 'draft';
+}
+```
+
+O que estava quebrando seu fluxo **na prática** era a edição “zerada” → o vendedor salvava com zeros → o orçamento ficava inválido/louco. Corrigindo o parse, o fluxo volta a fazer sentido.
+
+---
+
+# Texto pronto pra você colar pro Replit (pra ele aplicar exatamente)
+
+```text
+Aplique três correções no projeto:
+
+1) client/src/pages/vendor/budgets.tsx
+Na renderização do item (campo Preço Unitário), NÃO exibir mais "✓ Mín: R$..." quando o preço está acima do mínimo.
+Deixar aparecer SOMENTE quando unitPrice < minimumPrice (mensagem vermelha).
+
+2) client/src/pages/vendor/budgets.tsx
+Corrigir o bug da edição que zera os valores:
+- Em handleEditBudget, ao montar itemsArray, NÃO usar parseFloat(...) || 0
+Porque valores podem vir como "R$ 43,95" ou "43,95" e parseFloat vira NaN.
+Crie helper toNumber() que remove "R$", espaços, separador de milhar e troca vírgula por ponto.
+Use toNumber() para unitPrice, totalPrice, customizations e descontos.
+
+3) Validar fluxo de aprovação:
+- Se qualquer item ficar abaixo do mínimo, enviar requiresApproval=true e orçamento vai para status awaiting_approval.
+- Se após editar não houver mais itens abaixo do mínimo, enviar requiresApproval=false e backend deve voltar status para draft.
+```
+
+---
+
+Se você quiser, eu também reviso **o lado do Admin** (`admin/budget-approvals.tsx` e `admin/budgets.tsx`) pra garantir que:
+
+* ele só “aprova/rejeita” quando status é `awaiting_approval`
+* e que o admin_approved/not_approved reflita correto no painel do vendedor
+
+Mas com o que você me descreveu, **o maior bug real é o parse da edição** + **ocultar o mínimo quando não precisa** — e isso aqui resolve.

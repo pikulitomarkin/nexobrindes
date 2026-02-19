@@ -729,6 +729,18 @@ export default function VendorBudgets() {
     generatePDFMutation.mutate(budget.id);
   };
 
+  const toNumber = (v: any) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === "number") return v;
+    const s = String(v)
+      .replace("R$", "")
+      .replace(/\s/g, "")
+      .replace(/\./g, "")   // remove separador de milhar
+      .replace(",", ".");   // vírgula decimal
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const handleEditBudget = async (budget: any) => {
     console.log('Editing budget:', budget);
     
@@ -760,17 +772,21 @@ export default function VendorBudgets() {
           producerId = 'internal';
         }
 
+        const unitPrice = toNumber(item.unitPrice);
+        const minimumPrice = toNumber(item.minimumPrice);
+
         return {
           productId: item.productId,
           productName: item.productName || item.product?.name,
           producerId: producerId,
-          quantity: parseInt(item.quantity) || 1,
-          unitPrice: parseFloat(item.unitPrice) || 0,
-          totalPrice: parseFloat(item.totalPrice) || 0,
+          quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+          unitPrice: unitPrice,
+          minimumPrice: minimumPrice,
+          totalPrice: toNumber(item.totalPrice),
           // Item Customization - use exact saved values without fallback logic
           hasItemCustomization: Boolean(item.hasItemCustomization),
           selectedCustomizationId: item.selectedCustomizationId || "",
-          itemCustomizationValue: parseFloat(item.itemCustomizationValue) || 0,
+          itemCustomizationValue: toNumber(item.itemCustomizationValue),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
@@ -781,20 +797,20 @@ export default function VendorBudgets() {
           // Item discount
           hasItemDiscount: Boolean(item.hasItemDiscount),
           itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage) || 0,
-          itemDiscountValue: parseFloat(item.itemDiscountValue) || 0,
+          itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+          itemDiscountValue: toNumber(item.itemDiscountValue),
           // General Customization - use exact saved values without fallback logic
           hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
           generalCustomizationName: item.generalCustomizationName || "",
-          generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
+          generalCustomizationValue: toNumber(item.generalCustomizationValue),
         };
       });
       
       // Calculate the total for this budget to compute remaining amount correctly
       const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
-        let itemPrice = parseFloat(item.unitPrice) || 0;
-        itemPrice += parseFloat(item.itemCustomizationValue) || 0;
-        itemPrice += parseFloat(item.generalCustomizationValue) || 0;
+        let itemPrice = toNumber(item.unitPrice);
+        itemPrice += toNumber(item.itemCustomizationValue);
+        itemPrice += toNumber(item.generalCustomizationValue);
         if (item.hasItemDiscount) {
           const discountAmount = item.itemDiscountType === "percentage" 
             ? (itemPrice * item.itemDiscountPercentage) / 100 
@@ -888,11 +904,28 @@ export default function VendorBudgets() {
       return;
     }
 
-    const hasBelowMinimum = vendorBudgetForm.items.some(
-      (item: any) => item.minimumPrice > 0 && item.unitPrice < item.minimumPrice
+    const itemsArray = vendorBudgetForm.items.map(item => ({
+      ...item,
+      quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+      unitPrice: toNumber(item.unitPrice),
+      totalPrice: toNumber(item.totalPrice),
+      itemCustomizationValue: toNumber(item.itemCustomizationValue),
+      generalCustomizationValue: toNumber(item.generalCustomizationValue),
+      itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+      itemDiscountValue: toNumber(item.itemDiscountValue),
+    }));
+
+    const hasBelowMinimum = itemsArray.some(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice
     );
 
-    const formData = { ...vendorBudgetForm, requiresApproval: hasBelowMinimum };
+    const formData = { 
+      ...vendorBudgetForm, 
+      items: itemsArray,
+      requiresApproval: hasBelowMinimum,
+      // If we are editing and it no longer requires approval, it should go back to draft if it was rejected/awaiting
+      status: hasBelowMinimum ? 'awaiting_approval' : (isEditMode ? 'draft' : 'draft')
+    };
 
     if (isEditMode) {
       updateBudgetMutation.mutate(formData);
@@ -1249,11 +1282,10 @@ export default function VendorBudgets() {
                               value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
                               onChange={(e) => updateBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                             />
-                            {item.minimumPrice > 0 && item.unitPrice >= item.minimumPrice && (
-                              <p className="text-xs text-green-600">✓ Mín: R$ {item.minimumPrice.toFixed(2)}</p>
-                            )}
-                            {item.minimumPrice > 0 && item.unitPrice < item.minimumPrice && (
-                              <p className="text-xs text-red-600">✗ Abaixo do mín: R$ {item.minimumPrice.toFixed(2)}</p>
+                            {item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice && (
+                              <p className="text-xs text-red-600">
+                                ✗ Abaixo do mínimo: R$ {item.minimumPrice.toFixed(2)}
+                              </p>
                             )}
                           </div>
                           <div>
