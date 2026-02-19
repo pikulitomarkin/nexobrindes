@@ -964,24 +964,17 @@ export default function VendorBudgets() {
       return sum + (Math.max(0, itemPrice) * item.quantity);
     }, 0);
 
-    const hasBelowMinimum = itemsArray.some(
-      (item: any) => item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice
-    );
-
     const formData = { 
       ...vendorBudgetForm, 
       validUntil: fromDateInputValue(vendorBudgetForm.validUntil),
       deliveryDeadline: fromDateInputValue(vendorBudgetForm.deliveryDeadline),
       items: itemsArray,
-      requiresApproval: hasBelowMinimum,
       totalValue: subtotal.toFixed(2),
       downPayment: toNumber(vendorBudgetForm.downPayment),
       remainingAmount: toNumber(vendorBudgetForm.remainingAmount),
       shippingCost: toNumber(vendorBudgetForm.shippingCost),
       discountPercentage: toNumber(vendorBudgetForm.discountPercentage),
       discountValue: toNumber(vendorBudgetForm.discountValue),
-      // If we are editing and it no longer requires approval, it should go back to draft if it was rejected/awaiting
-      status: hasBelowMinimum ? 'awaiting_approval' : (isEditMode ? 'draft' : 'draft')
     };
 
     if (isEditMode) {

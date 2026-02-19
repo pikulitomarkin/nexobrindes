@@ -1037,18 +1037,11 @@ export default function AdminBudgets() {
       itemDiscountValue: toNumber(item.itemDiscountValue),
     }));
 
-    const hasBelowMinimum = itemsArray.some(
-      (item: any) => item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice
-    );
-
     const formData = { 
       ...adminBudgetForm, 
       items: itemsArray,
       validUntil: fromDateInputValue(adminBudgetForm.validUntil),
       deliveryDeadline: fromDateInputValue(adminBudgetForm.deliveryDeadline),
-      requiresApproval: hasBelowMinimum,
-      // Se estamos editando e não requer mais aprovação, deve voltar para draft se estava rejeitado/aguardando
-      status: hasBelowMinimum ? 'awaiting_approval' : (isEditMode ? 'draft' : 'draft')
     };
 
     if (isEditMode) {
