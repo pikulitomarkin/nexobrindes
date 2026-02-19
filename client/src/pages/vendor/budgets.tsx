@@ -1600,12 +1600,12 @@ export default function VendorBudgets() {
 
                           return filteredProducts.map((product: any) => {
                             const productCode = product.friendlyCode || product.externalCode || product.compositeCode;
-                            const costPrice = parseFloat(product.costPrice) || 0;
-                            const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
-                              return total + (item.unitPrice * item.quantity);
-                            }, 0);
-                            const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
+                            
+                            // PREÇO CONSISTENTE: Se costPrice != basePrice, significa que basePrice já é o preço de venda calculado.
+                            // Se forem iguais, aplicamos a regra do patch.
+                            const sale = getProductSalePrice(product, 0, pricingSettings, marginTiers);
                             const displayPrice = sale.price;
+
                             return (
                               <div 
                                 key={product.id} 
