@@ -806,7 +806,8 @@ export default function VendorBudgets() {
         }
 
         const unitPrice = toNumber(item.unitPrice);
-        const minimumPrice = toNumber(item.minimumPrice);
+        const product = products.find((p: any) => p.id === item.productId);
+        const costPrice = product ? parseFloat(product.costPrice) || 0 : 0;
 
         return {
           productId: item.productId,
@@ -814,7 +815,9 @@ export default function VendorBudgets() {
           producerId: producerId,
           quantity: Math.max(1, Math.round(toNumber(item.quantity))),
           unitPrice: unitPrice,
-          minimumPrice: minimumPrice,
+          minimumPrice: 0,
+          costPrice: costPrice,
+          priceSource: costPrice > 0 ? 'computed' : 'manual',
           totalPrice: toNumber(item.totalPrice),
           // Item Customization - use exact saved values without fallback logic
           hasItemCustomization: Boolean(item.hasItemCustomization),
@@ -839,6 +842,17 @@ export default function VendorBudgets() {
         };
       });
       
+      // Recalculate minimumPrice for each item based on costPrice and budget revenue
+      const budgetRevenue = itemsArray.reduce((sum: number, item: any) => {
+        return sum + (toNumber(item.unitPrice) * item.quantity);
+      }, 0);
+      for (const item of itemsArray) {
+        if (item.costPrice && item.costPrice > 0) {
+          const priceCalc = calculatePriceFromCost(item.costPrice, budgetRevenue);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+        }
+      }
+
       // Calculate the total for this budget to compute remaining amount correctly
       const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
         let itemPrice = toNumber(item.unitPrice);

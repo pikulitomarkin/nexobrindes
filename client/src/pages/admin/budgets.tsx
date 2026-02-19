@@ -894,13 +894,18 @@ export default function AdminBudgets() {
           producerId = 'internal';
         }
 
+        const product = products.find((p: any) => p.id === item.productId);
+        const costPrice = product ? parseFloat(product.costPrice) || 0 : 0;
+
         return {
           productId: item.productId,
           productName: item.productName || item.product?.name,
           producerId: producerId,
           quantity: Math.max(1, Math.round(toNumber(item.quantity))),
           unitPrice: toNumber(item.unitPrice),
-          minimumPrice: toNumber(item.minimumPrice),
+          minimumPrice: 0,
+          costPrice: costPrice,
+          priceSource: costPrice > 0 ? 'computed' : 'manual',
           totalPrice: toNumber(item.totalPrice),
           // Item Customization - use exact saved values without fallback logic
           hasItemCustomization: Boolean(item.hasItemCustomization),
@@ -925,6 +930,17 @@ export default function AdminBudgets() {
         };
       });
       
+      // Recalculate minimumPrice for each item based on costPrice and budget revenue
+      const budgetRevenue = itemsArray.reduce((sum: number, item: any) => {
+        return sum + (toNumber(item.unitPrice) * item.quantity);
+      }, 0);
+      for (const item of itemsArray) {
+        if (item.costPrice && item.costPrice > 0) {
+          const priceCalc = calculatePriceFromCost(item.costPrice, budgetRevenue);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+        }
+      }
+
       // Calculate the total for this budget to compute remaining amount correctly
       const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
         let itemPrice = toNumber(item.unitPrice);
@@ -2485,6 +2501,11 @@ export default function AdminBudgets() {
                               : 'bg-red-100 text-red-800'
                           }`}>
                             {budget.clientObservations}
+                          </div>
+                        )}
+                        {budget.status === 'not_approved' && budget.adminRejectionReason && (
+                          <div className="text-xs p-1 rounded bg-red-100 text-red-700 max-w-[200px] truncate" title={budget.adminRejectionReason}>
+                            Motivo: {budget.adminRejectionReason}
                           </div>
                         )}
                       </div>
