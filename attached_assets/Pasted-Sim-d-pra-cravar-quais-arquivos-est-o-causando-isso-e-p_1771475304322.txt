@@ -1,0 +1,114 @@
+Sim — dá pra cravar **quais arquivos** estão causando isso, e por que “passa” mesmo abaixo do mínimo:
+
+### Por que está passando?
+
+Hoje o fluxo de aprovação **só acontece se o FRONT mandar `requiresApproval`** no payload do `PUT /api/budgets/:id`.
+Se na edição o front não recalcula direito (ou perde `minimumPrice`), ele manda `requiresApproval=false` ou nem manda — e o backend **não recalcula**. Resultado: **o orçamento “passa”**.
+
+E tem outro problema grande:
+✅ O endpoint **`/api/budgets/:id/send-whatsapp` SEMPRE põe status `sent`**, sem checar mínimo. Isso derruba o orçamento de “aguardando aprovação” e ele vai como enviado. Isso explica o seu “deixou passar”.
+
+---
+
+# Os 2 arquivos que TEM que mudar (obrigatório)
+
+## 1) `server/routes.ts` — **dois trechos**
+
+### (A) `PUT /api/budgets/:id` (onde você viu o bloco `requiresApproval`)
+
+É esse bloco aqui que está errado conceitualmente, porque depende do front:
+
+```ts
+// Handle requiresApproval flag for budget approval workflow
+if (Object.prototype.hasOwnProperty.call(budgetMetadata, 'requiresApproval')) {
+  const existingBudget = await storage.getBudget(budgetId);
+  if (budgetMetadata.requiresApproval) {
+    budgetMetadata.status = 'awaiting_approval';
+  } else if (existingBudget && (existingBudget.status === 'not_approved' || existingBudget.status === 'awaiting_approval')) {
+    budgetMetadata.status = 'draft';
+  }
+  delete budgetMetadata.requiresApproval;
+}
+```
+
+✅ **O backend precisa recalcular isso sempre**, baseado nos itens, produtos, pricingSettings e tiers (igual você já calcula no `/api/budgets/awaiting-approval`).
+
+**Regra certa:**
+
+* se houver qualquer item com `unitPrice < minimumPriceCalculado` → status **SEMPRRE** `awaiting_approval`
+* se não houver nenhum abaixo e estava `awaiting_approval`/`not_approved` → volta pra `draft`
+
+> Ou seja: **não confiar no `requiresApproval` do front**.
+
+---
+
+### (B) `POST /api/budgets/:id/send-whatsapp`
+
+Esse endpoint hoje faz isso:
+
+```ts
+const updatedBudget = await storage.updateBudget(req.params.id, {
+  status: 'sent',
+  updatedAt: new Date()
+});
+```
+
+✅ Aqui precisa virar:
+
+* Se orçamento estiver abaixo do mínimo → **não pode virar `sent`**, tem que virar `awaiting_approval` (ou bloquear envio e retornar erro explicando).
+
+**O mínimo de correção:**
+
+* antes de marcar `sent`, carregue itens do orçamento + pricingSettings + tiers
+* calcule mínimo por item (igual o endpoint de awaiting approval faz)
+* se existir item abaixo → `status='awaiting_approval'` e retorna mensagem “Enviado para aprovação” (ou bloqueia o WhatsApp).
+
+---
+
+## 2) `client/src/pages/vendor/budgets.tsx` (e opcional no admin)
+
+Você tem que garantir que, ao clicar **Enviar**, o front não “força” `sent` quando deveria ser aprovação.
+
+Mas **mesmo que o front falhe**, o backend corrigido já impede a passagem.
+
+---
+
+# Resposta objetiva à sua pergunta: “qual arquivo você quer ver?”
+
+✅ **O arquivo principal é `server/routes.ts`** (dois endpoints: `PUT /api/budgets/:id` e `POST /api/budgets/:id/send-whatsapp`).
+Se você só mexer no front, vai voltar a quebrar. O controle tem que ser do servidor.
+
+---
+
+# Prompt pronto pro Replit Agent (copiar/colar)
+
+```text
+O bug de “passar” orçamento abaixo do mínimo é do BACKEND.
+
+1) server/routes.ts - PUT /api/budgets/:id
+- NÃO confiar em requiresApproval vindo do frontend.
+- Recalcular server-side se orçamento exige aprovação:
+  - carregar items do budget
+  - para cada item, buscar product.costPrice
+  - carregar pricingSettings + marginTiers
+  - calcular minimumPrice por item (mesma lógica do endpoint /api/budgets/awaiting-approval)
+  - se unitPrice < minimumPrice para qualquer item => status = 'awaiting_approval'
+  - se nenhum item abaixo e status anterior era 'awaiting_approval' ou 'not_approved' => status = 'draft'
+- Remover dependência do delete budgetMetadata.requiresApproval para lógica.
+
+2) server/routes.ts - POST /api/budgets/:id/send-whatsapp
+- Antes de marcar status 'sent', recalcular se há item abaixo do mínimo.
+- Se houver, NÃO setar 'sent'. Setar 'awaiting_approval' (ou bloquear e retornar erro explicando).
+- Só marcar 'sent' se estiver tudo >= mínimo.
+
+Depois testar:
+- orçamento abaixo do mínimo -> ao enviar WhatsApp deve virar 'awaiting_approval' (não 'sent')
+- editar e salvar sem mudar nada mantendo abaixo -> deve continuar 'awaiting_approval'
+```
+
+Se você quiser, eu te digo **o número aproximado das linhas** no seu `routes.ts`:
+
+* o `send-whatsapp` está por volta de onde aparece `app.post("/api/budgets/:id/send-whatsapp"` (no seu arquivo está logo após a conversão de orçamento).
+* o `PUT /api/budgets/:id` é aquele bloco onde tem `// Handle requiresApproval flag...`.
+
+Me confirma só: quando você clica “Enviar”, é **Enviar WhatsApp** mesmo? (pelo seu print parece ser esse botão). Isso bate exatamente com o endpoint acima.

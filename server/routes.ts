@@ -1626,9 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })));
       }
 
-      if (budgetData.requiresApproval) {
-        budgetData.status = 'awaiting_approval';
-      }
+      delete budgetData.requiresApproval;
 
       // Create budget with processed data
       const newBudget = await storage.createBudget({
@@ -1639,6 +1637,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("[CREATE BUDGET] Budget created successfully:", newBudget.id);
+
+      // SERVER-SIDE APPROVAL CHECK after creation
+      try {
+        const createdItems = await storage.getBudgetItems(newBudget.id);
+        const pricingSettings = await storage.getPricingSettings();
+        const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
+        const budgetTotal = parseFloat(newBudget.totalValue || '0');
+
+        let hasBelowMinimum = false;
+        for (const item of createdItems) {
+          const product = await storage.getProduct(item.productId);
+          const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+          if (costPrice > 0 && pricingSettings) {
+            const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+            const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+            const matchingTier = marginTiers
+              .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
+              .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
+            if (matchingTier) {
+              const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
+              const divisor = 1 - taxRate - commissionRate - minMarginRate;
+              if (divisor > 0) {
+                const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
+                const unitPrice = parseFloat(item.unitPrice as string);
+                if (unitPrice < minimumPrice) {
+                  hasBelowMinimum = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (hasBelowMinimum) {
+          console.log(`[CREATE BUDGET] Server-side check: budget ${newBudget.id} has items below minimum, setting awaiting_approval`);
+          await storage.updateBudget(newBudget.id, { status: 'awaiting_approval' });
+        }
+      } catch (approvalCheckError) {
+        console.error(`[CREATE BUDGET] Error in server-side approval check:`, approvalCheckError);
+      }
+
+      const finalBudget = await storage.getBudget(newBudget.id);
 
       // Log budget creation (non-blocking)
       const vendor = await storage.getUser(budgetData.vendorId);
@@ -1651,7 +1691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ).catch(() => {});
       }
 
-      res.json(newBudget);
+      res.json(finalBudget || newBudget);
     } catch (error) {
       console.error("Error creating budget:", error);
       res.status(500).json({ error: "Failed to create budget" });
@@ -8075,16 +8115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const budgetMetadata = { ...budgetData };
       delete budgetMetadata.items;
       
-      // Handle requiresApproval flag for budget approval workflow
-      if (Object.prototype.hasOwnProperty.call(budgetMetadata, 'requiresApproval')) {
-        const existingBudget = await storage.getBudget(budgetId);
-        if (budgetMetadata.requiresApproval) {
-          budgetMetadata.status = 'awaiting_approval';
-        } else if (existingBudget && (existingBudget.status === 'not_approved' || existingBudget.status === 'awaiting_approval')) {
-          budgetMetadata.status = 'draft';
-        }
-        delete budgetMetadata.requiresApproval;
-      }
+      delete budgetMetadata.requiresApproval;
       
       // FIX: Convert 'matriz' branchId to null (matriz is not a valid FK)
       if (budgetMetadata.branchId === 'matriz') {
@@ -8224,8 +8255,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`[UPDATE BUDGET] Successfully updated budget ${req.params.id}`);
-      res.json(updatedBudget);
+      // SERVER-SIDE APPROVAL CHECK: Recalculate if any item is below minimum price
+      // This ensures the approval workflow cannot be bypassed by the frontend
+      try {
+        const finalItems = await storage.getBudgetItems(budgetId);
+        const pricingSettings = await storage.getPricingSettings();
+        const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
+        const currentBudget = await storage.getBudget(budgetId);
+        const budgetTotal = parseFloat(currentBudget?.totalValue || '0');
+
+        let hasBelowMinimum = false;
+        for (const item of finalItems) {
+          const product = await storage.getProduct(item.productId);
+          const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+          if (costPrice > 0 && pricingSettings) {
+            const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+            const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+            const matchingTier = marginTiers
+              .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
+              .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
+            if (matchingTier) {
+              const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
+              const divisor = 1 - taxRate - commissionRate - minMarginRate;
+              if (divisor > 0) {
+                const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
+                const unitPrice = parseFloat(item.unitPrice as string);
+                if (unitPrice < minimumPrice) {
+                  hasBelowMinimum = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        let correctedStatus = currentBudget?.status;
+        if (hasBelowMinimum) {
+          correctedStatus = 'awaiting_approval';
+        } else if (currentBudget && (currentBudget.status === 'not_approved' || currentBudget.status === 'awaiting_approval')) {
+          correctedStatus = 'draft';
+        }
+
+        if (correctedStatus !== currentBudget?.status) {
+          console.log(`[UPDATE BUDGET] Server-side approval check: changing status from '${currentBudget?.status}' to '${correctedStatus}'`);
+          await storage.updateBudget(budgetId, { status: correctedStatus });
+        }
+      } catch (approvalCheckError) {
+        console.error(`[UPDATE BUDGET] Error in server-side approval check:`, approvalCheckError);
+      }
+
+      const finalBudget = await storage.getBudget(budgetId);
+      console.log(`[UPDATE BUDGET] Successfully updated budget ${req.params.id}, final status: ${finalBudget?.status}`);
+      res.json(finalBudget);
     } catch (error) {
       console.error("[UPDATE BUDGET] Error updating budget:", error);
       res.status(500).json({ error: "Failed to update budget: " + (error.message || error) });
@@ -8413,6 +8494,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientName = client.name;
           clientPhone = client.phone || budget.contactPhone;
         }
+      }
+
+      // SERVER-SIDE CHECK: Verify no items are below minimum price before allowing send
+      const budgetItems = await storage.getBudgetItems(req.params.id);
+      const pricingSettings = await storage.getPricingSettings();
+      const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
+      const budgetTotal = parseFloat(budget.totalValue || '0');
+
+      let hasBelowMinimum = false;
+      for (const item of budgetItems) {
+        const product = await storage.getProduct(item.productId);
+        const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+        if (costPrice > 0 && pricingSettings) {
+          const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+          const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+          const matchingTier = marginTiers
+            .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
+            .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
+          if (matchingTier) {
+            const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
+            const divisor = 1 - taxRate - commissionRate - minMarginRate;
+            if (divisor > 0) {
+              const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
+              const unitPrice = parseFloat(item.unitPrice as string);
+              if (unitPrice < minimumPrice) {
+                hasBelowMinimum = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (hasBelowMinimum && budget.status !== 'admin_approved') {
+        await storage.updateBudget(req.params.id, {
+          status: 'awaiting_approval',
+          updatedAt: new Date()
+        });
+        console.log(`Budget ${req.params.id} has items below minimum price - sent to approval instead of WhatsApp`);
+        return res.status(400).json({ 
+          error: "Este orçamento possui itens com preço abaixo do mínimo. Foi enviado para aprovação do administrador.",
+          status: 'awaiting_approval'
+        });
       }
 
       // Update budget status to 'sent' with proper timestamp
