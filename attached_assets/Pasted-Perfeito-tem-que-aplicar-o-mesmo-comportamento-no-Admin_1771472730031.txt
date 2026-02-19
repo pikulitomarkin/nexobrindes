@@ -1,0 +1,112 @@
+Perfeito — tem que aplicar **o mesmo comportamento no Admin**, sim: **não mostrar “Preço mínimo” o tempo todo**, só quando o **preço digitado ficar abaixo do mínimo**.
+
+Vou te passar exatamente **onde mexer** e **o que trocar**, do mesmo jeito que no vendedor.
+
+---
+
+## 1) Admin Orçamentos: esconder “mínimo” quando está OK
+
+📍 **Arquivo:** `client/src/pages/admin/budgets.tsx`
+
+Procure no arquivo o trecho onde renderiza cada item do orçamento (normalmente perto de “Preço Unitário”, “Subtotal”, etc.) e você vai achar algo parecido com isso:
+
+```tsx
+{item.minimumPrice > 0 && item.unitPrice >= item.minimumPrice && (
+  <p className="text-xs text-green-600">✓ Mín: R$ {item.minimumPrice.toFixed(2)}</p>
+)}
+{item.minimumPrice > 0 && item.unitPrice < item.minimumPrice && (
+  <p className="text-xs text-red-600">✗ Abaixo do mín: R$ {item.minimumPrice.toFixed(2)}</p>
+)}
+```
+
+✅ **Troque por isso** (fica igual ao vendedor: só aparece quando estiver abaixo):
+
+```tsx
+{item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice && (
+  <p className="text-xs text-red-600">
+    ✗ Abaixo do mínimo: R$ {item.minimumPrice.toFixed(2)}
+  </p>
+)}
+```
+
+Resultado: **Admin também fica limpo** e só alerta quando precisa.
+
+---
+
+## 2) Admin edição “zerada” (mesmo risco do vendedor)
+
+Mesmo que você tenha percebido o bug no painel do vendedor, o **Admin pode ter o mesmo problema**, porque em edição ele também costuma montar `itemsArray` com `parseFloat(...) || 0`.
+
+📍 Ainda em: `client/src/pages/admin/budgets.tsx`
+
+Procure por `handleEditBudget` ou por um trecho que faz algo como:
+
+```ts
+const itemsArray = budget.items.map((item) => ({
+  unitPrice: parseFloat(item.unitPrice) || 0,
+  ...
+}))
+```
+
+✅ Faça a mesma correção do vendedor:
+
+### 2.1) Adicione o helper no topo do componente (antes do handleEdit…)
+
+```ts
+const toNumber = (v: any) => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+  const s = String(v)
+    .replace("R$", "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+```
+
+### 2.2) Troque parseFloat/parseInt por toNumber
+
+Exemplo de troca:
+
+```ts
+quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+unitPrice: toNumber(item.unitPrice),
+totalPrice: toNumber(item.totalPrice),
+itemCustomizationValue: toNumber(item.itemCustomizationValue),
+generalCustomizationValue: toNumber(item.generalCustomizationValue),
+itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+itemDiscountValue: toNumber(item.itemDiscountValue),
+```
+
+> Isso evita o “zerou tudo” se o valor vier como `"R$ 43,95"` ou `"43,95"`.
+
+---
+
+## 3) Onde mais pode estar mostrando “mínimo” (catálogo/modal)
+
+Às vezes o “mínimo” também aparece no **card do produto** no modal de busca/adicionar produtos.
+Se isso existir no Admin, a regra é a mesma: **só mostra quando o vendedor/admin digitar abaixo** — então, em qualquer lugar que aparecer “Mín:” verde, remove.
+
+Procure no arquivo por: `minimumPrice`, `"Mín"`, `"mínimo"`.
+
+---
+
+## Texto pronto pra você mandar pro Replit Agent (Admin + Vendedor)
+
+```text
+Aplicar o mesmo comportamento do painel vendedor no painel admin:
+
+1) client/src/pages/admin/budgets.tsx
+- Onde renderiza o item do orçamento, remover o texto "✓ Mín..." (quando está acima).
+- Deixar aparecer SOMENTE quando unitPrice < minimumPrice (mensagem vermelha).
+
+2) client/src/pages/admin/budgets.tsx
+- Corrigir edição que pode zerar valores: substituir parseFloat(...)||0 por helper toNumber()
+- toNumber deve suportar valores "R$ 43,95" e "43,95" (trocar vírgula por ponto, remover R$ e separador de milhar).
+
+3) Confirmar que no admin e no vendedor o mínimo só aparece quando abaixo e que editar orçamento não zera campos.
+```
+
+Se você me disser **o nome do componente/arquivo** onde o Admin renderiza o item (às vezes é um componente separado tipo `BudgetItemEditor`), eu te digo exatamente o bloco e já deixo “copiar/colar” certinho no lugar.

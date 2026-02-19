@@ -818,6 +818,18 @@ export default function AdminBudgets() {
     generatePDFMutation.mutate(budget.id);
   };
 
+  const toNumber = (v: any) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === "number") return v;
+    const s = String(v)
+      .replace("R$", "")
+      .replace(/\s/g, "")
+      .replace(/\./g, "")   // remove separador de milhar
+      .replace(",", ".");   // vírgula decimal
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const handleEditBudget = async (budget: any) => {
     console.log('Editing budget:', budget);
     
@@ -853,13 +865,14 @@ export default function AdminBudgets() {
           productId: item.productId,
           productName: item.productName || item.product?.name,
           producerId: producerId,
-          quantity: parseInt(item.quantity) || 1,
-          unitPrice: parseFloat(item.unitPrice) || 0,
-          totalPrice: parseFloat(item.totalPrice) || 0,
+          quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+          unitPrice: toNumber(item.unitPrice),
+          minimumPrice: toNumber(item.minimumPrice),
+          totalPrice: toNumber(item.totalPrice),
           // Item Customization - use exact saved values without fallback logic
           hasItemCustomization: Boolean(item.hasItemCustomization),
           selectedCustomizationId: item.selectedCustomizationId || "",
-          itemCustomizationValue: parseFloat(item.itemCustomizationValue) || 0,
+          itemCustomizationValue: toNumber(item.itemCustomizationValue),
           itemCustomizationDescription: item.itemCustomizationDescription || "",
           additionalCustomizationNotes: item.additionalCustomizationNotes || "",
           customizationPhoto: item.customizationPhoto || "",
@@ -870,20 +883,20 @@ export default function AdminBudgets() {
           // Item discount
           hasItemDiscount: Boolean(item.hasItemDiscount),
           itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage) || 0,
-          itemDiscountValue: parseFloat(item.itemDiscountValue) || 0,
+          itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+          itemDiscountValue: toNumber(item.itemDiscountValue),
           // General Customization - use exact saved values without fallback logic
           hasGeneralCustomization: Boolean(item.hasGeneralCustomization),
           generalCustomizationName: item.generalCustomizationName || "",
-          generalCustomizationValue: parseFloat(item.generalCustomizationValue) || 0,
+          generalCustomizationValue: toNumber(item.generalCustomizationValue),
         };
       });
       
       // Calculate the total for this budget to compute remaining amount correctly
       const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
-        let itemPrice = parseFloat(item.unitPrice) || 0;
-        itemPrice += parseFloat(item.itemCustomizationValue) || 0;
-        itemPrice += parseFloat(item.generalCustomizationValue) || 0;
+        let itemPrice = toNumber(item.unitPrice);
+        itemPrice += toNumber(item.itemCustomizationValue);
+        itemPrice += toNumber(item.generalCustomizationValue);
         if (item.hasItemDiscount) {
           const discountAmount = item.itemDiscountType === "percentage" 
             ? (itemPrice * item.itemDiscountPercentage) / 100 
@@ -980,11 +993,28 @@ export default function AdminBudgets() {
       return;
     }
 
-    const hasBelowMinimum = adminBudgetForm.items.some(
-      (item: any) => item.minimumPrice > 0 && item.unitPrice < item.minimumPrice
+    const itemsArray = adminBudgetForm.items.map(item => ({
+      ...item,
+      quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+      unitPrice: toNumber(item.unitPrice),
+      totalPrice: toNumber(item.totalPrice),
+      itemCustomizationValue: toNumber(item.itemCustomizationValue),
+      generalCustomizationValue: toNumber(item.generalCustomizationValue),
+      itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+      itemDiscountValue: toNumber(item.itemDiscountValue),
+    }));
+
+    const hasBelowMinimum = itemsArray.some(
+      (item: any) => item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice
     );
 
-    const formData = { ...adminBudgetForm, requiresApproval: hasBelowMinimum };
+    const formData = { 
+      ...adminBudgetForm, 
+      items: itemsArray,
+      requiresApproval: hasBelowMinimum,
+      // Se estamos editando e não requer mais aprovação, deve voltar para draft se estava rejeitado/aguardando
+      status: hasBelowMinimum ? 'awaiting_approval' : (isEditMode ? 'draft' : 'draft')
+    };
 
     if (isEditMode) {
       updateAdminBudgetMutation.mutate(formData);
@@ -1361,12 +1391,9 @@ export default function AdminBudgets() {
                               onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                               className={item.minimumPrice && item.unitPrice < item.minimumPrice ? 'border-red-500 focus:ring-red-500' : ''}
                             />
-                            {item.minimumPrice > 0 && (
-                              <p className={`text-xs mt-1 ${item.unitPrice < item.minimumPrice ? 'text-red-600 font-medium' : 'text-green-600'}`}>
-                                {item.unitPrice < item.minimumPrice 
-                                  ? `⚠️ Mín: R$ ${item.minimumPrice.toFixed(2)}`
-                                  : `✓ Mín: R$ ${item.minimumPrice.toFixed(2)}`
-                                }
+                            {item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice && (
+                              <p className="text-xs text-red-600 mt-1 font-medium">
+                                ⚠️ Abaixo do mínimo: R$ {item.minimumPrice.toFixed(2)}
                               </p>
                             )}
                           </div>
