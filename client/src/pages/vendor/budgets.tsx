@@ -974,7 +974,7 @@ export default function VendorBudgets() {
       deliveryDeadline: fromDateInputValue(vendorBudgetForm.deliveryDeadline),
       items: itemsArray,
       requiresApproval: hasBelowMinimum,
-      totalValue: subtotal,
+      totalValue: subtotal.toFixed(2),
       downPayment: toNumber(vendorBudgetForm.downPayment),
       remainingAmount: toNumber(vendorBudgetForm.remainingAmount),
       shippingCost: toNumber(vendorBudgetForm.shippingCost),
