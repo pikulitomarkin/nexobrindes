@@ -916,13 +916,6 @@ export default function AdminProducts() {
                               maximumFractionDigits: 2
                             });
                           })()}
-                          {(() => {
-                            const sale = getProductSalePrice(product, 0, pricingSettings, marginTiers);
-                            if (sale.source === 'json') {
-                              return <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1 rounded">JSON</span>;
-                            }
-                            return null;
-                          })()}
                         </p>
                         {product.costPrice && parseFloat(product.costPrice) > 0 && (
                           <p className="text-xs text-gray-400">
