@@ -1,0 +1,163 @@
+Entendi o que aconteceu — isso é efeito colateral do “toNumber” que o Agent colocou.
+
+### Por que multiplicou tudo?
+
+O helper que remove `.` sempre (pra tratar milhar) **quebra quando o número já vem com ponto decimal** (ex.: `"88.00"` vira `"8800"`).
+Aí `unitPrice`, `frete`, `entrada` etc. ficam 100x/1000x maiores e o orçamento explode.
+
+E a data (`2026-03-11T00:00:00.000Z`) tá aparecendo “crua” porque o campo do input de data provavelmente está recebendo ISO completo, quando o HTML date/time espera outro formato.
+
+Vou te passar o patch certo (bem objetivo) pra você mandar pro Replit aplicar.
+
+---
+
+## 1) Corrigir o parse de moeda/número (sem inflar)
+
+**Onde:** `client/src/pages/vendor/budgets.tsx` **e** `client/src/pages/admin/budgets.tsx`
+**O que fazer:** substituir o `toNumber` atual por um parser “inteligente”:
+
+Cole/atualize o helper assim (troca o atual):
+
+```ts
+const toNumber = (v: any) => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+
+  let s = String(v).trim();
+
+  // remove moeda e espaços
+  s = s.replace("R$", "").replace(/\s/g, "");
+
+  // se vier vazio
+  if (!s) return 0;
+
+  // Caso 1: formato BR com vírgula decimal (ex: 4.400.050,00 ou 43,95)
+  if (s.includes(",")) {
+    s = s.replace(/\./g, ""); // remove milhar
+    s = s.replace(",", ".");  // troca decimal
+  } else {
+    // Caso 2: formato US/ISO com ponto decimal (ex: 88.00)
+    // não remove o ponto, só remove separadores estranhos
+    // (se tiver milhar com vírgula: 4,400,050.00)
+    const parts = s.split(".");
+    if (parts.length > 2) {
+      // muitos pontos -> provavelmente milhar, remove todos e tenta deixar o último como decimal
+      const last = parts.pop();
+      s = parts.join("") + "." + last;
+    }
+    s = s.replace(/,/g, ""); // remove milhar por vírgula
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+```
+
+✅ Isso resolve:
+
+* `"R$ 4.400.050"` → `4400050`
+* `"R$ 43,95"` → `43.95`
+* `"88.00"` → `88`
+* `"4,400,050.00"` → `4400050`
+
+Depois, mantenha os campos assim (sem `parseFloat(...) || 0`):
+
+```ts
+quantity: Math.max(1, Math.round(toNumber(item.quantity))),
+unitPrice: toNumber(item.unitPrice),
+totalPrice: toNumber(item.totalPrice),
+itemCustomizationValue: toNumber(item.itemCustomizationValue),
+generalCustomizationValue: toNumber(item.generalCustomizationValue),
+itemDiscountPercentage: toNumber(item.itemDiscountPercentage),
+itemDiscountValue: toNumber(item.itemDiscountValue),
+```
+
+---
+
+## 2) Corrigir a data “Prazo estimado de entrega” na edição
+
+O que você quer na UI é **mostrar só a data** (e não ISO completo).
+
+### Se o input for `type="date"`
+
+Quando carregar a edição, transforme ISO → `YYYY-MM-DD`:
+
+```ts
+const toDateInputValue = (iso: any) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+};
+```
+
+E na hora de setar o estado do form (no handleEditBudget), faça:
+
+```ts
+estimatedDeliveryDate: toDateInputValue(budget.estimatedDeliveryDate),
+```
+
+Na hora de salvar, se você precisa armazenar ISO:
+
+```ts
+const fromDateInputValue = (yyyyMmDd: string) => {
+  if (!yyyyMmDd) return null;
+  // salva como ISO 00:00Z (ou ajuste pra timezone local se quiser)
+  return new Date(yyyyMmDd + "T00:00:00.000Z").toISOString();
+};
+```
+
+E no payload do save:
+
+```ts
+estimatedDeliveryDate: fromDateInputValue(form.estimatedDeliveryDate),
+```
+
+> Se o seu campo no backend for só “date”, dá pra salvar `YYYY-MM-DD` direto — mas como hoje ele mostrou ISO, provavelmente tá guardando ISO mesmo.
+
+---
+
+## 3) Frete / entrada também inflando
+
+Esses campos estão sendo parseados com o mesmo helper errado.
+Procure no `handleEditBudget` (admin e vendor) onde você seta:
+
+* `shippingCost` / `freightValue` / `valorFrete`
+* `downPayment` / `entryValue` / `valorEntrada`
+* `remainingValue` etc.
+
+E aplique `toNumber(...)` também.
+
+Ex.:
+
+```ts
+shippingCost: toNumber(budget.shippingCost),
+downPayment: toNumber(budget.downPayment),
+```
+
+---
+
+# Prompt pronto pro Replit Agent aplicar (copia/cola)
+
+```text
+O bug atual de valores multiplicados na edição veio do helper toNumber que remove "." sempre. Isso transforma "88.00" em "8800".
+
+1) Em client/src/pages/vendor/budgets.tsx e client/src/pages/admin/budgets.tsx:
+- Substituir o toNumber atual por um parser robusto:
+  - Se tiver vírgula, tratar como BR: remove '.' (milhar) e troca ',' por '.'
+  - Se não tiver vírgula, tratar como US/ISO: manter '.' decimal e remover ',' de milhar
+- Garantir que unitPrice, totalPrice, frete, entrada e descontos usem toNumber (sem parseFloat||0)
+
+2) Corrigir a data de prazo estimado:
+- Ao carregar edição: converter ISO "2026-03-11T..." para "2026-03-11" (input type=date)
+- Ao salvar: converter "YYYY-MM-DD" de volta para ISO (ou manter date string se o backend aceitar)
+
+Depois testar:
+- Um orçamento de 100 itens x 88,xx deve continuar com subtotal correto na edição
+- Frete e entrada não podem inflar
+- Data deve aparecer formatada no campo
+```
+
+---
+
+Se você quiser ser ainda mais certeira: me diga como é o **nome exato do campo** no JSON do orçamento pra data (ex.: `estimatedDeliveryDate`, `deliveryDeadline`, etc.) e o tipo do input (`date` ou `datetime-local`). Aí eu te devolvo a linha exata pra colar sem adivinhação.

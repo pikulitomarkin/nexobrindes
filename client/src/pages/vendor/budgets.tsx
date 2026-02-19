@@ -732,13 +732,46 @@ export default function VendorBudgets() {
   const toNumber = (v: any) => {
     if (v === null || v === undefined) return 0;
     if (typeof v === "number") return v;
-    const s = String(v)
-      .replace("R$", "")
-      .replace(/\s/g, "")
-      .replace(/\./g, "")   // remove separador de milhar
-      .replace(",", ".");   // vírgula decimal
+
+    let s = String(v).trim();
+
+    // remove moeda e espaços
+    s = s.replace("R$", "").replace(/\s/g, "");
+
+    // se vier vazio
+    if (!s) return 0;
+
+    // Caso 1: formato BR com vírgula decimal (ex: 4.400.050,00 ou 43,95)
+    if (s.includes(",")) {
+      s = s.replace(/\./g, ""); // remove milhar
+      s = s.replace(",", ".");  // troca decimal
+    } else {
+      // Caso 2: formato US/ISO com ponto decimal (ex: 88.00)
+      // não remove o ponto, só remove separadores estranhos
+      // (se tiver milhar com vírgula: 4,400,050.00)
+      const parts = s.split(".");
+      if (parts.length > 2) {
+        // muitos pontos -> provavelmente milhar, remove todos e tenta deixar o último como decimal
+        const last = parts.pop();
+        s = parts.join("") + "." + last;
+      }
+      s = s.replace(/,/g, ""); // remove milhar por vírgula
+    }
+
     const n = Number(s);
     return Number.isFinite(n) ? n : 0;
+  };
+
+  const toDateInputValue = (iso: any) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  };
+
+  const fromDateInputValue = (yyyyMmDd: string) => {
+    if (!yyyyMmDd) return null;
+    return new Date(yyyyMmDd + "T00:00:00.000Z").toISOString();
   };
 
   const handleEditBudget = async (budget: any) => {
@@ -832,20 +865,20 @@ export default function VendorBudgets() {
         contactEmail: fullBudget.contactEmail || "",
         vendorId: fullBudget.vendorId,
         branchId: fullBudget.branchId || "matriz",
-        validUntil: fullBudget.validUntil || "",
-        deliveryDeadline: fullBudget.deliveryDeadline || "",
+        validUntil: toDateInputValue(fullBudget.validUntil),
+        deliveryDeadline: toDateInputValue(fullBudget.deliveryDeadline),
         deliveryType: fullBudget.deliveryType || "delivery",
         items: itemsArray,
         paymentMethodId: fullBudget.paymentInfo?.paymentMethodId || fullBudget.paymentMethodId || "",
         shippingMethodId: fullBudget.paymentInfo?.shippingMethodId || fullBudget.shippingMethodId || "",
         installments: Number(fullBudget.paymentInfo?.installments ?? fullBudget.installments ?? 1),
-        downPayment: newDownPayment,
-        remainingAmount: newRemainingAmount,
-        shippingCost: newShippingCost,
+        downPayment: toNumber(newDownPayment),
+        remainingAmount: toNumber(newRemainingAmount),
+        shippingCost: toNumber(newShippingCost),
         hasDiscount: Boolean(fullBudget.hasDiscount),
         discountType: fullBudget.discountType || "percentage",
-        discountPercentage: Number(fullBudget.discountPercentage ?? 0),
-        discountValue: Number(fullBudget.discountValue ?? 0)
+        discountPercentage: toNumber(fullBudget.discountPercentage),
+        discountValue: toNumber(fullBudget.discountValue)
       });
 
       setIsEditMode(true);
@@ -921,8 +954,16 @@ export default function VendorBudgets() {
 
     const formData = { 
       ...vendorBudgetForm, 
+      validUntil: fromDateInputValue(vendorBudgetForm.validUntil),
+      deliveryDeadline: fromDateInputValue(vendorBudgetForm.deliveryDeadline),
       items: itemsArray,
       requiresApproval: hasBelowMinimum,
+      totalValue: subtotal,
+      downPayment: toNumber(vendorBudgetForm.downPayment),
+      remainingAmount: toNumber(vendorBudgetForm.remainingAmount),
+      shippingCost: toNumber(vendorBudgetForm.shippingCost),
+      discountPercentage: toNumber(vendorBudgetForm.discountPercentage),
+      discountValue: toNumber(vendorBudgetForm.discountValue),
       // If we are editing and it no longer requires approval, it should go back to draft if it was rejected/awaiting
       status: hasBelowMinimum ? 'awaiting_approval' : (isEditMode ? 'draft' : 'draft')
     };
