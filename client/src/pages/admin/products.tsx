@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { getProductSalePrice } from "@/lib/pricingCalc";
 
 export default function AdminProducts() {
   const { toast } = useToast();
@@ -909,14 +910,8 @@ export default function AdminProducts() {
                       <div>
                         <p className="font-medium text-green-600">
                           R$ {(() => {
-                            const cost = parseFloat(product.costPrice || '0');
-                            if (cost > 0) {
-                              return calculateSalePrice(cost).toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                              });
-                            }
-                            return parseFloat(product.basePrice || '0').toLocaleString('pt-BR', {
+                            const sale = getProductSalePrice(product, 0, pricingSettings, marginTiers);
+                            return sale.price.toLocaleString('pt-BR', {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2
                             });

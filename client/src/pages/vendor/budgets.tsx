@@ -17,6 +17,7 @@ import { CustomizationSelector } from "@/components/customization-selector";
 import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
 // Import Badge component
 import { Badge } from "@/components/ui/badge";
+import { calculatePriceFromCost as calcPriceFromCost, getProductSalePrice } from "@/lib/pricingCalc";
 
 export default function VendorBudgets() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -219,34 +220,7 @@ export default function VendorBudgets() {
   });
 
   const calculatePriceFromCost = (costPrice: number, budgetRevenue: number = 0) => {
-    if (!pricingSettings || !costPrice || costPrice <= 0) return { idealPrice: 0, minimumPrice: 0, marginApplied: 0, minimumMarginApplied: 0 };
-    
-    const taxRate = parseFloat(pricingSettings.taxRate) / 100 || 0.09;
-    const commissionRate = parseFloat(pricingSettings.commissionRate) / 100 || 0.15;
-    
-    let marginRate = 0.28;
-    let minMarginRate = 0.20;
-    if (marginTiers && marginTiers.length > 0) {
-      for (const tier of marginTiers) {
-        const minRev = parseFloat(tier.minRevenue) || 0;
-        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Number.MAX_SAFE_INTEGER;
-        if (budgetRevenue >= minRev && budgetRevenue <= maxRev) {
-          marginRate = parseFloat(tier.marginRate) / 100;
-          minMarginRate = parseFloat(tier.minimumMarginRate) / 100;
-          break;
-        }
-      }
-    }
-    
-    const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
-    const divisorMinimo = 1 - (taxRate + commissionRate + minMarginRate);
-    
-    return {
-      idealPrice: costPrice / divisorIdeal,
-      minimumPrice: costPrice / divisorMinimo,
-      marginApplied: marginRate * 100,
-      minimumMarginApplied: minMarginRate * 100
-    };
+    return calcPriceFromCost(costPrice, budgetRevenue, pricingSettings, marginTiers);
   };
 
   const categories: string[] = ['all', ...new Set((products || []).map((product: any) => product.category).filter(Boolean))];
@@ -279,9 +253,9 @@ export default function VendorBudgets() {
     const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
       return total + (item.unitPrice * item.quantity);
     }, 0);
-    const priceCalc = calculatePriceFromCost(costPrice, currentRevenue);
-    const idealPrice = costPrice > 0 ? Math.round(priceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice) || 0;
-    const minimumPrice = costPrice > 0 ? Math.round(priceCalc.minimumPrice * 100) / 100 : 0;
+    const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
+    const idealPrice = sale.price;
+    const minimumPrice = sale.source === 'computed' ? (sale.details?.minimumPrice || 0) : 0;
     
     const newItem = {
       productId: product.id,
@@ -292,6 +266,7 @@ export default function VendorBudgets() {
       totalPrice: idealPrice,
       costPrice: costPrice,
       minimumPrice: minimumPrice,
+      priceSource: sale.source,
       hasItemCustomization: false,
       selectedCustomizationId: "",
       itemCustomizationValue: 0,
@@ -326,7 +301,8 @@ export default function VendorBudgets() {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
         
-        if (item.costPrice && item.costPrice > 0) {
+        // Só recalcular quando o preço veio de cálculo (evita "markup em cima de markup" quando costPrice foi igualado ao basePrice)
+        if (item.priceSource === 'computed' && item.costPrice && item.costPrice > 0) {
           const currentRevenue = prev.items.reduce((total: number, it: any, i: number) => {
             const qty = i === index ? quantity : it.quantity;
             return total + (it.unitPrice * qty);
@@ -1628,8 +1604,8 @@ export default function VendorBudgets() {
                             const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
                               return total + (item.unitPrice * item.quantity);
                             }, 0);
-                            const listingPriceCalc = calculatePriceFromCost(costPrice, currentRevenue);
-                            const displayPrice = costPrice > 0 ? Math.round(listingPriceCalc.idealPrice * 100) / 100 : parseFloat(product.basePrice || '0');
+                            const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
+                            const displayPrice = sale.price;
                             return (
                               <div 
                                 key={product.id} 

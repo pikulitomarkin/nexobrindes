@@ -1550,15 +1550,20 @@ export class PgStorage implements IStorage {
     const errors: string[] = [];
     
     try {
-      // Usar SQL direto para melhor performance com muitos produtos
-      // Atualiza cost_price = base_price onde cost_price está vazio
+      // IMPORTANTE (segurança):
+      // O sistema calcula preço de venda a partir do *custo* (cost_price).
+      // Igualar cost_price = base_price causa "markup em cima de markup" e infla preços.
+      // Portanto, esta rotina NUNCA deve sobrescrever o custo.
+      // Em vez disso, ela apenas preenche base_price quando estiver vazio, usando cost_price como referência.
+      // (O cálculo detalhado do preço final é feito no front, conforme faixa de faturamento do orçamento.)
+
       const result = await pg.execute(
-        sql`UPDATE products 
-            SET cost_price = base_price
-            WHERE (cost_price = '0.00' OR cost_price IS NULL OR cost_price = '0') 
-            AND base_price IS NOT NULL 
-            AND base_price != '0' 
-            AND base_price != '0.00'`
+        sql`UPDATE products
+            SET base_price = cost_price
+            WHERE (base_price = '0.00' OR base_price IS NULL OR base_price = '0')
+              AND cost_price IS NOT NULL
+              AND cost_price != '0'
+              AND cost_price != '0.00'`
       );
       
       const updated = result.rowCount || 0;
