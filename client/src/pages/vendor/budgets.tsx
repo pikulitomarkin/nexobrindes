@@ -1637,7 +1637,7 @@ export default function VendorBudgets() {
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs text-green-600 font-medium">
                                         R$ {(() => {
-                                          const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
+                                          const sale = getProductSalePrice(product, 0, pricingSettings, marginTiers);
                                           return sale.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                                         })()}
                                       </p>
