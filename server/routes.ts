@@ -121,10 +121,10 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
   const transactions: ParsedOFXTransaction[] = [];
 
   // Check for different OFX structures
-  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS || 
-                       ofxData?.BANKMSGSRSV1?.STMTTRNRS ||
-                       ofxData?.OFX?.STMTTRNRS;
-                       
+  const stmtTrnRsList = ofxData?.OFX?.BANKMSGSRSV1?.STMTTRNRS ||
+    ofxData?.BANKMSGSRSV1?.STMTTRNRS ||
+    ofxData?.OFX?.STMTTRNRS;
+
   if (!stmtTrnRsList) {
     console.warn('No STMTTRNRS found in OFX file. Available keys:', Object.keys(ofxData || {}));
     if (ofxData?.OFX) {
@@ -165,71 +165,71 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
     // Ensure it's an array
     const txnArray = Array.isArray(statementTransactions) ? statementTransactions : [statementTransactions];
 
-  txnArray.forEach((txn, index) => {
-    // Extract transaction data safely
-    const trnType = txn.TRNTYPE || 'OTHER';
-    const dtPostedRaw = txn.DTPOSTED || '';
-    const trnAmt = txn.TRNAMT || '0';
-    const memo = txn.MEMO || txn.NAME || 'Transação bancária';
-    const refNum = txn.REFNUM || txn.CHECKNUM || null;
+    txnArray.forEach((txn, index) => {
+      // Extract transaction data safely
+      const trnType = txn.TRNTYPE || 'OTHER';
+      const dtPostedRaw = txn.DTPOSTED || '';
+      const trnAmt = txn.TRNAMT || '0';
+      const memo = txn.MEMO || txn.NAME || 'Transação bancária';
+      const refNum = txn.REFNUM || txn.CHECKNUM || null;
 
-    // Generate deterministic FITID when missing
-    let fitId = txn.FITID;
-    if (!fitId) {
-      // Create deterministic hash from date+amount+memo for consistent deduplication
-      const hashInput = `${dtPostedRaw}|${trnAmt}|${memo}`;
-      const hash = crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16);
-      fitId = `HASH_${hash}`;
-      console.log(`Generated deterministic FITID for transaction: ${fitId} from ${hashInput}`);
-    }
+      // Generate deterministic FITID when missing
+      let fitId = txn.FITID;
+      if (!fitId) {
+        // Create deterministic hash from date+amount+memo for consistent deduplication
+        const hashInput = `${dtPostedRaw}|${trnAmt}|${memo}`;
+        const hash = crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16);
+        fitId = `HASH_${hash}`;
+        console.log(`Generated deterministic FITID for transaction: ${fitId} from ${hashInput}`);
+      }
 
-    // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
-    let transactionDate: Date | null = null;
-    let hasValidDate = false;
+      // Parse date (format: YYYYMMDDHHMMSS or YYYYMMDD)
+      let transactionDate: Date | null = null;
+      let hasValidDate = false;
 
-    if (dtPostedRaw && dtPostedRaw.length >= 8) {
-      try {
-        const dateStr = String(dtPostedRaw);
-        const year = parseInt(dateStr.substring(0, 4));
-        const month = parseInt(dateStr.substring(4, 6)) - 1; // Month is 0-based
-        const day = parseInt(dateStr.substring(6, 8));
+      if (dtPostedRaw && dtPostedRaw.length >= 8) {
+        try {
+          const dateStr = String(dtPostedRaw);
+          const year = parseInt(dateStr.substring(0, 4));
+          const month = parseInt(dateStr.substring(4, 6)) - 1; // Month is 0-based
+          const day = parseInt(dateStr.substring(6, 8));
 
-        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-          const parsedDate = new Date(year, month, day);
-          if (parsedDate.getFullYear() === year &&
+          if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+            const parsedDate = new Date(year, month, day);
+            if (parsedDate.getFullYear() === year &&
               parsedDate.getMonth() === month &&
               parsedDate.getDate() === day) {
-            transactionDate = parsedDate;
-            hasValidDate = true;
+              transactionDate = parsedDate;
+              hasValidDate = true;
+            }
           }
+        } catch (e) {
+          console.error("Error parsing date from DTPOSTED:", dtPostedRaw, e);
         }
-      } catch (e) {
-        console.error("Error parsing date from DTPOSTED:", dtPostedRaw, e);
       }
-    }
 
-    // Classify transaction type
-    let standardType: 'credit' | 'debit' | 'other' = 'other';
-    const amount = parseFloat(trnAmt);
+      // Classify transaction type
+      let standardType: 'credit' | 'debit' | 'other' = 'other';
+      const amount = parseFloat(trnAmt);
 
-    // Check for debit indicators (payments/withdrawals)
-    const isDebit = amount < 0 ||
-                   trnType === 'PAYMENT' ||
-                   trnType === 'DEBIT' ||
-                   trnType === 'CHECK' ||
-                   trnType === 'XFER' ||
-                   trnType === 'WITHDRAWAL' ||
-                   trnType === 'DEP' || // Some banks use DEP for debits
-                   memo.toLowerCase().includes('pag') ||
-                   memo.toLowerCase().includes('transf') ||
-                   memo.toLowerCase().includes('saque') ||
-                   memo.toLowerCase().includes('débito');
+      // Check for debit indicators (payments/withdrawals)
+      const isDebit = amount < 0 ||
+        trnType === 'PAYMENT' ||
+        trnType === 'DEBIT' ||
+        trnType === 'CHECK' ||
+        trnType === 'XFER' ||
+        trnType === 'WITHDRAWAL' ||
+        trnType === 'DEP' || // Some banks use DEP for debits
+        memo.toLowerCase().includes('pag') ||
+        memo.toLowerCase().includes('transf') ||
+        memo.toLowerCase().includes('saque') ||
+        memo.toLowerCase().includes('débito');
 
-    if (isDebit) {
-      standardType = 'debit';
-    } else if (trnType === 'CREDIT' || trnType === 'DEP' || amount > 0) {
-      standardType = 'credit';
-    }
+      if (isDebit) {
+        standardType = 'debit';
+      } else if (trnType === 'CREDIT' || trnType === 'DEP' || amount > 0) {
+        standardType = 'credit';
+      }
 
       transactions.push({
         fitId: fitId,
@@ -294,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const objectStorageService = new ObjectStorageService();
       const folder = (req.body.folder || 'uploads') as string;
-      
+
       // Upload to Object Storage for persistence
       const objectPath = await objectStorageService.uploadBuffer(
         req.file.buffer,
@@ -311,13 +311,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: req.file?.originalname,
         fileSize: req.file?.size
       });
-      
+
       // Return more specific error message
-      const errorMessage = error.message.includes('Object Storage') 
+      const errorMessage = error.message.includes('Object Storage')
         ? 'Erro no serviço de armazenamento. Tente novamente.'
         : 'Erro no upload do arquivo. Verifique o formato e tamanho.';
-        
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: errorMessage,
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -619,9 +619,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ 
-        imported, 
-        total: customizations.length, 
+      res.json({
+        imported,
+        total: customizations.length,
         errors: errors.slice(0, 10) // Limitar erros para não sobrecarregar resposta
       });
     } catch (error) {
@@ -683,10 +683,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter and validate items before enriching
       const validItems = items.filter((item: any) => {
         const isValid = item.productId &&
-                       item.productName &&
-                       item.productName.trim() !== '' &&
-                       item.quantity > 0 &&
-                       item.unitPrice > 0;
+          item.productName &&
+          item.productName.trim() !== '' &&
+          item.quantity > 0 &&
+          item.unitPrice > 0;
 
         if (!isValid) {
           console.log(`Filtering out invalid item for PDF:`, {
@@ -905,7 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const filtered = normalized.filter(tx => {
         const okStatus = status ? tx.status === status : true;
-        const okType   = type ? tx.type   === type   : true;
+        const okType = type ? tx.type === type : true;
         return okStatus && okType;
       });
 
@@ -931,14 +931,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pendingOrders = (orders || []).filter(o => {
         const total = parseFloat(o.totalValue || "0");
-        const paid  = parseFloat(o.paidValue  || "0");
+        const paid = parseFloat(o.paidValue || "0");
         const remaining = total - paid;
         return o.status !== "cancelled" && remaining > 0.01;
       });
 
       const totalRemaining = pendingOrders.reduce((acc, o) => {
         const total = parseFloat(o.totalValue || "0");
-        const paid  = parseFloat(o.paidValue  || "0");
+        const paid = parseFloat(o.paidValue || "0");
         return acc + (total - paid);
       }, 0);
 
@@ -962,7 +962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pendingOrders = (orders || []).filter(o => {
         const total = parseFloat(o.totalValue || "0");
-        const paid  = parseFloat(o.paidValue  || "0");
+        const paid = parseFloat(o.paidValue || "0");
         const remaining = total - paid;
         return o.status !== "cancelled" && remaining > 0.01;
       });
@@ -1110,8 +1110,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: paidValue > 0 
-          ? "Pedido cancelado com sucesso. Estorno registrado em Contas a Pagar." 
+        message: paidValue > 0
+          ? "Pedido cancelado com sucesso. Estorno registrado em Contas a Pagar."
           : "Pedido cancelado com sucesso",
         order: { ...order, status: 'cancelled' }
       });
@@ -1262,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users", async (req, res) => {
     try {
       const { username, password, role, name, email, phone, branchId, isCommissioned } = req.body;
-      
+
       if (!username || !password || !role || !name) {
         return res.status(400).json({ error: "Username, password, role and name are required" });
       }
@@ -1297,15 +1297,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     try {
       const users = await storage.getUsers();
-      
+
       // Also get clients from the clients table and merge them
       const clients = await storage.getClients();
-      
+
       // CRITICAL FIX: Create map of userId -> client data for enrichment
       const clientsByUserId = new Map(
         clients.map(c => [c.userId, c])
       );
-      
+
       // Enrich users with client data and filter duplicates
       const seenUserIds = new Set();
       const allUsers = users
@@ -1337,7 +1337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return u;
         });
-      
+
       console.log(`Returning ${allUsers.length} total users (${users.length} from users table, ${clients.length} from clients table)`);
       console.log(`Client records:`, clients.map(c => ({ id: c.id, name: c.name, userId: c.userId })));
       res.json(allUsers);
@@ -1535,7 +1535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!budgetData.clientId || budgetData.clientId === '' || budgetData.clientId === 'null') {
         budgetData.clientId = null;
       }
-      
+
       // Validate clientId if provided
       if (budgetData.clientId) {
         try {
@@ -1688,7 +1688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           vendor.name,
           newBudget.id,
           budgetData.contactName
-        ).catch(() => {});
+        ).catch(() => { });
       }
 
       res.json(finalBudget || newBudget);
@@ -1875,7 +1875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // If status is pending, update to accepted (user is confirming the send)
           if (existingForProducer.status === 'pending') {
             console.log(`Updating production order ${existingForProducer.id} from pending to accepted`);
-            
+
             // Update the production order status and details
             productionOrder = await storage.updateProductionOrder(existingForProducer.id, {
               status: 'accepted',
@@ -1885,29 +1885,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Reconcile production order items (ensure all expected items exist)
             const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
-            
+
             // Build set of existing item keys using comprehensive unique identifier
             const existingItemKeys = new Set(
               (existingItems || []).map(item => {
                 // Use multiple fields to ensure uniqueness, including customization
-                const customKey = item.hasItemCustomization ? 
+                const customKey = item.hasItemCustomization ?
                   `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
                 const generalKey = item.hasGeneralCustomization ?
                   `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
                 return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               })
             );
-            
+
             // Find items that should exist but don't
             const missingItems = uniqueProducerItems.filter((item: any) => {
-              const customKey = item.hasItemCustomization ? 
+              const customKey = item.hasItemCustomization ?
                 `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
               const generalKey = item.hasGeneralCustomization ?
                 `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
               const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               return !existingItemKeys.has(itemKey);
             });
-            
+
             // Create missing items with error tracking
             const itemCreationErrors = [];
             if (missingItems.length > 0) {
@@ -1927,7 +1927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   itemCreationErrors.push(errorMsg);
                 }
               }
-              
+
               // Alert if any items failed to create
               if (itemCreationErrors.length > 0) {
                 console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
@@ -1949,29 +1949,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Even if production order exists with accepted/other status,
             // ensure ALL items exist (reconcile expected vs existing)
             const existingItems = await storage.getProductionOrderItems(existingForProducer.id);
-            
+
             // Build set of existing item keys using comprehensive unique identifier
             const existingItemKeys = new Set(
               (existingItems || []).map(item => {
                 // Use multiple fields to ensure uniqueness, including customization
-                const customKey = item.hasItemCustomization ? 
+                const customKey = item.hasItemCustomization ?
                   `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
                 const generalKey = item.hasGeneralCustomization ?
                   `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
                 return `${item.productId}-${item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               })
             );
-            
+
             // Find items that should exist but don't
             const missingItems = uniqueProducerItems.filter((item: any) => {
-              const customKey = item.hasItemCustomization ? 
+              const customKey = item.hasItemCustomization ?
                 `${item.itemCustomizationDescription || ''}-${item.customizationPhoto || ''}` : '';
               const generalKey = item.hasGeneralCustomization ?
                 `${item.generalCustomizationName || ''}-${item.generalCustomizationValue || ''}` : '';
               const itemKey = `${item.productId}-${item.id || item.budgetItemId || 'null'}-${item.quantity}-${customKey}-${generalKey}`;
               return !existingItemKeys.has(itemKey);
             });
-            
+
             // Create missing items with error tracking
             const itemCreationErrors = [];
             if (missingItems.length > 0) {
@@ -1990,7 +1990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   itemCreationErrors.push(errorMsg);
                 }
               }
-              
+
               // Alert if any items failed to create
               if (itemCreationErrors.length > 0) {
                 console.error(`⚠️ WARNING: ${itemCreationErrors.length} items failed to create for production order ${existingForProducer.id}`);
@@ -2206,7 +2206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle producerId - 'internal' means null (no external producer)
       const isInternal = !updateData.producerId || updateData.producerId === 'internal';
-      
+
       // Clean the update data
       const cleanedUpdateData = {
         ...updateData,
@@ -2329,7 +2329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get or create producer payment for this production order
       let producerPayment = await storage.getProducerPaymentByProductionOrderId(productionOrderId);
-      
+
       if (!producerPayment) {
         // Create payment if it doesn't exist
         if (!productionOrder.producerValue || parseFloat(productionOrder.producerValue) <= 0) {
@@ -2352,7 +2352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       const validTransactions = bankTransactions.filter(t => t && t.status !== 'matched');
-      
+
       if (validTransactions.length === 0) {
         return res.status(400).json({ error: "Nenhuma transação válida encontrada. As transações podem já ter sido conciliadas." });
       }
@@ -2394,7 +2394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethod: 'ofx',
         reconciliationStatus: 'ofx_matched',
         bankTransactionId: transactionIds[0], // Primary transaction ID
-        notes: hasAdjustment 
+        notes: hasAdjustment
           ? `Conciliado via OFX. Diferença: R$ ${difference.toFixed(2)} (${transactionIds.length} transações)`
           : `Conciliado via OFX com ${transactionIds.length} transação(ões)`
       });
@@ -2505,7 +2505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all data from all tables
       const [
         users,
-        clients, 
+        clients,
         vendors,
         partners,
         products,
@@ -2527,7 +2527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUsers(),
         storage.getClients(),
         storage.getVendors(),
-        storage.getPartners(), 
+        storage.getPartners(),
         storage.getProducts({ limit: 10000 }).then(result => result.products),
         storage.getBudgets(),
         storage.getOrders(),
@@ -2567,8 +2567,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const totalRecords = users.length + clients.length + products.length + budgets.length + 
-                          orders.length + allBudgetItems.length + payments.length + commissions.length;
+      const totalRecords = users.length + clients.length + products.length + budgets.length +
+        orders.length + allBudgetItems.length + payments.length + commissions.length;
 
       const backupData = {
         metadata: {
@@ -2633,7 +2633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="database_backup_${new Date().toISOString().split('T')[0]}.json"`);
       res.setHeader('Cache-Control', 'no-cache');
-      
+
       // Send the actual JSON data
       res.send(JSON.stringify(backupData, null, 2));
 
@@ -2660,8 +2660,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate that producer value is set before allowing 'ready' status
       if (status === 'ready') {
         if (!currentPO.producerValue || parseFloat(currentPO.producerValue) <= 0) {
-          return res.status(400).json({ 
-            error: "Não é possível marcar como pronto sem definir o valor que você cobrará por este pedido. Defina o valor primeiro." 
+          return res.status(400).json({
+            error: "Não é possível marcar como pronto sem definir o valor que você cobrará por este pedido. Defina o valor primeiro."
           });
         }
       }
@@ -2740,7 +2740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let { producerId } = req.body;
-      
+
       // Handle internal products - producerId 'internal' or empty means null
       const isInternal = !producerId || producerId === 'internal';
       producerId = isInternal ? null : producerId;
@@ -2757,8 +2757,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (fileExtension === 'json') {
         try {
-          const fileContent = req.file.buffer.toString('utf8');
+          // Remove BOM character Se houver
+          const fileContent = req.file.buffer.toString('utf8').replace(/^\\uFEFF/, '');
           productsData = JSON.parse(fileContent);
+
+          // Se for um objeto com uma propriedade que é um array, extraia o array
+          if (productsData && typeof productsData === 'object' && !Array.isArray(productsData)) {
+            const possibleArrays = Object.values(productsData).filter(val => Array.isArray(val));
+            if (possibleArrays.length > 0) {
+              productsData = possibleArrays[0];
+            } else if (productsData.data && Array.isArray(productsData.data)) {
+              productsData = productsData.data;
+            } else if (productsData.products && Array.isArray(productsData.products)) {
+              productsData = productsData.products;
+            } else if (productsData.produtos && Array.isArray(productsData.produtos)) {
+              productsData = productsData.produtos;
+            }
+          }
         } catch (parseError) {
           return res.status(400).json({
             error: "Erro ao analisar arquivo JSON. Verifique se o formato está correto.",
@@ -3409,7 +3424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vendor?.name || 'Vendedor',
         newOrder.id,
         newOrder.contactName
-      ).catch(() => {});
+      ).catch(() => { });
 
       // Incluir alertas na resposta se existirem
       const response = {
@@ -3449,14 +3464,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // === CASCADING UPDATES ===
-      
+
       // 1. Check if order value changed - recalculate commissions
       const originalValue = parseFloat(originalOrder.totalValue || '0');
       const newValue = parseFloat(updatedOrder.totalValue || '0');
-      
+
       if (originalValue !== newValue && updateData.status !== 'cancelled') {
         console.log(`Order ${id} value changed from ${originalValue} to ${newValue} - recalculating commissions`);
-        
+
         // Recalculate commissions with new value (updates existing commissions)
         await storage.recalculateCommissionsForOrder(updatedOrder);
         console.log(`Commissions recalculated for order ${id}`);
@@ -3470,10 +3485,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Update production orders if items changed
       if (updateData.items && Array.isArray(updateData.items) && updateData.items.length > 0) {
         console.log(`Order ${id} items updated - syncing production orders`);
-        
+
         // Get existing production orders for this order
         const existingProductionOrders = await storage.getProductionOrdersByOrder(id);
-        
+
         // Group new items by producer
         const producerGroups = new Map<string, typeof updateData.items>();
         for (const item of updateData.items) {
@@ -3490,16 +3505,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For each producer group, create or update production order
         for (const [producerId, items] of producerGroups.entries()) {
           if (producerId === 'internal') continue; // Skip internal production
-          
+
           // Check if production order already exists for this producer
           const existingPO = existingProductionOrders.find(po => po.producerId === producerId);
-          
+
           if (existingPO) {
             // Update existing production order notes
             const itemsDescription = items.map((i: any) => `${i.productName} (${i.quantity}x)`).join(', ');
             await storage.updateProductionOrderStatus(
-              existingPO.id, 
-              existingPO.status, 
+              existingPO.id,
+              existingPO.status,
               `Itens atualizados: ${itemsDescription}`
             );
             console.log(`Updated production order ${existingPO.id} for producer ${producerId}`);
@@ -3513,10 +3528,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               deliveryDeadline: typeof deliveryDeadline === 'string' ? new Date(deliveryDeadline) : deliveryDeadline,
               notes: `Itens: ${items.map((i: any) => `${i.productName} (${i.quantity}x)`).join(', ')}`,
             };
-            
+
             const newPO = await storage.createProductionOrder(productionOrderData);
             console.log(`Created new production order ${newPO.id} for producer ${producerId}`);
-            
+
             // Create production order items
             for (const item of items) {
               await storage.createProductionOrderItem(newPO.id, {
@@ -3539,7 +3554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Cancelled production order ${existingPO.id} - producer removed from order`);
           }
         }
-        
+
         console.log(`Production orders synced for order ${id}`);
       }
 
@@ -3550,7 +3565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.user.name,
           id,
           `Status: ${updatedOrder.status}`
-        ).catch(() => {});
+        ).catch(() => { });
       } else {
         storage.logUserAction(
           req.user?.id || 'system',
@@ -3565,7 +3580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           undefined,
           undefined,
           updatedOrder.vendorId
-        ).catch(() => {});
+        ).catch(() => { });
       }
 
       console.log(`Order ${id} updated successfully with cascading updates`);
@@ -4170,7 +4185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 clientName = clientRecord.name;
               }
               // Montar endereço de entrega do cliente
-              clientAddress = clientRecord.enderecoEntregaLogradouro 
+              clientAddress = clientRecord.enderecoEntregaLogradouro
                 ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               console.log(`[PROD-ORDER DEBUG] Built address from clientRecord: ${clientAddress?.substring(0, 50)}`);
@@ -4183,7 +4198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   clientName = clientByUserId.name;
                 }
                 // Montar endereço de entrega do cliente
-                clientAddress = clientByUserId.enderecoEntregaLogradouro 
+                clientAddress = clientByUserId.enderecoEntregaLogradouro
                   ? `${clientByUserId.enderecoEntregaLogradouro}, ${clientByUserId.enderecoEntregaNumero || 's/n'}${clientByUserId.enderecoEntregaComplemento ? ` - ${clientByUserId.enderecoEntregaComplemento}` : ''}, ${clientByUserId.enderecoEntregaBairro || ''}, ${clientByUserId.enderecoEntregaCidade || ''}, CEP: ${clientByUserId.enderecoEntregaCep || ''}`
                   : clientByUserId.address;
                 clientPhone = clientPhone || clientByUserId.phone;
@@ -4593,7 +4608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // UPDATE endpoints
-  
+
   app.put("/api/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -5365,7 +5380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { vendorId } = req.params;
       console.log(`Fetching commissions for vendor: ${vendorId}`);
-      
+
       const commissions = await storage.getCommissionsByVendor(vendorId);
       console.log(`Found ${commissions.length} commissions for vendor ${vendorId}`);
 
@@ -6038,8 +6053,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // 2. Have remaining balance > 0.01 (to avoid floating point issues)
         // 3. Are confirmed (not just drafts)
         const shouldInclude = order.status !== 'cancelled' &&
-                             remainingValue > 0.01 &&
-                             (order.status === 'confirmed' || order.status === 'production' || order.status ==='pending');
+          remainingValue > 0.01 &&
+          (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
 
         if (shouldInclude) {
           console.log(`Including order ${order.orderNumber}: Total=${totalValue}, Paid=${paidValue}, Remaining=${remainingValue}, Status=${order.status}`);
@@ -6517,33 +6532,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const allPayables = await storage.getManualPayables();
       const estornos = allPayables.filter((p: any) => p.category === 'Estorno');
-      
+
       // Enrich with client and order info
       const enrichedEstornos = await Promise.all(estornos.map(async (estorno: any) => {
         let clientName = estorno.beneficiary;
         let orderNumber = null;
-        
+
         if (estorno.orderId) {
           const order = await storage.getOrder(estorno.orderId);
           if (order) {
             orderNumber = order.orderNumber;
           }
         }
-        
+
         if (estorno.clientId) {
           const client = await storage.getClient(estorno.clientId);
           if (client) {
             clientName = client.name || client.nomeFantasia || client.razaoSocial || estorno.beneficiary;
           }
         }
-        
+
         return {
           ...estorno,
           clientName,
           orderNumber,
         };
       }));
-      
+
       console.log(`Returning ${enrichedEstornos.length} estornos (refunds)`);
       res.json(enrichedEstornos);
     } catch (error) {
@@ -6562,7 +6577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // First try to find by ID (UUID)
       let estorno = await storage.getManualPayable(id);
-      
+
       // If not found, it might be a refund for an order that hasn't been defined yet
       // In that case, the ID might be the orderId
       if (!estorno) {
@@ -6571,7 +6586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check if there's already a manual payable for this order
           const payables = await storage.getManualPayables();
           estorno = payables.find((p: any) => p.orderId === id && p.category === 'Estorno');
-          
+
           if (!estorno) {
             // Create one on the fly if it doesn't exist but order has paidValue
             if (parseFloat(order.paidValue || '0') > 0) {
@@ -6609,7 +6624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the order - try estorno.orderId first, then the original id parameter
       const orderIdToUpdate = estorno.orderId || id;
       console.log(`Attempting to update order: ${orderIdToUpdate}`);
-      
+
       try {
         const orderUpdate = await storage.updateOrder(orderIdToUpdate, {
           refundedAt: new Date(),
@@ -6944,7 +6959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/finance/overview", async (req, res) => {
     try {
       const { branchId } = req.query;
-      
+
       let orders = await storage.getOrders();
       const payments = await storage.getPayments();
       let allCommissions = await storage.getAllCommissions();
@@ -6957,14 +6972,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (branchId && branchId !== 'all') {
         console.log(`Filtering financial overview by branchId: ${branchId}`);
         orders = orders.filter(order => order.branchId === branchId);
-        
+
         // Filtrar production orders e producer payments pelos orders filtrados
         const orderIds = orders.map(o => o.id);
         productionOrders = productionOrders.filter(po => orderIds.includes(po.orderId));
-        
+
         const productionOrderIds = productionOrders.map(po => po.id);
         producerPayments = producerPayments.filter(pp => productionOrderIds.includes(pp.productionOrderId));
-        
+
         // Filtrar comissões pelos orders filtrados
         allCommissions = allCommissions.filter(c => orderIds.includes(c.orderId));
       }
@@ -6981,13 +6996,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Contas a Receber - usar accountsReceivable (que já tem o valor correto)
       let accountsReceivable = await storage.getAccountsReceivable();
-      
+
       // Filtrar por filial se especificada
       if (branchId && branchId !== 'all') {
         const orderIds = orders.map(o => o.id);
         accountsReceivable = accountsReceivable.filter(ar => orderIds.includes(ar.orderId));
       }
-      
+
       const orderReceivables = accountsReceivable
         .filter(ar => ar.status !== 'paid' && ar.status !== 'cancelled')
         .reduce((total, ar) => {
@@ -7493,7 +7508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Creating user and client atomically in transaction...");
-      
+
       // Create user and client in a single transaction (atomic operation)
       const { user, client } = await storage.createClientWithUser(
         {
@@ -7568,7 +7583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        return res.status(400).json({ error:"Valor deve ser maior que zero" });
+        return res.status(400).json({ error: "Valor deve ser maior que zero" });
       }
 
       // Verify order exists
@@ -7641,26 +7656,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Products must be in_store before marking as delivered
       if (order.productStatus !== 'in_store') {
         console.log(`Order ${id} cannot be delivered - products not in store yet (status: ${order.productStatus})`);
-        return res.status(400).json({ 
-          error: "Os produtos ainda não estão na loja. Complete a etapa de compra primeiro." 
+        return res.status(400).json({
+          error: "Os produtos ainda não estão na loja. Complete a etapa de compra primeiro."
         });
       }
 
       // Check all production orders for this order
       const productionOrders = await storage.getProductionOrdersByOrder(id);
-      
+
       // Verify that production orders have been dispatched before delivery
-      const hasShippedOrDelivered = productionOrders.every(po => 
+      const hasShippedOrDelivered = productionOrders.every(po =>
         po.status === 'shipped' || po.status === 'delivered'
       );
-      
+
       if (!hasShippedOrDelivered && productionOrders.length > 0) {
         console.log(`Order ${id} cannot be delivered - not all production orders are shipped`);
-        return res.status(400).json({ 
-          error: "Alguns produtos ainda não foram despachados. Finalize o envio primeiro." 
+        return res.status(400).json({
+          error: "Alguns produtos ainda não foram despachados. Finalize o envio primeiro."
         });
       }
-      
+
       const allDelivered = productionOrders.every(po => po.status === 'delivered');
 
       if (allDelivered) {
@@ -8007,7 +8022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const pms = await storage.getPaymentMethods();
                 const pm = pms.find((p: any) => p.id === budget.paymentMethodId);
                 paymentMethodName = pm?.name || '';
-              } catch {}
+              } catch { }
             }
 
             let shippingMethodName = '';
@@ -8016,7 +8031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const sms = await storage.getShippingMethods();
                 const sm = sms.find((s: any) => s.id === budget.shippingMethodId);
                 shippingMethodName = sm?.name || '';
-              } catch {}
+              } catch { }
             }
 
             return {
@@ -8099,29 +8114,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const budgetData = req.body;
       const budgetId = req.params.id;
-      
+
       console.log(`[UPDATE BUDGET] Processing update for budget ${budgetId}`);
-      
+
       // CRITICAL FIX: Detect if items should be processed using hasOwnProperty
       // - If 'items' key not present → metadata-only update (keep existing items)
       // - If 'items' key present but null/undefined → treat as metadata-only (frontend compat)
       // - If 'items' key present and is [] → explicit removal of all items
       // - If 'items' key present and is [...] → update items list
-      const shouldProcessItems = Object.prototype.hasOwnProperty.call(budgetData, 'items') 
-        && budgetData.items !== null 
+      const shouldProcessItems = Object.prototype.hasOwnProperty.call(budgetData, 'items')
+        && budgetData.items !== null
         && budgetData.items !== undefined;
-      
+
       // Remove items from metadata payload to prevent DB column corruption
       const budgetMetadata = { ...budgetData };
       delete budgetMetadata.items;
-      
+
       delete budgetMetadata.requiresApproval;
-      
+
       // FIX: Convert 'matriz' branchId to null (matriz is not a valid FK)
       if (budgetMetadata.branchId === 'matriz') {
         budgetMetadata.branchId = null;
       }
-      
+
       // Update budget metadata
       const updatedBudget = await storage.updateBudget(budgetId, budgetMetadata);
 
@@ -8129,17 +8144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (shouldProcessItems) {
         if (!Array.isArray(budgetData.items)) {
           console.error(`[UPDATE BUDGET] Invalid items format - must be array`);
-          return res.status(400).json({ 
-            error: "Items must be an array when provided" 
+          return res.status(400).json({
+            error: "Items must be an array when provided"
           });
         }
-        
+
         console.log(`[UPDATE BUDGET] Updating items: ${budgetData.items.length} items provided`);
-        
+
         // CRITICAL FIX: VALIDATE and PREPARE all items BEFORE deleting anything
         // This prevents data loss if any item has invalid data
         const itemsToInsert = [];
-        
+
         if (budgetData.items.length > 0) {
           // Remove duplicate items before processing
           const seenItems = new Set();
@@ -8162,62 +8177,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // STEP 2: VALIDATE and PREPARE each item (no DB operations yet)
           for (const item of uniqueItems) {
-        const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
-        const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
-        const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
-        const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
+            const quantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity;
+            const unitPrice = typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice;
+            const itemCustomizationValue = typeof item.itemCustomizationValue === 'string' ? parseFloat(item.itemCustomizationValue) : (item.itemCustomizationValue || 0);
+            const generalCustomizationValue = typeof item.generalCustomizationValue === 'string' ? parseFloat(item.generalCustomizationValue) : (item.generalCustomizationValue || 0);
 
-        // Calculate total price including customizations and discounts
-        let totalPrice = unitPrice * quantity;
-        if (item.hasItemCustomization && itemCustomizationValue > 0) {
-          totalPrice += (itemCustomizationValue * quantity);
-        }
-        if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
-          totalPrice += (generalCustomizationValue * quantity);
-        }
+            // Calculate total price including customizations and discounts
+            let totalPrice = unitPrice * quantity;
+            if (item.hasItemCustomization && itemCustomizationValue > 0) {
+              totalPrice += (itemCustomizationValue * quantity);
+            }
+            if (item.hasGeneralCustomization && generalCustomizationValue > 0) {
+              totalPrice += (generalCustomizationValue * quantity);
+            }
 
-        // Add to preparation array (no DB operation yet)
-        // Handle producerId - 'internal' or empty means null (no external producer)
-        const isInternal = !item.producerId || item.producerId === 'internal';
+            // Add to preparation array (no DB operation yet)
+            // Handle producerId - 'internal' or empty means null (no external producer)
+            const isInternal = !item.producerId || item.producerId === 'internal';
             itemsToInsert.push({
-          productId: item.productId,
-          producerId: isInternal ? null : item.producerId,
-          quantity: quantity,
-          unitPrice: unitPrice.toFixed(2),
-          totalPrice: totalPrice.toFixed(2),
-          // Item Customization
-          hasItemCustomization: item.hasItemCustomization || false,
-          selectedCustomizationId: item.selectedCustomizationId || null,
-          itemCustomizationValue: itemCustomizationValue.toFixed(2),
-          itemCustomizationDescription: item.itemCustomizationDescription || null,
-          customizationPhoto: item.customizationPhoto || null,
-          // General Customization
-          hasGeneralCustomization: item.hasGeneralCustomization || false,
-          generalCustomizationName: item.generalCustomizationName || null,
-          generalCustomizationValue: generalCustomizationValue.toFixed(2),
-          // Product dimensions
-          productWidth: item.productWidth || null,
-          productHeight: item.productHeight || null,
-          productDepth: item.productDepth || null,
-          // Item discount
-          hasItemDiscount: item.hasItemDiscount || false,
-          itemDiscountType: item.itemDiscountType || "percentage",
-            itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
-            itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
+              productId: item.productId,
+              producerId: isInternal ? null : item.producerId,
+              quantity: quantity,
+              unitPrice: unitPrice.toFixed(2),
+              totalPrice: totalPrice.toFixed(2),
+              // Item Customization
+              hasItemCustomization: item.hasItemCustomization || false,
+              selectedCustomizationId: item.selectedCustomizationId || null,
+              itemCustomizationValue: itemCustomizationValue.toFixed(2),
+              itemCustomizationDescription: item.itemCustomizationDescription || null,
+              customizationPhoto: item.customizationPhoto || null,
+              // General Customization
+              hasGeneralCustomization: item.hasGeneralCustomization || false,
+              generalCustomizationName: item.generalCustomizationName || null,
+              generalCustomizationValue: generalCustomizationValue.toFixed(2),
+              // Product dimensions
+              productWidth: item.productWidth || null,
+              productHeight: item.productHeight || null,
+              productDepth: item.productDepth || null,
+              // Item discount
+              hasItemDiscount: item.hasItemDiscount || false,
+              itemDiscountType: item.itemDiscountType || "percentage",
+              itemDiscountPercentage: item.itemDiscountPercentage ? parseFloat(item.itemDiscountPercentage) : 0,
+              itemDiscountValue: item.itemDiscountValue ? parseFloat(item.itemDiscountValue) : 0
             });
           }
-          
+
           // STEP 3: Create ALL new items FIRST (safer than deleting first)
           console.log(`[UPDATE BUDGET] Creating ${itemsToInsert.length} new items FIRST (before deleting old ones)...`);
           const createdItemIds = [];
-          
+
           // Insert all new items - if this fails, old items remain intact
           for (const itemData of itemsToInsert) {
             const newItem = await storage.createBudgetItem(updatedBudget.id, itemData);
             createdItemIds.push(newItem.id);
           }
           console.log(`[UPDATE BUDGET] Successfully created ${createdItemIds.length} new items`);
-          
+
           // STEP 4: Only delete old items after ALL new ones are created successfully
           // NOTE: Without DB transactions, if deletion fails after some deletes, we may have
           // temporary duplicates, but this is better than losing data completely
@@ -8453,7 +8468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL FIX: Convert deliveryDate string to Date object for Drizzle
       const deliveryDateObj = new Date(deliveryDate);
-      
+
       const order = await storage.convertBudgetToOrder(id, clientId, deliveryDateObj);
 
       // Update budget status
@@ -8533,7 +8548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedAt: new Date()
         });
         console.log(`Budget ${req.params.id} has items below minimum price - sent to approval instead of WhatsApp`);
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Este orçamento possui itens com preço abaixo do mínimo. Foi enviado para aprovação do administrador.",
           status: 'awaiting_approval'
         });
@@ -8591,7 +8606,7 @@ Para mais detalhes, entre em contato conosco!`;
       // Enrich items with product data and calculate totals
       const enrichedItems = await Promise.all(
         items.map(async (item) => {
-          const product =await storage.getProduct(item.productId);
+          const product = await storage.getProduct(item.productId);
           const quantity = item.quantity;
           const unitPrice = parseFloat(item.unitPrice);
           const customizationValue = parseFloat(item.itemCustomizationValue || '0');
@@ -9238,11 +9253,11 @@ Para mais detalhes, entre em contato conosco!`;
       const dropshippingOrders = orders.filter(order => {
         // Order must be cancelled to be excluded
         if (order.status === 'cancelled') return false;
-        
+
         // Check payment status - order must have received some payment
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0;
-        
+
         if (!isPaid) return false;
 
         // Check if order has items with external producers
@@ -9266,19 +9281,19 @@ Para mais detalhes, entre em contato conosco!`;
             uniqueProducers.add(item.producerId);
           }
         }
-        
+
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
-        
+
         // Exclude if ALL producers have been sent POs already
         const allProducersHaveSentPOs = uniqueProducers.size > 0 && uniqueProducers.size === producersWithSentPOs.size;
-        
+
         return !allProducersHaveSentPOs;
       });
 
       console.log(`Found ${dropshippingOrders.length} dropshipping orders`);
-      
+
       // Enrich orders with producer names and client data
       const enrichedOrders = await Promise.all(
         dropshippingOrders.map(async (order) => {
@@ -9295,12 +9310,12 @@ Para mais detalhes, entre em contato conosco!`;
               return item;
             })
           );
-          
+
           // Get client data
           let clientName = order.contactName;
           let clientPhone = order.contactPhone;
           let clientEmail = order.contactEmail;
-          
+
           if (order.clientId) {
             let clientRecord = await storage.getClient(order.clientId);
             if (!clientRecord) {
@@ -9312,7 +9327,7 @@ Para mais detalhes, entre em contato conosco!`;
               if (!clientEmail) clientEmail = clientRecord.email;
             }
           }
-          
+
           return {
             ...order,
             items: enrichedItems,
@@ -9330,7 +9345,7 @@ Para mais detalhes, entre em contato conosco!`;
         'purchased': 2,
         'in_store': 3
       };
-      
+
       enrichedOrders.sort((a, b) => {
         const priorityA = statusPriority[a.productStatus] || 1;
         const priorityB = statusPriority[b.productStatus] || 1;
@@ -9359,11 +9374,11 @@ Para mais detalhes, entre em contato conosco!`;
         if (paidValue <= 0) continue;
         if (!order.budgetId) continue;
         if (order.productStatus === 'in_store') continue;
-        
+
         const budgetItems = await storage.getBudgetItems(order.budgetId);
         let clientName = order.contactName;
         let clientPhone = order.contactPhone;
-        
+
         if (order.clientId) {
           let clientRecord = await storage.getClient(order.clientId);
           if (!clientRecord) clientRecord = await storage.getClientByUserId(order.clientId);
@@ -9375,28 +9390,28 @@ Para mais detalhes, entre em contato conosco!`;
 
         for (const item of budgetItems) {
           if (!item.producerId || item.producerId === 'internal') continue;
-          
+
           const producer = await storage.getUser(item.producerId);
           const product = await storage.getProduct(item.productId);
-          
+
           const purchaseStatus = item.purchaseStatus || 'to_buy';
-          
+
           // Map purchaseStatus to filter status based on button logic:
           // if status is 'to_buy', it shows button for 'purchased'
           // if status is 'purchased', it shows button for 'in_store'
           // if status is 'in_store', it shows no button (already in store)
-          
+
           // The user says: "if the button is 'Na loja', filter those. if the button is 'Comprado', filter those. if the button is 'Para comprar', filter those."
           // Based on the code:
           // Item status 'to_buy' -> Button is 'Comprado' (yellow)
           // Item status 'purchased' -> Button is 'Na loja' (green)
           // Item status 'pending' -> Button is 'Para comprar' (red)
-          
+
           let buttonStatus = '';
           if (purchaseStatus === 'pending') buttonStatus = 'to_buy';
           else if (purchaseStatus === 'to_buy') buttonStatus = 'purchased';
           else if (purchaseStatus === 'purchased') buttonStatus = 'in_store';
-          
+
           if (status && status !== 'all' && buttonStatus !== status) continue;
 
           allItems.push({
@@ -9429,9 +9444,9 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Sort by purchase status priority: to_buy first, then purchased, then in_store
-      const statusPriority: Record<string, number> = { 
-        'to_buy': 1, 
-        'purchased': 2, 
+      const statusPriority: Record<string, number> = {
+        'to_buy': 1,
+        'purchased': 2,
         'in_store': 3,
         'pending': 1 // Fallback pending to same as to_buy
       };
@@ -9456,35 +9471,35 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const { itemId } = req.params;
       const { purchaseStatus } = req.body;
-      
+
       if (!['pending', 'to_buy', 'purchased', 'in_store'].includes(purchaseStatus)) {
         return res.status(400).json({ error: "Status inválido. Use: pending, to_buy, purchased, in_store" });
       }
-      
+
       const updatedItem = await storage.updateBudgetItemPurchaseStatus(itemId, purchaseStatus);
-      
+
       if (!updatedItem) {
         return res.status(404).json({ error: "Item não encontrado" });
       }
-      
+
       // Get the budget to find the order
       const budgets = await storage.getBudgets();
       const budget = budgets.find(b => b.id === updatedItem.budgetId);
-      
+
       let allItemsReady = false;
       let orderNumber = '';
-      
+
       if (budget) {
         // Find the order for this budget
         const orders = await storage.getOrders();
         const order = orders.find(o => o.budgetId === budget.id);
-        
+
         if (order) {
           orderNumber = order.orderNumber || '';
-          
+
           // Check if all items are now in_store
           const allInStore = await storage.checkAllItemsInStore(order.id);
-          
+
           if (allInStore && order.productStatus !== 'in_store') {
             // Update order productStatus to 'in_store' when all items are in store
             // This makes the order appear in the production queue (Dashboard)
@@ -9494,9 +9509,9 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
       }
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: `Status do item atualizado para ${purchaseStatus}`,
         item: updatedItem,
         allItemsReady,
@@ -9512,19 +9527,19 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/orders/:orderId/initialize-item-status", async (req, res) => {
     try {
       const { orderId } = req.params;
-      
+
       const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ error: "Pedido não encontrado" });
       }
-      
+
       if (!order.budgetId) {
         return res.status(400).json({ error: "Pedido não tem orçamento associado" });
       }
-      
+
       const items = await storage.getBudgetItems(order.budgetId);
       let updatedCount = 0;
-      
+
       for (const item of items) {
         // Only update items with external producers that are still pending
         if (item.producerId && item.producerId !== 'internal' && (!item.purchaseStatus || item.purchaseStatus === 'pending')) {
@@ -9532,11 +9547,11 @@ Para mais detalhes, entre em contato conosco!`;
           updatedCount++;
         }
       }
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: `${updatedCount} itens atualizados para 'to_buy'`,
-        updatedCount 
+        updatedCount
       });
     } catch (error) {
       console.error("Error initializing item status:", error);
@@ -9568,7 +9583,7 @@ Para mais detalhes, entre em contato conosco!`;
         const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0; // Any payment received
-        
+
         // For dropshipping workflow: only show orders with product in store
         const productStatus = order.productStatus || 'to_buy';
         const isProductInStore = productStatus === 'in_store';
@@ -9576,7 +9591,7 @@ Para mais detalhes, entre em contato conosco!`;
         // Check if order has items with external producers
         let hasExternalProducers = false;
         let uniqueProducers = new Set<string>();
-        
+
         if (order.budgetId) {
           // For budget-based orders, check budget items
           const budgetItems = order.items || [];
@@ -9600,7 +9615,7 @@ Para mais detalhes, entre em contato conosco!`;
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
-        
+
         // Order is valid if it's paid, has external producers, NOT ALL producers have been sent POs yet, AND product is in store
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
         const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs && isProductInStore;
@@ -9613,7 +9628,7 @@ Para mais detalhes, entre em contato conosco!`;
       });
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
-      
+
       // Enrich orders with producer names and client data
       const enrichedOrders = await Promise.all(
         paidOrders.map(async (order) => {
@@ -9630,30 +9645,30 @@ Para mais detalhes, entre em contato conosco!`;
               return item;
             })
           );
-          
+
           // Get client data for logistics display
           let clientName = order.contactName;
           let clientAddress = null;
           let clientPhone = order.contactPhone;
           let clientEmail = order.contactEmail;
-          
+
           // Always try to get client address for logistics
           if (order.clientId) {
             // Try to get client by ID first (direct client table lookup)
             let clientRecord = await storage.getClient(order.clientId);
-            
+
             // If not found, try by userId
             if (!clientRecord) {
               clientRecord = await storage.getClientByUserId(order.clientId);
             }
-            
+
             if (clientRecord) {
               // Use client name if contactName not available
               if (!clientName) {
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.enderecoEntregaLogradouro 
+              clientAddress = clientRecord.enderecoEntregaLogradouro
                 ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
@@ -9671,16 +9686,16 @@ Para mais detalhes, entre em contato conosco!`;
               }
             }
           }
-          
+
           if (!clientName) {
             clientName = "Nome não informado";
           }
-          
+
           // Priorizar endereço salvo no pedido, depois endereço do cliente
           const finalShippingAddress = order.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
             : (order.shippingAddress || clientAddress || 'Endereço não informado');
-          
+
           return {
             ...order,
             items: enrichedItems,
@@ -9693,7 +9708,7 @@ Para mais detalhes, entre em contato conosco!`;
           };
         })
       );
-      
+
       res.json(enrichedOrders);
     } catch (error) {
       console.error("Error fetching paid orders for logistics:", error);
@@ -9721,19 +9736,19 @@ Para mais detalhes, entre em contato conosco!`;
           if (order?.clientId) {
             // Try to get client by ID first (direct client table lookup)
             let clientRecord = await storage.getClient(order.clientId);
-            
+
             // If not found, try by userId
             if (!clientRecord) {
               clientRecord = await storage.getClientByUserId(order.clientId);
             }
-            
+
             if (clientRecord) {
               // Use client name if contactName not available
               if (!clientName) {
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.enderecoEntregaLogradouro 
+              clientAddress = clientRecord.enderecoEntregaLogradouro
                 ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
@@ -9819,19 +9834,19 @@ Para mais detalhes, entre em contato conosco!`;
           if (order.clientId) {
             // Try to get client by ID first (direct client table lookup)
             let clientRecord = await storage.getClient(order.clientId);
-            
+
             // If not found, try by userId
             if (!clientRecord) {
               clientRecord = await storage.getClientByUserId(order.clientId);
             }
-            
+
             if (clientRecord) {
               // Use client name if contactName not available
               if (!clientName || clientName === 'Cliente não identificado') {
                 clientName = clientRecord.name;
               }
               // Always get delivery address from client record
-              clientAddress = clientRecord.enderecoEntregaLogradouro 
+              clientAddress = clientRecord.enderecoEntregaLogradouro
                 ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
                 : clientRecord.address;
               clientPhone = clientPhone || clientRecord.phone;
@@ -9852,7 +9867,7 @@ Para mais detalhes, entre em contato conosco!`;
 
           const vendor = await storage.getUser(order.vendorId);
           const producer = order.producerId ? await storage.getUser(order.producerId) : null;
-          
+
           // Priorizar endereço salvo no pedido, depois endereço do cliente
           const finalShippingAddress = order.deliveryType === 'pickup'
             ? 'Sede Principal - Retirada no Local'
@@ -9930,9 +9945,9 @@ Para mais detalhes, entre em contato conosco!`;
       const vendorId = req.params.vendorId;
       const budgets = await storage.getBudgetsByVendor(vendorId);
 
-      const pendingBudgets = budgets.filter((budget: any) => 
-        budget.status === 'approved' || 
-        budget.status === 'admin_approved' || 
+      const pendingBudgets = budgets.filter((budget: any) =>
+        budget.status === 'approved' ||
+        budget.status === 'admin_approved' ||
         budget.status === 'not_approved'
       );
 
@@ -10291,16 +10306,16 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/pricing/calculate", async (req, res) => {
     try {
       const { productCost, quantity, revenue = 0, paymentCondition = 'standard' } = req.body;
-      
+
       const settings = await storage.getPricingSettings();
       if (!settings) {
         return res.status(400).json({ error: "No pricing settings configured" });
       }
-      
+
       const tiers = await storage.getPricingMarginTiers(settings.id);
       const totalCost = parseFloat(productCost);
       const revenueValue = parseFloat(revenue) || 0;
-      
+
       // Encontrar faixa baseada no faturamento
       let marginRate = 0.28;
       let minMarginRate = 0.20;
@@ -10313,20 +10328,20 @@ Para mais detalhes, entre em contato conosco!`;
           break;
         }
       }
-      
+
       const taxRate = parseFloat(settings.taxRate) / 100;
       const commissionRate = parseFloat(settings.commissionRate) / 100;
-      
+
       const divisorIdeal = 1 - (taxRate + commissionRate + marginRate);
       const divisorMinimo = 1 - (taxRate + commissionRate + minMarginRate);
-      
+
       let idealPrice = totalCost / divisorIdeal;
       const minimumPrice = totalCost / divisorMinimo;
-      
+
       if (paymentCondition === 'cash') {
         idealPrice *= (1 - parseFloat(settings.cashDiscount) / 100);
       }
-      
+
       res.json({
         totalCost: Math.round(totalCost * 100) / 100,
         marginApplied: marginRate * 100,

@@ -249,7 +249,7 @@ export class PgStorage implements IStorage {
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
     const clients = await pg.select().from(schema.clients)
       .where(and(eq(schema.clients.vendorId, vendorId), eq(schema.clients.isActive, true)));
-    
+
     // Filter out deleted clients (clients whose user was deleted)
     const activeClients = await Promise.all(
       clients.map(async (client) => {
@@ -260,7 +260,7 @@ export class PgStorage implements IStorage {
         return client; // Keep clients without userId (legacy records)
       })
     );
-    
+
     return activeClients.filter((client): client is Client => client !== null);
   }
 
@@ -286,7 +286,7 @@ export class PgStorage implements IStorage {
 
     const budgetOrders = await Promise.all(convertedBudgets.map(async (budget) => {
       const items = await this.getBudgetItems(budget.id);
-      
+
       // Map budget fields to order format
       return {
         id: budget.id,
@@ -362,7 +362,7 @@ export class PgStorage implements IStorage {
 
     if (budget && budget.status === 'converted') {
       const items = await this.getBudgetItems(budget.id);
-      
+
       // Map budget fields to order format
       return {
         id: budget.id,
@@ -439,10 +439,10 @@ export class PgStorage implements IStorage {
     // If items are provided but no budgetId, create a virtual budget to store the items
     let virtualBudgetId: string | null = null;
     const orderItems = (processedData as any).items;
-    
+
     if (orderItems && orderItems.length > 0 && !processedData.budgetId) {
       console.log(`Creating virtual budget for direct order with ${orderItems.length} items`);
-      
+
       // Create a virtual budget
       const budgetNumber = `ORC-AUTO-${Date.now()}`;
       const budgetResults = await pg.insert(schema.budgets).values({
@@ -461,17 +461,17 @@ export class PgStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       }).returning();
-      
+
       const virtualBudget = budgetResults[0];
       virtualBudgetId = virtualBudget.id;
-      
+
       // Insert budget items
       for (const item of orderItems) {
         // Handle "internal" producer - save as NULL (means internal production)
-        const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== '' 
-          ? item.producerId 
+        const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== ''
+          ? item.producerId
           : null;
-        
+
         await pg.insert(schema.budgetItems).values({
           budgetId: virtualBudgetId,
           productId: item.productId,
@@ -497,7 +497,7 @@ export class PgStorage implements IStorage {
           productHeight: item.productHeight?.toString() || null
         });
       }
-      
+
       console.log(`Created virtual budget ${budgetNumber} with ${orderItems.length} items`);
       processedData.budgetId = virtualBudgetId;
     }
@@ -654,43 +654,43 @@ export class PgStorage implements IStorage {
   async recalculateCommissionsForOrder(order: Order): Promise<void> {
     try {
       console.log(`Recalculating commissions for order ${order.orderNumber}`);
-      
+
       const orderValue = parseFloat(order.totalValue);
-      
+
       // Get existing commissions for this order
       const existingCommissions = await pg
         .select()
         .from(schema.commissions)
         .where(eq(schema.commissions.orderId, order.id));
-      
+
       if (existingCommissions.length === 0) {
         console.log(`No existing commissions found for order ${order.id}, creating new ones`);
         await this.calculateCommissions(order);
         return;
       }
-      
+
       // Get vendor commission rate
       const vendor = await pg
         .select()
         .from(schema.vendors)
         .where(eq(schema.vendors.userId, order.vendorId))
         .then(rows => rows[0]);
-      
+
       const vendorRate = vendor?.commissionRate || '10.00';
       const vendorCommissionAmount = (orderValue * parseFloat(vendorRate)) / 100;
-      
+
       // Get all partners for partner commissions
       const allPartners = await pg
         .select()
         .from(schema.users)
         .where(eq(schema.users.role, 'partner'));
-      
+
       const partnerRate = '15.00';
       const totalPartnerCommission = (orderValue * parseFloat(partnerRate)) / 100;
-      const individualPartnerCommission = allPartners.length > 0 
-        ? totalPartnerCommission / allPartners.length 
+      const individualPartnerCommission = allPartners.length > 0
+        ? totalPartnerCommission / allPartners.length
         : 0;
-      
+
       // Update each existing commission
       for (const commission of existingCommissions) {
         if (commission.type === 'vendor') {
@@ -701,13 +701,13 @@ export class PgStorage implements IStorage {
               amount: vendorCommissionAmount.toFixed(2)
             })
             .where(eq(schema.commissions.id, commission.id));
-          
+
           console.log(`Updated vendor commission ${commission.id}: R$ ${vendorCommissionAmount.toFixed(2)} (${vendorRate}%)`);
         } else if (commission.type === 'partner') {
-          const individualPercentage = allPartners.length > 0 
-            ? (parseFloat(partnerRate) / allPartners.length).toFixed(2) 
+          const individualPercentage = allPartners.length > 0
+            ? (parseFloat(partnerRate) / allPartners.length).toFixed(2)
             : partnerRate;
-          
+
           await pg.update(schema.commissions)
             .set({
               orderValue: order.totalValue,
@@ -715,11 +715,11 @@ export class PgStorage implements IStorage {
               amount: individualPartnerCommission.toFixed(2)
             })
             .where(eq(schema.commissions.id, commission.id));
-          
+
           console.log(`Updated partner commission ${commission.id}: R$ ${individualPartnerCommission.toFixed(2)}`);
         }
       }
-      
+
       console.log(`Recalculated ${existingCommissions.length} commissions for order ${order.orderNumber}`);
     } catch (error) {
       console.error('Error recalculating commissions:', error);
@@ -729,15 +729,15 @@ export class PgStorage implements IStorage {
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
     // Convert string dates to Date objects if they exist
     const processedData: any = { ...updates };
-    
+
     if (processedData.deadline && typeof processedData.deadline === 'string') {
       processedData.deadline = new Date(processedData.deadline);
     }
-    
+
     if (processedData.deliveryDeadline && typeof processedData.deliveryDeadline === 'string') {
       processedData.deliveryDeadline = new Date(processedData.deliveryDeadline);
     }
-    
+
     if (processedData.createdAt && typeof processedData.createdAt === 'string') {
       processedData.createdAt = new Date(processedData.createdAt);
     }
@@ -747,10 +747,10 @@ export class PgStorage implements IStorage {
     if (orderItems && orderItems.length > 0) {
       // Get the current order to check for budgetId
       const currentOrder = await pg.select().from(schema.orders).where(eq(schema.orders.id, id)).then(r => r[0]);
-      
+
       if (currentOrder) {
         let budgetId = currentOrder.budgetId;
-        
+
         // If no budget exists, create a virtual one
         if (!budgetId) {
           console.log(`Creating virtual budget for order ${id} during update`);
@@ -771,20 +771,20 @@ export class PgStorage implements IStorage {
             createdAt: new Date(),
             updatedAt: new Date()
           }).returning();
-          
+
           budgetId = budgetResults[0].id;
           processedData.budgetId = budgetId;
         }
-        
+
         // Delete existing items and insert new ones
         await pg.delete(schema.budgetItems).where(eq(schema.budgetItems.budgetId, budgetId));
-        
+
         for (const item of orderItems) {
           // Handle "internal" producer - save as NULL (means internal production)
-          const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== '' 
-            ? item.producerId 
+          const producerId = item.producerId && item.producerId !== 'internal' && item.producerId !== ''
+            ? item.producerId
             : null;
-          
+
           await pg.insert(schema.budgetItems).values({
             budgetId: budgetId,
             productId: item.productId,
@@ -810,11 +810,11 @@ export class PgStorage implements IStorage {
             productHeight: item.productHeight?.toString() || null
           });
         }
-        
+
         console.log(`Updated ${orderItems.length} items for order ${id}`);
       }
     }
-    
+
     // Remove items from processedData before updating orders table
     delete processedData.items;
 
@@ -886,7 +886,7 @@ export class PgStorage implements IStorage {
         eq(schema.budgets.status, 'converted')
       ))
       .orderBy(desc(schema.budgets.createdAt));
-    
+
     // Mapear budgets para o formato Order
     return budgetsAsOrders.map((b: any) => ({
       id: b.id,
@@ -984,7 +984,7 @@ export class PgStorage implements IStorage {
   async createProductionOrderItem(productionOrderId: string, itemData: any): Promise<ProductionOrderItem> {
     // Convert quantity to integer (budget items store as numeric)
     const quantity = Math.round(parseFloat(String(itemData.quantity || 0)));
-    
+
     const productionOrderItemData: InsertProductionOrderItem = {
       productionOrderId: productionOrderId,
       budgetItemId: itemData.budgetItemId || null,
@@ -1025,7 +1025,7 @@ export class PgStorage implements IStorage {
       orders = await pg.select().from(schema.productionOrders)
         .orderBy(desc(schema.productionOrders.id));
     }
-    
+
     return Promise.all(orders.map(async (order) => ({
       ...order,
       items: await this.getProductionOrderItems(order.id)
@@ -1176,7 +1176,7 @@ export class PgStorage implements IStorage {
         status: status,
         updatedAt: new Date()
       };
-      
+
       if (status === 'cancelled') {
         updateData.amount = '0.00';
       }
@@ -1448,19 +1448,22 @@ export class PgStorage implements IStorage {
 
     // Handle internal products - null producerId means internal
     const isInternal = !producerId;
-    
+
     // Map common field names from different JSON formats
     const mapProductFields = (item: any) => {
       // PrecoVenda do JSON é o CUSTO do produto
       // O preço de venda será calculado dinamicamente na exibição usando as configurações do painel
       const costPrice = parseFloat(item.PrecoVenda || item.Preco || item.PrecoCusto || 0);
       const salePrice = parseFloat(item.salePrice || item.PrecoFinal || 0);
-      
+
+      // Se não tiver preço de venda final, o preço base será o custo
+      const basePriceToUse = salePrice > 0 ? salePrice : (costPrice > 0 ? costPrice : 0);
+
       return {
         name: item.Nome || item.name || item.NomeProduto || 'Produto sem nome',
         description: item.Descricao || item.description || item.Descricao || '',
         category: item.WebTipo || item.category || item.Categoria || 'Geral',
-        basePrice: salePrice > 0 ? salePrice.toFixed(2) : "0.00", 
+        basePrice: basePriceToUse > 0 ? basePriceToUse.toFixed(2) : "0.00",
         costPrice: costPrice.toFixed(2), // Custo original do JSON
         unit: item.unit || item.Unidade || 'un',
         isActive: true,
@@ -1547,7 +1550,7 @@ export class PgStorage implements IStorage {
 
   async recalculateProductPrices(): Promise<{ updated: number; errors: string[] }> {
     const errors: string[] = [];
-    
+
     try {
       // IMPORTANTE (segurança):
       // O sistema calcula preço de venda a partir do *custo* (cost_price).
@@ -1564,7 +1567,7 @@ export class PgStorage implements IStorage {
               AND cost_price != '0'
               AND cost_price != '0.00'`
       );
-      
+
       const updated = result.rowCount || 0;
       return { updated, errors };
     } catch (error: any) {
@@ -1644,34 +1647,34 @@ export class PgStorage implements IStorage {
     async function getNextBudgetNumber(): Promise<string> {
       const maxRetries = 10;
       let attempt = 0;
-      
+
       while (attempt < maxRetries) {
         try {
           // Generate a unique number with timestamp to avoid collisions
           const timestamp = Date.now();
           const random = Math.floor(Math.random() * 1000);
           const uniqueId = `${timestamp}${random}`;
-          
+
           // Format: BUD-YYMM-UNIQUEID
           const now = new Date();
           const yymm = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
           const budgetNumber = `BUD-${yymm}-${uniqueId.slice(-6)}`;
-          
+
           // Check if this number already exists
           const existing = await pg.select().from(schema.budgets)
             .where(eq(schema.budgets.budgetNumber, budgetNumber))
             .limit(1);
-            
+
           if (existing.length === 0) {
             return budgetNumber;
           }
-          
+
           attempt++;
           console.log(`Budget number ${budgetNumber} exists, retrying... (attempt ${attempt})`);
-          
+
           // Add a small delay before retry
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
         } catch (e) {
           console.error('Error generating budget number:', e);
           attempt++;
@@ -1680,7 +1683,7 @@ export class PgStorage implements IStorage {
           }
         }
       }
-      
+
       // Fallback: use timestamp + random as backup
       const fallbackId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       return `BUD-FALLBACK-${fallbackId.slice(-10)}`;
@@ -1726,7 +1729,7 @@ export class PgStorage implements IStorage {
         if (!producerId || producerId === 'internal' || producerId === '') {
           producerId = null;
         }
-        
+
         return {
           budgetId: newBudget.id,
           productId: itemData.productId,
@@ -1761,16 +1764,16 @@ export class PgStorage implements IStorage {
           console.log(`✅ [PG CREATE BUDGET] ${itemsToInsert.length} items inseridos em uma única operação (batch insert)`);
         } catch (batchError: any) {
           console.error(`⚠️ [PG CREATE BUDGET] Batch insert falhou, tentando inserção individual:`, batchError.message);
-          
+
           // Fallback: insert items one by one with retry logic
           let successCount = 0;
           let failureCount = 0;
-          
+
           for (const itemValues of itemsToInsert) {
             let retryCount = 0;
             const maxRetries = 3;
             let itemSaved = false;
-            
+
             while (!itemSaved && retryCount < maxRetries) {
               try {
                 await pg.insert(schema.budgetItems).values(itemValues);
@@ -1788,9 +1791,9 @@ export class PgStorage implements IStorage {
               }
             }
           }
-          
+
           console.log(`📊 [PG CREATE BUDGET] Fallback: ✅ ${successCount} salvos | ❌ ${failureCount} falhados`);
-          
+
           if (failureCount > 0 && successCount === 0) {
             throw new Error(`Erro ao salvar itens do orçamento: todos os ${failureCount} itens falharam`);
           }
@@ -1939,7 +1942,7 @@ export class PgStorage implements IStorage {
       discountPercentage: toMoneyString(budget.discountPercentage),
       discountValue: toMoneyString(budget.discountValue)
     } as InsertOrder;
-    
+
     console.log(`[CONVERT BUDGET] Order data with payment info:`, {
       paymentMethodId: orderData.paymentMethodId,
       shippingMethodId: orderData.shippingMethodId,
@@ -1953,10 +1956,10 @@ export class PgStorage implements IStorage {
 
     // Get budget items to create production orders
     const budgetItems = await this.getBudgetItems(budgetId);
-    
+
     // Group items by producer and create production orders
     const producerGroups = new Map<string, typeof budgetItems>();
-    
+
     for (const item of budgetItems) {
       if (item.producerId) {
         if (!producerGroups.has(item.producerId)) {
@@ -2055,7 +2058,7 @@ export class PgStorage implements IStorage {
       .from(schema.budgetItems)
       .leftJoin(schema.products, eq(schema.budgetItems.productId, schema.products.id))
       .where(eq(schema.budgetItems.budgetId, budgetId));
-    
+
     return items as BudgetItem[];
   }
 
@@ -2087,29 +2090,29 @@ export class PgStorage implements IStorage {
 
   async updateBudgetItemPurchaseStatus(itemId: string, purchaseStatus: string): Promise<any> {
     const results = await pg.update(schema.budgetItems)
-      .set({ 
+      .set({
         purchaseStatus,
         updatedAt: new Date()
       })
       .where(eq(schema.budgetItems.id, itemId))
       .returning();
-    
+
     return results.length > 0 ? results[0] : null;
   }
 
   async checkAllItemsInStore(orderId: string): Promise<boolean> {
     const orderResults = await pg.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (orderResults.length === 0 || !orderResults[0].budgetId) return false;
-    
+
     const order = orderResults[0];
-    
+
     const items = await pg.select().from(schema.budgetItems)
       .where(eq(schema.budgetItems.budgetId, order.budgetId));
-    
+
     const externalItems = items.filter(item => item.producerId && item.producerId !== 'internal');
-    
+
     if (externalItems.length === 0) return true;
-    
+
     return externalItems.every(item => item.purchaseStatus === 'in_store');
   }
 
@@ -2244,7 +2247,7 @@ export class PgStorage implements IStorage {
     // Also generate accounts receivable from converted budgets that don't have AR entries
     const convertedBudgets = await pg.select().from(schema.budgets)
       .where(eq(schema.budgets.status, 'converted'));
-    
+
     // Get payment info for budgets
     const paymentInfos = await pg.select().from(schema.budgetPaymentInfo);
     const paymentInfoMap = new Map(paymentInfos.map(pi => [pi.budgetId, pi]));
@@ -2254,12 +2257,12 @@ export class PgStorage implements IStorage {
     for (const budget of convertedBudgets) {
       // Skip if already has AR entry
       if (existingAR.some(ar => ar.orderId === budget.id)) continue;
-      
+
       const paymentInfo = paymentInfoMap.get(budget.id);
       const totalValue = parseFloat(budget.totalValue || '0');
       const paidValue = parseFloat(budget.paidValue || '0');
       const remainingAmount = totalValue - paidValue;
-      
+
       if (remainingAmount > 0) {
         budgetARs.push({
           id: `ar-${budget.id}`,
@@ -2320,7 +2323,7 @@ export class PgStorage implements IStorage {
   async updateAccountsReceivableForOrder(order: Order): Promise<void> {
     try {
       const existingAR = await this.getAccountsReceivableByOrder(order.id);
-      
+
       if (existingAR.length === 0) {
         // Create new accounts receivable if none exists
         await this.createAccountsReceivableForOrder(order);
@@ -2330,7 +2333,7 @@ export class PgStorage implements IStorage {
 
       // Update existing accounts receivable
       const ar = existingAR[0];
-      
+
       const paidValue = order.paidValue || "0.00";
       const downPayment = order.downPayment || "0.00";
       const shippingCost = order.shippingCost || "0.00";
@@ -2791,33 +2794,33 @@ export class PgStorage implements IStorage {
     const clientUser = await pg.select().from(schema.users)
       .where(eq(schema.users.id, data.clientId))
       .limit(1);
-    
+
     const contactName = clientUser[0]?.name || 'Cliente';
-    
+
     // Fetch product details including basePrice
     const enrichedProducts = await Promise.all(
       data.products.map(async (product: any) => {
         if (!product.quantity || product.quantity <= 0) {
           throw new Error(`Invalid quantity for product: ${product.productId}`);
         }
-        
+
         const productDetails = await pg.select().from(schema.products)
           .where(eq(schema.products.id, product.productId))
           .limit(1);
-        
+
         if (!productDetails[0]) {
           throw new Error(`Product not found: ${product.productId}`);
         }
-        
+
         const basePrice = productDetails[0].basePrice;
         const basePriceNum = parseFloat(basePrice || '0');
-        
+
         if (!basePrice || isNaN(basePriceNum) || basePriceNum <= 0) {
           throw new Error(`Product ${product.productId} has invalid price: ${basePrice}`);
         }
-        
+
         const lineTotal = (basePriceNum * product.quantity).toFixed(2);
-        
+
         return {
           ...product,
           basePrice: basePrice,  // Keep as string from database
@@ -2845,7 +2848,7 @@ export class PgStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    
+
     const quoteRequest = quoteRequestResults[0];
 
     // Create quote request items
@@ -2884,7 +2887,7 @@ export class PgStorage implements IStorage {
     const quoteRequests = await pg.select().from(schema.quoteRequests)
       .where(eq(schema.quoteRequests.vendorId, vendorId))
       .orderBy(desc(schema.quoteRequests.createdAt));
-    
+
     // Enrich with items
     const enriched = await Promise.all(
       quoteRequests.map(async (qr) => {
@@ -2893,7 +2896,7 @@ export class PgStorage implements IStorage {
         return { ...qr, items };
       })
     );
-    
+
     return enriched;
   }
 
@@ -2901,7 +2904,7 @@ export class PgStorage implements IStorage {
     const quoteRequests = await pg.select().from(schema.quoteRequests)
       .where(eq(schema.quoteRequests.clientId, clientId))
       .orderBy(desc(schema.quoteRequests.createdAt));
-    
+
     // Enrich with items
     const enriched = await Promise.all(
       quoteRequests.map(async (qr) => {
@@ -2910,22 +2913,22 @@ export class PgStorage implements IStorage {
         return { ...qr, items };
       })
     );
-    
+
     return enriched;
   }
 
   async getQuoteRequestById(id: string): Promise<any> {
     const results = await pg.select().from(schema.quoteRequests)
       .where(eq(schema.quoteRequests.id, id));
-    
+
     if (!results[0]) {
       return undefined;
     }
-    
+
     // Enrich with items
     const items = await pg.select().from(schema.quoteRequestItems)
       .where(eq(schema.quoteRequestItems.quoteRequestId, results[0].id));
-    
+
     return { ...results[0], items };
   }
 
