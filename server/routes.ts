@@ -7225,9 +7225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthlyRevenue: monthlyRevenue,
         monthlyExpenses: monthlyExpenses
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching financial overview:", error);
-      res.status(500).json({ error: "Failed to fetch financial overview" });
+      res.status(500).json({ error: "Failed to fetch financial overview", details: error?.message || String(error) });
     }
   });
 
