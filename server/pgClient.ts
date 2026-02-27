@@ -17,7 +17,7 @@ if (!DATABASE_URL) {
 }
 
 // Create connection pool with PostgreSQL settings
-const sslConfig = DATABASE_URL.includes('supabase') || DATABASE_URL.includes('aws') 
+const sslConfig = DATABASE_URL.includes('supabase') || DATABASE_URL.includes('aws')
   ? { rejectUnauthorized: false }
   : false;
 
@@ -29,18 +29,14 @@ if (sslConfig) {
 const pool = new Pool({
   connectionString: DATABASE_URL,
 
-  // Pool size configuration
-  max: 10, // Maximum number of clients in the pool
+  // Serverless: keep pool small (PgBouncer/Supabase handles real pooling)
+  max: 2,
 
-  // Idle timeout: Close idle connections after 3 minutes
-  idleTimeoutMillis: 180000,
+  // Idle timeout: Close idle connections after 30 seconds (serverless)
+  idleTimeoutMillis: 30000,
 
   // Connection timeout: How long to wait for a connection from the pool
-  connectionTimeoutMillis: 10000,
-
-  // Maximum lifetime of a connection: Force recreation after 10 minutes
-  // This prevents using stale connections
-  maxUses: 7500, // ~10 minutes worth of queries at typical rates
+  connectionTimeoutMillis: 15000,
 
   // SSL configuration for Supabase/cloud databases
   ssl: sslConfig

@@ -63,7 +63,7 @@ async function initializeApp(): Promise<express.Express> {
   if (!initializationPromise) {
     initializationPromise = (async () => {
       console.log('🚀 Initializing Vercel serverless function...');
-      
+
       // In Vercel, static files are served automatically from the public directory
       // We'll only use serveStatic if running in development or other environments
       if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
@@ -87,26 +87,27 @@ async function initializeApp(): Promise<express.Express> {
 // Vercel serverless function handler
 export default async function handler(req: express.Request, res: express.Response) {
   try {
-    // Add timeout for initialization (5 seconds max for cold start)
-    const initializationTimeout = 5000;
+    // Allow up to 25 seconds for cold start (Supabase can be slow on first connection)
+    const initializationTimeout = 25000;
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Initialization timeout')), initializationTimeout);
     });
-    
+
     const appInstance = await Promise.race([
       initializeApp(),
       timeoutPromise
     ]) as express.Express;
-    
+
     return appInstance(req, res);
   } catch (error) {
-    console.error('❌ Error in Vercel handler:', error);
-    
-    // Provide more detailed error information
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('❌ Error in Vercel handler:', errorMessage);
+    console.error('Stack:', errorStack);
+
     const isTimeout = errorMessage.includes('timeout');
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Internal server error',
       message: isTimeout ? 'Server initialization timeout. Please try again.' : errorMessage,
       timestamp: new Date().toISOString()
