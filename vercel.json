@@ -1,36 +1,39 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.mjs",
-      "use": "@vercel/node"
+  "buildCommand": "npm install --omit=optional && npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node@4.0.0",
+      "maxDuration": 30
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.mjs"
+      "dest": "/api/index.ts"
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/public/assets/$1",
+      "dest": "/assets/$1",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
       }
     },
     {
-      "src": "/(.*\\.(css|js|png|jpg|jpeg|gif|ico|svg|pdf|txt))$",
-      "dest": "/public/$1",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
+      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|map))",
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/public/index.html",
+      "dest": "/index.html",
       "headers": {
         "Cache-Control": "public, max-age=0, must-revalidate"
       }
     }
-  ]
+  ],
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "ROLLUP_WASM": "true"
+  }
 }
