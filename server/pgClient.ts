@@ -17,6 +17,15 @@ if (!DATABASE_URL) {
 }
 
 // Create connection pool with PostgreSQL settings
+const sslConfig = DATABASE_URL.includes('supabase') || DATABASE_URL.includes('aws') 
+  ? { rejectUnauthorized: false }
+  : false;
+
+console.log(`🔧 Configuração SSL do pool: ${sslConfig ? 'HABILITADA' : 'DESABILITADA'}`);
+if (sslConfig) {
+  console.log(`🔧 SSL rejectUnauthorized: ${sslConfig.rejectUnauthorized}`);
+}
+
 const pool = new Pool({
   connectionString: DATABASE_URL,
 
@@ -32,6 +41,9 @@ const pool = new Pool({
   // Maximum lifetime of a connection: Force recreation after 10 minutes
   // This prevents using stale connections
   maxUses: 7500, // ~10 minutes worth of queries at typical rates
+
+  // SSL configuration for Supabase/cloud databases
+  ssl: sslConfig
 });
 
 // Log pool events for debugging and configure statement timeout
