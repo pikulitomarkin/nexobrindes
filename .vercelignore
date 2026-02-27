@@ -1,8 +1,4 @@
-# Ignorar o arquivo TypeScript source da API — o Vercel deve usar
-# o api/index.js já bundlado pelo esbuild no buildCommand
-api/index.ts
-
-# Ignorar arquivos grandes que não são necessários no deploy
+# Ignorar arquivos grandes desnecessários no deploy
 node_modules
 backup_20251115_061019.sql
 products.json
