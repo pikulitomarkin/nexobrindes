@@ -1,12 +1,8 @@
-console.error('[DEBUG VERCEL TOP-LEVEL] Iniciando imports do express');
 import express from 'express';
-console.error('[DEBUG VERCEL TOP-LEVEL] Express importado');
-// Using dynamic imports inside the handler to catch top-level errors (like DB connection fails)
-// import { registerRoutes } from '../server/routes';
-// import { serveStatic } from '../server/vite';
-console.error('[DEBUG VERCEL TOP-LEVEL] Importando dotenv');
+// Static imports required for Vercel's Edge/Node File Trace (nft) to include these files in the Lambda
+import { registerRoutes } from '../server/routes';
+import { serveStatic } from '../server/vite';
 import 'dotenv/config';
-console.error('[DEBUG VERCEL TOP-LEVEL] Dotenv importado');
 
 // Create Express app
 const app = express();
@@ -70,11 +66,7 @@ async function initializeApp(): Promise<express.Express> {
       console.error('[DEBUG VERCEL] 🚀 Initializing Vercel serverless function...');
 
       try {
-        console.error('[DEBUG VERCEL] Importing ../server/routes');
-        // Use dynamic imports to catch top-level errors during initialization
-        const { registerRoutes } = await import('../server/routes');
-        console.error('[DEBUG VERCEL] Importing ../server/vite');
-        const { serveStatic } = await import('../server/vite');
+        console.error('[DEBUG VERCEL] Setting up static files (if dev) and registering routes');
 
         // In Vercel, static files are served automatically from the public directory
         // We'll only use serveStatic if running in development or other environments
