@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild api/index.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs",
+    "build": "cross-env ROLLUP_WASM=true vite build",
     "build:local": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "node dist/index.js",
     "check": "tsc",
@@ -44,6 +47,7 @@
     "@radix-ui/react-toggle-group": "^1.1.3",
     "@radix-ui/react-tooltip": "^1.2.0",
     "@replit/object-storage": "^1.0.0",
+    "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/jspdf": "^1.3.3",
     "@types/multer": "^2.0.0",
@@ -76,6 +80,7 @@
     "node-ofx-parser": "^0.5.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pg": "^8.11.3",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -93,9 +98,7 @@
     "ws": "^8.18.3",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0",
-    "pg": "^8.11.3",
-    "@supabase/supabase-js": "^2.39.0"
+    "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.2.8",
@@ -111,17 +114,18 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.18.1",
+    "@vercel/node": "4.0.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.0.0",
     "drizzle-kit": "^0.30.4",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.19",
-    "@vercel/node": "4.0.0",
-    "dotenv": "^16.0.0"
+    "vite": "^5.4.19"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
