@@ -1,4 +1,4 @@
-import { pg } from "./pgClient";
+import { pg } from './pgClient.js';
 import { 
   users, clients, vendors, orders, productionOrders, 
   payments, producerPayments, commissions, partners,
@@ -7,7 +7,7 @@ import {
   expenseNotes, commissionPayouts, products, quoteRequests, quoteRequestItems,
   systemLogs, branches, paymentMethods, shippingMethods, customizationOptions,
   commissionSettings
-} from "../shared/schema";
+} from '../shared/schema.js';
 
 /**
  * ⚠️ SCRIPT DE RESET DO BANCO - USE COM CAUTELA! ⚠️

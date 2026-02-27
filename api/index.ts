@@ -1,7 +1,7 @@
 import express from 'express';
 // Static imports required for Vercel's Edge/Node File Trace (nft) to include these files in the Lambda
-import { registerRoutes } from '../server/routes';
-import { serveStatic } from '../server/vite';
+import { registerRoutes } from '../server/routes.js';
+import { serveStatic } from '../server/vite.js';
 import 'dotenv/config';
 
 // Create Express app

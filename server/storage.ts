@@ -1,4 +1,4 @@
-import { pgStorage } from './storage.pg';
+import { pgStorage } from './storage.pg.js';
 import {
   type User,
   type InsertUser,
@@ -58,7 +58,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm"; // Assuming drizzle-orm is used for DB operations
-import { db } from "./db"; // Assuming db connection is set up here
+import { db } from './db.js'; // Assuming db connection is set up here
 
 // Helper function to generate IDs (replace with a more robust solution if needed)
 function generateId(prefix: string) {

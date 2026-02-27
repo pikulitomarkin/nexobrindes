@@ -1,5 +1,5 @@
-import { pg } from "./pgClient";
-import { users, branches, paymentMethods, shippingMethods, customizationOptions, commissionSettings } from "../shared/schema";
+import { pg } from './pgClient.js';
+import { users, branches, paymentMethods, shippingMethods, customizationOptions, commissionSettings } from '../shared/schema.js';
 import { eq } from "drizzle-orm";
 
 /**

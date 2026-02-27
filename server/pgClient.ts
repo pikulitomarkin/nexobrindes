@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pkg from "pg";
-import * as schema from "../shared/schema";
+import * as schema from '../shared/schema.js';
 import "dotenv/config";
 
 const { Pool } = pkg;

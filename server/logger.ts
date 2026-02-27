@@ -1,4 +1,4 @@
-import { pgStorage } from './storage.pg';
+import { pgStorage } from './storage.pg.js';
 
 export interface LogEvent {
   userId: string;

@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, sql, isNull, not, gte, lte, inArray } from "drizzle-orm";
-import { pg } from "./pgClient";
-import * as schema from "../shared/schema";
+import { pg } from './pgClient.js';
+import * as schema from '../shared/schema.js';
 import type {
   User,
   InsertUser,
@@ -54,9 +54,9 @@ import type {
   InsertSystemLog,
   QuoteRequest,
   InsertQuoteRequest,
-} from "../shared/schema";
-import { addMoney, subtractMoney, percentageOf, compareMoney, toMoneyString, sumMoney } from "./money";
-import type { IStorage } from "./storage";
+} from '../shared/schema.js';
+import { addMoney, subtractMoney, percentageOf, compareMoney, toMoneyString, sumMoney } from './money.js';
+import type { IStorage } from './storage.js';
 
 /**
  * PostgreSQL Storage Adapter

@@ -1,8 +1,8 @@
 // Direct PostgreSQL connection using Neon serverless with WebSocket support
 // This eliminates unnecessary middleware and uses the properly configured connection pool
-import { pg, pool } from "./pgClient";
-import { pgStorage } from "./storage.pg";
-import * as schema from "../shared/schema";
+import { pg, pool } from './pgClient.js';
+import { pgStorage } from './storage.pg.js';
+import * as schema from '../shared/schema.js';
 
 // Export pgStorage as 'db' for compatibility with routes.ts (has methods like getUserByUsername)
 export const db = pgStorage;
@@ -37,7 +37,7 @@ export type {
   PaymentMethod,
   ShippingMethod,
   BudgetPaymentInfo
-} from "../shared/schema";
+} from '../shared/schema.js';
 
 // Export schema tables from shared/schema
 export {
@@ -57,4 +57,4 @@ export {
   paymentMethods,
   shippingMethods,
   budgetPaymentInfo
-} from "../shared/schema";
+} from '../shared/schema.js';

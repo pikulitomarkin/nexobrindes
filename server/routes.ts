@@ -5,10 +5,10 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { db as storage, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db';
+import { db as storage, eq, budgets, budgetPhotos, productionOrders, desc, sql, type ProductionOrder, users as usersTable, orders as ordersTable, productionOrders as productionOrdersTable } from './db.js';
 import { OrderEnrichmentService } from './services/order-enrichment.js';
-import { logger } from './logger';
-import { ObjectStorageService, ObjectNotFoundError } from './objectStorage';
+import { logger } from './logger.js';
+import { ObjectStorageService, ObjectNotFoundError } from './objectStorage.js';
 
 // Configure multer for file uploads
 const upload = multer({
