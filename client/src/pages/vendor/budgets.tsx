@@ -300,25 +300,28 @@ export default function VendorBudgets() {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
 
-      // Helper: recalculate unitPrice from basePriceWithMargin + customizations
+      // Helper: unitPrice now equals basePriceWithMargin because customizations are included in the cost base
       const recalcUnitPrice = (it: any) => {
-        const base = it.basePriceWithMargin || 0;
-        const customUnit = it.hasItemCustomization ? (parseFloat(it.itemCustomizationValue) || 0) : 0;
-        const genUnit = it.hasGeneralCustomization ? (parseFloat(it.generalCustomizationValue) || 0) : 0;
-        return Math.round((base + customUnit + genUnit) * 100) / 100;
+        return Math.round((it.basePriceWithMargin || 0) * 100) / 100;
       };
 
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
 
-        // Só recalcular quando o preço veio de cálculo (evita "markup em cima de markup" quando costPrice foi igualado ao basePrice)
+        // Só recalcular quando o preço veio de cálculo
         if (item.priceSource === 'computed' && item.costPrice && item.costPrice > 0) {
           const currentRevenue = prev.items.reduce((total: number, it: any, i: number) => {
             const qty = i === index ? quantity : it.quantity;
             return total + (it.unitPrice * qty);
           }, 0);
-          const priceCalc = calculatePriceFromCost(item.costPrice, currentRevenue);
+
+          // NEW FORMULA: Cost = Product Cost + Customizations
+          const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+          const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+          const totalCost = item.costPrice + customUnit + genUnit;
+
+          const priceCalc = calculatePriceFromCost(totalCost, currentRevenue);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
           item.basePriceWithMargin = Math.round(priceCalc.idealPrice * 100) / 100;
           item.unitPrice = recalcUnitPrice(item);
@@ -328,34 +331,52 @@ export default function VendorBudgets() {
       } else if (field === 'unitPrice') {
         const newPrice = parseFloat(value) || 0;
         item.unitPrice = newPrice;
-
-        // Extrair a parte base (sem personalização) para atualizar basePriceWithMargin
-        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
-        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
-        item.basePriceWithMargin = Math.max(0, Math.round((newPrice - customUnit - genUnit) * 100) / 100);
+        item.basePriceWithMargin = newPrice; // No novo modelo, o unitPrice é a base com margem total
 
         item.totalPrice = calculateItemTotal({ ...item, unitPrice: newPrice });
 
-        // Verificar margem mínima contra a parte base (sem personalização)
-        if (item.minimumPrice && item.minimumPrice > 0 && item.basePriceWithMargin < item.minimumPrice) {
+        // Verificar margem mínima contra o custo total (produto + personalização)
+        if (item.minimumPrice && item.minimumPrice > 0 && item.unitPrice < item.minimumPrice) {
           toast({
             title: "Atenção",
-            description: `Preço base (R$ ${item.basePriceWithMargin.toFixed(2)}) abaixo do mínimo (R$ ${item.minimumPrice.toFixed(2)}). Necessita aprovação do administrador.`,
+            description: `Preço Unitário (R$ ${item.unitPrice.toFixed(2)}) abaixo do mínimo sugerido (R$ ${item.minimumPrice.toFixed(2)}). Necessita aprovação do administrador.`,
             variant: "destructive"
           });
         }
-      } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
-        item[field] = parseFloat(value) || 0;
-        // Recalculate unitPrice = basePriceWithMargin + customizations
-        const updatedItem = { ...item, [field]: parseFloat(value) || 0 };
-        item.unitPrice = recalcUnitPrice(updatedItem);
-        item.totalPrice = calculateItemTotal({ ...updatedItem, unitPrice: item.unitPrice });
-      } else if (field === 'hasItemCustomization' || field === 'hasGeneralCustomization') {
-        item[field] = Boolean(value);
-        // Recalculate unitPrice when customization flags change
-        const updatedItem = { ...item, [field]: Boolean(value) };
-        item.unitPrice = recalcUnitPrice(updatedItem);
-        item.totalPrice = calculateItemTotal({ ...updatedItem, unitPrice: item.unitPrice });
+      } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue' || field === 'hasItemCustomization' || field === 'hasGeneralCustomization') {
+        // Update the specific field
+        if (field.startsWith('has')) {
+          item[field] = Boolean(value);
+        } else {
+          item[field] = parseFloat(value) || 0;
+        }
+
+        // NOVO FLOW: Sempre que mudar personalização, recalcular ideal e mínimo com base no novo custo total
+        if (item.priceSource === 'computed' && item.costPrice && item.costPrice > 0) {
+          const currentRevenue = prev.items.reduce((total: number, it: any) => {
+            return total + (it.unitPrice * it.quantity);
+          }, 0);
+
+          const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+          const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+          const totalCost = item.costPrice + customUnit + genUnit;
+
+          const priceCalc = calculatePriceFromCost(totalCost, currentRevenue);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+          item.basePriceWithMargin = Math.round(priceCalc.idealPrice * 100) / 100;
+          item.unitPrice = recalcUnitPrice(item);
+        } else {
+          // Se for preço manual, o unitPrice deve refletir a mudança direta se não houver cálculo de margem ativo
+          if (item.priceSource !== 'computed') {
+            const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+            const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+            item.unitPrice = Math.round((item.basePriceWithMargin + customUnit + genUnit) * 100) / 100;
+          } else {
+            item.unitPrice = recalcUnitPrice(item);
+          }
+        }
+
+        item.totalPrice = calculateItemTotal(item);
       } else {
         item[field] = value;
 
@@ -395,11 +416,8 @@ export default function VendorBudgets() {
       }
 
       const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
-        // minimumPrice é o preço base mínimo (sem personalização)
-        const minBase = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
-        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
-        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
-        const minUnitPrice = minBase + customUnit + genUnit;
+        // No novo modelo, o minimumPrice já é baseado no custo total (produto + personalização)
+        const minUnitPrice = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
         return total + (minUnitPrice * item.quantity);
       }, 0);
 
@@ -416,11 +434,10 @@ export default function VendorBudgets() {
 
     let subtotal = totalPrice;
 
-    // Aplicar desconto do item (sobre o preço base sem personalização)
+    // Aplicar desconto do item (sobre o preço unitário total que agora inclui tudo)
     if (item.hasItemDiscount) {
-      const basePriceOnly = (item.basePriceWithMargin || item.unitPrice) * item.quantity;
       if (item.itemDiscountType === 'percentage') {
-        const discountAmount = (basePriceOnly * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
+        const discountAmount = (totalPrice * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
         subtotal = subtotal - discountAmount;
       } else if (item.itemDiscountType === 'value') {
         subtotal = subtotal - (parseFloat(item.itemDiscountValue) || 0);
