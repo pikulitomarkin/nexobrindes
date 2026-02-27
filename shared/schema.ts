@@ -76,7 +76,6 @@ export const orders = pgTable("orders", {
   paidValue: decimal("paid_value", { precision: 10, scale: 2 }).default('0'),
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).default('0'), // Valor a ser restituído em caso de cancelamento
   status: text("status").notNull().default('pending'), // 'pending', 'confirmed', 'production', 'shipped', 'partial_shipped', 'delivered', 'cancelled'
-  productStatus: text("product_status").default('to_buy'), // 'to_buy', 'purchased', 'in_store' - Status do produto para dropshipping
   deadline: timestamp("deadline"),
   // Contact information fields
   contactName: text("contact_name").notNull(), // Nome de contato obrigatório
@@ -142,23 +141,23 @@ export const productionOrderItems = pgTable("production_order_items", {
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   notes: text("notes"),
-  
+
   // Personalização do item
   hasItemCustomization: boolean("has_item_customization").default(false),
   itemCustomizationValue: decimal("item_customization_value", { precision: 10, scale: 2 }).default('0.00'),
   itemCustomizationDescription: text("item_customization_description"),
   customizationPhoto: text("customization_photo"),
-  
+
   // Dimensões do produto (em cm)
   productWidth: decimal("product_width", { precision: 8, scale: 2 }),
   productHeight: decimal("product_height", { precision: 8, scale: 2 }),
   productDepth: decimal("product_depth", { precision: 8, scale: 2 }),
-  
+
   // Personalização geral
   hasGeneralCustomization: boolean("has_general_customization").default(false),
   generalCustomizationName: text("general_customization_name"),
   generalCustomizationValue: decimal("general_customization_value", { precision: 10, scale: 2 }).default('0.00'),
-  
+
   // Desconto do item
   hasItemDiscount: boolean("has_item_discount").default(false),
   itemDiscountType: text("item_discount_type").default('percentage'),
@@ -361,7 +360,7 @@ export const budgetItems = pgTable("budget_items", {
   productWidth: decimal("product_width", { precision: 8, scale: 2 }), // Largura em cm
   productHeight: decimal("product_height", { precision: 8, scale: 2 }), // Altura em cm
   productDepth: decimal("product_depth", { precision: 8, scale: 2 }), // Profundidade em cm
-  
+
   // Status de compra do produto (para controle de logística)
   purchaseStatus: text("purchase_status").default('pending'), // 'pending', 'to_buy', 'purchased', 'in_store'
 });
