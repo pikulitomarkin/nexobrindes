@@ -4,3 +4,34 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Build artifacts (NOTE: public/ is built by Vercel, so we commit these)
+# public/assets/ and public/index.html are committed for Vercel deployment
+
+# Test and temporary files
+test-*.txt
+test-*.ts
+test-output*.txt
+products.json
+
+# Uploads
+public/uploads/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
