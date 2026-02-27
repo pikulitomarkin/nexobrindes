@@ -1749,8 +1749,17 @@ export default function AdminBudgets() {
                             <Label className="text-sm">Preço Unitário da Peça (R$)</Label>
                             <Input
                               placeholder="R$ 0,00"
-                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
-                              onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
+                              defaultValue={item.unitPrice > 0 ? currencyMask(item.unitPrice.toFixed(2).replace('.', ',')) : ''}
+                              key={`admin-unit-price-${index}-${item.unitPrice}`}
+                              onChange={(e) => {
+                                // Aplica máscara enquanto digita (não parseia ainda)
+                                const masked = currencyMask(e.target.value);
+                                e.target.value = masked;
+                              }}
+                              onBlur={(e) => {
+                                // Só parseia e salva ao perder o foco
+                                updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value));
+                              }}
                               className="h-10"
                             />
                             {(() => {
