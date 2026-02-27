@@ -1,6 +1,7 @@
 import express from 'express';
-import { registerRoutes } from '../server/routes';
-import { serveStatic } from '../server/vite';
+// Using dynamic imports inside the handler to catch top-level errors (like DB connection fails)
+// import { registerRoutes } from '../server/routes';
+// import { serveStatic } from '../server/vite';
 import 'dotenv/config';
 
 // Create Express app
@@ -64,6 +65,10 @@ async function initializeApp(): Promise<express.Express> {
     initializationPromise = (async () => {
       console.log('🚀 Initializing Vercel serverless function...');
 
+      // Use dynamic imports to catch top-level errors during initialization
+      const { registerRoutes } = await import('../server/routes');
+      const { serveStatic } = await import('../server/vite');
+
       // In Vercel, static files are served automatically from the public directory
       // We'll only use serveStatic if running in development or other environments
       if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
@@ -87,7 +92,7 @@ async function initializeApp(): Promise<express.Express> {
 // Vercel serverless function handler
 export default async function handler(req: express.Request, res: express.Response) {
   try {
-    // Allow up to 25 seconds for cold start (Supabase can be slow on first connection)
+    // Add timeout for initialization (25 seconds max for cold start)
     const initializationTimeout = 25000;
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Initialization timeout')), initializationTimeout);
