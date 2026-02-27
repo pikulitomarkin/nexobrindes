@@ -62,6 +62,7 @@ export interface BudgetPDFData {
       category: string;
       imageLink?: string;
     };
+    notes?: string;
   }>;
   client: {
     name: string;
@@ -104,13 +105,13 @@ export class PDFGenerator {
   private async loadLetterhead(): Promise<void> {
     try {
       const img = await this.loadImageWithFallback(letterheadUrl);
-      
+
       if (img) {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
         const ctx = canvas.getContext('2d');
-        
+
         if (ctx) {
           ctx.drawImage(img, 0, 0);
           this.letterheadDataUrl = canvas.toDataURL('image/png');
@@ -154,14 +155,14 @@ export class PDFGenerator {
     this.currentY += 15;
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'normal');
-    
+
     // Data em cima
     this.doc.text(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
     this.currentY += 8;
-    
+
     // Número do orçamento embaixo da data
     this.doc.text(`Número: ${data.budget.budgetNumber}`, this.margin, this.currentY);
-    
+
     if (data.budget.validUntil) {
       this.currentY += 8;
       this.doc.text(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
@@ -222,30 +223,30 @@ export class PDFGenerator {
     if (data.branch && (data.branch.name || data.branch.cnpj || data.branch.address)) {
       const rightX = this.pageWidth - this.margin;
       let topY = 18;
-      
+
       // Filial (nome) - com ícone de prédio
       this.doc.setFontSize(9);
       this.doc.setFont('helvetica', 'bold');
       this.doc.setTextColor(40, 40, 40);
       const branchName = data.branch.name || 'Filial';
       this.doc.text(branchName, rightX, topY, { align: 'right' });
-      
+
       this.doc.setFont('helvetica', 'normal');
       this.doc.setFontSize(8);
       this.doc.setTextColor(80, 80, 80);
-      
+
       // Telefone
       if (data.branch.phone) {
         topY += 5;
         this.doc.text(`Tel: ${data.branch.phone}`, rightX, topY, { align: 'right' });
       }
-      
+
       // Email
       if (data.branch.email) {
         topY += 4;
         this.doc.text(data.branch.email, rightX, topY, { align: 'right' });
       }
-      
+
       // Endereço
       if (data.branch.address) {
         topY += 4;
@@ -255,13 +256,13 @@ export class PDFGenerator {
           topY += 4;
         });
       }
-      
+
       // CNPJ
       if (data.branch.cnpj) {
         topY += 1;
         this.doc.text(`CNPJ: ${data.branch.cnpj}`, rightX, topY, { align: 'right' });
       }
-      
+
       this.doc.setTextColor(0, 0, 0);
     }
   }
@@ -308,13 +309,13 @@ export class PDFGenerator {
       }
 
       const img = await this.loadImageWithFallback(imageUrl);
-      
+
       if (img) {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
         const ctx = canvas.getContext('2d');
-        
+
         if (ctx) {
           ctx.drawImage(img, 0, 0);
           const imageData = canvas.toDataURL('image/jpeg', 0.4);
@@ -325,7 +326,7 @@ export class PDFGenerator {
     } catch (error) {
       console.warn('Failed to load product image:', imageLink, error);
     }
-    
+
     this.imageCache.set(imageLink, null);
     return null;
   }
@@ -346,7 +347,7 @@ export class PDFGenerator {
     this.addNewPageIfNeeded(50);
 
     // Pre-load all product images
-    const productImages: Map<number, string | null> = new Map();
+    const productImages: Map<string, string | null> = new Map();
     for (const item of data.items) {
       if (item.product.imageLink) {
         const imageData = await this.loadAndCacheImage(item.product.imageLink);
@@ -411,19 +412,27 @@ export class PDFGenerator {
       currentX += colWidths[0];
 
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 40 
-        ? item.product.name.substring(0, 40) + '...' 
+      const productName = item.product.name.length > 40
+        ? item.product.name.substring(0, 40) + '...'
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
       // Add product description if available
-      if (item.product.description) {
+      const descriptionToUse = item.notes || item.product.description;
+      if (descriptionToUse) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = item.product.description.length > 45 
-          ? item.product.description.substring(0, 45) + '...' 
-          : item.product.description;
-        this.doc.text(description, currentX + 2, this.currentY + 10);
+        const description = descriptionToUse.length > 65
+          ? descriptionToUse.substring(0, 65) + '...'
+          : descriptionToUse;
+
+        // Use splitTextToSize to handle multi-line descriptions
+        const splitDescription = this.doc.splitTextToSize(description, colWidths[1] - 4);
+
+        splitDescription.forEach((line: string, lineIndex: number) => {
+          this.doc.text(line, currentX + 2, this.currentY + 10 + (lineIndex * 4));
+        });
+
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
@@ -568,7 +577,7 @@ export class PDFGenerator {
             this.doc.setFont('helvetica', 'bold');
             this.doc.text('Restante:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
-            this.doc.text(`R$ ${parseFloat(data.remainingAmount || data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
+            this.doc.text(`R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
             this.currentY += 10;
           }
         }
@@ -727,7 +736,7 @@ export class PDFGenerator {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      
+
       img.onload = () => {
         if (img.complete && img.naturalWidth > 0) {
           resolve(img);
@@ -735,17 +744,17 @@ export class PDFGenerator {
           resolve(null);
         }
       };
-      
+
       img.onerror = () => {
         console.warn(`Failed to load image: ${src}`);
         resolve(null);
       };
-      
+
       // Set timeout to avoid hanging
       setTimeout(() => {
         resolve(null);
       }, 5000);
-      
+
       img.src = src;
     });
   }
@@ -760,21 +769,21 @@ export class PDFGenerator {
         hasItems: !!data.items && data.items.length > 0,
         itemCount: data.items?.length || 0
       });
-      
+
       // Validate required data with better error messages
       if (!data || typeof data !== 'object') {
         throw new Error('Dados do PDF não foram fornecidos');
       }
-      
+
       if (!data.budget) {
         throw new Error('Dados do orçamento não encontrados na resposta da API');
       }
-      
+
       if (!data.client) {
         console.warn('Client data missing, using default values');
         data.client = { name: 'Cliente não informado', email: '', phone: '' };
       }
-      
+
       if (!data.vendor) {
         console.warn('Vendor data missing, using default values');
         data.vendor = { name: 'Vendedor não informado', email: '', phone: '' };
@@ -788,7 +797,7 @@ export class PDFGenerator {
       // Load letterhead background
       console.log('Loading letterhead background...');
       await this.loadLetterhead();
-      
+
       // Apply letterhead to first page
       this.applyLetterheadBackground();
 
@@ -800,19 +809,19 @@ export class PDFGenerator {
 
       console.log('Adding header...');
       this.addHeader(data);
-      
+
       console.log('Adding client and vendor info...');
       this.addClientVendorInfo(data);
-      
+
       console.log('Adding items...');
       await this.addItems(data);
-      
+
       console.log('Adding total...');
       this.addTotal(data);
-      
+
       console.log('Adding payment and shipping info...');
       this.addPaymentShippingInfo(data);
-      
+
       console.log('Adding description...');
       this.addDescription(data);
 
@@ -824,7 +833,7 @@ export class PDFGenerator {
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
-      throw new Error(`Falha ao gerar PDF: ${error.message}`);
+      throw new Error(`Falha ao gerar PDF: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -857,7 +866,7 @@ export class PDFGenerator {
       this.doc.setDrawColor(200);
       this.doc.rect(x, y, width, height);
       this.doc.setFontSize(8);
-      this.doc.text('Imagem não disponível', x + width/2, y + height/2, { align: 'center' });
+      this.doc.text('Imagem não disponível', x + width / 2, y + height / 2, { align: 'center' });
     }
   }
 

@@ -1489,6 +1489,8 @@ export class PgStorage implements IStorage {
       };
     };
 
+    const validProductsToInsert: any[] = [];
+
     for (const rawItem of productsData) {
       try {
         const productData = mapProductFields(rawItem);
@@ -1504,11 +1506,38 @@ export class PgStorage implements IStorage {
           continue;
         }
 
-        await this.createProduct(productData);
-        imported++;
+        validProductsToInsert.push(productData);
       } catch (error: any) {
         const itemName = rawItem.Nome || rawItem.name || rawItem.NomeProduto || 'Produto sem nome';
-        errors.push(`Erro ao importar "${itemName}": ${error.message}`);
+        errors.push(`Erro mapeando ${itemName}: ${error.message}`);
+      }
+    }
+
+    if (validProductsToInsert.length > 0) {
+      // Drizzle bulk insert with chunking for large datasets
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < validProductsToInsert.length; i += CHUNK_SIZE) {
+        const chunk = validProductsToInsert.slice(i, i + CHUNK_SIZE);
+        try {
+          // Bulk insert the chunk using Drizzle
+          await pg.insert(schema.products).values(chunk);
+          imported += chunk.length;
+          console.log(`Imported batch ${i / CHUNK_SIZE + 1} (${chunk.length} items)...`);
+        } catch (error: any) {
+          console.error(`Error importing chunk starting at ${i}:`, error.message);
+          errors.push(`Erro inserindo lote a partir do item ${i + 1}: ${error.message}`);
+
+          // Se falhar o lote todo, tenta inserir os produtos um por um como fallback (lento)
+          console.log("Tentando inserir o lote com falha item por item...");
+          for (const productData of chunk) {
+            try {
+              await this.createProduct(productData);
+              imported++;
+            } catch (singleError: any) {
+              errors.push(`Erro inserindo ${productData.name}: ${singleError.message}`);
+            }
+          }
+        }
       }
     }
 
@@ -1550,16 +1579,74 @@ export class PgStorage implements IStorage {
 
   async recalculateProductPrices(): Promise<{ updated: number; errors: string[] }> {
     const errors: string[] = [];
+    let updated = 0;
 
     try {
-      // IMPORTANTE (segurança):
-      // O sistema calcula preço de venda a partir do *custo* (cost_price).
-      // Igualar cost_price = base_price causa "markup em cima de markup" e infla preços.
-      // Portanto, esta rotina NUNCA deve sobrescrever o custo.
-      // Em vez disso, ela apenas preenche base_price quando estiver vazio, usando cost_price como referência.
-      // (O cálculo detalhado do preço final é feito no front, conforme faixa de faturamento do orçamento.)
+      // Buscar configurações de precificação ativas
+      const pricingSettings = await this.getPricingSettings();
+      if (!pricingSettings) {
+        errors.push('Configurações de precificação não encontradas');
+        return { updated: 0, errors };
+      }
 
-      const result = await pg.execute(
+      const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+      const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+
+      // Buscar todas as faixas de margem
+      const marginTiers = await this.getPricingMarginTiers(pricingSettings.id);
+
+      // Determinar a melhor faixa para orçamento R$0 (faixa base / padrão)
+      // Usamos a faixa que cobre o faturamento R$0 como referência de preço de catálogo
+      let defaultMarginRate: number;
+      let defaultMinimumMarginRate: number;
+
+      if (marginTiers.length > 0) {
+        // Ordenar por minRevenue, pegar a de menor valor que cobre R$0
+        const sortedTiers = [...marginTiers].sort(
+          (a: any, b: any) => parseFloat(a.minRevenue || '0') - parseFloat(b.minRevenue || '0')
+        );
+        // Tier que cobre R$0: primeira onde minRevenue <= 0
+        const baseTier = sortedTiers.find((t: any) => parseFloat(t.minRevenue || '0') <= 0) || sortedTiers[0];
+        defaultMarginRate = parseFloat(baseTier.marginRate as string) / 100;
+        defaultMinimumMarginRate = parseFloat(baseTier.minimumMarginRate as string) / 100;
+      } else {
+        // Fallback para margem mínima das configurações
+        defaultMarginRate = parseFloat(pricingSettings.minimumMargin as string) / 100;
+        defaultMinimumMarginRate = defaultMarginRate;
+      }
+
+      const divisor = 1 - taxRate - commissionRate - defaultMarginRate;
+      if (divisor <= 0) {
+        errors.push('Divisor de markup inválido (soma de taxas >= 100%). Verifique as configurações.');
+        return { updated: 0, errors };
+      }
+
+      // Buscar todos os produtos com costPrice definido
+      const allProducts = await pg.select().from(schema.products)
+        .where(
+          sql`cost_price IS NOT NULL AND cost_price != '0' AND cost_price != '0.00'`
+        );
+
+      for (const product of allProducts) {
+        try {
+          const costPrice = parseFloat(product.costPrice as string);
+          if (!costPrice || costPrice <= 0) continue;
+
+          // Calcular preço de venda ideal com a fórmula de markup divisor
+          const idealPrice = Math.round((costPrice / divisor) * 100) / 100;
+
+          await pg.update(schema.products)
+            .set({ basePrice: idealPrice.toFixed(2) } as any)
+            .where(eq(schema.products.id, product.id));
+
+          updated++;
+        } catch (productError: any) {
+          errors.push(`Produto ${product.id}: ${productError.message}`);
+        }
+      }
+
+      // Também preencher base_price = cost_price para produtos sem custo definido mas sem base_price
+      await pg.execute(
         sql`UPDATE products
             SET base_price = cost_price
             WHERE (base_price = '0.00' OR base_price IS NULL OR base_price = '0')
@@ -1568,11 +1655,10 @@ export class PgStorage implements IStorage {
               AND cost_price != '0.00'`
       );
 
-      const updated = result.rowCount || 0;
       return { updated, errors };
     } catch (error: any) {
       errors.push(`Erro geral: ${error.message}`);
-      return { updated: 0, errors };
+      return { updated, errors };
     }
   }
 
@@ -3122,7 +3208,22 @@ export class PgStorage implements IStorage {
     const results = await pg.select().from(schema.pricingSettings)
       .where(eq(schema.pricingSettings.isActive, true))
       .limit(1);
-    return results[0] || null;
+
+    if (results[0]) return results[0];
+
+    // Auto-seed default pricing settings if table is empty
+    const seeded = await pg.insert(schema.pricingSettings)
+      .values({
+        name: 'Configuração Padrão',
+        taxRate: '9.00',
+        commissionRate: '15.00',
+        minimumMargin: '20.00',
+        cashDiscount: '5.00',
+        cashNoTaxDiscount: '12.00',
+        isActive: true,
+      })
+      .returning();
+    return seeded[0];
   }
 
   async updatePricingSettings(id: string, updates: any): Promise<any> {

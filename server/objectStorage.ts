@@ -4,7 +4,19 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
-const client = new Client();
+const isReplit = process.env.REPL_ID !== undefined;
+
+let client: Client | null = null;
+
+try {
+  if (isReplit) {
+    client = new Client();
+  } else {
+    console.log("Not running in Replit, Object Storage client will be mocked/bypassed.");
+  }
+} catch (err) {
+  console.warn("Failed to initialize Replit Object Storage client. Will use fallback.", err);
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -14,8 +26,14 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
+// Ensure local uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 export class ObjectStorageService {
-  constructor() {}
+  constructor() { }
 
   async uploadBuffer(buffer: Buffer, folder: string = "uploads", originalFilename: string = ""): Promise<string> {
     try {
@@ -23,11 +41,15 @@ export class ObjectStorageService {
       const ext = originalFilename ? `.${originalFilename.split('.').pop()}` : '';
       const objectId = `${randomUUID()}${ext}`;
       const objectName = `${folder}/${objectId}`;
-      
+
       console.log(`Attempting to upload: ${objectName}, size: ${buffer.length} bytes`);
-      
+
+      if (!client) {
+        throw new Error("Replit Object Storage client not initialized");
+      }
+
       const result = await client.uploadFromBytes(objectName, buffer);
-      
+
       if (!result.ok) {
         const errorMessage = result.error?.message || result.error?.toString() || 'Unknown upload error';
         console.error("Object Storage upload failed:", {
@@ -42,18 +64,18 @@ export class ObjectStorageService {
       return `/objects/${objectName}`;
     } catch (error) {
       console.error("Object Storage upload error:", error);
-      
+
       // Fallback: try to save to local uploads folder for debugging
       try {
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
-        
+
         const ext = originalFilename ? `.${originalFilename.split('.').pop()}` : '';
         const filename = `image-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`;
         const filepath = path.join(uploadsDir, filename);
-        
+
         fs.writeFileSync(filepath, buffer);
         console.log(`Fallback: File saved locally as ${filename}`);
         return `/uploads/${filename}`;
@@ -70,7 +92,11 @@ export class ObjectStorageService {
     }
 
     const objectName = objectPath.slice("/objects/".length);
-    
+
+    if (!client) {
+      throw new ObjectNotFoundError();
+    }
+
     try {
       const result = await client.downloadAsBytes(objectName);
       if (!result.ok) {
@@ -96,7 +122,11 @@ export class ObjectStorageService {
       }
 
       const objectName = objectPath.slice("/objects/".length);
-      
+
+      if (!client) {
+        throw new ObjectNotFoundError();
+      }
+
       const result = await client.downloadAsBytes(objectName);
       if (!result.ok) {
         const errorMessage = result.error?.message || result.error?.toString() || 'Unknown download error';
@@ -109,7 +139,7 @@ export class ObjectStorageService {
       }
 
       const buffer = result.value[0];
-      
+
       const ext = objectName.split('.').pop()?.toLowerCase() || '';
       const mimeTypes: Record<string, string> = {
         'jpg': 'image/jpeg',
@@ -127,7 +157,7 @@ export class ObjectStorageService {
         "Content-Length": buffer.length.toString(),
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
       });
-      
+
       res.send(buffer);
     } catch (error) {
       console.error("Error downloading file:", error);
@@ -146,6 +176,8 @@ export class ObjectStorageService {
         return false;
       }
 
+      if (!client) return false;
+
       const objectName = objectPath.slice("/objects/".length);
       const result = await client.delete(objectName);
       return result.ok;
@@ -160,6 +192,8 @@ export class ObjectStorageService {
       if (!objectPath.startsWith("/objects/")) {
         return false;
       }
+
+      if (!client) return false;
 
       const objectName = objectPath.slice("/objects/".length);
       const result = await client.exists(objectName);

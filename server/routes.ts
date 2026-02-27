@@ -254,6 +254,78 @@ function generateId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).substring(2, 15)}`;
 }
 
+/**
+ * Determines whether a budget has any item priced below the minimum price
+ * calculated from the active pricing margin tiers (or minimumMargin fallback).
+ *
+ * @returns true  → budget must go to awaiting_approval
+ * @returns false → all items are priced at or above the minimum
+ */
+async function checkBudgetNeedsApproval(
+  budgetId: string,
+  storageInstance: any
+): Promise<boolean> {
+  try {
+    const items = await storageInstance.getBudgetItems(budgetId);
+    const budget = await storageInstance.getBudget(budgetId);
+    const pricingSettings = await storageInstance.getPricingSettings();
+
+    if (!pricingSettings || !budget) return false;
+
+    const marginTiers = await storageInstance.getPricingMarginTiers(pricingSettings.id);
+    const budgetTotal = parseFloat((budget as any).totalValue || '0');
+    const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
+    const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
+
+    for (const item of items) {
+      const product = await storageInstance.getProduct((item as any).productId);
+      const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+      if (costPrice <= 0) continue;
+
+      // Find the matching tier for the current budget total
+      let minMarginRate: number | null = null;
+      if (marginTiers.length > 0) {
+        const matchingTier = marginTiers
+          .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string || '0'))
+          .sort((a: any, b: any) => parseFloat(b.minRevenue as string || '0') - parseFloat(a.minRevenue as string || '0'))[0];
+        if (matchingTier) {
+          minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
+        }
+      }
+
+      // Fallback to pricingSettings minimumMargin if no tier matched
+      if (minMarginRate === null) {
+        minMarginRate = parseFloat(pricingSettings.minimumMargin as string) / 100;
+      }
+
+      const divisor = 1 - taxRate - commissionRate - minMarginRate;
+      if (divisor <= 0) continue;
+
+      const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
+      const unitPrice = parseFloat((item as any).unitPrice as string);
+
+      // Customization is vendor-set revenue — include in effective price but NOT in cost base
+      const itemCustomization = (item as any).hasItemCustomization
+        ? parseFloat((item as any).itemCustomizationValue as string || '0')
+        : 0;
+      const generalCustomization = (item as any).hasGeneralCustomization
+        ? parseFloat((item as any).generalCustomizationValue as string || '0')
+        : 0;
+      const effectiveUnitPrice = unitPrice + itemCustomization + generalCustomization;
+
+      if (effectiveUnitPrice < minimumPrice) {
+        return true; // At least one item is below minimum
+      }
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[checkBudgetNeedsApproval] Error:', err);
+    return false;
+  }
+}
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory (legacy support)
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
@@ -347,6 +419,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating budget status:", error);
       res.status(500).json({ error: "Erro ao atualizar status do orçamento" });
+    }
+  });
+
+  // Admin approval for underpriced budgets
+  app.post("/api/budgets/:id/admin-approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const budget = await storage.getBudget(id);
+
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      if (budget.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: "Orçamento não está aguardando aprovação" });
+      }
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: 'admin_approved',
+        adminRejectionReason: null // Clear any previous rejection reason
+      });
+
+      console.log(`[ADMIN APPROVE] Budget ${id} approved by admin`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("[ADMIN APPROVE] Error approving budget:", error);
+      res.status(500).json({ error: "Erro ao aprovar orçamento" });
+    }
+  });
+
+  // Admin rejection for underpriced budgets
+  app.post("/api/budgets/:id/admin-reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Motivo da rejeição é obrigatório" });
+      }
+
+      const budget = await storage.getBudget(id);
+      if (!budget) {
+        return res.status(404).json({ error: "Orçamento não encontrado" });
+      }
+
+      if (budget.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: "Orçamento não está aguardando aprovação" });
+      }
+
+      const updatedBudget = await storage.updateBudget(id, {
+        status: 'not_approved',
+        adminRejectionReason: reason
+      });
+
+      console.log(`[ADMIN REJECT] Budget ${id} rejected by admin. Reason: ${reason}`);
+      res.json(updatedBudget);
+    } catch (error) {
+      console.error("[ADMIN REJECT] Error rejecting budget:", error);
+      res.status(500).json({ error: "Erro ao rejeitar orçamento" });
     }
   });
 
@@ -1640,43 +1771,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // SERVER-SIDE APPROVAL CHECK after creation
       try {
-        const createdItems = await storage.getBudgetItems(newBudget.id);
-        const pricingSettings = await storage.getPricingSettings();
-        const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
-        const budgetTotal = parseFloat(newBudget.totalValue || '0');
-
-        let hasBelowMinimum = false;
-        for (const item of createdItems) {
-          const product = await storage.getProduct(item.productId);
-          const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
-          if (costPrice > 0 && pricingSettings) {
-            const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
-            const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
-            const matchingTier = marginTiers
-              .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
-              .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
-            if (matchingTier) {
-              const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
-              const divisor = 1 - taxRate - commissionRate - minMarginRate;
-              if (divisor > 0) {
-                const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
-                const unitPrice = parseFloat(item.unitPrice as string);
-                if (unitPrice < minimumPrice) {
-                  hasBelowMinimum = true;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        if (hasBelowMinimum) {
-          console.log(`[CREATE BUDGET] Server-side check: budget ${newBudget.id} has items below minimum, setting awaiting_approval`);
+        const needsApproval = await checkBudgetNeedsApproval(newBudget.id, storage);
+        if (needsApproval) {
+          console.log(`[CREATE BUDGET] Budget ${newBudget.id} has items below minimum, setting awaiting_approval`);
           await storage.updateBudget(newBudget.id, { status: 'awaiting_approval' });
         }
       } catch (approvalCheckError) {
         console.error(`[CREATE BUDGET] Error in server-side approval check:`, approvalCheckError);
       }
+
 
       const finalBudget = await storage.getBudget(newBudget.id);
 
@@ -8273,39 +8376,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SERVER-SIDE APPROVAL CHECK: Recalculate if any item is below minimum price
       // This ensures the approval workflow cannot be bypassed by the frontend
       try {
-        const finalItems = await storage.getBudgetItems(budgetId);
-        const pricingSettings = await storage.getPricingSettings();
-        const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
         const currentBudget = await storage.getBudget(budgetId);
-        const budgetTotal = parseFloat(currentBudget?.totalValue || '0');
-
-        let hasBelowMinimum = false;
-        for (const item of finalItems) {
-          const product = await storage.getProduct(item.productId);
-          const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
-          if (costPrice > 0 && pricingSettings) {
-            const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
-            const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
-            const matchingTier = marginTiers
-              .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
-              .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
-            if (matchingTier) {
-              const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
-              const divisor = 1 - taxRate - commissionRate - minMarginRate;
-              if (divisor > 0) {
-                const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
-                const unitPrice = parseFloat(item.unitPrice as string);
-                if (unitPrice < minimumPrice) {
-                  hasBelowMinimum = true;
-                  break;
-                }
-              }
-            }
-          }
-        }
+        const needsApproval = await checkBudgetNeedsApproval(budgetId, storage);
 
         let correctedStatus = currentBudget?.status;
-        if (hasBelowMinimum) {
+        if (needsApproval) {
           correctedStatus = 'awaiting_approval';
         } else if (currentBudget && (currentBudget.status === 'not_approved' || currentBudget.status === 'awaiting_approval')) {
           correctedStatus = 'draft';
@@ -8318,6 +8393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (approvalCheckError) {
         console.error(`[UPDATE BUDGET] Error in server-side approval check:`, approvalCheckError);
       }
+
 
       const finalBudget = await storage.getBudget(budgetId);
       console.log(`[UPDATE BUDGET] Successfully updated budget ${req.params.id}, final status: ${finalBudget?.status}`);
@@ -8512,37 +8588,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SERVER-SIDE CHECK: Verify no items are below minimum price before allowing send
-      const budgetItems = await storage.getBudgetItems(req.params.id);
-      const pricingSettings = await storage.getPricingSettings();
-      const marginTiers = pricingSettings ? await storage.getPricingMarginTiers(pricingSettings.id) : [];
-      const budgetTotal = parseFloat(budget.totalValue || '0');
-
-      let hasBelowMinimum = false;
-      for (const item of budgetItems) {
-        const product = await storage.getProduct(item.productId);
-        const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
-        if (costPrice > 0 && pricingSettings) {
-          const taxRate = parseFloat(pricingSettings.taxRate as string) / 100;
-          const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
-          const matchingTier = marginTiers
-            .filter((t: any) => budgetTotal >= parseFloat(t.minRevenue as string))
-            .sort((a: any, b: any) => parseFloat(b.minRevenue as string) - parseFloat(a.minRevenue as string))[0];
-          if (matchingTier) {
-            const minMarginRate = parseFloat(matchingTier.minimumMarginRate as string) / 100;
-            const divisor = 1 - taxRate - commissionRate - minMarginRate;
-            if (divisor > 0) {
-              const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
-              const unitPrice = parseFloat(item.unitPrice as string);
-              if (unitPrice < minimumPrice) {
-                hasBelowMinimum = true;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      if (hasBelowMinimum && budget.status !== 'admin_approved') {
+      const needsApproval = await checkBudgetNeedsApproval(req.params.id, storage);
+      if (needsApproval && budget.status !== 'admin_approved') {
         await storage.updateBudget(req.params.id, {
           status: 'awaiting_approval',
           updatedAt: new Date()
@@ -8553,6 +8600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'awaiting_approval'
         });
       }
+
 
       // Update budget status to 'sent' with proper timestamp
       const updatedBudget = await storage.updateBudget(req.params.id, {
@@ -10268,21 +10316,49 @@ Para mais detalhes, entre em contato conosco!`;
   app.post("/api/pricing/margin-tiers", async (req, res) => {
     try {
       const tierData = req.body;
+
+      // Ensure numeric fields have valid defaults if empty strings were passed
+      if (!tierData.marginRate || tierData.marginRate === "") tierData.marginRate = "0";
+      if (!tierData.minimumMarginRate || tierData.minimumMarginRate === "") tierData.minimumMarginRate = "20.00";
+      if (!tierData.minRevenue || tierData.minRevenue === "") tierData.minRevenue = "0";
+      if (!tierData.settingsId) {
+        return res.status(400).json({ error: "settingsId é obrigatório. Verifique se as configurações de preço foram carregadas." });
+      }
+
       const tier = await storage.createPricingMarginTier(tierData);
       res.json(tier);
+
+      // Recalculate all product prices in background after tier change
+      storage.recalculateProductPrices().then(result => {
+        console.log(`[PRICING] Preços recalculados após nova faixa de margem: ${result.updated} produtos atualizados`);
+        if (result.errors.length > 0) console.warn('[PRICING] Erros no recálculo:', result.errors);
+      }).catch(err => console.error('[PRICING] Erro ao recalcular preços:', err));
     } catch (error) {
       console.error("Error creating margin tier:", error);
       res.status(500).json({ error: "Failed to create margin tier" });
     }
   });
 
+
   // Atualizar faixa de margem
   app.put("/api/pricing/margin-tiers/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
+
+      // Ensure numeric fields have valid strings
+      if (updates.marginRate === "") updates.marginRate = "0";
+      if (updates.minimumMarginRate === "") updates.minimumMarginRate = "20.00";
+      if (updates.minRevenue === "") updates.minRevenue = "0";
+
       const tier = await storage.updatePricingMarginTier(id, updates);
       res.json(tier);
+
+      // Recalculate all product prices in background after tier change
+      storage.recalculateProductPrices().then(result => {
+        console.log(`[PRICING] Preços recalculados após edição de faixa: ${result.updated} produtos atualizados`);
+        if (result.errors.length > 0) console.warn('[PRICING] Erros no recálculo:', result.errors);
+      }).catch(err => console.error('[PRICING] Erro ao recalcular preços:', err));
     } catch (error) {
       console.error("Error updating margin tier:", error);
       res.status(500).json({ error: "Failed to update margin tier" });
@@ -10295,6 +10371,12 @@ Para mais detalhes, entre em contato conosco!`;
       const { id } = req.params;
       await storage.deletePricingMarginTier(id);
       res.json({ success: true });
+
+      // Recalculate all product prices in background after tier removed
+      storage.recalculateProductPrices().then(result => {
+        console.log(`[PRICING] Preços recalculados após exclusão de faixa: ${result.updated} produtos atualizados`);
+        if (result.errors.length > 0) console.warn('[PRICING] Erros no recálculo:', result.errors);
+      }).catch(err => console.error('[PRICING] Erro ao recalcular preços:', err));
     } catch (error) {
       console.error("Error deleting margin tier:", error);
       res.status(500).json({ error: "Failed to delete margin tier" });

@@ -29,6 +29,7 @@ export default function VendorBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [editingDescriptionIndex, setEditingDescriptionIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Image upload functions for individual products
@@ -137,7 +138,7 @@ export default function VendorBudgets() {
     queryFn: async ({ queryKey }) => {
       const [, params] = queryKey as [string, any];
       if (!params.search && params.category === "all") return { products: [], total: 0 };
-      
+
       const searchParams = new URLSearchParams();
       if (params.search) searchParams.append('search', params.search);
       if (params.category && params.category !== "all") searchParams.append('category', params.category);
@@ -249,20 +250,21 @@ export default function VendorBudgets() {
   // Budget functions
   const addProductToBudget = (product: any, producerId?: string) => {
     const costPrice = parseFloat(product.costPrice) || 0;
-    
+
     const currentRevenue = vendorBudgetForm.items.reduce((total: number, item: any) => {
       return total + (item.unitPrice * item.quantity);
     }, 0);
     const sale = getProductSalePrice(product, currentRevenue, pricingSettings, marginTiers);
     const idealPrice = sale.price;
     const minimumPrice = sale.source === 'computed' ? (sale.details?.minimumPrice || 0) : 0;
-    
+
     const newItem = {
       productId: product.id,
       productName: product.name,
       producerId: producerId || product.producerId || 'internal',
       quantity: 1,
       unitPrice: idealPrice,
+      basePriceWithMargin: idealPrice,
       totalPrice: idealPrice,
       costPrice: costPrice,
       minimumPrice: minimumPrice,
@@ -283,6 +285,7 @@ export default function VendorBudgets() {
       hasGeneralCustomization: false,
       generalCustomizationName: "",
       generalCustomizationValue: 0,
+      notes: product.description || "",
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -297,10 +300,18 @@ export default function VendorBudgets() {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
 
+      // Helper: recalculate unitPrice from basePriceWithMargin + customizations
+      const recalcUnitPrice = (it: any) => {
+        const base = it.basePriceWithMargin || 0;
+        const customUnit = it.hasItemCustomization ? (parseFloat(it.itemCustomizationValue) || 0) : 0;
+        const genUnit = it.hasGeneralCustomization ? (parseFloat(it.generalCustomizationValue) || 0) : 0;
+        return Math.round((base + customUnit + genUnit) * 100) / 100;
+      };
+
       if (field === 'quantity') {
         const quantity = parseInt(value) || 1;
         item.quantity = quantity;
-        
+
         // Só recalcular quando o preço veio de cálculo (evita "markup em cima de markup" quando costPrice foi igualado ao basePrice)
         if (item.priceSource === 'computed' && item.costPrice && item.costPrice > 0) {
           const currentRevenue = prev.items.reduce((total: number, it: any, i: number) => {
@@ -309,30 +320,42 @@ export default function VendorBudgets() {
           }, 0);
           const priceCalc = calculatePriceFromCost(item.costPrice, currentRevenue);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
-          item.unitPrice = Math.round(priceCalc.idealPrice * 100) / 100;
+          item.basePriceWithMargin = Math.round(priceCalc.idealPrice * 100) / 100;
+          item.unitPrice = recalcUnitPrice(item);
         }
-        
+
         item.totalPrice = calculateItemTotal({ ...item, quantity, unitPrice: item.unitPrice });
       } else if (field === 'unitPrice') {
         const newPrice = parseFloat(value) || 0;
         item.unitPrice = newPrice;
+
+        // Extrair a parte base (sem personalização) para atualizar basePriceWithMargin
+        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+        item.basePriceWithMargin = Math.max(0, Math.round((newPrice - customUnit - genUnit) * 100) / 100);
+
         item.totalPrice = calculateItemTotal({ ...item, unitPrice: newPrice });
-        
-        if (item.minimumPrice && item.minimumPrice > 0 && newPrice < item.minimumPrice) {
+
+        // Verificar margem mínima contra a parte base (sem personalização)
+        if (item.minimumPrice && item.minimumPrice > 0 && item.basePriceWithMargin < item.minimumPrice) {
           toast({
             title: "Atenção",
-            description: `Preço abaixo do mínimo permitido (R$ ${item.minimumPrice.toFixed(2)})`,
+            description: `Preço base (R$ ${item.basePriceWithMargin.toFixed(2)}) abaixo do mínimo (R$ ${item.minimumPrice.toFixed(2)}). Necessita aprovação do administrador.`,
             variant: "destructive"
           });
         }
       } else if (field === 'itemCustomizationValue' || field === 'generalCustomizationValue') {
         item[field] = parseFloat(value) || 0;
-        // Recalculate totalPrice when customization values change
-        item.totalPrice = calculateItemTotal({ ...item, [field]: parseFloat(value) || 0 });
+        // Recalculate unitPrice = basePriceWithMargin + customizations
+        const updatedItem = { ...item, [field]: parseFloat(value) || 0 };
+        item.unitPrice = recalcUnitPrice(updatedItem);
+        item.totalPrice = calculateItemTotal({ ...updatedItem, unitPrice: item.unitPrice });
       } else if (field === 'hasItemCustomization' || field === 'hasGeneralCustomization') {
         item[field] = Boolean(value);
-        // Recalculate totalPrice when customization flags change
-        item.totalPrice = calculateItemTotal({ ...item, [field]: Boolean(value) });
+        // Recalculate unitPrice when customization flags change
+        const updatedItem = { ...item, [field]: Boolean(value) };
+        item.unitPrice = recalcUnitPrice(updatedItem);
+        item.totalPrice = calculateItemTotal({ ...updatedItem, unitPrice: item.unitPrice });
       } else {
         item[field] = value;
 
@@ -360,7 +383,7 @@ export default function VendorBudgets() {
     }, 0);
 
     const allAtMinimum = vendorBudgetForm.items.length > 0 && vendorBudgetForm.items.every(
-      (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+      (item: any) => item.minimumPrice > 0 && (item.basePriceWithMargin || item.unitPrice) <= item.minimumPrice
     );
 
     if (vendorBudgetForm.hasDiscount && !allAtMinimum) {
@@ -372,11 +395,12 @@ export default function VendorBudgets() {
       }
 
       const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
-        const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
-        let itemMin = minPrice * item.quantity;
-        if (item.hasItemCustomization) itemMin += item.quantity * (parseFloat(item.itemCustomizationValue) || 0);
-        if (item.hasGeneralCustomization) itemMin += item.quantity * (parseFloat(item.generalCustomizationValue) || 0);
-        return total + itemMin;
+        // minimumPrice é o preço base mínimo (sem personalização)
+        const minBase = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
+        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+        const minUnitPrice = minBase + customUnit + genUnit;
+        return total + (minUnitPrice * item.quantity);
       }, 0);
 
       const discountedTotal = Math.max(0, subtotal - discountAmount);
@@ -387,20 +411,16 @@ export default function VendorBudgets() {
   };
 
   const calculateItemTotal = (item: any) => {
-    const basePrice = item.unitPrice * item.quantity;
+    // unitPrice já inclui personalização (basePriceWithMargin + customizations)
+    const totalPrice = item.unitPrice * item.quantity;
 
-    // Item customization (valor por unidade personalizada)
-    const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (parseFloat(item.itemCustomizationValue) || 0) : 0;
+    let subtotal = totalPrice;
 
-    // General customization (valor por unidade aplicado à quantidade total)
-    const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (parseFloat(item.generalCustomizationValue) || 0) : 0;
-
-    let subtotal = basePrice + itemCustomizationValue + generalCustomizationValue;
-
-    // Aplicar desconto do item (sobre o preço base apenas)
+    // Aplicar desconto do item (sobre o preço base sem personalização)
     if (item.hasItemDiscount) {
+      const basePriceOnly = (item.basePriceWithMargin || item.unitPrice) * item.quantity;
       if (item.itemDiscountType === 'percentage') {
-        const discountAmount = (basePrice * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
+        const discountAmount = (basePriceOnly * (parseFloat(item.itemDiscountPercentage) || 0)) / 100;
         subtotal = subtotal - discountAmount;
       } else if (item.itemDiscountType === 'value') {
         subtotal = subtotal - (parseFloat(item.itemDiscountValue) || 0);
@@ -414,14 +434,14 @@ export default function VendorBudgets() {
   const calculateCreditCardInterest = () => {
     if (!selectedPaymentMethod || selectedPaymentMethod.type !== 'credit_card') return 0;
     if (vendorBudgetForm.installments <= 1) return 0; // No interest for 1x payment
-    
+
     const interestRate = parseFloat(selectedPaymentMethod.installmentInterest || '0');
     if (interestRate === 0) return 0;
-    
+
     const subtotal = calculateBudgetTotal();
     const shipping = parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost();
     const baseTotal = subtotal + shipping;
-    
+
     // Calculate interest: rate * number of installments (simple interest)
     const interestValue = (baseTotal * interestRate * vendorBudgetForm.installments) / 100;
     return interestValue;
@@ -450,7 +470,7 @@ export default function VendorBudgets() {
   useEffect(() => {
     if (vendorBudgetForm.hasDiscount && vendorBudgetForm.items.length > 0) {
       const allAtMinimum = vendorBudgetForm.items.every(
-        (item: any) => item.minimumPrice > 0 && item.unitPrice <= item.minimumPrice
+        (item: any) => item.minimumPrice > 0 && (item.basePriceWithMargin || item.unitPrice) <= item.minimumPrice
       );
       if (allAtMinimum) {
         setVendorBudgetForm(prev => ({
@@ -788,19 +808,19 @@ export default function VendorBudgets() {
 
   const handleEditBudget = async (budget: any) => {
     console.log('Editing budget:', budget);
-    
+
     // Fetch full budget details with items
     try {
       const response = await fetch(`/api/budgets/${budget.id}`);
       if (!response.ok) throw new Error('Erro ao buscar orçamento');
       const fullBudget = await response.json();
-      
+
       console.log('Budget items:', fullBudget.items);
 
       // Pre-populate form with existing budget data
       const newDownPayment = Number(fullBudget.paymentInfo?.downPayment ?? fullBudget.downPayment ?? 0);
       const newShippingCost = Number(fullBudget.paymentInfo?.shippingCost ?? fullBudget.shippingCost ?? 0);
-      
+
       // Build the items array first
       const itemsArray = (fullBudget.items || []).map((item: any) => {
         // Ensure producerId is correctly mapped
@@ -821,12 +841,18 @@ export default function VendorBudgets() {
         const product = products.find((p: any) => p.id === item.productId);
         const costPrice = product ? parseFloat(product.costPrice) || 0 : 0;
 
+        // Calcular basePriceWithMargin: unitPrice salvo menos as personalizações
+        const itemCustomVal = Boolean(item.hasItemCustomization) ? toNumber(item.itemCustomizationValue) : 0;
+        const genCustomVal = Boolean(item.hasGeneralCustomization) ? toNumber(item.generalCustomizationValue) : 0;
+        const basePriceWithMargin = Math.max(0, Math.round((unitPrice - itemCustomVal - genCustomVal) * 100) / 100);
+
         return {
           productId: item.productId,
           productName: item.productName || item.product?.name,
           producerId: producerId,
           quantity: Math.max(1, Math.round(toNumber(item.quantity))),
           unitPrice: unitPrice,
+          basePriceWithMargin: basePriceWithMargin,
           minimumPrice: 0,
           costPrice: costPrice,
           priceSource: costPrice > 0 ? 'computed' : 'manual',
@@ -853,7 +879,7 @@ export default function VendorBudgets() {
           generalCustomizationValue: toNumber(item.generalCustomizationValue),
         };
       });
-      
+
       // Recalculate minimumPrice for each item based on costPrice and budget revenue
       const budgetRevenue = itemsArray.reduce((sum: number, item: any) => {
         return sum + (toNumber(item.unitPrice) * item.quantity);
@@ -866,22 +892,22 @@ export default function VendorBudgets() {
       }
 
       // Calculate the total for this budget to compute remaining amount correctly
+      // unitPrice já inclui personalização
       const subtotalItems = itemsArray.reduce((sum: number, item: any) => {
         let itemPrice = toNumber(item.unitPrice);
-        itemPrice += toNumber(item.itemCustomizationValue);
-        itemPrice += toNumber(item.generalCustomizationValue);
         if (item.hasItemDiscount) {
-          const discountAmount = item.itemDiscountType === "percentage" 
-            ? (itemPrice * item.itemDiscountPercentage) / 100 
+          const baseOnly = item.basePriceWithMargin || itemPrice;
+          const discountAmount = item.itemDiscountType === "percentage"
+            ? (baseOnly * item.itemDiscountPercentage) / 100
             : item.itemDiscountValue;
           itemPrice -= discountAmount;
         }
         return sum + (Math.max(0, itemPrice) * item.quantity);
       }, 0);
-      
+
       // Remaining amount excludes shipping - shipping is paid upfront with down payment
       const newRemainingAmount = Math.max(0, subtotalItems - newDownPayment);
-      
+
       setVendorBudgetForm({
         title: fullBudget.title,
         description: fullBudget.description || "",
@@ -946,6 +972,7 @@ export default function VendorBudgets() {
       toast({ title: "Erro", description: "O título do orçamento é obrigatório.", variant: "destructive" });
       return;
     }
+
     if (!vendorBudgetForm.contactName) {
       toast({ title: "Erro", description: "O nome de contato é obrigatório.", variant: "destructive" });
       return;
@@ -975,23 +1002,23 @@ export default function VendorBudgets() {
     }));
 
     // Calculate total value for the budget
+    // unitPrice já inclui personalização
     const subtotal = itemsArray.reduce((sum, item) => {
       let itemPrice = item.unitPrice;
-      itemPrice += item.itemCustomizationValue;
-      itemPrice += item.generalCustomizationValue;
-      
+
       if (item.hasItemDiscount) {
-        const discountAmount = item.itemDiscountType === "percentage" 
-          ? (itemPrice * item.itemDiscountPercentage) / 100 
+        const baseOnly = (item as any).basePriceWithMargin || itemPrice;
+        const discountAmount = item.itemDiscountType === "percentage"
+          ? (baseOnly * item.itemDiscountPercentage) / 100
           : item.itemDiscountValue;
         itemPrice -= discountAmount;
       }
-      
+
       return sum + (Math.max(0, itemPrice) * item.quantity);
     }, 0);
 
-    const formData = { 
-      ...vendorBudgetForm, 
+    const formData = {
+      ...vendorBudgetForm,
       validUntil: fromDateInputValue(vendorBudgetForm.validUntil),
       deliveryDeadline: fromDateInputValue(vendorBudgetForm.deliveryDeadline),
       items: itemsArray,
@@ -1307,21 +1334,21 @@ export default function VendorBudgets() {
 
               <Separator />
 
-              {/* Product Selection */}              
+              {/* Product Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Produtos do Orçamento *</h3>
 
-                {/* Selected Products */}                
+                {/* Selected Products */}
                 {vendorBudgetForm.items.length > 0 && (
                   <div className="space-y-4">
                     {vendorBudgetForm.items.map((item, index) => (
                       <div key={index} className={`p-4 border rounded-lg ${index % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
-                        {/* Producer Name Header */}                        
+                        {/* Producer Name Header */}
                         <div className="mb-3 p-2 bg-white/80 rounded-md border border-gray-200">
                           <div className="flex items-center gap-2">
                             <Factory className="h-4 w-4 text-gray-600" />
                             <span className="text-sm font-medium text-gray-700">
-                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' : 
+                              Produtor: {item.producerId === 'internal' ? 'Produtos Internos' :
                                 producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'}
                             </span>
                           </div>
@@ -1329,19 +1356,71 @@ export default function VendorBudgets() {
 
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium">{item.productName}</h4>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeProductFromBudget(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              title="Editar descrição que sairá no PDF"
+                              onClick={() => setEditingDescriptionIndex(editingDescriptionIndex === index ? null : index)}
+                              className={`p-1.5 rounded-md border transition-colors ${editingDescriptionIndex === index
+                                ? 'bg-blue-100 border-blue-400 text-blue-700'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                }`}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeProductFromBudget(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
+
+                        {/* Description editor — toggleable via pencil */}
+                        {editingDescriptionIndex === index ? (
+                          <div className="mb-3 bg-white/80 rounded-md p-2 border border-blue-200">
+                            <Label htmlFor={`description-${index}`} className="text-xs text-blue-700 font-medium flex items-center gap-1 mb-1">
+                              <Edit className="h-3 w-3" /> Descrição no PDF
+                            </Label>
+                            <Textarea
+                              id={`description-${index}`}
+                              value={item.notes || ''}
+                              onChange={(e) => updateBudgetItem(index, 'notes', e.target.value)}
+                              rows={2}
+                              className="text-sm"
+                              placeholder="Descrição que aparecerá para o cliente no PDF..."
+                              autoFocus
+                            />
+                            <p className="text-xs text-blue-500 mt-1">Clique no lápis para fechar</p>
+                          </div>
+                        ) : (
+                          item.notes ? (
+                            <p className="text-xs text-gray-500 mb-3 italic truncate" title={item.notes}>
+                              📝 {item.notes}
+                            </p>
+                          ) : null
+                        )}
 
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
-                            <Label htmlFor={`quantity-${index}`}>Quantidade *</Label>
+                            <div className="flex items-center justify-between mb-1">
+                              <Label htmlFor={`quantity-${index}`}>Quantidade *</Label>
+                              <button
+                                type="button"
+                                title={item.hasItemCustomization ? 'Personalização ativa' : 'Adicionar personalização'}
+                                onClick={() => updateBudgetItem(index, 'hasItemCustomization', !item.hasItemCustomization)}
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${item.hasItemCustomization
+                                  ? 'bg-blue-100 border-blue-400 text-blue-700'
+                                  : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-blue-50'
+                                  }`}
+                              >
+                                <Percent className="h-3 w-3" />
+                                {item.hasItemCustomization ? 'Personaliz.' : 'Personalizar'}
+                              </button>
+                            </div>
                             <Input
                               id={`quantity-${index}`}
                               type="number"
@@ -1358,23 +1437,28 @@ export default function VendorBudgets() {
                               value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
                               onChange={(e) => updateBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
                             />
-                            {item.minimumPrice > 0 && item.unitPrice > 0 && item.unitPrice < item.minimumPrice && (
-                              <p className="text-xs text-red-600">
-                                ✗ Abaixo do mínimo: R$ {item.minimumPrice.toFixed(2)}
-                              </p>
-                            )}
+                            <div className="flex justify-end mt-1 px-1">
+                              {(() => {
+                                const basePrice = item.basePriceWithMargin || item.unitPrice;
+                                return item.minimumPrice > 0 && basePrice > 0 && basePrice < item.minimumPrice ? (
+                                  <span className="text-xs text-red-600 font-bold">
+                                    Abaixo do mín.
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
                           </div>
                           <div>
                             <Label htmlFor={`subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
                             <Input
                               id={`subtotal-${index}`}
-                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
+                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                               disabled
                             />
                           </div>
                         </div>
 
-                        {/* Product Size Fields */}                        
+                        {/* Product Size Fields */}
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div>
                             <Label htmlFor={`width-${index}`}>Largura (cm)</Label>
@@ -1414,17 +1498,6 @@ export default function VendorBudgets() {
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Switch
-                            id={`item-customization-${index}`}
-                            checked={item.hasItemCustomization}
-                            onCheckedChange={(checked) => updateBudgetItem(index, 'hasItemCustomization', checked)}
-                          />
-                          <Label htmlFor={`item-customization-${index}`} className="flex items-center gap-2">
-                            <Percent className="h-4 w-4" />
-                            Personalização do Item
-                          </Label>
-                        </div>
 
                         {item.hasItemCustomization && (
                           <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
@@ -1488,12 +1561,12 @@ export default function VendorBudgets() {
                               />
                             </div>
 
-                            {/* Image Upload for Product Customization */}                            
+                            {/* Image Upload for Product Customization */}
                             <div>
                               <Label>
                                 Imagem da Personalização - {item.productName}
                                 <span className="text-xs text-gray-500 ml-2">
-                                  ({item.producerId === 'internal' ? 'Produto Interno' : 
+                                  ({item.producerId === 'internal' ? 'Produto Interno' :
                                     producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
                                 </span>
                               </Label>
@@ -1502,7 +1575,7 @@ export default function VendorBudgets() {
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                                     <div className="flex flex-col items-center justify-center pt-2 pb-2">
                                       <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                                       </svg>
                                       <p className="text-xs text-gray-500">Clique para enviar imagem</p>
                                       <p className="text-xs text-blue-600 font-medium">
@@ -1602,6 +1675,12 @@ export default function VendorBudgets() {
                           </div>
                         )}
 
+                        <div className="flex justify-between items-center text-sm text-gray-500 mb-1">
+                          <span>Custo Unitário (c/ Personalizações):</span>
+                          <span>
+                            R$ {((item.costPrice || 0) + (item.itemCustomizationValue || 0) + (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                         <div className="flex justify-between items-center text-sm">
                           <span>Subtotal:</span>
                           <span className="font-medium">
@@ -1614,39 +1693,39 @@ export default function VendorBudgets() {
                 )}
 
                 {/* Add Products - NEW FLOW: Product first, then producer (same as admin) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Adicionar Produtos ao Orçamento *
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Product Search and Filter */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          placeholder="Digite nome ou código do produto..."
-                          value={budgetProductSearch}
-                          onChange={(e) => setBudgetProductSearch(e.target.value)}
-                          className="pl-9"
-                        />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Adicionar Produtos ao Orçamento *
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Product Search and Filter */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                          <Input
+                            placeholder="Digite nome ou código do produto..."
+                            value={budgetProductSearch}
+                            onChange={(e) => setBudgetProductSearch(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
+                        <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category: string) => (
+                              <SelectItem key={category} value={category}>
+                                {category === "all" ? "Todas as Categorias" : category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select value={budgetCategoryFilter} onValueChange={setBudgetCategoryFilter}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Categoria" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category: string) => (
-                            <SelectItem key={category} value={category}>
-                              {category === "all" ? "Todas as Categorias" : category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
 
                       {/* Product List - Only show when searching */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
@@ -1708,15 +1787,15 @@ export default function VendorBudgets() {
 
                           return filteredProducts.map((product: any) => {
                             const productCode = product.friendlyCode || product.externalCode || product.compositeCode;
-                            
+
                             // PREÇO CONSISTENTE: Se costPrice != basePrice, significa que basePrice já é o preço de venda calculado.
                             // Se forem iguais, aplicamos a regra do patch.
                             const sale = getProductSalePrice(product, 0, pricingSettings, marginTiers);
                             const displayPrice = sale.price;
 
                             return (
-                              <div 
-                                key={product.id} 
+                              <div
+                                key={product.id}
                                 className="p-2 border rounded hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
                                 onClick={() => {
                                   setSelectedProductForProducer(product);
@@ -1725,10 +1804,10 @@ export default function VendorBudgets() {
                               >
                                 <div className="flex items-center gap-2">
                                   {product.imageLink ? (
-                                    <img 
-                                      src={product.imageLink} 
-                                      alt={product.name} 
-                                      className="w-10 h-10 object-cover rounded" 
+                                    <img
+                                      src={product.imageLink}
+                                      alt={product.name}
+                                      className="w-10 h-10 object-cover rounded"
                                     />
                                   ) : (
                                     <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
@@ -1796,53 +1875,53 @@ export default function VendorBudgets() {
                           </Button>
                         </div>
                       )}
-                  </div>
+                    </div>
 
-                  {/* Producer Selector Dialog - appears after product selected */}
-                  {showProducerSelector && selectedProductForProducer && (
-                    <Dialog open={showProducerSelector} onOpenChange={setShowProducerSelector}>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Selecionar Produtor</DialogTitle>
-                          <DialogDescription>
-                            Escolha qual produtor executará o produto: <strong>{selectedProductForProducer.name}</strong>
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              addProductToBudget(selectedProductForProducer, 'internal');
-                              setShowProducerSelector(false);
-                              setSelectedProductForProducer(null);
-                            }}
-                          >
-                            Produtos Internos
-                          </Button>
-                          {producers?.map((producer: any) => (
+                    {/* Producer Selector Dialog - appears after product selected */}
+                    {showProducerSelector && selectedProductForProducer && (
+                      <Dialog open={showProducerSelector} onOpenChange={setShowProducerSelector}>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Selecionar Produtor</DialogTitle>
+                            <DialogDescription>
+                              Escolha qual produtor executará o produto: <strong>{selectedProductForProducer.name}</strong>
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-2">
                             <Button
-                              key={producer.id}
                               variant="outline"
                               className="w-full justify-start"
                               onClick={() => {
-                                addProductToBudget(selectedProductForProducer, producer.id);
+                                addProductToBudget(selectedProductForProducer, 'internal');
                                 setShowProducerSelector(false);
                                 setSelectedProductForProducer(null);
                               }}
                             >
-                              {producer.name} - {producer.specialty}
+                              Produtos Internos
                             </Button>
-                          ))}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                            {producers?.map((producer: any) => (
+                              <Button
+                                key={producer.id}
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => {
+                                  addProductToBudget(selectedProductForProducer, producer.id);
+                                  setShowProducerSelector(false);
+                                  setSelectedProductForProducer(null);
+                                }}
+                              >
+                                {producer.name} - {producer.specialty}
+                              </Button>
+                            ))}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-              {/* Payment and Shipping Configuration */}              
+              {/* Payment and Shipping Configuration */}
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Pagamento e Frete</h3>
@@ -1850,7 +1929,7 @@ export default function VendorBudgets() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="payment-method">Forma de Pagamento *</Label>
-                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value }) } required>
+                    <Select value={vendorBudgetForm.paymentMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, paymentMethodId: value })} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a forma de pagamento" />
                       </SelectTrigger>
@@ -1863,7 +1942,7 @@ export default function VendorBudgets() {
                   </div>
                   <div>
                     <Label htmlFor="shipping-method">Método de Frete *</Label>
-                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value }) } required>
+                    <Select value={vendorBudgetForm.shippingMethodId || ""} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, shippingMethodId: value })} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o método de frete" />
                       </SelectTrigger>
@@ -1876,7 +1955,7 @@ export default function VendorBudgets() {
                   </div>
                 </div>
 
-                {/* Payment Configuration */}                
+                {/* Payment Configuration */}
                 {selectedPaymentMethod && (
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <h4 className="font-medium">Configuração de Pagamento</h4>
@@ -1885,7 +1964,7 @@ export default function VendorBudgets() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor="installments">Número de Parcelas *</Label>
-                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) }) } required>
+                          <Select value={vendorBudgetForm.installments?.toString() || "1"} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, installments: parseInt(value) })} required>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -1920,17 +1999,17 @@ export default function VendorBudgets() {
                         <div className="text-xs text-gray-600 mt-2 space-y-1">
                           <div className="flex justify-between">
                             <span>Subtotal dos Produtos:</span>
-                            <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                            <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
                           {vendorBudgetForm.deliveryType !== "pickup" && vendorBudgetForm.shippingCost > 0 && (
                             <div className="flex justify-between">
                               <span>Frete:</span>
-                              <span>R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                              <span>R$ {vendorBudgetForm.shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
                           <div className="flex justify-between font-medium text-green-700 pt-1 border-t">
                             <span>Entrada para Iniciar:</span>
-                            <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                            <span>R$ {(vendorBudgetForm.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       </div>
@@ -1938,7 +2017,7 @@ export default function VendorBudgets() {
                         <Label htmlFor="remaining-amount">Valor Restante (R$)</Label>
                         <Input
                           id="remaining-amount"
-                          value={`R$ ${(vendorBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`}
+                          value={`R$ ${(vendorBudgetForm.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                           disabled
                         />
                         <p className="text-xs text-gray-500 mt-1">
@@ -1949,7 +2028,7 @@ export default function VendorBudgets() {
                   </div>
                 )}
 
-                {/* Shipping Configuration */}                
+                {/* Shipping Configuration */}
                 {vendorBudgetForm.deliveryType === "pickup" ? (
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h4 className="font-medium text-blue-800">Retirada no Local</h4>
@@ -1991,7 +2070,7 @@ export default function VendorBudgets() {
                 )}
               </div>
 
-              {/* Discount Section */}              
+              {/* Discount Section */}
               <Separator />
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -2011,7 +2090,7 @@ export default function VendorBudgets() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <Label htmlFor="discount-type">Tipo de Desconto</Label>
-                        <Select value={vendorBudgetForm.discountType} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, discountType: value }) }>
+                        <Select value={vendorBudgetForm.discountType} onValueChange={(value) => setVendorBudgetForm({ ...vendorBudgetForm, discountType: value })}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -2056,10 +2135,7 @@ export default function VendorBudgets() {
                         <p className="text-lg font-semibold text-orange-600 mt-2">
                           R$ {(() => {
                             const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                              const basePrice = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
-                              const customizationValue = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                              const generalCustomizationValue = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
-                              return total + basePrice + customizationValue + generalCustomizationValue;
+                              return total + (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
                             }, 0);
 
                             if (vendorBudgetForm.discountType === 'percentage') {
@@ -2074,17 +2150,14 @@ export default function VendorBudgets() {
                     </div>
                     {(() => {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                        const base = (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
-                        const custVal = item.hasItemCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                        const genCustVal = item.hasGeneralCustomization ? (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0) : 0;
-                        return total + base + custVal + genCustVal;
+                        return total + (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
                       }, 0);
                       const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
-                        const minPrice = item.minimumPrice > 0 ? item.minimumPrice : item.unitPrice;
-                        let itemMin = minPrice * (parseInt(item.quantity) || 1);
-                        if (item.hasItemCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.itemCustomizationValue) || 0);
-                        if (item.hasGeneralCustomization) itemMin += (parseInt(item.quantity) || 1) * (parseFloat(item.generalCustomizationValue) || 0);
-                        return total + itemMin;
+                        const minBase = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
+                        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                        const minUnitPrice = minBase + customUnit + genUnit;
+                        return total + (minUnitPrice * (parseInt(item.quantity) || 1));
                       }, 0);
                       let discountAmt = 0;
                       if (vendorBudgetForm.discountType === 'percentage') {
@@ -2106,17 +2179,14 @@ export default function VendorBudgets() {
                 )}
               </div>
 
-              {/* Budget Total */}              
+              {/* Budget Total */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal dos Produtos:</span>
                     <span>R$ {(() => {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                        const basePrice = item.unitPrice * item.quantity;
-                        const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                        const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
-                        return total + basePrice + itemCustomizationValue + generalCustomizationValue;
+                        return total + item.unitPrice * item.quantity;
                       }, 0);
                       return itemsSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                     })()}</span>
@@ -2126,10 +2196,7 @@ export default function VendorBudgets() {
                       <span>Desconto:</span>
                       <span>- R$ {(() => {
                         const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
-                          const basePrice = item.unitPrice * item.quantity;
-                          const itemCustomizationValue = item.hasItemCustomization ? item.quantity * (item.itemCustomizationValue || 0) : 0;
-                          const generalCustomizationValue = item.hasGeneralCustomization ? item.quantity * (item.generalCustomizationValue || 0) : 0;
-                          return total + basePrice + itemCustomizationValue + generalCustomizationValue;
+                          return total + item.unitPrice * item.quantity;
                         }, 0);
 
                         if (vendorBudgetForm.discountType === 'percentage') {
@@ -2142,18 +2209,18 @@ export default function VendorBudgets() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span>Subtotal com Desconto:</span>
-                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                    <span>R$ {calculateBudgetTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor da Entrada:</span>
-                    <span>R$ {vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                    <span>R$ {vendorBudgetForm.downPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Valor do Frete:</span>
                     <span>
-                      {vendorBudgetForm.deliveryType === "pickup" ? 
-                        "R$ 0,00" : 
-                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
+                      {vendorBudgetForm.deliveryType === "pickup" ?
+                        "R$ 0,00" :
+                        `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
                     </span>
                   </div>
@@ -2165,13 +2232,13 @@ export default function VendorBudgets() {
                   )}
                   <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
                     <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</span>
+                    <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>
                     <span className="text-blue-600">
-                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
+                      R$ {calculateTotalWithShipping().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -2205,7 +2272,7 @@ export default function VendorBudgets() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}      
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
         <Card className="card-hover">
           <CardContent className="p-3 md:p-6">
@@ -2272,169 +2339,169 @@ export default function VendorBudgets() {
         </Card>
       </div>
 
-      {/* Filters */}      
+      {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="draft">Rascunho</SelectItem>
-                  <SelectItem value="sent">Enviado</SelectItem>
-                  <SelectItem value="approved">Aprovado</SelectItem>
-                  <SelectItem value="rejected">Rejeitado</SelectItem>
-                  <SelectItem value="converted">Convertido</SelectItem>
-                  <SelectItem value="awaiting_approval">Aguardando Autorização</SelectItem>
-                  <SelectItem value="admin_approved">Autorizado</SelectItem>
-                  <SelectItem value="not_approved">Não Autorizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Input
-                placeholder="Buscar por título, descrição ou cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="draft">Rascunho</SelectItem>
+              <SelectItem value="sent">Enviado</SelectItem>
+              <SelectItem value="approved">Aprovado</SelectItem>
+              <SelectItem value="rejected">Rejeitado</SelectItem>
+              <SelectItem value="converted">Convertido</SelectItem>
+              <SelectItem value="awaiting_approval">Aguardando Autorização</SelectItem>
+              <SelectItem value="admin_approved">Autorizado</SelectItem>
+              <SelectItem value="not_approved">Não Autorizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por título, descrição ou cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Seção de Orçamentos Aguardando Autorização do Admin */}
+      {budgets?.filter((budget: any) => budget.status === 'awaiting_approval').length > 0 && (
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            ⏳ Aguardando Autorização do Administrador
+          </h3>
+          <p className="text-sm text-orange-700 mb-3">
+            Estes orçamentos possuem itens com preço abaixo do mínimo e precisam de autorização do administrador antes de serem convertidos em pedido.
+          </p>
+          <div className="space-y-2">
+            {budgets.filter((budget: any) => budget.status === 'awaiting_approval').map((budget: any) => (
+              <div key={budget.id} className="bg-white p-3 rounded border border-orange-200 flex justify-between items-center">
+                <div>
+                  <p className="font-medium">{budget.title}</p>
+                  <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                  <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewBudget(budget)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver Detalhes
+                  </Button>
+                  <span className="text-xs text-orange-600 font-medium px-3 py-1.5 bg-orange-100 rounded-full flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Aguardando autorização
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
+        </div>
+      )}
 
-          {/* Seção de Orçamentos Aguardando Autorização do Admin */}
-          {budgets?.filter((budget: any) => budget.status === 'awaiting_approval').length > 0 && (
-            <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                ⏳ Aguardando Autorização do Administrador
-              </h3>
-              <p className="text-sm text-orange-700 mb-3">
-                Estes orçamentos possuem itens com preço abaixo do mínimo e precisam de autorização do administrador antes de serem convertidos em pedido.
-              </p>
-              <div className="space-y-2">
-                {budgets.filter((budget: any) => budget.status === 'awaiting_approval').map((budget: any) => (
-                  <div key={budget.id} className="bg-white p-3 rounded border border-orange-200 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{budget.title}</p>
-                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+      {/* Seção de Orçamentos Não Autorizados pelo Admin */}
+      {budgets?.filter((budget: any) => budget.status === 'not_approved').length > 0 && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="font-bold text-red-800 mb-3 flex items-center gap-2">
+            <X className="h-5 w-5" />
+            ❌ Orçamentos Não Autorizados
+          </h3>
+          <p className="text-sm text-red-700 mb-3">
+            Estes orçamentos foram rejeitados pelo administrador. Edite os preços para atender ao mínimo exigido e reenvie para nova análise.
+          </p>
+          <div className="space-y-2">
+            {budgets.filter((budget: any) => budget.status === 'not_approved').map((budget: any) => (
+              <div key={budget.id} className="bg-white p-3 rounded border border-red-200 flex justify-between items-center">
+                <div className="flex-1">
+                  <p className="font-medium">{budget.title}</p>
+                  <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                  <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  {budget.adminRejectionReason && (
+                    <div className="mt-2 p-2 bg-red-100 rounded text-sm">
+                      <span className="font-medium text-red-800">Motivo da rejeição:</span>
+                      <p className="text-red-700">{budget.adminRejectionReason}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewBudget(budget)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver Detalhes
-                      </Button>
-                      <span className="text-xs text-orange-600 font-medium px-3 py-1.5 bg-orange-100 rounded-full flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Aguardando autorização
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+                <div className="flex items-center gap-2 ml-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewBudget(budget)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                    onClick={() => handleEditBudget(budget)}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar e Reenviar
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
 
-          {/* Seção de Orçamentos Não Autorizados pelo Admin */}
-          {budgets?.filter((budget: any) => budget.status === 'not_approved').length > 0 && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-bold text-red-800 mb-3 flex items-center gap-2">
-                <X className="h-5 w-5" />
-                ❌ Orçamentos Não Autorizados
-              </h3>
-              <p className="text-sm text-red-700 mb-3">
-                Estes orçamentos foram rejeitados pelo administrador. Edite os preços para atender ao mínimo exigido e reenvie para nova análise.
-              </p>
-              <div className="space-y-2">
-                {budgets.filter((budget: any) => budget.status === 'not_approved').map((budget: any) => (
-                  <div key={budget.id} className="bg-white p-3 rounded border border-red-200 flex justify-between items-center">
-                    <div className="flex-1">
-                      <p className="font-medium">{budget.title}</p>
-                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      <p className="text-sm text-gray-600">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                      {budget.adminRejectionReason && (
-                        <div className="mt-2 p-2 bg-red-100 rounded text-sm">
-                          <span className="font-medium text-red-800">Motivo da rejeição:</span>
-                          <p className="text-red-700">{budget.adminRejectionReason}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewBudget(budget)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver
-                      </Button>
-                      <Button 
-                        size="sm"
-                        variant="outline"
-                        className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                        onClick={() => handleEditBudget(budget)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Editar e Reenviar
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+      {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
+      {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+          <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            🔔 Orçamentos Aprovados - Prontos para Conversão
+          </h3>
+          <div className="space-y-2">
+            {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
+              <div key={budget.id} className="bg-white p-3 rounded border border-green-200 flex justify-between items-center">
+                <div>
+                  <p className="font-medium">{budget.title}</p>
+                  <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
+                  <p className="text-sm text-green-600 font-medium">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  {budget.status === 'admin_approved' && (
+                    <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full mt-1 inline-block">
+                      Autorizado pelo Admin
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewBudget(budget)}
+                  >
+                    Ver Detalhes
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gradient-bg text-white"
+                    onClick={() => {
+                      setBudgetToConvert(budget.id);
+                      setConvertDialogOpen(true);
+                    }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-1" />
+                    Converter em Pedido
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
 
-          {/* Seção de Orçamentos Aprovados - Aguardando Conversão */}
-          {budgets?.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').length > 0 && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                🔔 Orçamentos Aprovados - Prontos para Conversão
-              </h3>
-              <div className="space-y-2">
-                {budgets.filter((budget: any) => budget.status === 'approved' || budget.status === 'admin_approved').map((budget: any) => (
-                  <div key={budget.id} className="bg-white p-3 rounded border border-green-200 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{budget.title}</p>
-                      <p className="text-sm text-gray-600">Cliente: {budget.contactName}</p>
-                      <p className="text-sm text-green-600 font-medium">Total: R$ {parseFloat(budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                      {budget.status === 'admin_approved' && (
-                        <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full mt-1 inline-block">
-                          Autorizado pelo Admin
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewBudget(budget)}
-                      >
-                        Ver Detalhes
-                      </Button>
-                      <Button 
-                        size="sm"
-                        className="gradient-bg text-white"
-                        onClick={() => {
-                          setBudgetToConvert(budget.id);
-                          setConvertDialogOpen(true);
-                        }}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-1" />
-                        Converter em Pedido
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-      {/* Budgets Table */}      
+      {/* Budgets Table */}
       <Card>
         <CardHeader>
           <CardTitle>Lista de Orçamentos ({filteredBudgets?.length || 0})</CardTitle>
@@ -2493,11 +2560,10 @@ export default function VendorBudgets() {
                       <div className="space-y-2">
                         {getStatusBadge(budget.status)}
                         {budget.clientObservations && (
-                          <div className={`text-xs p-1 rounded ${
-                            budget.status === 'approved' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
+                          <div className={`text-xs p-1 rounded ${budget.status === 'approved'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                            }`}>
                             {budget.clientObservations}
                           </div>
                         )}
@@ -2596,7 +2662,7 @@ export default function VendorBudgets() {
         </CardContent>
       </Card>
 
-      {/* View Budget Dialog */}      
+      {/* View Budget Dialog */}
       <Dialog open={viewBudgetDialogOpen} onOpenChange={setViewBudgetDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -2649,7 +2715,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Budget Header */}              
+              {/* Budget Header */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div>
                   <Label className="font-semibold">Número do Orçamento</Label>
@@ -2707,7 +2773,7 @@ export default function VendorBudgets() {
                 </div>
               </div>
 
-              {/* Budget Items */}              
+              {/* Budget Items */}
               {budgetToView.items && budgetToView.items.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Itens do Orçamento ({budgetToView.items.length})</h3>
@@ -2732,8 +2798,8 @@ export default function VendorBudgets() {
                               <div>
                                 <span className="text-gray-500">Dimensões:</span>
                                 <p className="font-medium">
-                                  {item.productWidth && item.productHeight && item.productDepth ? 
-                                    `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` : 
+                                  {item.productWidth && item.productHeight && item.productDepth ?
+                                    `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
                                     'Não informado'
                                   }
                                 </p>
@@ -2767,9 +2833,9 @@ export default function VendorBudgets() {
                             {item.customizationPhoto && (
                               <div className="mt-2">
                                 <span className="text-xs text-blue-600 block mb-1">Imagem de referência:</span>
-                                <img 
-                                  src={item.customizationPhoto} 
-                                  alt="Personalização do produto" 
+                                <img
+                                  src={item.customizationPhoto}
+                                  alt="Personalização do produto"
                                   className="w-20 h-20 object-cover rounded border cursor-pointer"
                                   onClick={() => window.open(item.customizationPhoto, '_blank')}
                                 />
@@ -2798,7 +2864,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Budget Details */}              
+              {/* Budget Details */}
               <div>
                 <Label className="font-semibold">Título</Label>
                 <p className="mt-1">{budgetToView.title}</p>
@@ -2811,7 +2877,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Payment and Shipping Information */}              
+              {/* Payment and Shipping Information */}
               {(budgetToView.paymentMethodId || budgetToView.shippingMethodId) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Informações de Pagamento e Frete</h3>
@@ -2825,8 +2891,8 @@ export default function VendorBudgets() {
                         )}
                         {budgetToView.downPayment > 0 && (
                           <div className="mt-2 space-y-1">
-                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
-                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                            <p className="text-sm"><span className="font-medium">Entrada:</span> R$ {parseFloat(budgetToView.downPayment || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-sm"><span className="font-medium">Restante:</span> R$ {parseFloat(budgetToView.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                           </div>
                         )}
                       </div>
@@ -2844,7 +2910,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Budget Items */}              
+              {/* Budget Items */}
               <div>
                 <h3 className="text-lg font-semibold mb-3">Itens do Orçamento</h3>
                 <div className="space-y-3">
@@ -2861,7 +2927,7 @@ export default function VendorBudgets() {
                         </div>
                         <div>
                           <Label className="text-xs md:text-sm font-medium">Preço Unitário</Label>
-                          <p className="text-sm md:text-base">R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                          <p className="text-sm md:text-base">R$ {parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                         <div>
                           <Label className="text-xs md:text-sm font-medium">Subtotal</Label>
@@ -2871,7 +2937,7 @@ export default function VendorBudgets() {
                         </div>
                       </div>
 
-                      {/* Product Size Information */}                      
+                      {/* Product Size Information */}
                       {(item.productWidth || item.productHeight || item.productDepth) && (
                         <div className="mt-3 p-3 bg-gray-50 rounded">
                           <Label className="text-sm font-medium">Dimensões (cm)</Label>
@@ -2907,7 +2973,7 @@ export default function VendorBudgets() {
                             </div>
                             <div>
                               <Label className="text-xs md:text-sm font-medium">Valor Unit. Personalização</Label>
-                              <p className="text-sm">R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                              <p className="text-sm">R$ {parseFloat(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                             </div>
                             <div>
                               <Label className="text-xs md:text-sm font-medium">Total Personalização</Label>
@@ -2942,7 +3008,7 @@ export default function VendorBudgets() {
                             </div>
                             <div>
                               <Label className="text-sm font-medium">Valor Unit. Personalização Geral</Label>
-                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                              <p>R$ {parseFloat(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                             </div>
                           </div>
                           <div className="mt-2 pt-2 border-t border-green-200">
@@ -2959,11 +3025,11 @@ export default function VendorBudgets() {
                       )}
                     </div>
                   ))
-                }
+                  }
                 </div>
               </div>
 
-              {/* Discount Details */}              
+              {/* Discount Details */}
               {budgetToView.hasDiscount && (
                 <div className="p-4 bg-orange-50 rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Desconto Aplicado</h3>
@@ -2977,7 +3043,7 @@ export default function VendorBudgets() {
                       <p className="text-orange-600 font-semibold">
                         {budgetToView.discountType === 'percentage'
                           ? `${budgetToView.discountPercentage}%`
-                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }`
+                          : `R$ ${parseFloat(budgetToView.discountValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                         }
                       </p>
                     </div>
@@ -2985,7 +3051,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Customization Details */}              
+              {/* Customization Details */}
               {budgetToView.hasCustomization && (
                 <div className="p-4 bg-yellow-50 rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Personalização Geral</h3>
@@ -2996,7 +3062,7 @@ export default function VendorBudgets() {
                     </div>
                     <div>
                       <Label className="font-medium">Valor</Label>
-                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }</p>
+                      <p>R$ {parseFloat(budgetToView.customizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="col-span-2">
                       <Label className="font-medium">Descrição</Label>
@@ -3006,7 +3072,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Product Customization Images */}              
+              {/* Product Customization Images */}
               {budgetToView.items?.some((item: any) => item.customizationPhoto) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Fotos de Personalização por Produto</h3>
@@ -3034,7 +3100,7 @@ export default function VendorBudgets() {
                 </div>
               )}
 
-              {/* Actions */}              
+              {/* Actions */}
               <div className="flex gap-2 pt-4 border-t">
                 <Button
                   variant="outline"
@@ -3108,7 +3174,7 @@ export default function VendorBudgets() {
         </DialogContent>
       </Dialog>
 
-      {/* Convert to Order Confirmation Dialog */}      
+      {/* Convert to Order Confirmation Dialog */}
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -3131,8 +3197,8 @@ export default function VendorBudgets() {
                 </SelectContent>
               </Select>
             </div>
-            
-            {/* Input for Delivery Date */}            
+
+            {/* Input for Delivery Date */}
             <div>
               <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
               <Input
@@ -3144,7 +3210,7 @@ export default function VendorBudgets() {
               />
             </div>
 
-            {/* Show producers involved in this budget */}            
+            {/* Show producers involved in this budget */}
             {budgetToConvert && (() => {
               const budget = budgets?.find((b: any) => b.id === budgetToConvert);
               if (!budget?.items) return null;
