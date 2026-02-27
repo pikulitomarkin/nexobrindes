@@ -1,7 +1,6 @@
 import express from 'express';
 // Static imports required for Vercel's Edge/Node File Trace (nft) to include these files in the Lambda
 import { registerRoutes } from '../server/routes.js';
-import { serveStatic } from '../server/vite.js';
 import 'dotenv/config';
 
 // Create Express app
@@ -66,14 +65,11 @@ async function initializeApp(): Promise<express.Express> {
       console.error('[DEBUG VERCEL] 🚀 Initializing Vercel serverless function...');
 
       try {
-        console.error('[DEBUG VERCEL] Setting up static files (if dev) and registering routes');
+        console.error('[DEBUG VERCEL] Setting up registering routes');
 
-        // In Vercel, static files are served automatically from the public directory
-        // We'll only use serveStatic if running in development or other environments
-        if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
-          console.error('[DEBUG VERCEL] 📁 Setting up static file serving for development');
-          serveStatic(app);
-        }
+        // Note: Vite static file serving is explicitly skipped in Vercel environment 
+        // to avoid top-level imports of devDependencies like 'vite' which crash the Node lambda.
+        // Vercel routes handle static files natively via vercel.json.
 
         // Register all API routes
         console.error('[DEBUG VERCEL] 🔄 Registering API routes... Database URL length:', process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 'MISSING');
