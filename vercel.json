@@ -3,15 +3,14 @@
   "buildCommand": "npm install --include=dev && npm run build",
   "outputDirectory": "public",
   "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@4.0.0",
+    "api/index.mjs": {
       "maxDuration": 30
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.ts"
+      "dest": "/api/index.mjs"
     },
     {
       "src": "/assets/(.*)",
@@ -33,7 +32,6 @@
     }
   ],
   "env": {
-    "NODE_OPTIONS": "--max-old-space-size=4096",
-    "ROLLUP_WASM": "true"
+    "NODE_OPTIONS": "--max-old-space-size=4096"
   }
 }
