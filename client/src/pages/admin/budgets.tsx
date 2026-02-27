@@ -1506,25 +1506,37 @@ export default function AdminBudgets() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium">{item.productName}</h4>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              title="Editar descrição que sairá no PDF"
-                              onClick={() => setEditingDescriptionIndex(editingDescriptionIndex === index ? null : index)}
-                              className={`p-1.5 rounded-md border transition-colors ${editingDescriptionIndex === index
-                                ? 'bg-blue-100 border-blue-400 text-blue-700'
-                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                }`}
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-semibold text-gray-800">{item.productName}</h4>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id={`admin-customization-toggle-${index}`}
+                                checked={item.hasItemCustomization}
+                                onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasItemCustomization', checked)}
+                              />
+                              <Label htmlFor={`admin-customization-toggle-${index}`} className="text-sm font-medium text-gray-700 cursor-pointer">
+                                Personalizar
+                              </Label>
+                            </div>
+                            <div className="h-6 w-px bg-gray-300 mx-1"></div>
                             <Button
                               type="button"
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-500 hover:text-blue-600"
+                              onClick={() => setEditingDescriptionIndex(editingDescriptionIndex === index ? null : index)}
+                              title="Editar descrição no PDF"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                               onClick={() => removeProductFromAdminBudget(index)}
+                              title="Remover item"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1556,104 +1568,9 @@ export default function AdminBudgets() {
                           ) : null
                         )}
 
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <Label htmlFor={`admin-quantity-${index}`}>Quantidade *</Label>
-                              <button
-                                type="button"
-                                title={item.hasItemCustomization ? 'Personalização ativa' : 'Adicionar personalização'}
-                                onClick={() => updateAdminBudgetItem(index, 'hasItemCustomization', !item.hasItemCustomization)}
-                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${item.hasItemCustomization
-                                  ? 'bg-blue-100 border-blue-400 text-blue-700'
-                                  : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-blue-50'
-                                  }`}
-                              >
-                                <Percent className="h-3 w-3" />
-                                {item.hasItemCustomization ? 'Personaliz.' : 'Personalizar'}
-                              </button>
-                            </div>
-                            <Input
-                              id={`admin-quantity-${index}`}
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => updateAdminBudgetItem(index, 'quantity', e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <Label className="text-xs">Preço Unitário (R$)</Label>
-                            <Input
-                              placeholder="R$ 0,00"
-                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
-                              onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
-                              className={item.minimumPrice && (item.basePriceWithMargin || item.unitPrice) < item.minimumPrice ? 'border-red-500 focus:ring-red-500' : ''}
-                            />
-                            <div className="flex justify-end mt-1 px-1">
-                              {(() => {
-                                const basePrice = item.basePriceWithMargin || item.unitPrice;
-                                return item.minimumPrice > 0 && basePrice > 0 && basePrice < item.minimumPrice ? (
-                                  <span className="text-xs text-red-600 font-bold">
-                                    Abaixo do mín.
-                                  </span>
-                                ) : null;
-                              })()}
-                            </div>
-                          </div>
-                          <div>
-                            <Label htmlFor={`admin-subtotal-${index}`}>Subtotal (Qtd x Preço)</Label>
-                            <Input
-                              id={`admin-subtotal-${index}`}
-                              value={`R$ ${(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                              disabled
-                            />
-                          </div>
-                        </div>
-
-                        {/* Product Size Fields */}
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div>
-                            <Label htmlFor={`admin-width-${index}`}>Largura (cm)</Label>
-                            <Input
-                              id={`admin-width-${index}`}
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={item.productWidth}
-                              onChange={(e) => updateAdminBudgetItem(index, 'productWidth', e.target.value)}
-                              placeholder="Ex: 150.0"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`admin-height-${index}`}>Altura (cm)</Label>
-                            <Input
-                              id={`admin-height-${index}`}
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={item.productHeight}
-                              onChange={(e) => updateAdminBudgetItem(index, 'productHeight', e.target.value)}
-                              placeholder="Ex: 80.0"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`admin-depth-${index}`}>Profundidade (cm)</Label>
-                            <Input
-                              id={`admin-depth-${index}`}
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={item.productDepth}
-                              onChange={(e) => updateAdminBudgetItem(index, 'productDepth', e.target.value)}
-                              placeholder="Ex: 60.0"
-                            />
-                          </div>
-                        </div>
-
-
+                        {/* 1. Customization Section (Now First) */}
                         {item.hasItemCustomization && (
-                          <div className="bg-blue-50 p-3 rounded mb-3 space-y-3">
+                          <div className="bg-white/50 p-2 rounded-lg border border-blue-100 mb-4 space-y-3">
                             <CustomizationSelector
                               productCategory={products.find((p: any) => p.id === item.productId)?.category}
                               quantity={item.quantity}
@@ -1676,9 +1593,9 @@ export default function AdminBudgets() {
                               onCustomizationDescriptionChange={(description) => updateAdminBudgetItem(index, 'itemCustomizationDescription', description)}
                             />
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <Label>Valor Unitário (R$)</Label>
+                                <Label className="text-xs">Valor Unitário (R$)</Label>
                                 <Input
                                   value={item.itemCustomizationValue > 0 ? currencyMask(item.itemCustomizationValue.toString().replace('.', ',')) : ''}
                                   onChange={(e) => {
@@ -1686,10 +1603,11 @@ export default function AdminBudgets() {
                                     updateAdminBudgetItem(index, 'itemCustomizationValue', value);
                                   }}
                                   placeholder="0,00"
+                                  className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <Label>Total da Personalização (R$)</Label>
+                                <Label className="text-xs">Total da Personalização (R$)</Label>
                                 <Input
                                   value={currencyMask((item.quantity * (item.itemCustomizationValue || 0)).toFixed(2).replace('.', ','))}
                                   onChange={(e) => {
@@ -1698,147 +1616,186 @@ export default function AdminBudgets() {
                                     updateAdminBudgetItem(index, 'itemCustomizationValue', unitValue);
                                   }}
                                   placeholder="0,00"
+                                  className="h-8 text-sm"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
                               </div>
                             </div>
 
                             <div>
-                              <Label>Observações Adicionais (Opcional)</Label>
+                              <Label className="text-xs">Observações Adicionais (Opcional)</Label>
                               <Input
                                 value={item.additionalCustomizationNotes || ''}
                                 onChange={(e) => updateAdminBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
-                                placeholder="Observações extras sobre a personalização..."
+                                placeholder="Observações extras..."
+                                className="h-8 text-sm"
                               />
                             </div>
 
                             {/* Image Upload for Product Customization */}
                             <div>
-                              <Label>
-                                Imagem da Personalização - {item.productName}
-                                <span className="text-xs text-gray-500 ml-2">
-                                  ({item.producerId === 'internal' ? 'Produto Interno' :
-                                    producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
-                                </span>
-                              </Label>
-                              <div className="mt-2 space-y-2">
-                                <div className="flex items-center justify-center w-full">
-                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
-                                      <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
-                                      </svg>
-                                      <p className="text-xs text-gray-500">Clique para enviar imagem</p>
-                                      <p className="text-xs text-blue-600 font-medium">
-                                        Para: {item.productName}
-                                      </p>
-                                    </div>
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept="image/*"
-                                      onChange={(e) => handleAdminProductImageUpload(e, index)}
-                                    />
-                                  </label>
-                                </div>
+                              <Label className="text-xs">Imagem da Personalização</Label>
+                              <div className="mt-1 flex items-center gap-3">
+                                <label className="flex items-center justify-center px-4 h-10 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Upload className="h-4 w-4 text-gray-500" />
+                                    <span className="text-xs text-gray-500 font-medium">Anexar Arte/Imagem</span>
+                                  </div>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleAdminProductImageUpload(e, index)}
+                                  />
+                                </label>
 
                                 {item.customizationPhoto && (
-                                  <div className="relative inline-block">
+                                  <div className="relative h-10 w-10 flex-shrink-0">
                                     <img
                                       src={item.customizationPhoto}
-                                      alt={`Personalização ${item.productName}`}
-                                      className="w-24 h-24 object-cover rounded-lg"
-                                      onError={(e) => {
-                                        console.error('Erro ao carregar imagem:', item.customizationPhoto);
-                                        e.currentTarget.style.display = 'none';
-                                      }}
+                                      alt="Arte"
+                                      className="h-10 w-10 object-cover rounded border"
                                     />
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                                    <button
                                       onClick={() => removeAdminProductImage(index)}
+                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
                                       type="button"
                                     >
-                                      ×
-                                    </Button>
+                                      <X className="h-3 w-3" />
+                                    </button>
                                   </div>
                                 )}
                               </div>
                             </div>
 
-                            <Separator className="my-4" />
-
-                            <div className="flex items-center space-x-2 mb-3">
+                            <div className="flex items-center space-x-2 py-1">
                               <Switch
                                 id={`admin-general-customization-${index}`}
                                 checked={item.hasGeneralCustomization}
                                 onCheckedChange={(checked) => updateAdminBudgetItem(index, 'hasGeneralCustomization', checked)}
                               />
-                              <Label htmlFor={`admin-general-customization-${index}`} className="flex items-center gap-2">
-                                <Percent className="h-4 w-4" />
-                                Personalização Geral
+                              <Label htmlFor={`admin-general-customization-${index}`} className="text-xs font-medium flex items-center gap-1 cursor-pointer">
+                                <Percent className="h-3 w-3" />
+                                Personalização Geral (Manual)
                               </Label>
                             </div>
 
                             {item.hasGeneralCustomization && (
-                              <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
-                                <div className="grid grid-cols-2 gap-3">
+                              <div className="bg-green-50/50 p-2 rounded border border-green-100 space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div>
-                                    <Label htmlFor={`admin-general-customization-name-${index}`}>Nome da Personalização</Label>
+                                    <Label className="text-xs">Tipo/Nome</Label>
                                     <Input
-                                      id={`admin-general-customization-name-${index}`}
                                       value={item.generalCustomizationName || ''}
                                       onChange={(e) => updateAdminBudgetItem(index, 'generalCustomizationName', e.target.value)}
-                                      placeholder="Ex: Bordado, Gravação, etc."
+                                      placeholder="Ex: Silk, Laser..."
+                                      className="h-8 text-sm"
                                     />
                                   </div>
                                   <div>
-                                    <Label htmlFor={`admin-general-customization-value-${index}`}>Valor Unitário (R$)</Label>
+                                    <Label className="text-xs">Valor Unit. (R$)</Label>
                                     <Input
-                                      id={`admin-general-customization-value-${index}`}
                                       value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
                                       onChange={(e) => {
                                         const value = parseCurrencyValue(e.target.value);
                                         updateAdminBudgetItem(index, 'generalCustomizationValue', value);
                                       }}
-                                      placeholder="R$ 0,00"
+                                      placeholder="0,00"
+                                      className="h-8 text-sm"
                                     />
                                   </div>
-                                </div>
-                                <div>
-                                  <Label>Total da Personalização Geral (R$)</Label>
-                                  <Input
-                                    value={currencyMask((item.quantity * (item.generalCustomizationValue || 0)).toFixed(2).replace('.', ','))}
-                                    onChange={(e) => {
-                                      const totalValue = parseCurrencyValue(e.target.value);
-                                      const unitValue = item.quantity > 0 ? totalValue / item.quantity : 0;
-                                      updateAdminBudgetItem(index, 'generalCustomizationValue', unitValue);
-                                    }}
-                                    placeholder="0,00"
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                  </p>
                                 </div>
                               </div>
                             )}
                           </div>
                         )}
 
-                        <div className="flex justify-between items-center text-sm text-gray-500 mb-1">
-                          <span>Custo Unitário (c/ Personalizações):</span>
-                          <span>
-                            R$ {((item.costPrice || 0) + (item.itemCustomizationValue || 0) + (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
+                        {/* 2. Quantity, Price and Subtotal (Now Second) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                          <div>
+                            <Label className="text-sm">Quantidade *</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateAdminBudgetItem(index, 'quantity', e.target.value)}
+                              className="h-10"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm">Preço Unitário da Peça (R$)</Label>
+                            <Input
+                              placeholder="R$ 0,00"
+                              value={item.unitPrice > 0 ? currencyMask(item.unitPrice.toString().replace('.', ',')) : ''}
+                              onChange={(e) => updateAdminBudgetItem(index, 'unitPrice', parseCurrencyValue(e.target.value))}
+                              className="h-10"
+                            />
+                            {(() => {
+                              const basePrice = item.basePriceWithMargin || item.unitPrice;
+                              return item.minimumPrice > 0 && basePrice > 0 && basePrice < item.minimumPrice ? (
+                                <p className="text-[10px] text-red-600 font-bold mt-1 uppercase">Abaixo do preço mínimo!</p>
+                              ) : null;
+                            })()}
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium">Subtotal Item (R$)</Label>
+                            <div className="h-10 flex items-center px-3 bg-gray-100 border rounded-md font-semibold text-gray-700">
+                              R$ {(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span>Subtotal:</span>
-                          <span className="font-medium">
-                            R$ {calculateAdminItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
+
+                        {/* 3. Dimensions (Now Third) */}
+                        <div className="grid grid-cols-3 gap-3 mb-4 p-2 bg-gray-50/50 rounded-lg border border-gray-100">
+                          <div>
+                            <Label className="text-[10px] uppercase text-gray-500">Larg. (cm)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={item.productWidth}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productWidth', e.target.value)}
+                              placeholder="0.0"
+                              className="h-8 text-xs px-2"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] uppercase text-gray-500">Alt. (cm)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={item.productHeight}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productHeight', e.target.value)}
+                              placeholder="0.0"
+                              className="h-8 text-xs px-2"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] uppercase text-gray-500">Prof. (cm)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={item.productDepth}
+                              onChange={(e) => updateAdminBudgetItem(index, 'productDepth', e.target.value)}
+                              placeholder="0.0"
+                              className="h-8 text-xs px-2"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 4. Costs Summary */}
+                        <div className="pt-2 border-t border-gray-100 space-y-1">
+                          <div className="flex justify-between items-center text-xs text-gray-500">
+                            <span>Custo Unit. Total (Custo + Pers.):</span>
+                            <span className="font-mono">
+                              R$ {((item.costPrice || 0) + (item.itemCustomizationValue || 0) + (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-gray-700">Total do Item no Orçamento:</span>
+                            <span className="font-bold text-blue-700 text-lg">
+                              R$ {calculateAdminItemTotal(item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))}
