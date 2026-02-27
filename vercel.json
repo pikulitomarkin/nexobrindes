@@ -3,7 +3,7 @@
   "buildCommand": "npm install --include=dev && npm run build",
   "outputDirectory": "public",
   "functions": {
-    "api/index.js": {
+    "api/index.ts": {
       "runtime": "@vercel/node@4.0.0",
       "maxDuration": 30
     }
@@ -11,7 +11,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.js"
+      "dest": "/api/index.ts"
     },
     {
       "src": "/assets/(.*)",
