@@ -771,40 +771,5 @@ export type InsertPricingSettings = z.infer<typeof insertPricingSettingsSchema>;
 export type PricingMarginTier = typeof pricingMarginTiers.$inferSelect;
 export type InsertPricingMarginTier = z.infer<typeof insertPricingMarginTierSchema>;
 
-export interface ExpenseNote {
-  id: string;
-  date: Date;
-  category: string;
-  description: string;
-  amount: string;
-  vendorId?: string;
-  orderId?: string;
-  attachmentUrl?: string;
-  status: 'recorded' | 'approved' | 'rejected' | 'reimbursed';
-  approvedBy?: string;
-  approvedAt?: Date;
-  createdBy: string;
-  createdAt: Date;
-  updatedAt?: Date;
-}
 
-export interface BankTransaction {
-  id: string;
-  importId?: string;
-  fitId: string;
-  date: Date;
-  hasValidDate: boolean;
-  amount: string;
-  description: string;
-  memo: string;
-  bankRef: string;
-  originalType: string;
-  type: 'credit' | 'debit' | 'other';
-  status: 'unmatched' | 'matched' | 'ignored';
-  matchedOrderId?: string;
-  matchedPaymentId?: string;
-  matchedEntityType?: string;
-  matchedEntityId?: string;
-  matchedAt?: Date;
-  notes: string;
-}
+

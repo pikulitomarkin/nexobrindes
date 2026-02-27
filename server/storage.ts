@@ -4902,6 +4902,11 @@ export class MemStorage implements IStorage {
       ...logData,
       id,
       createdAt: new Date(),
+      // Ensure optional fields are set to null if undefined
+      details: logData.details ?? null,
+      vendorId: logData.vendorId ?? null,
+      ipAddress: logData.ipAddress ?? null,
+      userAgent: logData.userAgent ?? null,
     };
 
     // Ensure mockData.systemLogs is initialized
@@ -4934,6 +4939,7 @@ export class MemStorage implements IStorage {
       userId,
       userName,
       userRole,
+      vendorId: null,
       action,
       entity: entity || null,
       entityId: entityId || null,

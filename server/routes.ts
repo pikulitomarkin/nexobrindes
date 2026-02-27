@@ -115,7 +115,8 @@ async function parseOFXBuffer(buffer: Buffer): Promise<ParsedOFXResult> {
     console.log('OFX parsing successful, structure:', JSON.stringify(ofxData, null, 2).substring(0, 500) + '...');
   } catch (parseError) {
     console.error('OFX parsing failed:', parseError);
-    throw new Error(`Erro ao analisar arquivo OFX: ${parseError.message}`);
+    const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+    throw new Error(`Erro ao analisar arquivo OFX: ${errorMessage}`);
   }
 
   const transactions: ParsedOFXTransaction[] = [];
@@ -376,7 +377,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`File uploaded successfully: ${objectPath}`);
       res.json({ url: objectPath });
-    } catch (error) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       console.error('Upload error details:', {
         message: error.message,
         stack: error.stack,
@@ -502,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const items = await storage.getProductionOrderItems(productionOrder.id);
 
       // Get budget photos if order was converted from budget
-      let photos = [];
+      let photos: string[] = [];
       if (order.budgetId) {
         const budgetPhotos = await storage.getBudgetPhotos(order.budgetId);
         photos = budgetPhotos.map(photo => photo.imageUrl || photo.photoUrl);
