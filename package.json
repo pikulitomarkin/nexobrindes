@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild api/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/api.mjs",
+    "build": "vite build && esbuild api/index.ts --platform=node --packages=external --bundle --format=esm --outfile=api/index.mjs",
     "build:local": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "node dist/index.js",
     "check": "tsc",

@@ -2,21 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/api.mjs",
+      "src": "api/index.mjs",
       "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "public"
-      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/api.mjs"
+      "dest": "/api/index.mjs"
     },
     {
       "src": "/assets/(.*)",
