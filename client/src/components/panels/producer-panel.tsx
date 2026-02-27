@@ -107,7 +107,7 @@ export default function ProducerPanel() {
     active: activeOrders.length,
     urgent: urgentOrders.length,
     readyToShip: readyToShip.length
-  }));
+  });
 
   return (
     <div className="space-y-6">
