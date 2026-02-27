@@ -4,6 +4,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.ts": {
+      "includeFiles": "server/**,shared/**,.env*",
       "runtime": "@vercel/node@4.0.0",
       "maxDuration": 30
     }
