@@ -1,8 +1,12 @@
+console.error('[DEBUG VERCEL TOP-LEVEL] Iniciando imports do express');
 import express from 'express';
+console.error('[DEBUG VERCEL TOP-LEVEL] Express importado');
 // Using dynamic imports inside the handler to catch top-level errors (like DB connection fails)
 // import { registerRoutes } from '../server/routes';
 // import { serveStatic } from '../server/vite';
+console.error('[DEBUG VERCEL TOP-LEVEL] Importando dotenv');
 import 'dotenv/config';
+console.error('[DEBUG VERCEL TOP-LEVEL] Dotenv importado');
 
 // Create Express app
 const app = express();
@@ -63,26 +67,33 @@ async function initializeApp(): Promise<express.Express> {
   // Prevent multiple initializations
   if (!initializationPromise) {
     initializationPromise = (async () => {
-      console.log('🚀 Initializing Vercel serverless function...');
+      console.error('[DEBUG VERCEL] 🚀 Initializing Vercel serverless function...');
 
-      // Use dynamic imports to catch top-level errors during initialization
-      const { registerRoutes } = await import('../server/routes');
-      const { serveStatic } = await import('../server/vite');
+      try {
+        console.error('[DEBUG VERCEL] Importing ../server/routes');
+        // Use dynamic imports to catch top-level errors during initialization
+        const { registerRoutes } = await import('../server/routes');
+        console.error('[DEBUG VERCEL] Importing ../server/vite');
+        const { serveStatic } = await import('../server/vite');
 
-      // In Vercel, static files are served automatically from the public directory
-      // We'll only use serveStatic if running in development or other environments
-      if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
-        console.log('📁 Setting up static file serving for development');
-        serveStatic(app);
+        // In Vercel, static files are served automatically from the public directory
+        // We'll only use serveStatic if running in development or other environments
+        if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+          console.error('[DEBUG VERCEL] 📁 Setting up static file serving for development');
+          serveStatic(app);
+        }
+
+        // Register all API routes
+        console.error('[DEBUG VERCEL] 🔄 Registering API routes... Database URL length:', process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 'MISSING');
+        await registerRoutes(app);
+
+        initializedApp = app;
+        console.error('[DEBUG VERCEL] ✅ App initialization complete');
+        return initializedApp;
+      } catch (err) {
+        console.error('[DEBUG VERCEL FATAL] Erro capturado dentro da promise de inicialização:', err);
+        throw err;
       }
-
-      // Register all API routes
-      console.log('🔄 Registering API routes...');
-      await registerRoutes(app);
-
-      initializedApp = app;
-      console.log('✅ App initialization complete');
-      return initializedApp;
     })();
   }
 
