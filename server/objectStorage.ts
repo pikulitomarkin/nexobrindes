@@ -26,11 +26,8 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
-// Ensure local uploads directory exists
+// Local uploads directory (will be checked lazily during upload to prevent Read-Only File System crash on Serverless)
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 export class ObjectStorageService {
   constructor() { }
