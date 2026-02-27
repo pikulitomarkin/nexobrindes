@@ -1410,9 +1410,14 @@ export default function VendorBudgets() {
                           </div>
                         ) : (
                           item.notes ? (
-                            <p className="text-xs text-gray-500 mb-3 italic truncate" title={item.notes}>
-                              📝 {item.notes}
-                            </p>
+                            <div className="mb-3 px-1 min-w-0">
+                              <p
+                                className="text-[11px] text-gray-400 italic line-clamp-1 opacity-80 hover:line-clamp-none transition-all cursor-help"
+                                title={item.notes}
+                              >
+                                📝 {item.notes}
+                              </p>
+                            </div>
                           ) : null
                         )}
 

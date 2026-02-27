@@ -167,7 +167,7 @@ export function CustomizationSelector({
                               <div className="flex flex-col">
                                 <span>{customization.name}</span>
                                 <span className="text-[9px] text-gray-500">
-                                  Preço base: R$ {customization.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  Preço base: R$ {Number(customization.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   {customization.minQuantity > 1 && ` (mín. ${customization.minQuantity})`}
                                 </span>
                               </div>
