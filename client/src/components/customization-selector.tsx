@@ -20,8 +20,6 @@ export function CustomizationSelector({
   quantity,
   selectedCustomization,
   onCustomizationChange,
-  customizationValue = 0,
-  onCustomizationValueChange,
   customizationDescription = '',
   onCustomizationDescriptionChange,
   onValidationError
@@ -39,7 +37,9 @@ export function CustomizationSelector({
   });
 
   // Filtra as personalizações
-  const filteredCustomizations = customizations.filter((c: any) => {
+  const filteredCustomizations = (customizations as any[]).filter((c: any) => {
+    // Ignora itens sem ID (evita crash no SelectItem)
+    if (c.id == null) return false;
     // Se tiver categoria do produto, tenta filtrar. Se não, mostra todas as ativas.
     if (productCategory && c.category) {
       return c.category.toLowerCase().includes(productCategory.toLowerCase());
@@ -51,18 +51,22 @@ export function CustomizationSelector({
     return <div className="text-xs text-blue-600 animate-pulse">Carregando opções...</div>;
   }
 
+  // Garante que o valor selecionado seja sempre string
+  const selectValue = selectedCustomization ? String(selectedCustomization) : "none";
+
   return (
     <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
       <div className="space-y-1.5">
         <Label className="text-xs font-bold uppercase text-gray-500">Tipo de Personalização</Label>
         <Select
-          value={selectedCustomization || "none"}
+          value={selectValue}
           onValueChange={(value) => {
             if (value === "none") {
               onCustomizationChange(null);
               return;
             }
-            const selected = customizations.find((c: any) => c.id === value);
+            // Comparação por string para funcionar com IDs numéricos ou textuais da API
+            const selected = (customizations as any[]).find((c: any) => String(c.id) === String(value));
             if (selected) {
               if (quantity < selected.minQuantity) {
                 const msg = `Mínimo de ${selected.minQuantity} unidades para esta personalização.`;
@@ -80,7 +84,8 @@ export function CustomizationSelector({
           <SelectContent>
             <SelectItem value="none">Sem personalização</SelectItem>
             {filteredCustomizations.map((c: any) => (
-              <SelectItem key={c.id} value={c.id}>
+              // Coerce ID para string — SelectItem requer value string não-vazio
+              <SelectItem key={String(c.id)} value={String(c.id)}>
                 {c.name} - R$ {Number(c.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </SelectItem>
             ))}
