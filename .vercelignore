@@ -1,0 +1,10 @@
+# Ignorar o arquivo TypeScript source da API — o Vercel deve usar
+# o api/index.js já bundlado pelo esbuild no buildCommand
+api/index.ts
+
+# Ignorar arquivos de desenvolvimento e dados grandes
+node_modules
+attached_assets
+backup_20251115_061019.sql
+products.json
+*.md

@@ -2,15 +2,10 @@
   "version": 2,
   "buildCommand": "npm install --include=dev && npm run build",
   "outputDirectory": "public",
-  "functions": {
-    "api/index.mjs": {
-      "maxDuration": 30
-    }
-  },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.mjs"
+      "dest": "/api/index.js"
     },
     {
       "src": "/assets/(.*)",
