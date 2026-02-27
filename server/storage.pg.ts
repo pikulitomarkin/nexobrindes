@@ -1640,42 +1640,33 @@ export class PgStorage implements IStorage {
         return { updated: 0, errors };
       }
 
-      // Buscar todos os produtos com costPrice definido
-      const allProducts = await pg.select().from(schema.products)
-        .where(
-          sql`cost_price IS NOT NULL AND cost_price != '0' AND cost_price != '0.00'`
-        );
+      // Buscar todos os produtos que têm costPrice definido e atualizar em uma única operação SQL (Batch Update)
+      // Isso evita o erro 504 na Vercel decorrente de múltiplos comandos sequenciais (N+1 updates)
+      const updateResult = await pg.execute(
+        sql`UPDATE products 
+          SET base_price = ROUND((CAST(cost_price AS NUMERIC) / ${divisor.toString()}), 2),
+              updated_at = NOW()
+          WHERE cost_price IS NOT NULL 
+            AND cost_price != '0' 
+            AND cost_price != '0.00'`
+      );
 
-      for (const product of allProducts) {
-        try {
-          const costPrice = parseFloat(product.costPrice as string);
-          if (!costPrice || costPrice <= 0) continue;
-
-          // Calcular preço de venda ideal com a fórmula de markup divisor
-          const idealPrice = Math.round((costPrice / divisor) * 100) / 100;
-
-          await pg.update(schema.products)
-            .set({ basePrice: idealPrice.toFixed(2) } as any)
-            .where(eq(schema.products.id, product.id));
-
-          updated++;
-        } catch (productError: any) {
-          errors.push(`Produto ${product.id}: ${productError.message}`);
-        }
-      }
+      updated = (updateResult as any).rowCount || 0;
 
       // Também preencher base_price = cost_price para produtos sem custo definido mas sem base_price
       await pg.execute(
         sql`UPDATE products
-            SET base_price = cost_price
-            WHERE (base_price = '0.00' OR base_price IS NULL OR base_price = '0')
-              AND cost_price IS NOT NULL
-              AND cost_price != '0'
-              AND cost_price != '0.00'`
+          SET base_price = cost_price,
+              updated_at = NOW()
+          WHERE (base_price = '0.00' OR base_price IS NULL OR base_price = '0')
+            AND cost_price IS NOT NULL
+            AND cost_price != '0'
+            AND cost_price != '0.00'`
       );
 
       return { updated, errors };
     } catch (error: any) {
+      console.error('Error recalculating product prices:', error);
       errors.push(`Erro geral: ${error.message}`);
       return { updated, errors };
     }
