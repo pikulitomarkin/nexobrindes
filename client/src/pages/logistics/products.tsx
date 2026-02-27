@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Plus, Upload, Search, Edit, Trash2, Package, Factory, FileText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -65,8 +65,8 @@ export default function LogisticsProducts() {
 
   // Queries
   const productsQuery = useQuery({
-    queryKey: ["/api/logistics/products", { 
-      page: currentPage, 
+    queryKey: ["/api/logistics/products", {
+      page: currentPage,
       limit: pageSize,
       search: debouncedSearch || undefined,
       category: selectedCategory !== "all" ? selectedCategory : undefined,
@@ -156,31 +156,86 @@ export default function LogisticsProducts() {
         throw new Error('Arquivo muito grande. O limite é de 50MB.');
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('producerId', producerId);
-
-      const response = await fetch('/api/logistics/products/import', {
-        method: 'POST',
-        body: formData,
+      // Read file content in browser to chunk it and bypass Vercel 4.5MB Payload limit
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = (e) => reject(new Error('Erro ao ler arquivo'));
+        reader.readAsText(file);
       });
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Erro ao importar produtos');
+      let productsArray = [];
+      try {
+        productsArray = JSON.parse(fileContent);
+        if (!Array.isArray(productsArray)) {
+          throw new Error('O arquivo JSON deve conter um array de produtos');
+        }
+      } catch (err) {
+        throw new Error('Arquivo JSON inválido ou mal formatado');
       }
 
-      return responseData;
+      const totalItems = productsArray.length;
+      if (totalItems === 0) {
+        throw new Error('Nenhum produto encontrado no arquivo');
+      }
+
+      // Chunk array into batches of 250 to avoid payload limits
+      const chunkSize = 250;
+      let importedCount = 0;
+      let totalErrors = [] as any[];
+
+      for (let i = 0; i < totalItems; i += chunkSize) {
+        const chunk = productsArray.slice(i, i + chunkSize);
+
+        // Convert chunk back to File to use existing Multer logic on backend
+        // We simulate a smaller file upload for each chunk
+        const chunkBlob = new Blob([JSON.stringify(chunk)], { type: 'application/json' });
+        const chunkFile = new File([chunkBlob], `chunk-${i}.json`, { type: 'application/json' });
+
+        const formData = new FormData();
+        formData.append('file', chunkFile);
+        formData.append('producerId', producerId);
+
+        try {
+          const response = await fetch('/api/logistics/products/import', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const responseData = await response.json();
+          if (!response.ok) {
+            throw new Error(responseData.error || 'Erro no lote ' + i);
+          }
+
+          importedCount += responseData.imported || 0;
+          if (responseData.errors && responseData.errors.length > 0) {
+            totalErrors = [...totalErrors, ...responseData.errors];
+          }
+
+          // Update progress
+          const progressPercent = Math.min(Math.round(((i + chunkSize) / totalItems) * 100), 100);
+          setImportProgress(progressPercent);
+        } catch (chunkErr: any) {
+          console.error(`Error importing chunk ${i}:`, chunkErr);
+          // Continue with next chunk even if one fails
+          totalErrors.push({ error: `System Error on chunk ${i}: ${chunkErr.message}` });
+        }
+      }
+
+      return {
+        imported: importedCount,
+        total: totalItems,
+        errors: totalErrors
+      };
     },
     onSuccess: (data) => {
       const hasErrors = data.errors && data.errors.length > 0;
 
       toast({
         title: hasErrors ? "Importação Concluída com Avisos" : "Importação Concluída",
-        description: hasErrors 
+        description: hasErrors
           ? `${data.imported} de ${data.total} produtos importados. ${data.errors.length} produtos tiveram problemas.`
-          : `${data.imported} produtos importados com sucesso para o produtor!`,
+          : `${data.imported} de ${data.total} produtos importados com sucesso!`,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/logistics/products"] });
@@ -190,7 +245,7 @@ export default function LogisticsProducts() {
       setSelectedProducerForImport("");
 
       if (hasErrors) {
-        console.log('Import errors:', data.errors);
+        console.log('Import errors details:', data.errors);
       }
     },
     onError: (error: any) => {
@@ -394,8 +449,8 @@ export default function LogisticsProducts() {
                       </div>
                     )}
                     <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => {
                           setIsImportDialogOpen(false);
                           setImportFile(null);
@@ -405,7 +460,7 @@ export default function LogisticsProducts() {
                       >
                         Cancelar
                       </Button>
-                      <Button 
+                      <Button
                         onClick={handleImport}
                         disabled={!importFile || !selectedProducerForImport || importProductsMutation.isPending}
                       >
@@ -424,7 +479,7 @@ export default function LogisticsProducts() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button 
+                  <Button
                     className="bg-white text-orange-600 hover:bg-orange-50"
                     onClick={() => {
                       resetProductForm();
@@ -464,7 +519,7 @@ export default function LogisticsProducts() {
                             <Input
                               id="name"
                               value={productForm.name}
-                              onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                               required
                             />
                           </div>
@@ -473,7 +528,7 @@ export default function LogisticsProducts() {
                             <Input
                               id="category"
                               value={productForm.category}
-                              onChange={(e) => setProductForm({...productForm, category: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                             />
                           </div>
                         </div>
@@ -482,7 +537,7 @@ export default function LogisticsProducts() {
                           <Textarea
                             id="description"
                             value={productForm.description}
-                            onChange={(e) => setProductForm({...productForm, description: e.target.value})}
+                            onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                             rows={3}
                           />
                         </div>
@@ -494,15 +549,15 @@ export default function LogisticsProducts() {
                               type="number"
                               step="0.01"
                               value={productForm.basePrice}
-                              onChange={(e) => setProductForm({...productForm, basePrice: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })}
                               required
                             />
                           </div>
                           <div>
                             <Label htmlFor="unit">Unidade</Label>
-                            <Select 
+                            <Select
                               value={productForm.unit}
-                              onValueChange={(value) => setProductForm({...productForm, unit: value})}
+                              onValueChange={(value) => setProductForm({ ...productForm, unit: value })}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -520,7 +575,7 @@ export default function LogisticsProducts() {
                           <div className="flex items-center space-x-2 pt-6">
                             <Switch
                               checked={productForm.isActive}
-                              onCheckedChange={(checked) => setProductForm({...productForm, isActive: checked})}
+                              onCheckedChange={(checked) => setProductForm({ ...productForm, isActive: checked })}
                             />
                             <Label>Produto Ativo</Label>
                           </div>
@@ -528,10 +583,10 @@ export default function LogisticsProducts() {
 
                         <div>
                           <Label htmlFor="producerId">Produtor Responsável</Label>
-                          <Select 
+                          <Select
                             value={productForm.producerId}
                             onValueChange={(value) => setProductForm({
-                              ...productForm, 
+                              ...productForm,
                               producerId: value,
                               type: value === "internal" ? "internal" : "external"
                             })}
@@ -558,25 +613,22 @@ export default function LogisticsProducts() {
                           </Select>
                         </div>
 
-                        <div className={`p-3 rounded-lg border ${
-                          productForm.producerId === "internal" ? "bg-blue-50" : "bg-purple-50"
-                        }`}>
+                        <div className={`p-3 rounded-lg border ${productForm.producerId === "internal" ? "bg-blue-50" : "bg-purple-50"
+                          }`}>
                           <div className="flex items-center space-x-2 mb-2">
                             {productForm.producerId === "internal" ? (
                               <Package className="h-4 w-4 text-blue-600" />
                             ) : (
                               <Factory className="h-4 w-4 text-purple-600" />
                             )}
-                            <Label className={`font-medium ${
-                              productForm.producerId === "internal" ? "text-blue-700" : "text-purple-700"
-                            }`}>
+                            <Label className={`font-medium ${productForm.producerId === "internal" ? "text-blue-700" : "text-purple-700"
+                              }`}>
                               Tipo de Produto
                             </Label>
                           </div>
-                          <p className={`text-sm ${
-                            productForm.producerId === "internal" ? "text-blue-600" : "text-purple-600"
-                          }`}>
-                            {productForm.producerId === "internal" 
+                          <p className={`text-sm ${productForm.producerId === "internal" ? "text-blue-600" : "text-purple-600"
+                            }`}>
+                            {productForm.producerId === "internal"
                               ? "Este produto será cadastrado como PRODUTO INTERNO da empresa"
                               : `Este produto será associado ao produtor ${producers?.find((p: any) => p.id === productForm.producerId)?.name || 'selecionado'}`
                             }
@@ -593,7 +645,7 @@ export default function LogisticsProducts() {
                               type="number"
                               step="0.01"
                               value={productForm.weight}
-                              onChange={(e) => setProductForm({...productForm, weight: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, weight: e.target.value })}
                             />
                           </div>
                           <div>
@@ -603,7 +655,7 @@ export default function LogisticsProducts() {
                               type="number"
                               step="0.1"
                               value={productForm.height}
-                              onChange={(e) => setProductForm({...productForm, height: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, height: e.target.value })}
                             />
                           </div>
                         </div>
@@ -615,7 +667,7 @@ export default function LogisticsProducts() {
                               type="number"
                               step="0.1"
                               value={productForm.width}
-                              onChange={(e) => setProductForm({...productForm, width: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, width: e.target.value })}
                             />
                           </div>
                           <div>
@@ -625,7 +677,7 @@ export default function LogisticsProducts() {
                               type="number"
                               step="0.1"
                               value={productForm.depth}
-                              onChange={(e) => setProductForm({...productForm, depth: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, depth: e.target.value })}
                             />
                           </div>
                         </div>
@@ -638,7 +690,7 @@ export default function LogisticsProducts() {
                             id="imageLink"
                             type="url"
                             value={productForm.imageLink}
-                            onChange={(e) => setProductForm({...productForm, imageLink: e.target.value})}
+                            onChange={(e) => setProductForm({ ...productForm, imageLink: e.target.value })}
                             placeholder="https://exemplo.com/imagem.jpg"
                           />
                         </div>
@@ -648,7 +700,7 @@ export default function LogisticsProducts() {
                             <Input
                               id="mainColor"
                               value={productForm.mainColor}
-                              onChange={(e) => setProductForm({...productForm, mainColor: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, mainColor: e.target.value })}
                               placeholder="Ex: Branco, Marrom, etc."
                             />
                           </div>
@@ -657,7 +709,7 @@ export default function LogisticsProducts() {
                             <Input
                               id="secondaryColor"
                               value={productForm.secondaryColor}
-                              onChange={(e) => setProductForm({...productForm, secondaryColor: e.target.value})}
+                              onChange={(e) => setProductForm({ ...productForm, secondaryColor: e.target.value })}
                               placeholder="Ex: Preto, Dourado, etc."
                             />
                           </div>
@@ -669,8 +721,8 @@ export default function LogisticsProducts() {
                       <Button type="button" variant="outline" onClick={() => setIsProductDialogOpen(false)}>
                         Cancelar
                       </Button>
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={createProductMutation.isPending || updateProductMutation.isPending}
                         className="bg-gradient-to-r from-orange-600 to-red-600 text-white"
                       >
@@ -766,8 +818,8 @@ export default function LogisticsProducts() {
                   <TableRow key={product.id}>
                     <TableCell>
                       {product.imageLink ? (
-                        <img 
-                          src={product.imageLink} 
+                        <img
+                          src={product.imageLink}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded"
                           onError={(e) => {
@@ -825,15 +877,15 @@ export default function LogisticsProducts() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleEditProduct(product)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => handleDeleteProduct(product.id)}
                         >
