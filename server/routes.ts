@@ -7227,7 +7227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error fetching financial overview:", error);
-      res.status(500).json({ error: "Failed to fetch financial overview", details: error?.message || String(error) });
+      res.status(500).json({ error: "Failed to fetch financial overview", details: error?.message || String(error), stack: error?.stack });
     }
   });
 
