@@ -301,7 +301,6 @@ export class PgStorage implements IStorage {
         paidValue: budget.paidValue || '0',
         refundAmount: '0',
         status: budget.orderStatus || 'confirmed', // Use orderStatus from budget
-        productStatus: 'to_buy',
         deadline: budget.deliveryDeadline,
         contactName: budget.contactName,
         contactPhone: budget.contactPhone,
@@ -377,7 +376,6 @@ export class PgStorage implements IStorage {
         paidValue: budget.paidValue || '0',
         refundAmount: '0',
         status: budget.orderStatus || 'confirmed', // Use orderStatus from budget
-        productStatus: 'to_buy',
         deadline: budget.deliveryDeadline,
         contactName: budget.contactName,
         contactPhone: budget.contactPhone,
