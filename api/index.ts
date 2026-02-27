@@ -1,6 +1,7 @@
 import express from 'express';
 import { registerRoutes } from '../server/routes';
 import { serveStatic } from '../server/vite';
+import 'dotenv/config';
 
 // Create Express app
 const app = express();
@@ -51,32 +52,64 @@ app.use((err: any, req: any, res: any, next: any) => {
 
 // Initialize the app asynchronously
 let initializedApp: express.Express | null = null;
+let initializationPromise: Promise<express.Express> | null = null;
 
 async function initializeApp(): Promise<express.Express> {
   if (initializedApp) {
     return initializedApp;
   }
 
-  // In Vercel, static files are served automatically from the public directory
-  // We'll only use serveStatic if running in development or other environments
-  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
-    serveStatic(app);
+  // Prevent multiple initializations
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      console.log('🚀 Initializing Vercel serverless function...');
+      
+      // In Vercel, static files are served automatically from the public directory
+      // We'll only use serveStatic if running in development or other environments
+      if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+        console.log('📁 Setting up static file serving for development');
+        serveStatic(app);
+      }
+
+      // Register all API routes
+      console.log('🔄 Registering API routes...');
+      await registerRoutes(app);
+
+      initializedApp = app;
+      console.log('✅ App initialization complete');
+      return initializedApp;
+    })();
   }
 
-  // Register all API routes
-  await registerRoutes(app);
-
-  initializedApp = app;
-  return initializedApp;
+  return await initializationPromise;
 }
 
 // Vercel serverless function handler
 export default async function handler(req: express.Request, res: express.Response) {
   try {
-    const appInstance = await initializeApp();
+    // Add timeout for initialization (5 seconds max for cold start)
+    const initializationTimeout = 5000;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Initialization timeout')), initializationTimeout);
+    });
+    
+    const appInstance = await Promise.race([
+      initializeApp(),
+      timeoutPromise
+    ]) as express.Express;
+    
     return appInstance(req, res);
   } catch (error) {
-    console.error('Error initializing app:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Error in Vercel handler:', error);
+    
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = errorMessage.includes('timeout');
+    
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: isTimeout ? 'Server initialization timeout. Please try again.' : errorMessage,
+      timestamp: new Date().toISOString()
+    });
   }
 }
