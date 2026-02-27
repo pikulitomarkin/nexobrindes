@@ -1410,23 +1410,44 @@ export class PgStorage implements IStorage {
       return isNaN(num) ? null : num.toString();
     };
 
-    for (const productData of productsData) {
-      try {
-        // Clean the product data before creating
-        const cleanedProductData = {
-          ...productData,
-          // Clean numeric fields
-          weight: cleanNumericField(productData.weight),
-          height: cleanNumericField(productData.height),
-          width: cleanNumericField(productData.width),
-          depth: cleanNumericField(productData.depth),
-          basePrice: productData.basePrice || "0.00"
-        };
+    try {
+      // Clean all products first
+      const cleanedProducts = productsData.map(productData => ({
+        ...productData,
+        weight: cleanNumericField(productData.weight),
+        height: cleanNumericField(productData.height),
+        width: cleanNumericField(productData.width),
+        depth: cleanNumericField(productData.depth),
+        basePrice: productData.basePrice || "0.00",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
 
-        await this.createProduct(cleanedProductData);
-        imported++;
-      } catch (error: any) {
-        errors.push(`Error importing ${productData.name}: ${error.message}`);
+      if (cleanedProducts.length > 0) {
+        // Execute batch insert for much better performance
+        await pg.insert(schema.products).values(cleanedProducts as any);
+        imported = cleanedProducts.length;
+      }
+    } catch (error: any) {
+      console.error('Error in batch import:', error);
+      errors.push(`Erro no lote de importação: ${error.message}`);
+
+      // Fallback for single insertion if batch fails (to identify which product failed)
+      console.log('Falling back to individual insertion for debugging...');
+      for (const productData of productsData) {
+        try {
+          await this.createProduct({
+            ...productData,
+            weight: cleanNumericField(productData.weight),
+            height: cleanNumericField(productData.height),
+            width: cleanNumericField(productData.width),
+            depth: cleanNumericField(productData.depth),
+            basePrice: productData.basePrice || "0.00"
+          });
+          imported++;
+        } catch (individualError: any) {
+          errors.push(`Erro inserindo ${productData.name}: ${individualError.message}`);
+        }
       }
     }
 
