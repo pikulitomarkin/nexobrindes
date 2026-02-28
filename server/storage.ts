@@ -1745,12 +1745,12 @@ export class MemStorage implements IStorage {
   async updateOrderStatus(id: string, status: string, cancellationReason?: string, cancelledBy?: string): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (order) {
-      const updatedOrder = { 
-        ...order, 
-        status, 
+      const updatedOrder = {
+        ...order,
+        status,
         cancellationReason: cancellationReason || order.cancellationReason,
         cancelledBy: cancelledBy || order.cancelledBy,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       };
       this.orders.set(id, updatedOrder);
 
@@ -1912,9 +1912,9 @@ export class MemStorage implements IStorage {
     console.log(`Storage: Total clients available:`, allClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
 
     const filteredClients = allClients.filter(client => {
-      const isMatch = client.vendorId === vendorId;
-      console.log(`Storage: Client ${client.name} (${client.id}) - vendorId: ${client.vendorId}, matches ${vendorId}: ${isMatch}`);
-      return isMatch;
+      const isMatch = client.vendorId === vendorId || !client.vendorId;
+      console.log(`Storage: Client ${client.name} (${client.id}) - vendorId: ${client.vendorId}, matches ${vendorId} or global: ${isMatch}`);
+      return isMatch && client.isActive !== false;
     });
 
     console.log(`Storage: Filtered clients for vendor ${vendorId}:`, filteredClients.map(c => ({ id: c.id, name: c.name, vendorId: c.vendorId })));
@@ -2664,7 +2664,7 @@ export class MemStorage implements IStorage {
   async importProductsForProducer(productsData: any[], producerId: string | null): Promise<{ imported: number; errors: string[] }> {
     const errors: string[] = [];
     let imported = 0;
-    
+
     // Handle internal products - null producerId means internal
     const isInternal = !producerId;
 
@@ -2798,18 +2798,18 @@ export class MemStorage implements IStorage {
     let updated = 0;
     const errors: string[] = [];
     const defaultDivisor = 0.31;
-    
+
     for (const [id, product] of this.products) {
       try {
         const currentBasePrice = parseFloat(product.basePrice || '0');
         const currentCostPrice = parseFloat(product.costPrice || '0');
-        
+
         if (currentCostPrice > 0) continue;
-        
+
         if (currentBasePrice > 0) {
           const costPrice = currentBasePrice;
           const newBasePrice = costPrice / defaultDivisor;
-          
+
           product.costPrice = costPrice.toFixed(2);
           product.basePrice = newBasePrice.toFixed(2);
           this.products.set(id, product);
@@ -2819,7 +2819,7 @@ export class MemStorage implements IStorage {
         errors.push(`Erro ao atualizar produto "${product.name}": ${error.message}`);
       }
     }
-    
+
     return { updated, errors };
   }
 
@@ -2835,25 +2835,25 @@ export class MemStorage implements IStorage {
     // Get budget items with all fields including customizationPhoto
     const items = await Promise.all(
       Array.from(this.budgetItems.values())
-      .filter(item => item.budgetId === id)
-      .map(async (item) => {
-        const product = await this.getProduct(item.productId);
-        let producerName = null;
-        if (item.producerId && item.producerId !== 'internal') {
-          const producer = await this.getUser(item.producerId);
-          producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
-        }
-        return {
-          ...item,
-          producerName: producerName,
-          product: {
-            name: product?.name || 'Produto não encontrado',
-            description: product?.description || '',
-            category: product?.category || '',
-            imageLink: product?.imageLink || ''
+        .filter(item => item.budgetId === id)
+        .map(async (item) => {
+          const product = await this.getProduct(item.productId);
+          let producerName = null;
+          if (item.producerId && item.producerId !== 'internal') {
+            const producer = await this.getUser(item.producerId);
+            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
           }
-        };
-      })
+          return {
+            ...item,
+            producerName: producerName,
+            product: {
+              name: product?.name || 'Produto não encontrado',
+              description: product?.description || '',
+              category: product?.category || '',
+              imageLink: product?.imageLink || ''
+            }
+          };
+        })
     );
 
     // Get budget photos
@@ -2927,25 +2927,25 @@ export class MemStorage implements IStorage {
     const enrichedBudgets = await Promise.all(budgets.map(async (budget) => {
       const items = await Promise.all(
         Array.from(this.budgetItems.values())
-        .filter(item => item.budgetId === budget.id)
-        .map(async (item) => {
-          const product = await this.getProduct(item.productId);
-          let producerName = null;
-          if (item.producerId && item.producerId !== 'internal') {
-            const producer = await this.getUser(item.producerId);
-            producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
-          }
-          return {
-            ...item,
-            producerName: producerName,
-            product: {
-              name: product?.name || 'Produto não encontrado',
-              description: product?.description || '',
-              category: product?.category || '',
-              imageLink: product?.imageLink || ''
+          .filter(item => item.budgetId === budget.id)
+          .map(async (item) => {
+            const product = await this.getProduct(item.productId);
+            let producerName = null;
+            if (item.producerId && item.producerId !== 'internal') {
+              const producer = await this.getUser(item.producerId);
+              producerName = producer?.name || `Produtor ${item.producerId.slice(-6)}`;
             }
-          };
-        })
+            return {
+              ...item,
+              producerName: producerName,
+              product: {
+                name: product?.name || 'Produto não encontrado',
+                description: product?.description || '',
+                category: product?.category || '',
+                imageLink: product?.imageLink || ''
+              }
+            };
+          })
       );
       return { ...budget, items };
     }));
@@ -3483,13 +3483,13 @@ export class MemStorage implements IStorage {
   async updateBudgetItemPurchaseStatus(itemId: string, purchaseStatus: string): Promise<any> {
     const item = this.budgetItems.get(itemId);
     if (!item) return null;
-    
+
     const updatedItem = {
       ...item,
       purchaseStatus,
       updatedAt: new Date()
     };
-    
+
     this.budgetItems.set(itemId, updatedItem);
     return updatedItem;
   }
@@ -3498,10 +3498,10 @@ export class MemStorage implements IStorage {
     // Get order to find budgetId
     const order = await this.getOrder(orderId);
     if (!order || !order.budgetId) return false;
-    
+
     // Get all items from the budget
     const items = await this.getBudgetItems(order.budgetId);
-    
+
     // Check if all items have purchaseStatus = 'in_store'
     const allInStore = items.every(item => item.purchaseStatus === 'in_store');
     return allInStore;
@@ -3649,7 +3649,7 @@ export class MemStorage implements IStorage {
     if (!budget) return;
 
     let subtotal = items.reduce((sum, item) => {
-      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity ||'1');
+      const basePrice = parseFloat(item.unitPrice || '0') * parseInt(item.quantity || '1');
 
       // Apply item customization if applicable (now as fixed value)
       if (item.hasItemCustomization) {
@@ -3814,7 +3814,7 @@ export class MemStorage implements IStorage {
   }
 
   getAll(table: string): any[] {
-    switch(table) {
+    switch (table) {
       case 'products':
         return Array.from(this.products.values());
       case 'orders':
@@ -4701,8 +4701,8 @@ export class MemStorage implements IStorage {
       }
 
       const isReadyForProduction = order.status === 'confirmed' &&
-                                   hasMinimumPayment &&
-                                   remainingValue >= 0;
+        hasMinimumPayment &&
+        remainingValue >= 0;
 
       if (isReadyForProduction) {
         console.log(`Storage: Order ${order.orderNumber} is ready for production - Total: ${totalValue}, Paid: ${paidValue}, Status: ${order.status}`);
@@ -4733,8 +4733,8 @@ export class MemStorage implements IStorage {
       // 2. Have remaining balance > 0.01 (to avoid floating point issues)
       // 3. Are confirmed (not just drafts)
       const shouldInclude = order.status !== 'cancelled' &&
-                           remainingValue > 0.01 &&
-                           (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
+        remainingValue > 0.01 &&
+        (order.status === 'confirmed' || order.status === 'production' || order.status === 'pending');
 
       if (shouldInclude) {
         console.log(`Storage: Including order ${order.orderNumber} for reconciliation - Total: ${totalValue}, Paid: ${paidValue}, Remaining: ${remainingValue}, Status: ${order.status}`);

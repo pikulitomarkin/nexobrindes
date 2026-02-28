@@ -868,6 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productWidth: item.productWidth,
             productHeight: item.productHeight,
             productDepth: item.productDepth,
+            notes: item.notes,
             product: {
               name: product?.name || item.productName || 'Produto não encontrado',
               description: product?.description || '',
@@ -8676,6 +8677,7 @@ Para mais detalhes, entre em contato conosco!`;
             itemCustomizationValue: item.itemCustomizationValue,
             itemCustomizationDescription: item.itemCustomizationDescription || '',
             customizationPhoto: item.customizationPhoto || '',
+            notes: item.notes,
             product: {
               name: product?.name || 'Produto não encontrado',
               description: product?.description || '',

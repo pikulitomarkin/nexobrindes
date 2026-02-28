@@ -1,0 +1,58 @@
+[
+  {
+    "line": 428,
+    "code": "app.post(\"/api/budgets/:id/admin-approve\", async (req, res) => {"
+  },
+  {
+    "line": 455,
+    "code": "app.post(\"/api/budgets/:id/admin-reject\", async (req, res) => {"
+  },
+  {
+    "line": 1649,
+    "code": "app.post(\"/api/budgets\", async (req, res) => {"
+  },
+  {
+    "line": 8218,
+    "code": "app.put(\"/api/budgets/:id\", async (req, res) => {"
+  },
+  {
+    "line": 8422,
+    "code": "app.post(\"/api/budgets/:id/approve\", async (req, res) => {"
+  },
+  {
+    "line": 8444,
+    "code": "app.post(\"/api/budgets/:id/reject\", async (req, res) => {"
+  },
+  {
+    "line": 8468,
+    "code": "app.post(\"/api/budgets/:id/admin-approve\", requireAuth, async (req, res) => {"
+  },
+  {
+    "line": 8493,
+    "code": "app.post(\"/api/budgets/:id/admin-reject\", requireAuth, async (req, res) => {"
+  },
+  {
+    "line": 8522,
+    "code": "app.post(\"/api/budgets/:id/convert-to-order\", async (req, res) => {"
+  },
+  {
+    "line": 8570,
+    "code": "app.post(\"/api/budgets/:id/convert-to-budget\", async (req, res) => {"
+  },
+  {
+    "line": 8573,
+    "code": "app.post(\"/api/budgets/:id/send-whatsapp\", async (req, res) => {"
+  },
+  {
+    "line": 8779,
+    "code": "app.post(\"/api/budgets/:budgetId/items\", async (req, res) => {"
+  },
+  {
+    "line": 8819,
+    "code": "app.post(\"/api/budgets/:budgetId/photos\", async (req, res) => {"
+  },
+  {
+    "line": 9971,
+    "code": "app.post(\"/api/budgets/:id/approve\", async (req, res) => {"
+  }
+]

@@ -1,0 +1,15 @@
+402: app.patch("/api/budgets/:id/approve", async (req, res) => {
+428: app.post("/api/budgets/:id/admin-approve", async (req, res) => {
+455: app.post("/api/budgets/:id/admin-reject", async (req, res) => {
+1649: app.post("/api/budgets", async (req, res) => {
+8218: app.put("/api/budgets/:id", async (req, res) => {
+8422: app.post("/api/budgets/:id/approve", async (req, res) => {
+8444: app.post("/api/budgets/:id/reject", async (req, res) => {
+8468: app.post("/api/budgets/:id/admin-approve", requireAuth, async (req, res) => {
+8493: app.post("/api/budgets/:id/admin-reject", requireAuth, async (req, res) => {
+8522: app.post("/api/budgets/:id/convert-to-order", async (req, res) => {
+8570: app.post("/api/budgets/:id/convert-to-budget", async (req, res) => {
+8573: app.post("/api/budgets/:id/send-whatsapp", async (req, res) => {
+8779: app.post("/api/budgets/:budgetId/items", async (req, res) => {
+8819: app.post("/api/budgets/:budgetId/photos", async (req, res) => {
+9971: app.post("/api/budgets/:id/approve", async (req, res) => {

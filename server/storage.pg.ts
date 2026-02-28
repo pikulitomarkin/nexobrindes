@@ -248,7 +248,15 @@ export class PgStorage implements IStorage {
 
   async getClientsByVendor(vendorId: string): Promise<Client[]> {
     const clients = await pg.select().from(schema.clients)
-      .where(and(eq(schema.clients.vendorId, vendorId), eq(schema.clients.isActive, true)));
+      .where(
+        and(
+          eq(schema.clients.isActive, true),
+          or(
+            eq(schema.clients.vendorId, vendorId),
+            isNull(schema.clients.vendorId)
+          )
+        )
+      );
 
     // Filter out deleted clients (clients whose user was deleted)
     const activeClients = await Promise.all(

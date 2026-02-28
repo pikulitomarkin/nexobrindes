@@ -614,10 +614,18 @@ export default function AdminBudgets() {
       resetAdminBudgetForm();
       setBudgetProductSearch("");
       setBudgetCategoryFilter("all");
-      toast({
-        title: "Sucesso!",
-        description: "Orçamento criado com sucesso",
-      });
+      if (data.status === 'awaiting_approval') {
+        toast({
+          title: "Atenção",
+          description: "Orçamento criado, porém possui itens abaixo do mínimo e aguarda autorização do administrador.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso!",
+          description: "Orçamento criado com sucesso",
+        });
+      }
     },
   });
 
@@ -650,10 +658,18 @@ export default function AdminBudgets() {
       resetAdminBudgetForm();
       setBudgetProductSearch("");
       setBudgetCategoryFilter("all");
-      toast({
-        title: "Sucesso!",
-        description: "Orçamento atualizado com sucesso",
-      });
+      if (data.status === 'awaiting_approval') {
+        toast({
+          title: "Atenção",
+          description: "Orçamento atualizado, mas possui itens abaixo do mínimo e aguarda autorização.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso!",
+          description: "Orçamento atualizado com sucesso",
+        });
+      }
     },
   });
 
@@ -740,7 +756,10 @@ export default function AdminBudgets() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      if (!response.ok) throw new Error("Erro ao enviar orçamento");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Erro ao enviar orçamento");
+      }
       return response.json();
     },
     onSuccess: (data) => {
@@ -753,6 +772,14 @@ export default function AdminBudgets() {
         description: "Orçamento enviado via WhatsApp",
       });
     },
+    onError: (error: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      toast({
+        title: "Atenção",
+        description: error.message || "Erro ao enviar orçamento",
+        variant: "destructive"
+      });
+    }
   });
 
   const generatePDFMutation = useMutation({
