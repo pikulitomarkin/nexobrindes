@@ -3000,25 +3000,28 @@ export default function AdminBudgets() {
               {budgetToView.status === 'awaiting_approval' && budgetToView.items && (() => {
                 const rows = budgetToView.items.map((item: any) => {
                   const qty = parseFloat(item.quantity) || 1;
-                  const unitPrice = parseFloat(item.unitPrice) || 0;
+                  const unitPrice = parseFloat(item.unitPrice) || 0; // valor total já embutindo personalização
                   const costPrice = parseFloat(item.costPrice) || 0;
                   const customUnit = item.hasItemCustomization ? parseFloat(item.itemCustomizationValue) || 0 : 0;
                   const genUnit = item.hasGeneralCustomization ? parseFloat(item.generalCustomizationValue) || 0 : 0;
                   const totalCustomUnit = customUnit + genUnit;
-                  const baseUnitPrice = parseFloat(item.basePriceWithMargin) || Math.max(0, unitPrice - totalCustomUnit);
-                  const productRevenue = baseUnitPrice * qty;
-                  const productCost = costPrice * qty;
-                  const customizationRevenue = totalCustomUnit * qty;
+
+                  // O Custo Total engloba o que custou a peça original + quanto vai custar a personalização
+                  const totalItemCost = costPrice + totalCustomUnit;
+                  const productCost = totalItemCost * qty;
+
+                  // A receita do item é baseada no valor final ofertado ao cliente
+                  const productRevenue = unitPrice * qty;
                   const productProfit = productRevenue - productCost;
-                  return { productRevenue, productCost, customizationRevenue, productProfit };
+
+                  return { productRevenue, productCost, productProfit };
                 });
 
                 const totalProductRevenue = rows.reduce((s: number, r: any) => s + r.productRevenue, 0);
                 const totalProductCost = rows.reduce((s: number, r: any) => s + r.productCost, 0);
-                const totalCustomRevenue = rows.reduce((s: number, r: any) => s + r.customizationRevenue, 0);
                 const totalProductProfit = totalProductRevenue - totalProductCost;
-                const totalMarginPct = (totalProductRevenue + totalCustomRevenue) > 0
-                  ? (totalProductProfit / (totalProductRevenue + totalCustomRevenue)) * 100
+                const totalMarginPct = totalProductRevenue > 0
+                  ? (totalProductProfit / totalProductRevenue) * 100
                   : 0;
 
                 return (
@@ -3027,7 +3030,7 @@ export default function AdminBudgets() {
                       <DollarSign className="h-4 w-4 text-green-400" />
                       <h4 className="text-sm font-bold text-white tracking-wide">Desempenho Financeiro Estimado</h4>
                     </div>
-                    <div className="grid grid-cols-3 gap-0 divide-x divide-gray-200">
+                    <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200">
                       <div className="px-4 py-3 text-center bg-white">
                         <p className="text-xs text-gray-500 mb-1">Custo Produção</p>
                         <p className="text-base font-medium text-gray-800">
@@ -3035,14 +3038,8 @@ export default function AdminBudgets() {
                         </p>
                       </div>
                       <div className="px-4 py-3 text-center bg-white">
-                        <p className="text-xs text-gray-500 mb-1">Receita Personaliz.</p>
-                        <p className="text-base font-bold text-blue-600">
-                          R$ {totalCustomRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div className="px-4 py-3 text-center bg-white">
                         <p className="text-xs text-gray-500 mb-1">Venda Produtos</p>
-                        <p className="text-base font-medium text-gray-800">
+                        <p className="text-base font-bold text-blue-600">
                           R$ {totalProductRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>

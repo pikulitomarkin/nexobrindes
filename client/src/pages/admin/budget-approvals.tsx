@@ -474,37 +474,44 @@ export default function AdminBudgetApprovals() {
                   {selectedBudget.items && selectedBudget.items.length > 0 && (() => {
                     const rows = selectedBudget.items.map((item: any) => {
                       const qty = parseFloat(item.quantity) || 1;
-                      const unitPrice = parseFloat(item.unitPrice) || 0;
+                      const unitPrice = parseFloat(item.unitPrice) || 0; // unitPrice total vindo do vendor
                       const costPrice = parseFloat(item.costPrice) || 0;
+
                       const customUnit = item.hasItemCustomization ? parseFloat(item.itemCustomizationValue) || 0 : 0;
                       const genUnit = item.hasGeneralCustomization ? parseFloat(item.generalCustomizationValue) || 0 : 0;
                       const totalCustomUnit = customUnit + genUnit;
-                      // unitPrice já inclui personalização, extrair preço base
-                      const baseUnitPrice = parseFloat(item.basePriceWithMargin) || Math.max(0, unitPrice - totalCustomUnit);
-                      const productRevenue = baseUnitPrice * qty;
-                      const productCost = costPrice * qty;
-                      const customizationRevenue = totalCustomUnit * qty;
+
+                      // Custo de produção engloba a custa da base + custo da personalização (como na precificação central)
+                      const totalItemCost = costPrice + totalCustomUnit;
+                      const productCost = totalItemCost * qty;
+
+                      // Receita já é computada full e embedada
+                      const productRevenue = unitPrice * qty;
+
                       const productProfit = productRevenue - productCost;
                       const marginPct = productRevenue > 0 ? ((productProfit / productRevenue) * 100) : 0;
+
+                      const baseUnitPrice = parseFloat(item.basePriceWithMargin) || Math.max(0, unitPrice - totalCustomUnit);
                       const isBelowMin = parseFloat(item.minimumPrice || 0) > 0 && baseUnitPrice < parseFloat(item.minimumPrice);
-                      return { item, qty, unitPrice, baseUnitPrice, productRevenue, productCost, customizationRevenue, productProfit, marginPct, totalCustomUnit, isBelowMin };
+
+                      return { item, qty, unitPrice, totalItemCost, productRevenue, productCost, productProfit, marginPct, isBelowMin };
                     });
 
                     const totalProductRevenue = rows.reduce((s: number, r: any) => s + r.productRevenue, 0);
                     const totalProductCost = rows.reduce((s: number, r: any) => s + r.productCost, 0);
-                    const totalCustomRevenue = rows.reduce((s: number, r: any) => s + r.customizationRevenue, 0);
                     const totalProductProfit = totalProductRevenue - totalProductCost;
                     const discountAmt = hasDiscount
                       ? (selectedBudget.discountType === 'percentage' ? (subtotal * discountPercentage / 100) : discountValue)
                       : 0;
-                    const totalMarginPct = (totalProductRevenue + totalCustomRevenue) > 0
-                      ? (totalProductProfit / (totalProductRevenue + totalCustomRevenue)) * 100
+
+                    const totalMarginPct = totalProductRevenue > 0
+                      ? (totalProductProfit / totalProductRevenue) * 100
                       : 0;
 
                     return (
                       <div>
                         {/* Per-item rows */}
-                        {rows.map(({ item, productRevenue, productCost, customizationRevenue, productProfit, marginPct, isBelowMin }: any, idx: number) => (
+                        {rows.map(({ item, productRevenue, productCost, productProfit, marginPct, isBelowMin }: any, idx: number) => (
                           <div key={idx} className={`px-4 py-2.5 border-b border-gray-100 text-xs ${isBelowMin ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-semibold text-gray-800 truncate max-w-[55%]">{item.productName}</span>
@@ -526,9 +533,6 @@ export default function AdminBudgetApprovals() {
                                 </span>
                                 {isBelowMin && <span className="text-red-600 font-bold">⚠ Abaixo do mínimo</span>}
                               </div>
-                              {customizationRevenue > 0 && (
-                                <span className="text-blue-600 font-medium">+ {formatCurrency(customizationRevenue)} personalização</span>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -536,15 +540,9 @@ export default function AdminBudgetApprovals() {
                         {/* Totals section */}
                         <div className="bg-gray-50 px-4 pt-3 pb-2 space-y-1.5 text-sm border-b border-gray-200">
                           <div className="flex justify-between text-gray-600">
-                            <span>Subtotal produtos</span>
+                            <span>Subtotal Vendas (Produtos + Pers.)</span>
                             <span className="font-medium">{formatCurrency(totalProductRevenue)}</span>
                           </div>
-                          {totalCustomRevenue > 0 && (
-                            <div className="flex justify-between text-blue-600">
-                              <span>Personalizações</span>
-                              <span className="font-medium">{formatCurrency(totalCustomRevenue)}</span>
-                            </div>
-                          )}
                           {hasDiscount && discountAmt > 0 && (
                             <div className="flex justify-between text-red-500">
                               <span>Desconto</span>
@@ -560,22 +558,30 @@ export default function AdminBudgetApprovals() {
                         </div>
 
                         {/* Profit highlight cards */}
-                        <div className="grid grid-cols-3 gap-0 divide-x divide-gray-200">
+                        <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200 border-b border-gray-200">
                           <div className="px-4 py-3 text-center bg-white">
-                            <p className="text-xs text-gray-500 mb-1">Lucro em Vendas</p>
-                            <p className={`text-base font-bold ${totalProductProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <p className="text-xs text-gray-500 mb-1">Custo Produção</p>
+                            <p className="text-base font-medium text-gray-800">
+                              {formatCurrency(totalProductCost)}
+                            </p>
+                          </div>
+                          <div className="px-4 py-3 text-center bg-white">
+                            <p className="text-xs text-gray-500 mb-1">Venda Produtos</p>
+                            <p className="text-base font-medium text-gray-800">
+                              {formatCurrency(totalProductRevenue)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200 bg-gray-50 border-b border-gray-200">
+                          <div className="px-4 py-3 text-center">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">Lucro Bruto</p>
+                            <p className={`text-lg font-bold ${totalProductProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {totalProductProfit >= 0 ? '+' : ''}{formatCurrency(totalProductProfit)}
                             </p>
                           </div>
-                          <div className="px-4 py-3 text-center bg-white">
-                            <p className="text-xs text-gray-500 mb-1">Receita Personaliz.</p>
-                            <p className="text-base font-bold text-blue-600">
-                              {totalCustomRevenue > 0 ? formatCurrency(totalCustomRevenue) : <span className="text-gray-400 text-sm">—</span>}
-                            </p>
-                          </div>
-                          <div className="px-4 py-3 text-center bg-white">
-                            <p className="text-xs text-gray-500 mb-1">Margem Geral</p>
-                            <p className={`text-base font-bold ${totalMarginPct >= 20 ? 'text-emerald-600' :
+                          <div className="px-4 py-3 text-center">
+                            <p className="text-xs text-gray-600 mb-1 font-medium">Margem Geral (%)</p>
+                            <p className={`text-lg font-bold ${totalMarginPct >= 20 ? 'text-emerald-600' :
                               totalMarginPct >= 10 ? 'text-yellow-600' :
                                 'text-red-600'
                               }`}>

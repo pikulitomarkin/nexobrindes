@@ -411,44 +411,49 @@ export class PDFGenerator {
       this.renderProductThumbnail(productImageData || null, currentX + 1, this.currentY - 3, 18, 18);
       currentX += colWidths[0];
 
+      // --- 1. Top Line: Product Name, Qty, Unit Price, Total Price ---
       // Product name (with text wrapping if needed)
       const productName = item.product.name.length > 40
         ? item.product.name.substring(0, 40) + '...'
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
-      // Add product description if available (only use manual notes from the budget, not full product description)
+      let tempX = currentX + colWidths[1];
+
+      // Quantity - ensure it's displayed as integer without thousands separator
+      const qty = typeof item.quantity === 'string' ? parseInt(item.quantity) : Math.round(item.quantity);
+      this.doc.text(qty.toString(), tempX + 2, this.currentY + 5);
+      tempX += colWidths[2];
+
+      // Unit price
+      this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tempX + 2, this.currentY + 5);
+      tempX += colWidths[3];
+
+      // Total price
+      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tempX + 2, this.currentY + 5);
+
+      // --- 2. Second Line Below Name: Product description if available --- 
+      let descriptionHeight = 0;
       const descriptionToUse = item.notes;
       if (descriptionToUse) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = descriptionToUse; // Removed artificial length limit
 
         // Use splitTextToSize to handle multi-line descriptions
-        const splitDescription = this.doc.splitTextToSize(description, colWidths[1] - 4);
+        const splitDescription = this.doc.splitTextToSize(descriptionToUse, colWidths[1] - 4);
 
         splitDescription.forEach((line: string, lineIndex: number) => {
-          this.doc.text(line, currentX + 2, this.currentY + 10 + (lineIndex * 4));
+          this.doc.text(line, currentX + 2, this.currentY + 11 + (lineIndex * 4));
         });
+
+        descriptionHeight = splitDescription.length * 4 + 2;
 
         this.doc.setFontSize(10);
         this.doc.setTextColor(0, 0, 0);
       }
-      currentX += colWidths[1];
 
-      // Quantity - ensure it's displayed as integer without thousands separator
-      const qty = typeof item.quantity === 'string' ? parseInt(item.quantity) : Math.round(item.quantity);
-      this.doc.text(qty.toString(), currentX + 2, this.currentY + 10);
-      currentX += colWidths[2];
+      this.currentY += Math.max(baseRowHeight, 15 + descriptionHeight);
 
-      // Unit price
-      this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
-      currentX += colWidths[3];
-
-      // Total price
-      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, currentX + 2, this.currentY + 10);
-
-      this.currentY += baseRowHeight;
 
       // Add product dimensions if exists
       if (item.productWidth || item.productHeight || item.productDepth) {
