@@ -302,19 +302,20 @@ async function checkBudgetNeedsApproval(
       const divisor = 1 - taxRate - commissionRate - minMarginRate;
       if (divisor <= 0) continue;
 
-      const minimumPrice = Math.round((costPrice / divisor) * 100) / 100;
-      const unitPrice = parseFloat((item as any).unitPrice as string);
-
-      // Customization is vendor-set revenue — include in effective price but NOT in cost base
+      // Customization cost is included in the cost base to ensure margin applies to the total effort
       const itemCustomization = (item as any).hasItemCustomization
         ? parseFloat((item as any).itemCustomizationValue as string || '0')
         : 0;
       const generalCustomization = (item as any).hasGeneralCustomization
         ? parseFloat((item as any).generalCustomizationValue as string || '0')
         : 0;
-      const effectiveUnitPrice = unitPrice + itemCustomization + generalCustomization;
 
-      if (effectiveUnitPrice < minimumPrice) {
+      const totalCost = costPrice + itemCustomization + generalCustomization;
+      const minimumPrice = Math.round((totalCost / divisor) * 100) / 100;
+
+      const unitPrice = parseFloat((item as any).unitPrice as string);
+
+      if (unitPrice < minimumPrice) {
         return true; // At least one item is below minimum
       }
     }
