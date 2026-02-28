@@ -422,9 +422,7 @@ export class PDFGenerator {
       if (descriptionToUse) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
-        const description = descriptionToUse.length > 65
-          ? descriptionToUse.substring(0, 65) + '...'
-          : descriptionToUse;
+        const description = descriptionToUse; // Removed artificial length limit
 
         // Use splitTextToSize to handle multi-line descriptions
         const splitDescription = this.doc.splitTextToSize(description, colWidths[1] - 4);
@@ -490,50 +488,60 @@ export class PDFGenerator {
   }
 
   private addTotal(data: BudgetPDFData): void {
+    // We don't need a massive addNewPageIfNeeded here anymore since it's going at the very end
     this.addNewPageIfNeeded(60);
 
     // Calculate subtotal
     const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
-
-    // Draw total section
-    const sectionHeight = data.budget.hasDiscount ? 40 : 20;
-    // Removing fill to avoid white background issues
-    // this.doc.setFillColor(240, 240, 240);
-    // this.doc.rect(this.pageWidth - this.margin - 100, this.currentY - 5, 100, sectionHeight, 'F');
+    const shippingCost = parseFloat(data.budget.shippingCost || '0');
 
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
 
+    let currentOffsetY = 5;
+
     // Subtotal
-    this.doc.text('Subtotal:', this.margin, this.currentY + 5);
-    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + 10);
+    this.doc.text('Subtotal:', this.margin, this.currentY + currentOffsetY);
+    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 5);
+    currentOffsetY += 15;
 
     // Discount if exists
+    let discountAmount = 0;
     if (data.budget.hasDiscount) {
       this.doc.setTextColor(255, 100, 0); // Orange color for discount
-      this.doc.text('Desconto:', this.margin, this.currentY + 15);
+      this.doc.text('Desconto:', this.margin, this.currentY + currentOffsetY);
 
       let discountText = '';
       if (data.budget.discountType === 'percentage') {
-        const discountAmount = (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100;
+        discountAmount = (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100;
         discountText = `- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${data.budget.discountPercentage}%)`;
       } else {
-        discountText = `- R$ ${parseFloat(data.budget.discountValue || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        discountAmount = parseFloat(data.budget.discountValue || '0');
+        discountText = `- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       }
 
-      this.doc.text(discountText, this.margin, this.currentY + 20);
+      this.doc.text(discountText, this.margin, this.currentY + currentOffsetY + 5);
       this.doc.setTextColor(0, 0, 0); // Reset to black
 
-      this.currentY += 10; // Extra space for discount
+      currentOffsetY += 15;
+    }
+
+    // Shipping Cost if exists
+    if (shippingCost > 0) {
+      this.doc.text('Frete:', this.margin, this.currentY + currentOffsetY);
+      this.doc.text(`+ R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 5);
+      currentOffsetY += 15;
     }
 
     // Total
+    const finalTotal = subtotal - discountAmount + shippingCost;
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('TOTAL GERAL:', this.margin, this.currentY + 15);
-    this.doc.text(`R$ ${parseFloat(data.budget.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + 25);
+    this.doc.text('TOTAL GERAL:', this.margin, this.currentY + currentOffsetY);
+    // Use the explicitly calculated finalTotal to ensure it matches the breakdown
+    this.doc.text(`R$ ${finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 10);
 
-    this.currentY += 40;
+    this.currentY += currentOffsetY + 25;
   }
 
   private addPaymentShippingInfo(data: BudgetPDFData): void {
@@ -816,11 +824,11 @@ export class PDFGenerator {
       console.log('Adding items...');
       await this.addItems(data);
 
-      console.log('Adding total...');
-      this.addTotal(data);
-
       console.log('Adding payment and shipping info...');
       this.addPaymentShippingInfo(data);
+
+      console.log('Adding total...');
+      this.addTotal(data);
 
       console.log('Adding description...');
       this.addDescription(data);
