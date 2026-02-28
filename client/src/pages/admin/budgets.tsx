@@ -2996,6 +2996,78 @@ export default function AdminBudgets() {
                 </div>
               )}
 
+              {/* Financial Summary */}
+              {budgetToView.status === 'awaiting_approval' && budgetToView.items && (() => {
+                const rows = budgetToView.items.map((item: any) => {
+                  const qty = parseFloat(item.quantity) || 1;
+                  const unitPrice = parseFloat(item.unitPrice) || 0;
+                  const costPrice = parseFloat(item.costPrice) || 0;
+                  const customUnit = item.hasItemCustomization ? parseFloat(item.itemCustomizationValue) || 0 : 0;
+                  const genUnit = item.hasGeneralCustomization ? parseFloat(item.generalCustomizationValue) || 0 : 0;
+                  const totalCustomUnit = customUnit + genUnit;
+                  const baseUnitPrice = parseFloat(item.basePriceWithMargin) || Math.max(0, unitPrice - totalCustomUnit);
+                  const productRevenue = baseUnitPrice * qty;
+                  const productCost = costPrice * qty;
+                  const customizationRevenue = totalCustomUnit * qty;
+                  const productProfit = productRevenue - productCost;
+                  return { productRevenue, productCost, customizationRevenue, productProfit };
+                });
+
+                const totalProductRevenue = rows.reduce((s: number, r: any) => s + r.productRevenue, 0);
+                const totalProductCost = rows.reduce((s: number, r: any) => s + r.productCost, 0);
+                const totalCustomRevenue = rows.reduce((s: number, r: any) => s + r.customizationRevenue, 0);
+                const totalProductProfit = totalProductRevenue - totalProductCost;
+                const totalMarginPct = (totalProductRevenue + totalCustomRevenue) > 0
+                  ? (totalProductProfit / (totalProductRevenue + totalCustomRevenue)) * 100
+                  : 0;
+
+                return (
+                  <div className="mt-4 border rounded-lg overflow-hidden shadow-sm">
+                    <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-green-400" />
+                      <h4 className="text-sm font-bold text-white tracking-wide">Desempenho Financeiro Estimado</h4>
+                    </div>
+                    <div className="grid grid-cols-3 gap-0 divide-x divide-gray-200">
+                      <div className="px-4 py-3 text-center bg-white">
+                        <p className="text-xs text-gray-500 mb-1">Custo Produção</p>
+                        <p className="text-base font-medium text-gray-800">
+                          R$ {totalProductCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="px-4 py-3 text-center bg-white">
+                        <p className="text-xs text-gray-500 mb-1">Receita Personaliz.</p>
+                        <p className="text-base font-bold text-blue-600">
+                          R$ {totalCustomRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="px-4 py-3 text-center bg-white">
+                        <p className="text-xs text-gray-500 mb-1">Venda Produtos</p>
+                        <p className="text-base font-medium text-gray-800">
+                          R$ {totalProductRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200 border-t border-gray-200">
+                      <div className="px-4 py-3 text-center bg-gray-50">
+                        <p className="text-xs text-gray-600 mb-1 font-medium">Lucro Bruto Estimado</p>
+                        <p className={`text-lg font-bold ${totalProductProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {totalProductProfit >= 0 ? '+' : ''}R$ {totalProductProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="px-4 py-3 text-center bg-gray-50">
+                        <p className="text-xs text-gray-600 mb-1 font-medium">Margem Geral (%)</p>
+                        <p className={`text-lg font-bold ${totalMarginPct >= 20 ? 'text-emerald-600' :
+                          totalMarginPct >= 10 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                          {totalMarginPct.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Actions */}
               <div className="flex gap-2 pt-4 border-t">
                 <Button

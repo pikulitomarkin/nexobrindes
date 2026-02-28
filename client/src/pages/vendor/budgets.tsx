@@ -883,7 +883,8 @@ export default function VendorBudgets() {
 
         const unitPrice = toNumber(item.unitPrice);
         const product = products.find((p: any) => p.id === item.productId);
-        const costPrice = product ? parseFloat(product.costPrice) || 0 : 0;
+        // Usar o costPrice que já vem do backend, senão usar o do array de produtos (fallback)
+        const costPrice = parseFloat(item.costPrice) || (product ? parseFloat(product.costPrice) || 0 : 0);
 
         // Calcular basePriceWithMargin: unitPrice salvo menos as personalizações
         const itemCustomVal = Boolean(item.hasItemCustomization) ? toNumber(item.itemCustomizationValue) : 0;
@@ -930,7 +931,12 @@ export default function VendorBudgets() {
       }, 0);
       for (const item of itemsArray) {
         if (item.costPrice && item.costPrice > 0) {
-          const priceCalc = calculatePriceFromCost(item.costPrice, budgetRevenue);
+          // Na edição, precisamos somar o custo de personalização ao custo do produto para bater com a fórmula do backend
+          const customVal = item.hasItemCustomization ? toNumber(item.itemCustomizationValue) : 0;
+          const genCustomVal = item.hasGeneralCustomization ? toNumber(item.generalCustomizationValue) : 0;
+          const totalCostBase = item.costPrice + customVal + genCustomVal;
+
+          const priceCalc = calculatePriceFromCost(totalCostBase, budgetRevenue);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
         }
       }
@@ -980,6 +986,30 @@ export default function VendorBudgets() {
       setIsEditMode(true);
       setEditingBudgetId(budget.id);
       setIsBudgetDialogOpen(true);
+
+      // Avisar o usuário se existir algum item abaixo do mínimo já carregado
+      const hasBelowMin = itemsArray.some((item: any) => {
+        const basePriceInfo = item.basePriceWithMargin || item.unitPrice;
+        return item.minimumPrice > 0 && basePriceInfo > 0 && basePriceInfo < item.minimumPrice;
+      });
+
+      if (hasBelowMin && budget.status === 'not_approved') {
+        setTimeout(() => {
+          toast({
+            title: "Atenção aos Preços",
+            description: "Existem itens neste orçamento com preço abaixo do mínimo, o que causou a rejeição. Verifique os avisos em vermelho.",
+            variant: "destructive",
+          });
+        }, 500);
+      } else if (hasBelowMin) {
+        setTimeout(() => {
+          toast({
+            title: "Aviso de Margem",
+            description: "Existem itens neste orçamento sendo vendidos abaixo da margem mínima estipulada. Este orçamento exigirá aprovação.",
+            variant: "default",
+          });
+        }, 500);
+      }
     } catch (error) {
       toast({
         title: "Erro",

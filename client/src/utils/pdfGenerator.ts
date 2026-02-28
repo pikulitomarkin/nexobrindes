@@ -417,8 +417,8 @@ export class PDFGenerator {
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
-      // Add product description if available
-      const descriptionToUse = item.notes || item.product.description;
+      // Add product description if available (only use manual notes from the budget, not full product description)
+      const descriptionToUse = item.notes;
       if (descriptionToUse) {
         this.doc.setFontSize(8);
         this.doc.setTextColor(100, 100, 100);
