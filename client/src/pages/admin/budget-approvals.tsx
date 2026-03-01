@@ -378,12 +378,14 @@ export default function AdminBudgetApprovals() {
                               <tr key={idx} className={`border-t ${isBelowMin ? "bg-red-50" : ""}`}>
                                 <td className="p-3">
                                   <span className="font-medium">{item.productName}</span>
+                                  {item.notes && (
+                                    <span className="block text-xs text-gray-500 italic mt-0.5 line-clamp-2 max-w-sm whitespace-pre-wrap">{item.notes}</span>
+                                  )}
                                   {isBelowMin && (
                                     <span className="block text-xs text-red-600 font-semibold mt-0.5">
                                       {diffPercent}% abaixo do mínimo
                                     </span>
                                   )}
-
                                 </td>
                                 <td className="p-3 text-right">{qty.toLocaleString('pt-BR')}</td>
                                 <td className="p-3 text-right text-gray-500">{costPrice > 0 ? formatCurrency(costPrice) : "-"}</td>
