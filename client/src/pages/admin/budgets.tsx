@@ -1691,33 +1691,41 @@ export default function AdminBudgets() {
                             {/* Image Upload for Product Customization */}
                             <div>
                               <Label className="text-xs">Imagem da Personalização</Label>
-                              <div className="mt-1 flex items-center gap-3">
-                                <label className="flex items-center justify-center px-4 h-10 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <Upload className="h-4 w-4 text-gray-500" />
-                                    <span className="text-xs text-gray-500 font-medium">Anexar Arte/Imagem</span>
-                                  </div>
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) => handleAdminProductImageUpload(e, index)}
-                                  />
-                                </label>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-center w-full">
+                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                                      <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                                      </svg>
+                                      <p className="text-xs text-gray-500">Clique para enviar imagem</p>
+                                      <p className="text-xs text-blue-600 font-medium">
+                                        Para: {item.productName}
+                                      </p>
+                                    </div>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) => handleAdminProductImageUpload(e, index)}
+                                    />
+                                  </label>
+                                </div>
 
                                 {item.customizationPhoto && (
-                                  <div className="relative h-10 w-10 flex-shrink-0">
+                                  <div className="relative inline-block mt-2">
                                     <img
                                       src={item.customizationPhoto}
-                                      alt="Arte"
-                                      className="h-10 w-10 object-cover rounded border"
+                                      alt={`Arte ${item.productName}`}
+                                      className="w-24 h-24 object-cover rounded-lg border"
                                     />
                                     <button
                                       onClick={() => removeAdminProductImage(index)}
-                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
+                                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md transition-colors"
                                       type="button"
+                                      title="Remover Imagem"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-4 w-4" />
                                     </button>
                                   </div>
                                 )}
