@@ -1547,9 +1547,9 @@ export default function VendorBudgets() {
                               onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
                             />
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                               <div>
-                                <Label className="text-xs">Valor Unitário (R$)</Label>
+                                <Label>Valor Unitário (R$)</Label>
                                 <Input
                                   value={item.itemCustomizationValue > 0 ? currencyMask(item.itemCustomizationValue.toString().replace('.', ',')) : ''}
                                   onChange={(e) => {
@@ -1557,65 +1557,79 @@ export default function VendorBudgets() {
                                     updateBudgetItem(index, 'itemCustomizationValue', value);
                                   }}
                                   placeholder="0,00"
-                                  className="h-8 text-sm"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">Total da Personalização (R$)</Label>
+                                <Label>Total da Personalização (R$)</Label>
                                 <Input
-                                  value={currencyMask((item.quantity * (item.itemCustomizationValue || 0)).toFixed(2).replace('.', ','))}
-                                  onChange={(e) => {
-                                    const totalValue = parseCurrencyValue(e.target.value);
-                                    const unitValue = item.quantity > 0 ? totalValue / item.quantity : 0;
-                                    updateBudgetItem(index, 'itemCustomizationValue', unitValue);
-                                  }}
-                                  placeholder="0,00"
-                                  className="h-8 text-sm"
+                                  value={`R$ ${(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                  disabled
                                 />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {item.quantity} × R$ {(item.itemCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.itemCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
                               </div>
                             </div>
 
                             <div>
-                              <Label className="text-xs">Observações Adicionais (Opcional)</Label>
+                              <Label>Observações Adicionais (Opcional)</Label>
                               <Input
                                 value={item.additionalCustomizationNotes || ''}
                                 onChange={(e) => updateBudgetItem(index, 'additionalCustomizationNotes', e.target.value)}
-                                placeholder="Observações extras..."
-                                className="h-8 text-sm"
+                                placeholder="Observações extras sobre a personalização..."
                               />
                             </div>
 
                             {/* Image Upload for Product Customization */}
                             <div>
-                              <Label className="text-xs">Imagem da Personalização</Label>
-                              <div className="mt-1 flex items-center gap-3">
-                                <label className="flex items-center justify-center px-4 h-10 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <Upload className="h-4 w-4 text-gray-500" />
-                                    <span className="text-xs text-gray-500 font-medium">Anexar Arte/Imagem</span>
-                                  </div>
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) => handleProductImageUpload(e, index)}
-                                  />
-                                </label>
+                              <Label>
+                                Imagem da Personalização - {item.productName}
+                                <span className="text-xs text-gray-500 ml-2">
+                                  ({item.producerId === 'internal' ? 'Produto Interno' :
+                                    producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
+                                </span>
+                              </Label>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-center w-full">
+                                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                                    <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                                      <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                                      </svg>
+                                      <p className="text-xs text-gray-500">Clique para enviar imagem</p>
+                                      <p className="text-xs text-blue-600 font-medium">
+                                        Para: {item.productName}
+                                      </p>
+                                    </div>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) => handleProductImageUpload(e, index)}
+                                    />
+                                  </label>
+                                </div>
 
                                 {item.customizationPhoto && (
-                                  <div className="relative h-10 w-10 flex-shrink-0">
+                                  <div className="relative inline-block">
                                     <img
                                       src={item.customizationPhoto}
-                                      alt="Arte"
-                                      className="h-10 w-10 object-cover rounded border"
+                                      alt={`Personalização ${item.productName}`}
+                                      className="w-24 h-24 object-cover rounded-lg border"
+                                      onError={(e) => {
+                                        console.error('Erro ao carregar imagem:', item.customizationPhoto);
+                                        e.currentTarget.style.display = 'none';
+                                      }}
                                     />
-                                    <button
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      className="absolute -top-2 -right-2 h-6 w-6 p-0 shadow-sm"
                                       onClick={() => removeProductImage(index)}
-                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
                                       type="button"
                                     >
-                                      <X className="h-3 w-3" />
-                                    </button>
+                                      ×
+                                    </Button>
                                   </div>
                                 )}
                               </div>
@@ -1627,26 +1641,25 @@ export default function VendorBudgets() {
                                 checked={item.hasGeneralCustomization}
                                 onCheckedChange={(checked) => updateBudgetItem(index, 'hasGeneralCustomization', checked)}
                               />
-                              <Label htmlFor={`general-customization-${index}`} className="text-xs font-medium flex items-center gap-1 cursor-pointer">
-                                <Percent className="h-3 w-3" />
-                                Personalização Geral (Manual)
+                              <Label htmlFor={`general-customization-${index}`} className="flex items-center gap-2 cursor-pointer">
+                                <Percent className="h-4 w-4" />
+                                Personalização Geral
                               </Label>
                             </div>
 
                             {item.hasGeneralCustomization && (
-                              <div className="bg-green-50/50 p-2 rounded border border-green-100 space-y-3">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="bg-green-50 p-3 rounded mb-3 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
                                   <div>
-                                    <Label className="text-xs">Tipo/Nome</Label>
+                                    <Label>Nome da Personalização</Label>
                                     <Input
                                       value={item.generalCustomizationName || ''}
                                       onChange={(e) => updateBudgetItem(index, 'generalCustomizationName', e.target.value)}
-                                      placeholder="Ex: Silk, Laser..."
-                                      className="h-8 text-sm"
+                                      placeholder="Ex: Bordado, Gravação, etc."
                                     />
                                   </div>
                                   <div>
-                                    <Label className="text-xs">Valor Unit. (R$)</Label>
+                                    <Label>Valor Unitário (R$)</Label>
                                     <Input
                                       value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
                                       onChange={(e) => {
@@ -1654,9 +1667,18 @@ export default function VendorBudgets() {
                                         updateBudgetItem(index, 'generalCustomizationValue', value);
                                       }}
                                       placeholder="0,00"
-                                      className="h-8 text-sm"
                                     />
                                   </div>
+                                </div>
+                                <div>
+                                  <Label>Total da Personalização Geral</Label>
+                                  <Input
+                                    value={`R$ ${(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                    disabled
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {item.quantity} × R$ {(item.generalCustomizationValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ {(item.quantity * (item.generalCustomizationValue || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
                                 </div>
                               </div>
                             )}
