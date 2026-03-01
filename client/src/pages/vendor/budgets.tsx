@@ -285,7 +285,7 @@ export default function VendorBudgets() {
       hasGeneralCustomization: false,
       generalCustomizationName: "",
       generalCustomizationValue: 0,
-      notes: product.description || "",
+      notes: product.description ? product.description.replace(/<[^>]+>/g, '').trim() : "",
     };
     setVendorBudgetForm(prev => ({
       ...prev,
@@ -1523,6 +1523,7 @@ export default function VendorBudgets() {
                           </div>
                         </div>
 
+                        {/* Description editor — toggleable via pencil */}
                         {/* Description editor — toggleable via pencil */}
                         {editingDescriptionIndex === index ? (
                           <div className="mb-3 bg-white/80 rounded-md p-2 border border-blue-200">

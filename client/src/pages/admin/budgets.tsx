@@ -328,7 +328,7 @@ export default function AdminBudgets() {
       hasGeneralCustomization: false,
       generalCustomizationName: "",
       generalCustomizationValue: 0,
-      notes: product.description || "",
+      notes: product.description ? product.description.replace(/<[^>]+>/g, '').trim() : "",
     };
     setAdminBudgetForm(prev => ({
       ...prev,
