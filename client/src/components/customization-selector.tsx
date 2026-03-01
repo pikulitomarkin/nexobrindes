@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,8 @@ export function CustomizationSelector({
   onCustomizationDescriptionChange,
   onValidationError
 }: CustomizationSelectorProps) {
-  const [categoryFilter, setCategoryFilter] = useState(productCategory || '');
+  // Inicialização VAZIA ao invés de productCategory para evitar auto-preenchimento
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const { data: customizations = [], isLoading } = useQuery({
     queryKey: ["/api/settings/customization-options"],
@@ -42,7 +43,7 @@ export function CustomizationSelector({
   const filteredCustomizations = (customizations as any[]).filter((c: any) => {
     if (c.id == null) return false;
 
-    // Filtro por categoria
+    // Filtro por categoria (só se algo for digitado)
     const matchesCategory = categoryFilter.trim()
       ? (c.category || '').toLowerCase().includes(categoryFilter.toLowerCase())
       : true;
@@ -92,16 +93,18 @@ export function CustomizationSelector({
                     if (onValidationError) onValidationError("");
                     return;
                   }
+
                   const selected = (customizations as any[]).find((c: any) => String(c.id) === String(value));
-                  if (selected) {
-                    if (quantity < selected.minQuantity) {
-                      const msg = `Esta personalização requer no mínimo ${selected.minQuantity} unidades. Quantidade atual: ${quantity}`;
-                      if (onValidationError) onValidationError(msg);
-                      return;
-                    }
-                    if (onValidationError) onValidationError("");
-                    onCustomizationChange(selected);
+                  if (!selected) return;
+
+                  if (quantity < selected.minQuantity) {
+                    const msg = `Esta personalização requer no mínimo ${selected.minQuantity} unidades. Quantidade atual: ${quantity}`;
+                    if (onValidationError) onValidationError(msg);
+                    return;
                   }
+
+                  if (onValidationError) onValidationError("");
+                  onCustomizationChange(selected);
                 }}
               >
                 <SelectTrigger className="h-9 text-sm bg-white">
@@ -111,8 +114,7 @@ export function CustomizationSelector({
                   <SelectItem value="none">Nenhuma personalização</SelectItem>
                   {filteredCustomizations.map((c: any) => (
                     <SelectItem key={String(c.id)} value={String(c.id)}>
-                      {c.name}
-                      R$ {Number(c.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {c.name} - R$ {Number(c.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       {c.minQuantity > 1 && ` (mín. ${c.minQuantity})`}
                     </SelectItem>
                   ))}
