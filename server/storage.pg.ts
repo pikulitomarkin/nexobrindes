@@ -1661,10 +1661,10 @@ export class PgStorage implements IStorage {
 
       updated = (updateResult as any).rowCount || 0;
 
-      // Também preencher base_price = cost_price para produtos sem custo definido mas sem base_price
+      // Também preencher base_price com preço calculado (com margem) para produtos que tinham base_price zerado
       await pg.execute(
         sql`UPDATE products
-          SET base_price = cost_price,
+          SET base_price = ROUND((CAST(cost_price AS NUMERIC) / ${divisor.toString()}), 2),
               updated_at = NOW()
           WHERE (base_price = '0.00' OR base_price IS NULL OR base_price = '0')
             AND cost_price IS NOT NULL

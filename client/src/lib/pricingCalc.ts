@@ -133,14 +133,19 @@ export function getProductSalePrice(
   const hasBase = !Number.isNaN(base) && base > 0;
   const hasCost = !Number.isNaN(cost) && cost > 0;
 
-  if (!hasCost) {
-    return { price: hasBase ? roundMoney(base) : 0, source: 'base' as const };
+  // Se tem costPrice válido e configurações de pricing, SEMPRE calcular com margem
+  if (hasCost && pricingSettings) {
+    const details = calculatePriceFromCost(cost, budgetRevenue, pricingSettings, marginTiers);
+    if (details.idealPrice > 0) {
+      return { price: details.idealPrice, source: 'computed' as const, details };
+    }
   }
 
-  if (hasBase && Math.abs(cost - base) < 0.0001) {
+  // Fallback: se não tem costPrice ou pricingSettings inválido, usa basePrice
+  if (hasBase) {
     return { price: roundMoney(base), source: 'base' as const };
   }
 
-  const details = calculatePriceFromCost(cost, budgetRevenue, pricingSettings, marginTiers);
-  return { price: details.idealPrice, source: 'computed' as const, details };
+  // Nenhum preço disponível
+  return { price: 0, source: 'base' as const };
 }

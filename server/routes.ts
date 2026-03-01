@@ -1734,6 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
+          notes: item.notes || null,
           hasItemCustomization: item.hasItemCustomization || false,
           selectedCustomizationId: item.selectedCustomizationId || null,
           itemCustomizationValue: item.itemCustomizationValue || 0,
@@ -8307,6 +8308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               quantity: quantity,
               unitPrice: unitPrice.toFixed(2),
               totalPrice: totalPrice.toFixed(2),
+              notes: item.notes || null,
               // Item Customization
               hasItemCustomization: item.hasItemCustomization || false,
               selectedCustomizationId: item.selectedCustomizationId || null,

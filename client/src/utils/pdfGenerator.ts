@@ -148,75 +148,114 @@ export class PDFGenerator {
   }
 
   private addHeader(data: BudgetPDFData): void {
-    this.doc.setFontSize(30);
+    // Título
+    this.doc.setFontSize(22);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('ORÇAMENTO', this.pageWidth / 2, this.currentY, { align: 'center' });
+    this.doc.setTextColor(30, 30, 30);
+    this.doc.text('ORÇAMENTO', this.margin, this.currentY);
 
-    this.currentY += 15;
-    this.doc.setFontSize(12);
+    // Número do orçamento ao lado do título
+    this.doc.setFontSize(11);
     this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(100, 100, 100);
+    this.doc.text(`Nº ${data.budget.budgetNumber}`, this.pageWidth - this.margin, this.currentY, { align: 'right' });
 
-    // Data em cima
-    this.doc.text(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
+    this.currentY += 12;
+
+    // Informações em linha horizontal
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(80, 80, 80);
+
+    const infoItems: string[] = [];
+    infoItems.push(`Data: ${new Date(data.budget.createdAt).toLocaleDateString('pt-BR')}`);
+    if (data.budget.validUntil) {
+      infoItems.push(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`);
+    }
+    if (data.budget.deliveryDeadline) {
+      infoItems.push(`Entrega: ${new Date(data.budget.deliveryDeadline).toLocaleDateString('pt-BR')}`);
+    }
+    this.doc.text(infoItems.join('   |   '), this.margin, this.currentY);
+
     this.currentY += 8;
 
-    // Número do orçamento embaixo da data
-    this.doc.text(`Número: ${data.budget.budgetNumber}`, this.margin, this.currentY);
+    // Linha separadora
+    this.doc.setDrawColor(200, 200, 200);
+    this.doc.setLineWidth(0.5);
+    this.doc.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
+    this.currentY += 10;
 
-    if (data.budget.validUntil) {
-      this.currentY += 8;
-      this.doc.text(`Válido até: ${new Date(data.budget.validUntil).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
-    }
-    // Add delivery deadline if it exists
-    if (data.budget.deliveryDeadline) {
-      this.currentY += 8;
-      this.doc.text(`Prazo de entrega: ${new Date(data.budget.deliveryDeadline).toLocaleDateString('pt-BR')}`, this.margin, this.currentY);
-    }
-
-    this.currentY += 20;
+    this.doc.setTextColor(0, 0, 0);
   }
 
   private addClientVendorInfo(data: BudgetPDFData): void {
-    this.addNewPageIfNeeded(40);
+    this.addNewPageIfNeeded(50);
 
-    // Client info
-    this.doc.setFontSize(12);
+    const colWidth = (this.pageWidth - 2 * this.margin - 10) / 2;
+    const rightColumn = this.margin + colWidth + 10;
+    const startY = this.currentY;
+
+    // === COLUNA ESQUERDA: CLIENTE ===
+    this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('CLIENTE:', this.margin, this.currentY);
+    this.doc.setTextColor(80, 80, 80);
+    this.doc.text('CLIENTE', this.margin, this.currentY);
+    this.currentY += 7;
+
+    this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
-    this.currentY += 8;
+    this.doc.setTextColor(30, 30, 30);
     this.doc.text(data.client.name, this.margin, this.currentY);
+    this.currentY += 6;
 
+    this.doc.setFontSize(9);
+    this.doc.setTextColor(80, 80, 80);
     if (data.client.email) {
-      this.currentY += 6;
-      this.doc.text(`Email: ${data.client.email}`, this.margin, this.currentY);
+      this.doc.text(data.client.email, this.margin, this.currentY);
+      this.currentY += 5;
     }
-
     if (data.client.phone) {
-      this.currentY += 6;
-      this.doc.text(`Telefone: ${data.client.phone}`, this.margin, this.currentY);
+      this.doc.text(data.client.phone, this.margin, this.currentY);
+      this.currentY += 5;
     }
 
-    // Vendor info
-    const rightColumn = this.pageWidth / 2 + 10;
-    // Adjust vendor starting Y based on client info height
-    let vendorStartY = this.currentY - (data.client.email ? 14 : 8) - (data.client.phone ? 6 : 0);
-    vendorStartY = Math.max(vendorStartY, this.currentY - 20); // Ensure it doesn't go above currentY
+    const clientEndY = this.currentY;
 
+    // === COLUNA DIREITA: VENDEDOR ===
+    let vendorY = startY;
+    this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('VENDEDOR:', rightColumn, vendorStartY);
+    this.doc.setTextColor(80, 80, 80);
+    this.doc.text('VENDEDOR', rightColumn, vendorY);
+    vendorY += 7;
+
+    this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(data.vendor.name, rightColumn, vendorStartY + 8);
+    this.doc.setTextColor(30, 30, 30);
+    this.doc.text(data.vendor.name, rightColumn, vendorY);
+    vendorY += 6;
 
+    this.doc.setFontSize(9);
+    this.doc.setTextColor(80, 80, 80);
     if (data.vendor.email) {
-      this.doc.text(`Email: ${data.vendor.email}`, rightColumn, vendorStartY + 14);
+      this.doc.text(data.vendor.email, rightColumn, vendorY);
+      vendorY += 5;
     }
-
     if (data.vendor.phone) {
-      this.doc.text(`Telefone: ${data.vendor.phone}`, rightColumn, vendorStartY + (data.vendor.email ? 20 : 14));
+      this.doc.text(data.vendor.phone, rightColumn, vendorY);
+      vendorY += 5;
     }
 
-    this.currentY += 20;
+    // Avançar Y para o maior dos dois blocos
+    this.currentY = Math.max(clientEndY, vendorY) + 8;
+
+    // Linha separadora
+    this.doc.setDrawColor(220, 220, 220);
+    this.doc.setLineWidth(0.3);
+    this.doc.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
+    this.currentY += 10;
+
+    this.doc.setTextColor(0, 0, 0);
   }
 
   private addBranchInfoTopRight(data: BudgetPDFData): void {
@@ -356,10 +395,11 @@ export class PDFGenerator {
     }
 
     // Title
-    this.doc.setFontSize(14);
+    this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(30, 30, 30);
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
-    this.currentY += 15;
+    this.currentY += 10;
 
     // Table headers (com imagem do produto)
     const imgColWidth = 22;
@@ -367,13 +407,9 @@ export class PDFGenerator {
     const startX = this.margin;
     let currentX = startX;
 
-    this.doc.setFontSize(10);
+    this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'bold');
-
-    // Draw header background
-    // Removing fill to avoid white background issues
-    // this.doc.setFillColor(240, 240, 240);
-    // this.doc.rect(startX, this.currentY - 5, colWidths.reduce((a, b) => a + b, 0), 10, 'F');
+    this.doc.setTextColor(80, 80, 80);
 
     this.doc.text('Img', currentX + 2, this.currentY);
     currentX += colWidths[0];
@@ -385,7 +421,13 @@ export class PDFGenerator {
     currentX += colWidths[3];
     this.doc.text('Total', currentX + 2, this.currentY);
 
-    this.currentY += 10;
+    this.currentY += 4;
+    // Header underline
+    this.doc.setDrawColor(180, 180, 180);
+    this.doc.setLineWidth(0.5);
+    this.doc.line(startX, this.currentY, startX + colWidths.reduce((a, b) => a + b, 0), this.currentY);
+    this.currentY += 6;
+    this.doc.setTextColor(0, 0, 0);
 
     // Items
     this.doc.setFont('helvetica', 'normal');
@@ -486,112 +528,154 @@ export class PDFGenerator {
         this.doc.setTextColor(0, 0, 0);
       }
 
-      this.currentY += 5; // Extra spacing between items
+      this.currentY += 3;
+
+      // Linha separadora pontilhada entre itens
+      if (index < data.items.length - 1) {
+        this.doc.setDrawColor(210, 210, 210);
+        this.doc.setLineWidth(0.2);
+        this.doc.setLineDashPattern([2, 2], 0);
+        this.doc.line(startX, this.currentY, startX + colWidths.reduce((a, b) => a + b, 0), this.currentY);
+        this.doc.setLineDashPattern([], 0);
+        this.currentY += 5;
+      }
     }
 
-    this.currentY += 10;
+    // Linha sólida final após todos os itens
+    this.currentY += 5;
+    this.doc.setDrawColor(180, 180, 180);
+    this.doc.setLineWidth(0.5);
+    this.doc.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
+    this.currentY += 15;
   }
 
   private addTotal(data: BudgetPDFData): void {
-    // We don't need a massive addNewPageIfNeeded here anymore since it's going at the very end
-    this.addNewPageIfNeeded(60);
+    this.addNewPageIfNeeded(70);
 
     // Calculate subtotal
     const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
     const shippingCost = parseFloat(data.budget.shippingCost || '0');
 
-    this.doc.setFontSize(10);
-    this.doc.setFont('helvetica', 'normal');
+    // Caixa de resumo financeiro - alinhada à direita
+    const boxWidth = 85;
+    const boxX = this.pageWidth - this.margin - boxWidth;
+    let boxY = this.currentY;
+    const lineHeight = 8;
+    let linesCount = 2; // Subtotal + Total
+    if (data.budget.hasDiscount) linesCount++;
+    if (shippingCost > 0) linesCount++;
+    const boxHeight = linesCount * lineHeight + 18;
 
-    let currentOffsetY = 5;
+    // Borda da caixa
+    this.doc.setDrawColor(180, 180, 180);
+    this.doc.setLineWidth(0.5);
+    this.doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2, 'D');
+
+    boxY += 8;
+    const labelX = boxX + 5;
+    const valueX = boxX + boxWidth - 5;
+
+    this.doc.setFontSize(9);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(60, 60, 60);
 
     // Subtotal
-    this.doc.text('Subtotal:', this.margin, this.currentY + currentOffsetY);
-    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 5);
-    currentOffsetY += 15;
+    this.doc.text('Subtotal:', labelX, boxY);
+    this.doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, valueX, boxY, { align: 'right' });
+    boxY += lineHeight;
 
     // Discount if exists
     let discountAmount = 0;
     if (data.budget.hasDiscount) {
-      this.doc.setTextColor(255, 100, 0); // Orange color for discount
-      this.doc.text('Desconto:', this.margin, this.currentY + currentOffsetY);
-
-      let discountText = '';
+      this.doc.setTextColor(220, 80, 0);
       if (data.budget.discountType === 'percentage') {
         discountAmount = (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100;
-        discountText = `- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${data.budget.discountPercentage}%)`;
+        this.doc.text(`Desconto (${data.budget.discountPercentage}%):`, labelX, boxY);
       } else {
         discountAmount = parseFloat(data.budget.discountValue || '0');
-        discountText = `- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        this.doc.text('Desconto:', labelX, boxY);
       }
-
-      this.doc.text(discountText, this.margin, this.currentY + currentOffsetY + 5);
-      this.doc.setTextColor(0, 0, 0); // Reset to black
-
-      currentOffsetY += 15;
+      this.doc.text(`- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, valueX, boxY, { align: 'right' });
+      boxY += lineHeight;
+      this.doc.setTextColor(60, 60, 60);
     }
 
     // Shipping Cost if exists
     if (shippingCost > 0) {
-      this.doc.text('Frete:', this.margin, this.currentY + currentOffsetY);
-      this.doc.text(`+ R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 5);
-      currentOffsetY += 15;
+      this.doc.text('Frete:', labelX, boxY);
+      this.doc.text(`+ R$ ${shippingCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, valueX, boxY, { align: 'right' });
+      boxY += lineHeight;
     }
+
+    // Linha separadora dentro da caixa
+    this.doc.setDrawColor(200, 200, 200);
+    this.doc.setLineWidth(0.3);
+    this.doc.line(labelX, boxY - 2, valueX, boxY - 2);
+    boxY += 3;
 
     // Total
     const finalTotal = subtotal - discountAmount + shippingCost;
-    this.doc.setFontSize(12);
+    this.doc.setFontSize(11);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text('TOTAL GERAL:', this.margin, this.currentY + currentOffsetY);
-    // Use the explicitly calculated finalTotal to ensure it matches the breakdown
-    this.doc.text(`R$ ${finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin, this.currentY + currentOffsetY + 10);
+    this.doc.setTextColor(30, 30, 30);
+    this.doc.text('TOTAL:', labelX, boxY);
+    this.doc.text(`R$ ${finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, valueX, boxY, { align: 'right' });
 
-    this.currentY += currentOffsetY + 25;
+    this.currentY += boxHeight + 15;
+    this.doc.setTextColor(0, 0, 0);
   }
 
   private addPaymentShippingInfo(data: BudgetPDFData): void {
     if (data.budget.paymentMethodId || data.budget.shippingMethodId) {
       this.addNewPageIfNeeded(60);
 
-      this.doc.setFontSize(12);
+      this.doc.setFontSize(11);
       this.doc.setFont('helvetica', 'bold');
-      this.doc.text('INFORMAÇÕES DE PAGAMENTO E FRETE', this.margin, this.currentY);
-      this.currentY += 15;
+      this.doc.setTextColor(30, 30, 30);
+      this.doc.text('PAGAMENTO E FRETE', this.margin, this.currentY);
+      this.currentY += 10;
 
-      this.doc.setFontSize(10);
-      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(9);
+      const labelOffset = 40; // Espaço entre label e valor
 
       // Payment info
       if (data.budget.paymentMethodId) {
         const paymentMethod = data.paymentMethods?.find(pm => pm.id === data.budget.paymentMethodId);
         if (paymentMethod) {
           this.doc.setFont('helvetica', 'bold');
-          this.doc.text('Forma de Pagamento:', this.margin, this.currentY);
-          this.currentY += 8;
+          this.doc.setTextColor(80, 80, 80);
+          this.doc.text('Pagamento:', this.margin, this.currentY);
           this.doc.setFont('helvetica', 'normal');
-          this.doc.text(paymentMethod.name, this.margin, this.currentY);
-          this.currentY += 10;
+          this.doc.setTextColor(30, 30, 30);
+          this.doc.text(paymentMethod.name, this.margin + labelOffset, this.currentY);
+          this.currentY += 6;
 
           if (data.budget.installments && data.budget.installments > 1) {
             this.doc.setFont('helvetica', 'bold');
+            this.doc.setTextColor(80, 80, 80);
             this.doc.text('Parcelas:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
-            this.doc.text(`${data.budget.installments}x`, this.margin + 20, this.currentY);
-            this.currentY += 8;
+            this.doc.setTextColor(30, 30, 30);
+            this.doc.text(`${data.budget.installments}x`, this.margin + labelOffset, this.currentY);
+            this.currentY += 6;
           }
 
           if (data.budget.downPayment && parseFloat(data.budget.downPayment) > 0) {
             this.doc.setFont('helvetica', 'bold');
+            this.doc.setTextColor(80, 80, 80);
             this.doc.text('Entrada:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
-            this.doc.text(`R$ ${parseFloat(data.budget.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
-            this.currentY += 8;
+            this.doc.setTextColor(30, 30, 30);
+            this.doc.text(`R$ ${parseFloat(data.budget.downPayment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+            this.currentY += 6;
 
             this.doc.setFont('helvetica', 'bold');
+            this.doc.setTextColor(80, 80, 80);
             this.doc.text('Restante:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
-            this.doc.text(`R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 20, this.currentY);
-            this.currentY += 10;
+            this.doc.setTextColor(30, 30, 30);
+            this.doc.text(`R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+            this.currentY += 6;
           }
         }
       }
@@ -600,19 +684,23 @@ export class PDFGenerator {
       if (data.budget.shippingMethodId) {
         const shippingMethod = data.shippingMethods?.find(sm => sm.id === data.budget.shippingMethodId);
         if (shippingMethod) {
+          this.currentY += 2;
           this.doc.setFont('helvetica', 'bold');
-          this.doc.text('Método de Frete:', this.margin, this.currentY);
-          this.currentY += 8;
+          this.doc.setTextColor(80, 80, 80);
+          this.doc.text('Frete:', this.margin, this.currentY);
           this.doc.setFont('helvetica', 'normal');
-          this.doc.text(shippingMethod.name, this.margin, this.currentY);
-          this.currentY += 10;
+          this.doc.setTextColor(30, 30, 30);
+          this.doc.text(shippingMethod.name, this.margin + labelOffset, this.currentY);
+          this.currentY += 6;
 
           if (data.budget.shippingCost) {
             this.doc.setFont('helvetica', 'bold');
-            this.doc.text('Valor do Frete:', this.margin, this.currentY);
+            this.doc.setTextColor(80, 80, 80);
+            this.doc.text('Valor Frete:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
-            this.doc.text(`R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + 30, this.currentY);
-            this.currentY += 8;
+            this.doc.setTextColor(30, 30, 30);
+            this.doc.text(`R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+            this.currentY += 6;
           }
         }
       }
@@ -620,30 +708,55 @@ export class PDFGenerator {
       // Credit card interest
       if (data.budget.interestValue && parseFloat(data.budget.interestValue) > 0) {
         this.doc.setFont('helvetica', 'bold');
-        this.doc.text('Juros do Cartão:', this.margin, this.currentY);
+        this.doc.setTextColor(80, 80, 80);
+        this.doc.text('Juros:', this.margin, this.currentY);
         this.doc.setFont('helvetica', 'normal');
-        const interestRate = data.budget.interestRate ? `(${data.budget.interestRate}% x ${data.budget.installments || 1}x)` : '';
-        this.doc.text(`R$ ${parseFloat(data.budget.interestValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${interestRate}`, this.margin, this.currentY);
-        this.currentY += 8;
+        this.doc.setTextColor(30, 30, 30);
+        const interestRate = data.budget.interestRate ? ` (${data.budget.interestRate}% x ${data.budget.installments || 1}x)` : '';
+        this.doc.text(`R$ ${parseFloat(data.budget.interestValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${interestRate}`, this.margin + labelOffset, this.currentY);
+        this.currentY += 6;
       }
 
+      // Separador
+      this.currentY += 5;
+      this.doc.setDrawColor(220, 220, 220);
+      this.doc.setLineWidth(0.3);
+      this.doc.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
       this.currentY += 10;
+
+      this.doc.setTextColor(0, 0, 0);
     }
   }
 
   private addDescription(data: BudgetPDFData): void {
     if (data.budget.description) {
-      this.addNewPageIfNeeded(30);
+      this.addNewPageIfNeeded(40);
 
-      this.doc.setFontSize(12);
+      // Título da seção
+      this.doc.setFontSize(11);
       this.doc.setFont('helvetica', 'bold');
-      this.doc.text('OBSERVAÇÕES:', this.margin, this.currentY);
-      this.currentY += 10;
+      this.doc.setTextColor(30, 30, 30);
+      this.doc.text('OBSERVAÇÕES', this.margin, this.currentY);
+      this.currentY += 8;
 
+      // Calcular altura do texto
+      this.doc.setFontSize(9);
       this.doc.setFont('helvetica', 'normal');
-      const lines = this.doc.splitTextToSize(data.budget.description, this.pageWidth - 2 * this.margin);
-      this.doc.text(lines, this.margin, this.currentY);
-      this.currentY += lines.length * 6;
+      const maxTextWidth = this.pageWidth - 2 * this.margin - 10;
+      const lines = this.doc.splitTextToSize(data.budget.description, maxTextWidth);
+      const textHeight = lines.length * 5 + 10;
+
+      // Caixa com borda sutil
+      this.doc.setDrawColor(200, 200, 200);
+      this.doc.setLineWidth(0.3);
+      this.doc.roundedRect(this.margin, this.currentY - 3, this.pageWidth - 2 * this.margin, textHeight, 2, 2, 'D');
+
+      // Texto dentro da caixa
+      this.doc.setTextColor(50, 50, 50);
+      this.doc.text(lines, this.margin + 5, this.currentY + 5);
+      this.currentY += textHeight + 10;
+
+      this.doc.setTextColor(0, 0, 0);
     }
   }
 

@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { phoneMask } from "@/utils/masks";
 
 const vendorFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -419,7 +420,7 @@ export default function AdminVendors() {
                       <FormItem>
                         <FormLabel>Telefone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} />
+                          <Input placeholder="(11) 99999-9999" {...field} onChange={(e) => field.onChange(phoneMask(e.target.value))} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -561,8 +562,8 @@ export default function AdminVendors() {
                       )}
                     </div>
                     <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           setSelectedVendorId(vendor.id);
@@ -572,9 +573,9 @@ export default function AdminVendors() {
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         title="Ver Detalhes"
                         onClick={() => {
                           setSelectedVendorId(vendor.id);
@@ -583,25 +584,25 @@ export default function AdminVendors() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         title="Alterar Senha"
                         onClick={() => openPasswordDialog(vendor)}
                       >
                         <Lock className="h-4 w-4 text-yellow-600" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         title="Editar"
                         onClick={() => handleEditVendor(vendor)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         title="Excluir"
                         onClick={() => handleDeleteVendor(vendor.id, vendor.name)}
                         disabled={deleteVendorMutation.isPending}
@@ -804,16 +805,15 @@ export default function AdminVendors() {
                           R$ {parseFloat(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                            order.status === 'production' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                              order.status === 'production' ? 'bg-blue-100 text-blue-800' :
+                                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                            }`}>
                             {order.status === 'delivered' ? 'Entregue' :
-                             order.status === 'production' ? 'Em Produção' :
-                             order.status === 'pending' ? 'Pendente' :
-                             order.status}
+                              order.status === 'production' ? 'Em Produção' :
+                                order.status === 'pending' ? 'Pendente' :
+                                  order.status}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -850,26 +850,26 @@ export default function AdminVendors() {
               {(() => {
                 const vendor = vendors?.find((v: any) => v.id === selectedVendorId);
                 if (!vendor) return null;
-                
+
                 return (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-600">Nome:</label>
                       <p className="text-sm text-gray-900">{vendor.name}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Código de Acesso:</label>
                       <p className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         {vendor.userCode || vendor.username || 'N/A'}
                       </p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Email:</label>
                       <p className="text-sm text-gray-900">{vendor.email || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Telefone:</label>
                       <p className="text-sm text-gray-900">{vendor.phone || 'N/A'}</p>
@@ -879,12 +879,12 @@ export default function AdminVendors() {
                       <label className="text-sm font-medium text-gray-600">Endereço:</label>
                       <p className="text-sm text-gray-900">{vendor.address || 'N/A'}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Taxa de Comissão:</label>
                       <p className="text-sm text-gray-900">{vendor.commissionRate}%</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm font-medium text-gray-600">Status:</label>
                       <p className={`text-sm font-medium ${vendor.isActive ? 'text-green-600' : 'text-red-600'}`}>
@@ -966,7 +966,7 @@ export default function AdminVendors() {
                     <FormItem>
                       <FormLabel>Telefone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-9999" {...field} />
+                        <Input placeholder="(11) 99999-9999" {...field} onChange={(e) => field.onChange(phoneMask(e.target.value))} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
