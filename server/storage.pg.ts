@@ -2158,6 +2158,7 @@ export class PgStorage implements IStorage {
       itemDiscountValue: schema.budgetItems.itemDiscountValue,
       purchaseStatus: schema.budgetItems.purchaseStatus,
       productName: schema.products.name,
+      costPrice: schema.products.costPrice,
     })
       .from(schema.budgetItems)
       .leftJoin(schema.products, eq(schema.budgetItems.productId, schema.products.id))
