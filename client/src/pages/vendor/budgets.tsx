@@ -335,6 +335,21 @@ export default function VendorBudgets() {
 
         item.totalPrice = calculateItemTotal({ ...item, unitPrice: newPrice });
 
+        // Se minimumPrice não foi calculado (pode acontecer na edição), recalcular agora
+        if ((!item.minimumPrice || item.minimumPrice <= 0) && item.costPrice && item.costPrice > 0) {
+          const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+          const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+          const totalCost = item.costPrice + customUnit + genUnit;
+          const currentRevenue = prev.items.reduce((total: number, it: any) => total + (it.unitPrice * it.quantity), 0);
+          const priceCalc = calculatePriceFromCost(totalCost, currentRevenue);
+          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+          // Fallback se pricingSettings não está carregado
+          if (item.minimumPrice <= 0) {
+            const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20;
+            item.minimumPrice = Math.round((totalCost / fallbackDivisor) * 100) / 100;
+          }
+        }
+
         // Verificar margem mínima contra o custo total (produto + personalização)
         if (item.minimumPrice && item.minimumPrice > 0 && item.unitPrice < item.minimumPrice) {
           toast({
@@ -929,6 +944,11 @@ export default function VendorBudgets() {
       const budgetRevenue = itemsArray.reduce((sum: number, item: any) => {
         return sum + (toNumber(item.unitPrice) * item.quantity);
       }, 0);
+
+      if (!pricingSettings) {
+        console.warn('[BUDGET EDIT] pricingSettings não carregado — minimumPrice será calculado com defaults');
+      }
+
       for (const item of itemsArray) {
         if (item.costPrice && item.costPrice > 0) {
           // Na edição, precisamos somar o custo de personalização ao custo do produto para bater com a fórmula do backend
@@ -936,8 +956,15 @@ export default function VendorBudgets() {
           const genCustomVal = item.hasGeneralCustomization ? toNumber(item.generalCustomizationValue) : 0;
           const totalCostBase = item.costPrice + customVal + genCustomVal;
 
-          const priceCalc = calculatePriceFromCost(totalCostBase, budgetRevenue);
+          const priceCalc = calcPriceFromCost(totalCostBase, budgetRevenue, pricingSettings, marginTiers);
           item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+
+          // Fallback: se pricingSettings não carregou e minimumPrice ficou 0, usar fórmula com defaults
+          if (item.minimumPrice <= 0) {
+            // Defaults: 9% imposto, 15% comissão, 20% margem mínima = divisor 0.56
+            const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20;
+            item.minimumPrice = Math.round((totalCostBase / fallbackDivisor) * 100) / 100;
+          }
         }
       }
 

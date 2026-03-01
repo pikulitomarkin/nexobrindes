@@ -1081,10 +1081,17 @@ export default function AdminBudgets() {
       const budgetRevenue = itemsArray.reduce((sum: number, item: any) => {
         return sum + (toNumber(item.unitPrice) * item.quantity);
       }, 0);
+
       for (const item of itemsArray) {
         if (item.costPrice && item.costPrice > 0) {
-          const priceCalc = calculatePriceFromCost(item.costPrice, budgetRevenue);
-          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+          const customVal = item.hasItemCustomization ? toNumber(item.itemCustomizationValue) : 0;
+          const genCustomVal = item.hasGeneralCustomization ? toNumber(item.generalCustomizationValue) : 0;
+          const totalCostBase = item.costPrice + customVal + genCustomVal;
+
+          // Admin não possui pricingSettings/marginTiers no escopo local, usar fallback direto
+          // Taxas padrão: 9% imposto + 15% comissão + 20% margem mínima
+          const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20; // = 0.56
+          item.minimumPrice = Math.round((totalCostBase / fallbackDivisor) * 100) / 100;
         }
       }
 
