@@ -1,4 +1,3 @@
-import { Client } from "@replit/object-storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
@@ -6,16 +5,16 @@ import * as path from "path";
 
 const isReplit = process.env.REPL_ID !== undefined;
 
-let client: Client | null = null;
+let client: any = null;
 
-try {
-  if (isReplit) {
-    client = new Client();
-  } else {
-    console.log("Not running in Replit, Object Storage client will be mocked/bypassed.");
-  }
-} catch (err) {
-  console.warn("Failed to initialize Replit Object Storage client. Will use fallback.", err);
+if (isReplit) {
+  import("@replit/object-storage").then(module => {
+    client = new module.Client();
+  }).catch(err => {
+    console.warn("Failed to initialize Replit Object Storage client. Will use fallback.", err);
+  });
+} else {
+  console.log("Not running in Replit, Object Storage client will be mocked/bypassed.");
 }
 
 export class ObjectNotFoundError extends Error {
@@ -78,7 +77,8 @@ export class ObjectStorageService {
         return `/uploads/${filename}`;
       } catch (fallbackError) {
         console.error("Fallback save also failed:", fallbackError);
-        throw new Error(`Upload failed completely: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Upload failed completely: ${errorMessage}`);
       }
     }
   }
