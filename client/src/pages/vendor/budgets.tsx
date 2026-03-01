@@ -2340,10 +2340,7 @@ export default function VendorBudgets() {
                       <span>R$ {calculateCreditCardInterest().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(vendorBudgetForm.downPayment + (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
+
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>

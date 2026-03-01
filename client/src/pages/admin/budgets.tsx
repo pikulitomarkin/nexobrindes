@@ -2445,10 +2445,7 @@ export default function AdminBudgets() {
                       <span>R$ {calculateAdminCreditCardInterest().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(adminBudgetForm.downPayment + (adminBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
+
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Orçamento:</span>

@@ -1859,10 +1859,7 @@ export default function VendorOrders() {
                       }
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm font-medium text-blue-600 bg-blue-50 p-2 rounded">
-                    <span>Entrada + Frete (para financeiro):</span>
-                    <span>R$ {(vendorOrderForm.downPayment + (vendorOrderForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorOrderForm.shippingCost) || calculateShippingCost()))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
+
                   <Separator />
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Total do Pedido:</span>
@@ -2103,9 +2100,9 @@ export default function VendorOrders() {
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className={`h-2 rounded-full ${order.status === 'delayed' ? 'bg-red-500' :
-                                  order.status === 'ready' ? 'bg-yellow-500' :
-                                    order.status === 'shipped' ? 'bg-blue-500' :
-                                      order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
+                                order.status === 'ready' ? 'bg-yellow-500' :
+                                  order.status === 'shipped' ? 'bg-blue-500' :
+                                    order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
                                 }`}
                               style={{
                                 width: productionStatuses?.[order.id] ? (() => {
