@@ -344,13 +344,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from public/uploads directory (legacy support)
   app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
-  // Serve objects from Object Storage
+  // Serve objects from Object Storage (New prefix to bypass Vercel static cache)
+  app.get("/api/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      await objectStorageService.downloadObject(`/api/objects/${req.params.objectPath}`, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Serve objects from Object Storage (Legacy prefix for backward compatibility with existing DB entries)
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      await objectStorageService.downloadObject(`/objects/${req.params.objectPath}`, res);
+      // the method internally checks for /api/objects/ to parse the name, so we must prepend it
+      await objectStorageService.downloadObject(`/api/objects/${req.params.objectPath}`, res);
     } catch (error) {
-      console.error("Error serving object:", error);
+      console.error("Error serving legacy object:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }

@@ -126,7 +126,7 @@ export default function FinancePayables() {
         transactionId: "",
         notes: "",
       });
-      
+
       // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
@@ -452,7 +452,7 @@ export default function FinancePayables() {
   const filteredPayables = allPayables.filter((payable: any) => {
     const matchesStatus = statusFilter === "all" || payable.status === statusFilter;
     const matchesType = typeFilter === "all" || payable.type === typeFilter;
-    
+
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
       const payableDate = new Date(payable.dueDate || payable.createdAt);
@@ -463,11 +463,11 @@ export default function FinancePayables() {
       matchesDate = payableDate >= from && payableDate <= to;
     }
 
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       payable.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payable.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payable.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBranch = branchFilter === "all" || 
+    const matchesBranch = branchFilter === "all" ||
       payable.branchId === branchFilter ||
       (branchFilter === 'matriz' && (!payable.branchId || payable.branchId === 'matriz'));
     return matchesStatus && matchesType && matchesSearch && matchesBranch && matchesDate;
@@ -475,10 +475,10 @@ export default function FinancePayables() {
 
   const handlePayProducer = (producerPayment: any) => {
     setSelectedPayable(producerPayment);
-    setPaymentData(prev => ({ 
-      ...prev, 
+    setPaymentData(prev => ({
+      ...prev,
       amount: producerPayment.amount,
-      notes: producerPayment.notes || '' 
+      notes: producerPayment.notes || ''
     }));
     setIsPayDialogOpen(true);
   };
@@ -542,8 +542,8 @@ export default function FinancePayables() {
     if (selectedPayable && paymentData.amount && paymentData.method) {
       if (selectedPayable.type === 'manual') {
         // Handle manual payable payment
-        const actualId = selectedPayable.id.startsWith('manual-') 
-          ? selectedPayable.id.replace('manual-', '') 
+        const actualId = selectedPayable.id.startsWith('manual-')
+          ? selectedPayable.id.replace('manual-', '')
           : selectedPayable.id;
 
         payManualPayableMutation.mutate({
@@ -563,10 +563,10 @@ export default function FinancePayables() {
       } else if (selectedPayable.type === 'refund') {
         // Handle refund payment
         const actualId = selectedPayable.id.replace('refund-', '');
-        
+
         // Use the estorno processing API if it's a refund
-        processEstornoMutation.mutate({ 
-          id: actualId, 
+        processEstornoMutation.mutate({
+          id: actualId,
           data: {
             paymentMethod: paymentData.method,
             notes: paymentData.notes,
@@ -592,12 +592,12 @@ export default function FinancePayables() {
       setIsPayDialogOpen(false);
       setSelectedPayable(null);
       setPaymentData({ paymentMethod: "", notes: "", transactionId: "", method: "", amount: "" });
-      
+
       queryClient.invalidateQueries({ queryKey: ["/api/finance/estornos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/payables/manual"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      
+
       toast({
         title: "Estorno processado",
         description: "O estorno foi processado com sucesso.",
@@ -755,13 +755,13 @@ export default function FinancePayables() {
               </div>
               <div className="w-full md:w-auto">
                 <Label className="text-xs font-medium mb-1 block">Período</Label>
-                <DatePickerWithRange 
-                  date={dateRange as any} 
-                  setDate={(date) => setDateRange(date as any)} 
+                <DatePickerWithRange
+                  date={dateRange as any}
+                  setDate={(date) => setDateRange(date as any)}
                 />
               </div>
             </div>
-            
+
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex-1 min-w-[140px]">
                 <Label className="text-xs font-medium mb-1 block">Status</Label>
@@ -824,7 +824,7 @@ export default function FinancePayables() {
                 </Select>
               </div>
 
-              <Button 
+              <Button
                 className="gradient-bg text-white"
                 onClick={() => setIsCreatePayableDialogOpen(true)}
               >
@@ -996,8 +996,8 @@ export default function FinancePayables() {
                           Ver
                         </Button>
                         {payable.type === 'refund' && payable.status === 'pending_definition' && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             className="h-7 px-2"
                             onClick={() => {
@@ -1045,11 +1045,11 @@ export default function FinancePayables() {
           <DialogHeader>
             <DialogTitle>{selectedPayable?.type === 'refund' ? 'Processar Estorno' : 'Registrar Pagamento Manual'}</DialogTitle>
             <DialogDescription>
-              {selectedPayable?.type === 'producer' 
+              {selectedPayable?.type === 'producer'
                 ? `Registrando pagamento de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary || 'Produtor'}`
                 : selectedPayable?.type === 'refund'
-                ? `Registrando estorno de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary}`
-                : `Registrando pagamento de ${selectedPayable?.type || 'item'}`}
+                  ? `Registrando estorno de R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para ${selectedPayable.beneficiary}`
+                  : `Registrando pagamento de ${selectedPayable?.type || 'item'}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
@@ -1083,8 +1083,8 @@ export default function FinancePayables() {
                 <Input
                   id="payment-amount"
                   type="text"
-                  value={selectedPayable?.type === 'producer' 
-                    ? `R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                  value={selectedPayable?.type === 'producer'
+                    ? `R$ ${parseFloat(selectedPayable.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                     : (paymentData.amount.startsWith('R$') ? paymentData.amount : `R$ ${parseFloat(paymentData.amount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}
                   onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value.replace('R$ ', '').replace('.', '').replace(',', '.') }))}
                   placeholder="0,00"
@@ -1098,7 +1098,7 @@ export default function FinancePayables() {
 
               <div>
                 <Label htmlFor="payment-method">Método de {selectedPayable?.type === 'refund' ? 'Estorno' : 'Pagamento'} <span className="text-red-500">*</span></Label>
-                <Select 
+                <Select
                   value={paymentData.method}
                   onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
                 >
@@ -1143,7 +1143,7 @@ export default function FinancePayables() {
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
                 <div className="text-sm text-yellow-700">
-                  <strong>Confirmação:</strong> Certifique-se de que a operação foi efetivamente realizada antes de registrar. 
+                  <strong>Confirmação:</strong> Certifique-se de que a operação foi efetivamente realizada antes de registrar.
                   Esta ação marcará o item como concluído no sistema.
                 </div>
               </div>
@@ -1216,8 +1216,8 @@ export default function FinancePayables() {
 
               <div>
                 <Label htmlFor="refund-method">Método de Estorno</Label>
-                <Select 
-                  value={refundData.method || ''} 
+                <Select
+                  value={refundData.method || ''}
                   onValueChange={(value) => setRefundData(prev => ({ ...prev, method: value }))}
                 >
                   <SelectTrigger>
@@ -1274,7 +1274,7 @@ export default function FinancePayables() {
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
                 <div className="text-sm text-red-700">
-                  <strong>Atenção:</strong> O valor de estorno será adicionado às contas a pagar e deverá ser processado pelo departamento financeiro. 
+                  <strong>Atenção:</strong> O valor de estorno será adicionado às contas a pagar e deverá ser processado pelo departamento financeiro.
                   Certifique-se de que todas as informações estão corretas antes de confirmar.
                 </div>
               </div>
@@ -1345,13 +1345,13 @@ export default function FinancePayables() {
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <a href={`/objects/${selectedPayable.attachmentUrl}`} target="_blank" rel="noreferrer">
+                        <a href={`/api/objects/${selectedPayable.attachmentUrl}`} target="_blank" rel="noreferrer">
                           <Eye className="h-4 w-4 mr-2" />
                           Ver
                         </a>
                       </Button>
                       <Button size="sm" className="gradient-bg text-white" asChild>
-                        <a href={`/objects/${selectedPayable.attachmentUrl}`} download>
+                        <a href={`/api/objects/${selectedPayable.attachmentUrl}`} download>
                           <Download className="h-4 w-4 mr-2" />
                           Baixar
                         </a>
@@ -1375,13 +1375,13 @@ export default function FinancePayables() {
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <a href={`/objects/${selectedPayable.attachmentUrl2}`} target="_blank" rel="noreferrer">
+                        <a href={`/api/objects/${selectedPayable.attachmentUrl2}`} target="_blank" rel="noreferrer">
                           <Eye className="h-4 w-4 mr-2" />
                           Ver
                         </a>
                       </Button>
                       <Button size="sm" className="gradient-bg text-white" asChild>
-                        <a href={`/objects/${selectedPayable.attachmentUrl2}`} download>
+                        <a href={`/api/objects/${selectedPayable.attachmentUrl2}`} download>
                           <Download className="h-4 w-4 mr-2" />
                           Baixar
                         </a>
@@ -1416,7 +1416,7 @@ export default function FinancePayables() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>Fechar</Button>
             {selectedPayable?.status === 'pending' && (
-              <Button 
+              <Button
                 className="gradient-bg text-white"
                 onClick={() => {
                   setIsPreviewDialogOpen(false);
@@ -1449,8 +1449,8 @@ export default function FinancePayables() {
             <div className="space-y-2 col-span-2 sm:col-span-1">
               <Label htmlFor="category">Categoria</Label>
               <div className="flex gap-2">
-                <Select 
-                  value={newPayableData.category} 
+                <Select
+                  value={newPayableData.category}
                   onValueChange={(value) => {
                     if (value === "new") {
                       setIsAddingCategory(true);
@@ -1473,37 +1473,37 @@ export default function FinancePayables() {
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
               <Label htmlFor="beneficiary">Beneficiário / Fornecedor</Label>
-              <Input 
-                id="beneficiary" 
-                placeholder="Ex: Companhia de Energia" 
+              <Input
+                id="beneficiary"
+                placeholder="Ex: Companhia de Energia"
                 value={newPayableData.beneficiary}
                 onChange={(e) => setNewPayableData(prev => ({ ...prev, beneficiary: e.target.value }))}
               />
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="description">Descrição</Label>
-              <Input 
-                id="description" 
-                placeholder="Ex: Conta de luz - Vencimento Dezembro" 
+              <Input
+                id="description"
+                placeholder="Ex: Conta de luz - Vencimento Dezembro"
                 value={newPayableData.description}
                 onChange={(e) => setNewPayableData(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
               <Label htmlFor="amount">Valor (R$)</Label>
-              <Input 
-                id="amount" 
-                type="number" 
-                placeholder="0.00" 
+              <Input
+                id="amount"
+                type="number"
+                placeholder="0.00"
                 value={newPayableData.amount}
                 onChange={(e) => setNewPayableData(prev => ({ ...prev, amount: e.target.value }))}
               />
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
               <Label htmlFor="dueDate">Data de Vencimento</Label>
-              <Input 
-                id="dueDate" 
-                type="date" 
+              <Input
+                id="dueDate"
+                type="date"
                 value={newPayableData.dueDate}
                 onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
               />
@@ -1511,8 +1511,8 @@ export default function FinancePayables() {
             <div className="space-y-2 col-span-2">
               <Label>Anexos (Nota Fiscal/Boleto)</Label>
               <div className="grid grid-cols-2 gap-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full h-24 border-dashed border-2 flex flex-col gap-2"
                   onClick={() => {
                     const input = document.createElement('input');
@@ -1535,8 +1535,8 @@ export default function FinancePayables() {
                     </>
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full h-24 border-dashed border-2 flex flex-col gap-2"
                   onClick={() => {
                     const input = document.createElement('input');
@@ -1563,9 +1563,9 @@ export default function FinancePayables() {
             </div>
             <div className="space-y-2 col-span-2">
               <Label htmlFor="notes">Observações</Label>
-              <Textarea 
-                id="notes" 
-                placeholder="Informações adicionais..." 
+              <Textarea
+                id="notes"
+                placeholder="Informações adicionais..."
                 value={newPayableData.notes}
                 onChange={(e) => setNewPayableData(prev => ({ ...prev, notes: e.target.value }))}
               />
@@ -1588,9 +1588,9 @@ export default function FinancePayables() {
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="new-category">Nome da Categoria</Label>
-            <Input 
-              id="new-category" 
-              value={newCategoryName} 
+            <Input
+              id="new-category"
+              value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="Digite o nome da categoria"
             />

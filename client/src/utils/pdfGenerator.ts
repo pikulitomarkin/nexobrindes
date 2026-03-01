@@ -343,7 +343,7 @@ export class PDFGenerator {
 
     try {
       let imageUrl = imageLink;
-      if (imageLink.startsWith('/uploads/')) {
+      if (imageLink.startsWith('/')) {
         imageUrl = `${window.location.origin}${imageLink}`;
       }
 
@@ -781,7 +781,7 @@ export class PDFGenerator {
         let imageUrl = item.customizationPhoto!;
 
         // Convert relative URLs to absolute URLs for PDF generation
-        if (item.customizationPhoto!.startsWith('/uploads/')) {
+        if (item.customizationPhoto!.startsWith('/')) {
           imageUrl = `${window.location.origin}${item.customizationPhoto}`;
         }
 

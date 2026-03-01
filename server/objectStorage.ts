@@ -81,7 +81,7 @@ export class ObjectStorageService {
           [objectName, mimeType, base64Data]
         );
         console.log(`Fallback: File saved to DB as ${objectName}`);
-        return `/objects/${objectName}`;
+        return `/api/objects/${objectName}`;
       }
 
       const result = await client.uploadFromBytes(objectName, buffer);
@@ -97,7 +97,7 @@ export class ObjectStorageService {
       }
 
       console.log(`File uploaded successfully to Object Storage: ${objectName}`);
-      return `/objects/${objectName}`;
+      return `/api/objects/${objectName}`;
     } catch (error) {
       console.error("Object Storage upload error:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -135,11 +135,11 @@ export class ObjectStorageService {
 
   async downloadObject(objectPath: string, res: Response, cacheTtlSec: number = 3600) {
     try {
-      if (!objectPath.startsWith("/objects/")) {
+      if (!objectPath.startsWith("/api/objects/")) {
         throw new ObjectNotFoundError();
       }
 
-      const objectName = objectPath.slice("/objects/".length);
+      const objectName = objectPath.slice("/api/objects/".length);
       let buffer: Buffer;
       let contentType = this.getMimeTypeFromObjectName(objectName);
 
