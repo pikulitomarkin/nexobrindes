@@ -58,6 +58,7 @@ export interface BudgetPDFData {
     productDepth?: string;
     product: {
       name: string;
+      friendlyCode?: string;
       description?: string;
       category: string;
       imageLink?: string;
@@ -401,9 +402,14 @@ export class PDFGenerator {
     this.doc.text('ITENS DO ORÇAMENTO', this.margin, this.currentY);
     this.currentY += 10;
 
-    // Table headers (com imagem do produto)
-    const imgColWidth = 22;
-    const colWidths = [imgColWidth, 68, 20, 35, 40];
+    // Table headers (com imagem do produto e código)
+    const imgColWidth = 18;
+    const codeColWidth = 24;
+    const prodColWidth = 52;
+    const qtdColWidth = 16;
+    const unitColWidth = 35;
+    const totalColWidth = 40;
+    const colWidths = [imgColWidth, codeColWidth, prodColWidth, qtdColWidth, unitColWidth, totalColWidth];
     const startX = this.margin;
     let currentX = startX;
 
@@ -413,12 +419,14 @@ export class PDFGenerator {
 
     this.doc.text('Img', currentX + 2, this.currentY);
     currentX += colWidths[0];
-    this.doc.text('Produto', currentX + 2, this.currentY);
+    this.doc.text('Código', currentX + 2, this.currentY);
     currentX += colWidths[1];
-    this.doc.text('Qtd', currentX + 2, this.currentY);
+    this.doc.text('Produto', currentX + 2, this.currentY);
     currentX += colWidths[2];
-    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    this.doc.text('Qtd', currentX + 2, this.currentY);
     currentX += colWidths[3];
+    this.doc.text('Preço Unit.', currentX + 2, this.currentY);
+    currentX += colWidths[4];
     this.doc.text('Total', currentX + 2, this.currentY);
 
     this.currentY += 4;
@@ -450,29 +458,34 @@ export class PDFGenerator {
 
       // Product thumbnail image
       const productImageData = productImages.get(item.id);
-      this.renderProductThumbnail(productImageData || null, currentX + 1, this.currentY - 3, 18, 18);
+      this.renderProductThumbnail(productImageData || null, currentX + 1, this.currentY - 3, 16, 16);
       currentX += colWidths[0];
 
-      // --- 1. Top Line: Product Name, Qty, Unit Price, Total Price ---
+      // Code 
+      const code = item.product?.friendlyCode || '-';
+      this.doc.text(code, currentX + 2, this.currentY + 5);
+      currentX += colWidths[1];
+
       // Product name (with text wrapping if needed)
-      const productName = item.product.name.length > 40
-        ? item.product.name.substring(0, 40) + '...'
+      const productName = item.product.name.length > 30
+        ? item.product.name.substring(0, 30) + '...'
         : item.product.name;
       this.doc.text(productName, currentX + 2, this.currentY + 5);
 
-      let tempX = currentX + colWidths[1];
+      let tempX = currentX + colWidths[2];
 
       // Quantity - ensure it's displayed as integer without thousands separator
       const qty = typeof item.quantity === 'string' ? parseInt(item.quantity) : Math.round(item.quantity);
       this.doc.text(qty.toString(), tempX + 2, this.currentY + 5);
-      tempX += colWidths[2];
+      tempX += colWidths[3];
 
       // Unit price
       this.doc.text(`R$ ${parseFloat(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tempX + 2, this.currentY + 5);
-      tempX += colWidths[3];
+      tempX += colWidths[4];
 
       // Total price
-      this.doc.text(`R$ ${parseFloat(item.totalPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tempX + 2, this.currentY + 5);
+      const calculatedTotal = parseFloat(item.unitPrice) * qty;
+      this.doc.text(`R$ ${calculatedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tempX + 2, this.currentY + 5);
 
       // --- 2. Second Line Below Name: Product description if available --- 
       let descriptionHeight = 0;
@@ -482,7 +495,7 @@ export class PDFGenerator {
         this.doc.setTextColor(100, 100, 100);
 
         // Use splitTextToSize to handle multi-line descriptions
-        const splitDescription = this.doc.splitTextToSize(descriptionToUse, colWidths[1] - 4);
+        const splitDescription = this.doc.splitTextToSize(descriptionToUse, colWidths[2] - 4);
 
         splitDescription.forEach((line: string, lineIndex: number) => {
           this.doc.text(line, currentX + 2, this.currentY + 11 + (lineIndex * 4));
@@ -674,7 +687,15 @@ export class PDFGenerator {
             this.doc.text('Restante:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
             this.doc.setTextColor(30, 30, 30);
-            this.doc.text(`R$ ${parseFloat(data.budget.remainingAmount || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+
+            // Recalculating actual remaining extracting standard fixed shipping logic
+            const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+            const discountA = data.budget.hasDiscount ?
+              (data.budget.discountType === 'percentage' ? (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100 : parseFloat(data.budget.discountValue || '0')) : 0;
+            const totalComDesconto = subtotal - discountA;
+            const actualRemaining = totalComDesconto - parseFloat(data.budget.downPayment);
+
+            this.doc.text(`R$ ${actualRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
             this.currentY += 6;
           }
         }
@@ -700,7 +721,16 @@ export class PDFGenerator {
             this.doc.setFont('helvetica', 'normal');
             this.doc.setTextColor(30, 30, 30);
             this.doc.text(`R$ ${parseFloat(data.budget.shippingCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
-            this.currentY += 6;
+            this.currentY += 8;
+
+            if (data.budget.downPayment) {
+              const entMaisFrete = parseFloat(data.budget.downPayment) + parseFloat(data.budget.shippingCost);
+              this.doc.setFont('helvetica', 'bold');
+              this.doc.setTextColor(30, 30, 30);
+              this.doc.text('Entrada + Frete:', this.margin, this.currentY);
+              this.doc.text(`R$ ${entMaisFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+              this.currentY += 6;
+            }
           }
         }
       }
