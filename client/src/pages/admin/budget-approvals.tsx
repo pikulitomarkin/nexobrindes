@@ -265,15 +265,25 @@ export default function AdminBudgetApprovals() {
             </DialogTitle>
           </DialogHeader>
           {selectedBudget && (() => {
-            const subtotal = selectedBudget.items?.reduce((sum: number, item: any) => sum + parseFloat(item.totalPrice || 0), 0) || 0;
+            const subtotal = selectedBudget.items?.reduce((sum: number, item: any) => sum + (parseFloat(item.unitPrice || 0) * (parseFloat(item.quantity) || 1)), 0) || 0;
             const shippingCost = parseFloat(selectedBudget.shippingCost || 0);
-            const downPayment = parseFloat(selectedBudget.downPayment || 0);
-            const remainingAmount = parseFloat(selectedBudget.remainingAmount || 0);
-            const totalValue = parseFloat(selectedBudget.totalValue || 0);
+
             const hasDiscount = selectedBudget.hasDiscount;
             const discountPercentage = parseFloat(selectedBudget.discountPercentage || 0);
             const discountValue = parseFloat(selectedBudget.discountValue || 0);
-            const discountAmount = selectedBudget.discountType === 'percentage' ? (subtotal * discountPercentage / 100) : discountValue;
+            const discountAmount = hasDiscount
+              ? (selectedBudget.discountType === 'percentage' ? (subtotal * discountPercentage / 100) : discountValue)
+              : 0;
+
+            const totalWithoutShipping = Math.max(0, subtotal - discountAmount);
+            const totalValue = totalWithoutShipping + shippingCost;
+
+            // Recalculating Real DownPayment (Entrada 50% excludes Shipping, but Shipping is paid upfront along with it in the standard business logic)
+            // 1. Entrance chunk is 50% of the goods (subtotal - discount) = totalWithoutShipping / 2
+            // 2. Shipping is paid 100% upfront (shippingCost)
+            // 3. Final downPayment = goodsHalf + shipping
+            const correctedDownPayment = (totalWithoutShipping / 2) + shippingCost;
+            const correctedRemainingAmount = totalValue - correctedDownPayment;
 
             return (
               <div className="space-y-5">
@@ -362,6 +372,8 @@ export default function AdminBudgetApprovals() {
                             const basePrice = parseFloat(item.basePriceWithMargin) || Math.max(0, unitPrice - customUnit - genUnit);
                             const isBelowMin = minPrice > 0 && basePrice < minPrice;
                             const diffPercent = minPrice > 0 ? ((basePrice - minPrice) / minPrice * 100).toFixed(1) : null;
+                            const qty = parseFloat(item.quantity) || 1;
+                            const totalPrice = unitPrice * qty;
                             return (
                               <tr key={idx} className={`border-t ${isBelowMin ? "bg-red-50" : ""}`}>
                                 <td className="p-3">
@@ -373,13 +385,13 @@ export default function AdminBudgetApprovals() {
                                   )}
 
                                 </td>
-                                <td className="p-3 text-right">{parseFloat(item.quantity).toLocaleString('pt-BR')}</td>
+                                <td className="p-3 text-right">{qty.toLocaleString('pt-BR')}</td>
                                 <td className="p-3 text-right text-gray-500">{costPrice > 0 ? formatCurrency(costPrice) : "-"}</td>
                                 <td className="p-3 text-right text-gray-500 font-medium">{minPrice > 0 ? formatCurrency(minPrice) : "-"}</td>
                                 <td className={`p-3 text-right font-semibold ${isBelowMin ? "text-red-600" : "text-gray-900"}`}>
                                   {formatCurrency(unitPrice)}
                                 </td>
-                                <td className="p-3 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                                <td className="p-3 text-right font-medium">{formatCurrency(totalPrice)}</td>
                               </tr>
                             );
                           })}
@@ -439,16 +451,16 @@ export default function AdminBudgetApprovals() {
                           <span className="font-medium">{selectedBudget.installments}x</span>
                         </div>
                       )}
-                      {downPayment > 0 && (
+                      {correctedDownPayment > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Entrada:</span>
-                          <span className="font-medium text-green-700">{formatCurrency(downPayment)}</span>
+                          <span className="text-gray-500">Entrada + Frete:</span>
+                          <span className="font-medium text-green-700">{formatCurrency(correctedDownPayment)}</span>
                         </div>
                       )}
-                      {remainingAmount > 0 && (
+                      {correctedRemainingAmount > 0 && (
                         <div className="flex justify-between">
                           <span className="text-gray-500">Restante:</span>
-                          <span className="font-medium">{formatCurrency(remainingAmount)}</span>
+                          <span className="font-medium">{formatCurrency(correctedRemainingAmount)}</span>
                         </div>
                       )}
                       {selectedBudget.validUntil && (

@@ -317,9 +317,9 @@ export default function AdminBudgets() {
       itemCustomizationDescription: "",
       additionalCustomizationNotes: "",
       customizationPhoto: "",
-      productWidth: "",
-      productHeight: "",
-      productDepth: "",
+      productWidth: product.width ? String(product.width) : "",
+      productHeight: product.height ? String(product.height) : "",
+      productDepth: product.depth ? String(product.depth) : "",
       hasItemDiscount: false,
       itemDiscountType: "percentage",
       itemDiscountPercentage: 0,
@@ -2468,6 +2468,16 @@ export default function AdminBudgets() {
                         "R$ 0,00" :
                         `R$ ${(parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-sm py-1.5 px-3 bg-blue-50/50 text-blue-700 font-medium rounded border border-blue-100/50">
+                    <span>Entrada + Frete (para financeiro):</span>
+                    <span>
+                      R$ {(
+                        adminBudgetForm.downPayment +
+                        (adminBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(adminBudgetForm.shippingCost) || calculateAdminShippingCost()))
+                      ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   {calculateAdminCreditCardInterest() > 0 && (

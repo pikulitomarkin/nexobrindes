@@ -275,9 +275,9 @@ export default function VendorBudgets() {
       itemCustomizationDescription: "",
       additionalCustomizationNotes: "",
       customizationPhoto: "",
-      productWidth: "",
-      productHeight: "",
-      productDepth: "",
+      productWidth: product.width ? String(product.width) : "",
+      productHeight: product.height ? String(product.height) : "",
+      productDepth: product.depth ? String(product.depth) : "",
       hasItemDiscount: false,
       itemDiscountType: "percentage",
       itemDiscountPercentage: 0,
@@ -2358,6 +2358,16 @@ export default function VendorBudgets() {
                         "R$ 0,00" :
                         `R$ ${(parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                       }
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-sm py-1.5 px-3 bg-blue-50/50 text-blue-700 font-medium rounded border border-blue-100/50">
+                    <span>Entrada + Frete (para financeiro):</span>
+                    <span>
+                      R$ {(
+                        vendorBudgetForm.downPayment +
+                        (vendorBudgetForm.deliveryType === "pickup" ? 0 : (parseFloat(vendorBudgetForm.shippingCost) || calculateShippingCost()))
+                      ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   {calculateCreditCardInterest() > 0 && (
