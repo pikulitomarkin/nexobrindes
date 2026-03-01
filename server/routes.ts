@@ -291,8 +291,14 @@ async function checkBudgetNeedsApproval(
     const commissionRate = parseFloat(pricingSettings.commissionRate as string) / 100;
 
     for (const item of items) {
-      const product = await storageInstance.getProduct((item as any).productId);
-      const costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+      let costPrice = item.costPrice ? parseFloat(item.costPrice as string) : 0;
+
+      // Fallback: se o item em si não registrou costPrice na gravação, busca no produto
+      if (costPrice <= 0) {
+        const product = await storageInstance.getProduct((item as any).productId);
+        costPrice = product?.costPrice ? parseFloat(product.costPrice as string) : 0;
+      }
+
       if (costPrice <= 0) continue;
 
       // Find the matching tier for the current budget total
