@@ -905,6 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: item.notes,
             product: {
               name: product?.name || item.productName || 'Produto não encontrado',
+              friendlyCode: product?.friendlyCode || '',
               description: product?.description || '',
               category: product?.category || '',
               imageLink: product?.imageLink || ''
@@ -8716,6 +8717,7 @@ Para mais detalhes, entre em contato conosco!`;
             notes: item.notes,
             product: {
               name: product?.name || 'Produto não encontrado',
+              friendlyCode: product?.friendlyCode || '',
               description: product?.description || '',
               category: product?.category || '',
               imageLink: product?.imageLink || ''
