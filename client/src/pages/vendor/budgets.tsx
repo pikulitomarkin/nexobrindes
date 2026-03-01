@@ -351,10 +351,10 @@ export default function VendorBudgets() {
         }
 
         // Verificar margem mínima contra o custo total (produto + personalização)
-        if (item.minimumPrice && item.minimumPrice > 0 && item.unitPrice < item.minimumPrice) {
+        if (item.minimumPrice && item.minimumPrice > 0 && Number(item.unitPrice) < Number(item.minimumPrice)) {
           toast({
             title: "Atenção",
-            description: `Preço Unitário (R$ ${item.unitPrice.toFixed(2)}) abaixo do mínimo sugerido (R$ ${item.minimumPrice.toFixed(2)}). Necessita aprovação do administrador.`,
+            description: `Preço Unitário (R$ ${Number(item.unitPrice).toFixed(2)}) abaixo do mínimo sugerido (R$ ${Number(item.minimumPrice).toFixed(2)}). Necessita aprovação do administrador.`,
             variant: "destructive"
           });
         }
@@ -489,8 +489,13 @@ export default function VendorBudgets() {
 
   useEffect(() => {
     const totalWithShipping = calculateTotalWithShipping();
+    const subtotal = calculateBudgetTotal();
+    const interest = calculateCreditCardInterest();
+    const totalWithoutShipping = subtotal + interest;
+
     if (totalWithShipping > 0) {
-      const half = Math.round(totalWithShipping * 100 / 2) / 100;
+      // Entrada não deve incluir o frete
+      const half = Math.round(totalWithoutShipping * 100 / 2) / 100;
       setVendorBudgetForm(prev => ({
         ...prev,
         downPayment: half,
@@ -1725,8 +1730,9 @@ export default function VendorBudgets() {
                               className="h-10"
                             />
                             {(() => {
-                              const basePrice = item.basePriceWithMargin || item.unitPrice;
-                              return item.minimumPrice > 0 && basePrice > 0 && basePrice < item.minimumPrice ? (
+                              const currentPrice = Number(item.unitPrice) || 0;
+                              const minPrice = Number(item.minimumPrice) || 0;
+                              return minPrice > 0 && currentPrice > 0 && currentPrice < minPrice ? (
                                 <p className="text-[10px] text-red-600 font-bold mt-1 uppercase">Abaixo do preço mínimo!</p>
                               ) : null;
                             })()}
