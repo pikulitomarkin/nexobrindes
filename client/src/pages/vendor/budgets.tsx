@@ -335,18 +335,22 @@ export default function VendorBudgets() {
 
         item.totalPrice = calculateItemTotal({ ...item, unitPrice: newPrice });
 
-        // Se minimumPrice não foi calculado (pode acontecer na edição), recalcular agora
-        if ((!item.minimumPrice || item.minimumPrice <= 0) && item.costPrice && item.costPrice > 0) {
-          const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
-          const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
-          const totalCost = item.costPrice + customUnit + genUnit;
-          const currentRevenue = prev.items.reduce((total: number, it: any) => total + (it.unitPrice * it.quantity), 0);
-          const priceCalc = calculatePriceFromCost(totalCost, currentRevenue);
-          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
-          // Fallback se pricingSettings não está carregado
-          if (item.minimumPrice <= 0) {
-            const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20;
-            item.minimumPrice = Math.round((totalCost / fallbackDivisor) * 100) / 100;
+        // Sem importar se foi calculado no EDIT mode ou via onChange, VAMOS FORÇAR O MINIMUM PRICE se ele for ausente!
+        if (!item.minimumPrice || item.minimumPrice <= 0 || Number.isNaN(item.minimumPrice)) {
+          if (item.costPrice && item.costPrice > 0) {
+            const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+            const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+            const totalCost = item.costPrice + customUnit + genUnit;
+            const currentRevenue = prev.items.reduce((total: number, it: any) => total + (it.unitPrice * it.quantity), 0);
+
+            const priceCalc = calculatePriceFromCost(totalCost, currentRevenue);
+            let recalcMinPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
+
+            if (recalcMinPrice <= 0 || Number.isNaN(recalcMinPrice)) {
+              const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20;
+              recalcMinPrice = Math.round((totalCost / fallbackDivisor) * 100) / 100;
+            }
+            item.minimumPrice = recalcMinPrice;
           }
         }
 
@@ -950,8 +954,26 @@ export default function VendorBudgets() {
         return sum + (toNumber(item.unitPrice) * item.quantity);
       }, 0);
 
-      if (!pricingSettings) {
-        console.warn('[BUDGET EDIT] pricingSettings não carregado — minimumPrice será calculado com defaults');
+      let currentPricingSettings = pricingSettings;
+      if (!currentPricingSettings) {
+        try {
+          const res = await fetch('/api/pricing/settings');
+          if (res.ok) currentPricingSettings = await res.json();
+        } catch (e) {
+          console.warn('Pricing settings fetch failed', e);
+        }
+      }
+
+      let currentMarginTiers = marginTiers;
+      if (!currentMarginTiers || currentMarginTiers.length === 0) {
+        if (currentPricingSettings?.id) {
+          try {
+            const res = await fetch(`/api/pricing/margin-tiers/${currentPricingSettings.id}`);
+            if (res.ok) currentMarginTiers = await res.json();
+          } catch (e) {
+            console.warn('Margin tiers fetch failed', e);
+          }
+        }
       }
 
       for (const item of itemsArray) {
@@ -961,15 +983,19 @@ export default function VendorBudgets() {
           const genCustomVal = item.hasGeneralCustomization ? toNumber(item.generalCustomizationValue) : 0;
           const totalCostBase = item.costPrice + customVal + genCustomVal;
 
-          const priceCalc = calcPriceFromCost(totalCostBase, budgetRevenue, pricingSettings, marginTiers);
-          item.minimumPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
-
-          // Fallback: se pricingSettings não carregou e minimumPrice ficou 0, usar fórmula com defaults
-          if (item.minimumPrice <= 0) {
-            // Defaults: 9% imposto, 15% comissão, 20% margem mínima = divisor 0.56
-            const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20;
-            item.minimumPrice = Math.round((totalCostBase / fallbackDivisor) * 100) / 100;
+          let finalMinPrice = 0;
+          if (currentPricingSettings) {
+            const priceCalc = calcPriceFromCost(totalCostBase, budgetRevenue, currentPricingSettings, currentMarginTiers);
+            finalMinPrice = Math.round(priceCalc.minimumPrice * 100) / 100;
           }
+
+          // Fallback brutal caso a api de pricing falhe, esteja indefinida ou retorne margin 0
+          if (!finalMinPrice || finalMinPrice <= 0 || Number.isNaN(finalMinPrice)) {
+            const fallbackDivisor = 1 - 0.09 - 0.15 - 0.20; // 0.56
+            finalMinPrice = Math.round((totalCostBase / fallbackDivisor) * 100) / 100;
+          }
+
+          item.minimumPrice = finalMinPrice;
         }
       }
 
