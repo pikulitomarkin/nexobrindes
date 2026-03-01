@@ -1034,7 +1034,8 @@ export default function AdminBudgets() {
         }
 
         const product = products.find((p: any) => p.id === item.productId);
-        const costPrice = product ? parseFloat(product.costPrice) || 0 : 0;
+        // Usar o costPrice anexado do db, senão usar o do array de produtos paginado
+        const costPrice = Number(item.costPrice) || (item.product ? Number(item.product.costPrice) : 0) || (product ? Number(product.costPrice) || 0 : 0);
 
         const unitPrice = toNumber(item.unitPrice);
 
@@ -1648,6 +1649,15 @@ export default function AdminBudgets() {
                               onCustomizationValueChange={(value) => updateAdminBudgetItem(index, 'itemCustomizationValue', value)}
                               customizationDescription={item.itemCustomizationDescription || ''}
                               onCustomizationDescriptionChange={(description) => updateAdminBudgetItem(index, 'itemCustomizationDescription', description)}
+                              onValidationError={(msg) => {
+                                if (msg) {
+                                  toast({
+                                    title: "Validação da Personalização",
+                                    description: msg,
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
                             />
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

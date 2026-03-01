@@ -520,7 +520,7 @@ export default function VendorOrders() {
       const response = await fetch(`/api/orders/${order.id}`);
       if (!response.ok) throw new Error('Erro ao buscar pedido');
       const fullOrder = await response.json();
-      
+
       console.log('Order items:', fullOrder.items);
 
       // Pre-populate form with existing order data
@@ -537,57 +537,57 @@ export default function VendorOrders() {
         deliveryDeadline: fullOrder.deliveryDeadline ? new Date(fullOrder.deliveryDeadline).toISOString().split('T')[0] : "",
         deliveryType: fullOrder.deliveryType || "delivery",
         items: fullOrder.items?.map((item: any) => {
-        // Ensure producerId is correctly mapped
-        let producerId = item.producerId;
+          // Ensure producerId is correctly mapped
+          let producerId = item.producerId;
 
-        // If producerId is missing, try to find it from the product
-        if (!producerId && item.productId) {
-          const product = products.find((p: any) => p.id === item.productId);
-          producerId = product?.producerId || 'internal';
-        }
+          // If producerId is missing, try to find it from the product
+          if (!producerId && item.productId) {
+            const product = products.find((p: any) => p.id === item.productId);
+            producerId = product?.producerId || 'internal';
+          }
 
-        // Default to 'internal' if still not found
-        if (!producerId) {
-          producerId = 'internal';
-        }
+          // Default to 'internal' if still not found
+          if (!producerId) {
+            producerId = 'internal';
+          }
 
-        console.log(`Mapping item ${item.productName}: producerId=${producerId}`);
+          console.log(`Mapping item ${item.productName}: producerId=${producerId}`);
 
-        return {
-          productId: item.productId,
-          productName: item.productName || item.product?.name || 'Produto não encontrado',
-          producerId: producerId,
-          quantity: parseInt(item.quantity) || 1,
-          unitPrice: parseFloat(item.unitPrice) || 0,
-          totalPrice: parseFloat(item.totalPrice) || 0,
-          hasItemCustomization: item.hasItemCustomization || false,
-          selectedCustomizationId: item.selectedCustomizationId || "",
-          itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
-          itemCustomizationDescription: item.itemCustomizationDescription || "",
-          additionalCustomizationNotes: item.additionalCustomizationNotes || "",
-          customizationPhoto: item.customizationPhoto || "",
-          hasGeneralCustomization: item.hasGeneralCustomization || false,
-          generalCustomizationName: item.generalCustomizationName || "",
-          generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
-          productWidth: item.productWidth || "",
-          productHeight: item.productHeight || "",
-          productDepth: item.productDepth || "",
-          hasItemDiscount: item.hasItemDiscount || false,
-          itemDiscountType: item.itemDiscountType || "percentage",
-          itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
-          itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
-        };
-      }) || [],
-      paymentMethodId: fullOrder.paymentInfo?.paymentMethodId || fullOrder.paymentMethodId || "",
-      shippingMethodId: fullOrder.paymentInfo?.shippingMethodId || fullOrder.shippingMethodId || "",
-      installments: Number(fullOrder.paymentInfo?.installments ?? fullOrder.installments ?? 1),
-      downPayment: Number(fullOrder.paymentInfo?.downPayment ?? fullOrder.downPayment ?? 0),
-      remainingAmount: Number(fullOrder.paymentInfo?.remainingAmount ?? fullOrder.remainingAmount ?? 0),
-      shippingCost: Number(fullOrder.paymentInfo?.shippingCost ?? fullOrder.shippingCost ?? 0),
-      hasDiscount: Boolean(fullOrder.hasDiscount),
-      discountType: fullOrder.discountType || "percentage",
-      discountPercentage: Number(fullOrder.discountPercentage ?? 0),
-      discountValue: Number(fullOrder.discountValue ?? 0)
+          return {
+            productId: item.productId,
+            productName: item.productName || item.product?.name || 'Produto não encontrado',
+            producerId: producerId,
+            quantity: parseInt(item.quantity) || 1,
+            unitPrice: parseFloat(item.unitPrice) || 0,
+            totalPrice: parseFloat(item.totalPrice) || 0,
+            hasItemCustomization: item.hasItemCustomization || false,
+            selectedCustomizationId: item.selectedCustomizationId || "",
+            itemCustomizationValue: parseFloat(item.itemCustomizationValue || 0),
+            itemCustomizationDescription: item.itemCustomizationDescription || "",
+            additionalCustomizationNotes: item.additionalCustomizationNotes || "",
+            customizationPhoto: item.customizationPhoto || "",
+            hasGeneralCustomization: item.hasGeneralCustomization || false,
+            generalCustomizationName: item.generalCustomizationName || "",
+            generalCustomizationValue: parseFloat(item.generalCustomizationValue || 0),
+            productWidth: item.productWidth || "",
+            productHeight: item.productHeight || "",
+            productDepth: item.productDepth || "",
+            hasItemDiscount: item.hasItemDiscount || false,
+            itemDiscountType: item.itemDiscountType || "percentage",
+            itemDiscountPercentage: parseFloat(item.itemDiscountPercentage || 0),
+            itemDiscountValue: parseFloat(item.itemDiscountValue || 0)
+          };
+        }) || [],
+        paymentMethodId: fullOrder.paymentInfo?.paymentMethodId || fullOrder.paymentMethodId || "",
+        shippingMethodId: fullOrder.paymentInfo?.shippingMethodId || fullOrder.shippingMethodId || "",
+        installments: Number(fullOrder.paymentInfo?.installments ?? fullOrder.installments ?? 1),
+        downPayment: Number(fullOrder.paymentInfo?.downPayment ?? fullOrder.downPayment ?? 0),
+        remainingAmount: Number(fullOrder.paymentInfo?.remainingAmount ?? fullOrder.remainingAmount ?? 0),
+        shippingCost: Number(fullOrder.paymentInfo?.shippingCost ?? fullOrder.shippingCost ?? 0),
+        hasDiscount: Boolean(fullOrder.hasDiscount),
+        discountType: fullOrder.discountType || "percentage",
+        discountPercentage: Number(fullOrder.discountPercentage ?? 0),
+        discountValue: Number(fullOrder.discountValue ?? 0)
       });
 
       setIsEditMode(true);
@@ -604,7 +604,7 @@ export default function VendorOrders() {
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validar produtos obrigatórios
     if (vendorOrderForm.items.length === 0) {
       toast({
@@ -849,7 +849,7 @@ export default function VendorOrders() {
                     onChange={(e) => {
                       const selectedDate = e.target.value;
                       const today = new Date().toISOString().split('T')[0];
-                      
+
                       if (selectedDate < today) {
                         toast({
                           title: "Data Inválida",
@@ -858,7 +858,7 @@ export default function VendorOrders() {
                         });
                         return;
                       }
-                      
+
                       setVendorOrderForm({ ...vendorOrderForm, deadline: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -885,13 +885,13 @@ export default function VendorOrders() {
                       try {
                         const days = parseInt(value);
                         if (isNaN(days)) return;
-                        
+
                         const today = new Date();
                         const deliveryDate = new Date(today);
                         deliveryDate.setDate(today.getDate() + days);
-                        
+
                         if (isNaN(deliveryDate.getTime())) return;
-                        
+
                         setVendorOrderForm({ ...vendorOrderForm, deliveryDeadline: deliveryDate.toISOString().split('T')[0] });
                       } catch (error) {
                         console.error('Error setting delivery deadline:', error);
@@ -1160,6 +1160,15 @@ export default function VendorOrders() {
                               onCustomizationValueChange={(value) => updateOrderItem(index, 'itemCustomizationValue', value)}
                               customizationDescription={item.itemCustomizationDescription || ''}
                               onCustomizationDescriptionChange={(description) => updateOrderItem(index, 'itemCustomizationDescription', description)}
+                              onValidationError={(msg) => {
+                                if (msg) {
+                                  toast({
+                                    title: "Validação da Personalização",
+                                    description: msg,
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
                             />
 
                             <div className="grid grid-cols-1 gap-3">
@@ -1189,7 +1198,7 @@ export default function VendorOrders() {
                               <Label>
                                 Imagem da Personalização - {item.productName}
                                 <span className="text-xs text-gray-500 ml-2">
-                                  ({item.producerId === 'internal' ? 'Produto Interno' : 
+                                  ({item.producerId === 'internal' ? 'Produto Interno' :
                                     producers?.find((p: any) => p.id === item.producerId)?.name || 'Produtor não encontrado'})
                                 </span>
                               </Label>
@@ -1198,7 +1207,7 @@ export default function VendorOrders() {
                                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                                     <div className="flex flex-col items-center justify-center pt-2 pb-2">
                                       <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                                       </svg>
                                       <p className="text-xs text-gray-500">Clique para enviar imagem</p>
                                       <p className="text-xs text-blue-600 font-medium">
@@ -1455,8 +1464,8 @@ export default function VendorOrders() {
                           }
 
                           return filteredProducts.map((product: any) => (
-                            <div 
-                              key={product.id} 
+                            <div
+                              key={product.id}
                               className="p-2 border rounded hover:bg-gray-50 cursor-pointer transition-colors"
                               onClick={() => {
                                 setSelectedProductForProducer(product);
@@ -1465,10 +1474,10 @@ export default function VendorOrders() {
                             >
                               <div className="flex items-center gap-2">
                                 {product.imageLink ? (
-                                  <img 
-                                    src={product.imageLink} 
-                                    alt={product.name} 
-                                    className="w-8 h-8 object-cover rounded" 
+                                  <img
+                                    src={product.imageLink}
+                                    alt={product.name}
+                                    className="w-8 h-8 object-cover rounded"
                                   />
                                 ) : (
                                   <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
@@ -2093,12 +2102,11 @@ export default function VendorOrders() {
                         {(order.status === 'production' || order.status === 'delayed' || order.status === 'ready' || order.status === 'shipped' || order.status === 'delivered') && (
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full ${
-                                order.status === 'delayed' ? 'bg-red-500' :
-                                order.status === 'ready' ? 'bg-yellow-500' :
-                                order.status === 'shipped' ? 'bg-blue-500' :
-                                order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
-                              }`}
+                              className={`h-2 rounded-full ${order.status === 'delayed' ? 'bg-red-500' :
+                                  order.status === 'ready' ? 'bg-yellow-500' :
+                                    order.status === 'shipped' ? 'bg-blue-500' :
+                                      order.status === 'delivered' ? 'bg-green-500' : 'bg-purple-500'
+                                }`}
                               style={{
                                 width: productionStatuses?.[order.id] ? (() => {
                                   const pStatus = productionStatuses[order.id].status;
@@ -2110,9 +2118,9 @@ export default function VendorOrders() {
                                   return '25%';
                                 })() : (
                                   order.status === 'production' ? '25%' :
-                                  order.status === 'delayed' ? '25%' :
-                                  order.status === 'ready' ? '50%' :
-                                  order.status === 'shipped' ? '75%' : '100%'
+                                    order.status === 'delayed' ? '25%' :
+                                      order.status === 'ready' ? '50%' :
+                                        order.status === 'shipped' ? '75%' : '100%'
                                 )
                               }}
                             ></div>
@@ -2538,8 +2546,8 @@ export default function VendorOrders() {
                           <label className="text-purple-600">Status:</label>
                           <p className="font-medium">{productionStatuses[selectedOrder.id]?.status === 'production' ? 'Em Produção' :
                             productionStatuses[selectedOrder.id]?.status === 'ready' ? 'Pronto' :
-                            productionStatuses[selectedOrder.id]?.status === 'shipped' ? 'Enviado' :
-                            productionStatuses[selectedOrder.id]?.status}</p>
+                              productionStatuses[selectedOrder.id]?.status === 'shipped' ? 'Enviado' :
+                                productionStatuses[selectedOrder.id]?.status}</p>
                         </div>
                       </div>
                     </CardContent>

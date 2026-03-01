@@ -3334,6 +3334,7 @@ export class MemStorage implements IStorage {
         return {
           ...item,
           productName: product?.name || 'Produto não encontrado',
+          costPrice: product?.costPrice ? parseFloat(product.costPrice.toString()) : 0,
           product: product
         };
       })

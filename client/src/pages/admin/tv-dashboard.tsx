@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
-import { 
-  TrendingUp, DollarSign, Users, Factory, 
+import {
+  TrendingUp, DollarSign, Users, Factory,
   ShoppingCart, Package, Award, Target, Activity,
   Play, Pause, Maximize, Minimize, RefreshCw, Monitor,
   ArrowUpRight, ArrowDownRight, Clock, LogOut, MapPin
@@ -125,9 +125,9 @@ const BRANCH_COLORS = ['#06D6A0', '#118AB2', '#EF476F', '#3A86FF', '#8338EC', '#
 
 const REPORT_ROTATION_INTERVAL = 15000;
 
-type ReportType = 
+type ReportType =
   | 'sales_overview'
-  | 'top_vendors' 
+  | 'top_vendors'
   | 'top_products'
   | 'monthly_revenue'
   | 'revenue_by_state'
@@ -272,7 +272,7 @@ export default function TvDashboard() {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
-  
+
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
@@ -317,17 +317,17 @@ export default function TvDashboard() {
   confirmedSales.forEach((sale: any) => {
     const items = sale.budgetItems && Array.isArray(sale.budgetItems) ? sale.budgetItems : [];
     const productsInOrder = new Set<string>();
-    
+
     items.forEach((item: any) => {
       const productName = item.productName || 'Produto';
       const imageUrl = item.imageLink || '';
-      
+
       if (!productsInOrder.has(productName)) {
         productsInOrder.add(productName);
         if (!productSalesMap[productName]) {
-          productSalesMap[productName] = { 
-            name: productName, 
-            quantidade: 0, 
+          productSalesMap[productName] = {
+            name: productName,
+            quantidade: 0,
             valor: 0,
             imageUrl: imageUrl
           };
@@ -376,6 +376,8 @@ export default function TvDashboard() {
     shipped: 'Despachado',
     delayed: 'Atrasado',
     pending_acceptance: 'Aguardando Aceite',
+    admin_approved: 'Aprovado (Admin)',
+    not_approved: 'Não Aprovado',
   };
   const ordersByStatusData = Object.entries(statusCounts).map(([status, count]) => ({
     name: statusLabels[status] || status,
@@ -399,7 +401,7 @@ export default function TvDashboard() {
   const fifteenDaysAgo = new Date();
   fifteenDaysAgo.setHours(0, 0, 0, 0);
   fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-  
+
   for (let i = 0; i <= 15; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -741,10 +743,10 @@ export default function TvDashboard() {
           <div className="h-[520px] flex flex-col">
             <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
               {topProductsData.map((product, index) => (
-                <div 
-                  key={product.name} 
+                <div
+                  key={product.name}
                   className="relative bg-gradient-to-br rounded-xl p-4 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${COLORS[index % COLORS.length]}22, ${COLORS[index % COLORS.length]}44)`,
                     border: `2px solid ${COLORS[index % COLORS.length]}`
                   }}
@@ -755,8 +757,8 @@ export default function TvDashboard() {
                     {index + 1}º
                   </div>
                   {product.imageUrl ? (
-                    <img 
-                      src={product.imageUrl} 
+                    <img
+                      src={product.imageUrl}
                       alt={product.name}
                       className="w-20 h-20 object-contain rounded-lg bg-white/10 mb-2"
                       onError={(e) => {
@@ -790,14 +792,14 @@ export default function TvDashboard() {
               <AreaChart data={monthlyChartData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="mes" stroke="#9CA3AF" />
-                <YAxis tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} stroke="#9CA3AF" />
-                <Tooltip 
+                <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} stroke="#9CA3AF" />
+                <Tooltip
                   formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Faturamento']}
                   contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
                   labelStyle={{ color: '#F9FAFB' }}
@@ -915,7 +917,7 @@ export default function TvDashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   formatter={(value: any) => [value, 'Pedidos']}
                   contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
                 />
@@ -930,10 +932,10 @@ export default function TvDashboard() {
           <div className="h-[520px] flex flex-col">
             <div className="flex-1 grid grid-cols-4 gap-6 p-4">
               {topClientsData.map((client, index) => (
-                <div 
-                  key={client.name + index} 
+                <div
+                  key={client.name + index}
                   className="relative bg-gradient-to-br rounded-xl p-6 flex flex-col items-center justify-between shadow-lg transform hover:scale-105 transition-transform"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${COLORS[index % COLORS.length]}22, ${COLORS[index % COLORS.length]}44)`,
                     border: `2px solid ${COLORS[index % COLORS.length]}`
                   }}
@@ -943,7 +945,7 @@ export default function TvDashboard() {
                   >
                     {index + 1}º
                   </div>
-                  
+
                   <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-3 border-4 border-white/20">
                     <ShoppingCart className="w-10 h-10 text-white opacity-80" />
                   </div>
@@ -982,14 +984,14 @@ export default function TvDashboard() {
                 <AreaChart data={dailyChartData}>
                   <defs>
                     <linearGradient id="colorVendas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="dia" stroke="#9CA3AF" angle={-45} textAnchor="end" height={60} />
-                  <YAxis tickFormatter={(v) => `R$ ${(v/1000).toFixed(1)}k`} stroke="#9CA3AF" />
-                  <Tooltip 
+                  <YAxis tickFormatter={(v) => `R$ ${(v / 1000).toFixed(1)}k`} stroke="#9CA3AF" />
+                  <Tooltip
                     formatter={(value: any) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Vendas']}
                     contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
                     labelStyle={{ color: '#F9FAFB' }}
@@ -1003,7 +1005,7 @@ export default function TvDashboard() {
 
       case 'branch_performance':
         const maxPedidos = Math.max(...branchPerformanceData.map((b: any) => b.pedidos), 1);
-        
+
         // Detectar estados que têm filiais baseado nas cidades cadastradas
         const statesWithBranches = new Set<string>();
         branches.forEach((branch: any) => {
@@ -1053,7 +1055,7 @@ export default function TvDashboard() {
 
         // Cor opaca para estados sem filiais
         const inactiveColor = "#2D3748";
-        
+
         return (
           <div className="h-[520px] flex gap-4">
             {/* Mapa do Brasil */}
@@ -1148,7 +1150,7 @@ export default function TvDashboard() {
               </h3>
               <div className="space-y-3">
                 {branchPerformanceData.sort((a: any, b: any) => b.pedidos - a.pedidos).map((branch: any, index: number) => (
-                  <div 
+                  <div
                     key={branch.id}
                     className="bg-gray-700/50 rounded-lg p-3 border-l-4"
                     style={{ borderColor: branch.isHeadquarters ? "#F59E0B" : BRANCH_COLORS[index % BRANCH_COLORS.length] }}
@@ -1202,7 +1204,7 @@ export default function TvDashboard() {
           <Badge variant="outline" className="text-lg px-4 py-2 border-gray-600 text-gray-300">
             {currentReportIndex + 1} / {REPORT_CONFIGS.length}
           </Badge>
-          
+
           <Button
             variant="outline"
             size="lg"
@@ -1267,8 +1269,8 @@ export default function TvDashboard() {
               setCurrentReportIndex(index);
               setLastUpdate(new Date());
             }}
-            className={currentReportIndex === index 
-              ? `bg-gradient-to-r ${report.color} border-0 whitespace-nowrap` 
+            className={currentReportIndex === index
+              ? `bg-gradient-to-r ${report.color} border-0 whitespace-nowrap`
               : 'border-gray-600 text-gray-300 hover:bg-gray-800 whitespace-nowrap'
             }
           >

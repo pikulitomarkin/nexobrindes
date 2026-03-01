@@ -898,8 +898,8 @@ export default function VendorBudgets() {
 
         const unitPrice = toNumber(item.unitPrice);
         const product = products.find((p: any) => p.id === item.productId);
-        // Usar o costPrice que já vem do backend, senão usar o do array de produtos (fallback)
-        const costPrice = parseFloat(item.costPrice) || (product ? parseFloat(product.costPrice) || 0 : 0);
+        // Usar o costPrice que já vem do backend, priorizando do item (injetado) ou do objeto aninhado, senão usar o do array de produtos
+        const costPrice = Number(item.costPrice) || (item.product ? Number(item.product.costPrice) : 0) || (product ? Number(product.costPrice) || 0 : 0);
 
         // Calcular basePriceWithMargin: unitPrice salvo menos as personalizações
         const itemCustomVal = Boolean(item.hasItemCustomization) ? toNumber(item.itemCustomizationValue) : 0;
@@ -1545,6 +1545,15 @@ export default function VendorBudgets() {
                               onCustomizationValueChange={(value) => updateBudgetItem(index, 'itemCustomizationValue', value)}
                               customizationDescription={item.itemCustomizationDescription || ''}
                               onCustomizationDescriptionChange={(description) => updateBudgetItem(index, 'itemCustomizationDescription', description)}
+                              onValidationError={(msg) => {
+                                if (msg) {
+                                  toast({
+                                    title: "Validação da Personalização",
+                                    description: msg,
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
                             />
 
                             <div className="grid grid-cols-1 gap-3">
