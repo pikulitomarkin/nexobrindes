@@ -376,6 +376,7 @@ export default function TvDashboard() {
     shipped: 'Despachado',
     delayed: 'Atrasado',
     pending_acceptance: 'Aguardando Aceite',
+    awaiting_approval: 'Aguardando Aprovação',
     admin_approved: 'Aprovado (Admin)',
     not_approved: 'Não Aprovado',
   };
