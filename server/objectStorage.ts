@@ -1,7 +1,5 @@
 import { Response } from "express";
 import { randomUUID } from "crypto";
-import * as fs from "fs";
-import * as path from "path";
 
 const isReplit = process.env.REPL_ID !== undefined;
 
@@ -25,11 +23,43 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
-// Local uploads directory (will be checked lazily during upload to prevent Read-Only File System crash on Serverless)
-const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-
 export class ObjectStorageService {
+  private _dbInitialized = false;
+
   constructor() { }
+
+  private async initializeTable() {
+    if (this._dbInitialized) return;
+    try {
+      // Import pooling inside methods to ensure it loads at the right time
+      const { pool } = await import('./pgClient.js');
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS replit_object_fallback (
+          id text PRIMARY KEY,
+          mime_type text,
+          data text,
+          created_at timestamp DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      this._dbInitialized = true;
+    } catch (e) {
+      console.error("Failed to initialize object storage fallback table:", e);
+    }
+  }
+
+  private getMimeTypeFromObjectName(objectName: string): string {
+    const ext = objectName.split('.').pop()?.toLowerCase() || '';
+    const mimeTypes: Record<string, string> = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'svg': 'image/svg+xml',
+      'pdf': 'application/pdf',
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+  }
 
   async uploadBuffer(buffer: Buffer, folder: string = "uploads", originalFilename: string = ""): Promise<string> {
     try {
@@ -41,7 +71,17 @@ export class ObjectStorageService {
       console.log(`Attempting to upload: ${objectName}, size: ${buffer.length} bytes`);
 
       if (!client) {
-        throw new Error("Replit Object Storage client not initialized");
+        await this.initializeTable();
+        const { pool } = await import('./pgClient.js');
+        const mimeType = this.getMimeTypeFromObjectName(objectName);
+        const base64Data = buffer.toString('base64');
+
+        await pool.query(
+          'INSERT INTO replit_object_fallback (id, mime_type, data) VALUES ($1, $2, $3)',
+          [objectName, mimeType, base64Data]
+        );
+        console.log(`Fallback: File saved to DB as ${objectName}`);
+        return `/objects/${objectName}`;
       }
 
       const result = await client.uploadFromBytes(objectName, buffer);
@@ -60,26 +100,8 @@ export class ObjectStorageService {
       return `/objects/${objectName}`;
     } catch (error) {
       console.error("Object Storage upload error:", error);
-
-      // Fallback: try to save to local uploads folder for debugging
-      try {
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-
-        const ext = originalFilename ? `.${originalFilename.split('.').pop()}` : '';
-        const filename = `image-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`;
-        const filepath = path.join(uploadsDir, filename);
-
-        fs.writeFileSync(filepath, buffer);
-        console.log(`Fallback: File saved locally as ${filename}`);
-        return `/uploads/${filename}`;
-      } catch (fallbackError) {
-        console.error("Fallback save also failed:", fallbackError);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        throw new Error(`Upload failed completely: ${errorMessage}`);
-      }
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Upload failed completely: ${errorMessage}`);
     }
   }
 
@@ -91,18 +113,17 @@ export class ObjectStorageService {
     const objectName = objectPath.slice("/objects/".length);
 
     if (!client) {
-      throw new ObjectNotFoundError();
+      await this.initializeTable();
+      const { pool } = await import('./pgClient.js');
+      const result = await pool.query('SELECT data FROM replit_object_fallback WHERE id = $1', [objectName]);
+      if (result.rows.length === 0) throw new ObjectNotFoundError();
+      return Buffer.from(result.rows[0].data, 'base64');
     }
 
     try {
       const result = await client.downloadAsBytes(objectName);
       if (!result.ok) {
-        const errorMessage = result.error?.message || result.error?.toString() || 'Unknown download error';
-        console.error("Object Storage download failed:", {
-          objectName,
-          error: result.error,
-          errorMessage
-        });
+        console.error("Object Storage download failed:", result.error);
         throw new ObjectNotFoundError();
       }
       return result.value[0];
@@ -119,35 +140,25 @@ export class ObjectStorageService {
       }
 
       const objectName = objectPath.slice("/objects/".length);
+      let buffer: Buffer;
+      let contentType = this.getMimeTypeFromObjectName(objectName);
 
       if (!client) {
-        throw new ObjectNotFoundError();
+        await this.initializeTable();
+        const { pool } = await import('./pgClient.js');
+        const result = await pool.query('SELECT mime_type, data FROM replit_object_fallback WHERE id = $1', [objectName]);
+        if (result.rows.length === 0) throw new ObjectNotFoundError();
+
+        buffer = Buffer.from(result.rows[0].data, 'base64');
+        contentType = result.rows[0].mime_type || contentType;
+      } else {
+        const result = await client.downloadAsBytes(objectName);
+        if (!result.ok) {
+          console.error("Object Storage download failed:", result.error);
+          throw new ObjectNotFoundError();
+        }
+        buffer = result.value[0];
       }
-
-      const result = await client.downloadAsBytes(objectName);
-      if (!result.ok) {
-        const errorMessage = result.error?.message || result.error?.toString() || 'Unknown download error';
-        console.error("Object Storage download failed:", {
-          objectName,
-          error: result.error,
-          errorMessage
-        });
-        throw new ObjectNotFoundError();
-      }
-
-      const buffer = result.value[0];
-
-      const ext = objectName.split('.').pop()?.toLowerCase() || '';
-      const mimeTypes: Record<string, string> = {
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'png': 'image/png',
-        'gif': 'image/gif',
-        'webp': 'image/webp',
-        'svg': 'image/svg+xml',
-        'pdf': 'application/pdf',
-      };
-      const contentType = mimeTypes[ext] || 'application/octet-stream';
 
       res.set({
         "Content-Type": contentType,
@@ -172,10 +183,15 @@ export class ObjectStorageService {
       if (!objectPath.startsWith("/objects/")) {
         return false;
       }
-
-      if (!client) return false;
-
       const objectName = objectPath.slice("/objects/".length);
+
+      if (!client) {
+        await this.initializeTable();
+        const { pool } = await import('./pgClient.js');
+        const result = await pool.query('DELETE FROM replit_object_fallback WHERE id = $1', [objectName]);
+        return (result.rowCount || 0) > 0;
+      }
+
       const result = await client.delete(objectName);
       return result.ok;
     } catch (error) {
@@ -189,10 +205,15 @@ export class ObjectStorageService {
       if (!objectPath.startsWith("/objects/")) {
         return false;
       }
-
-      if (!client) return false;
-
       const objectName = objectPath.slice("/objects/".length);
+
+      if (!client) {
+        await this.initializeTable();
+        const { pool } = await import('./pgClient.js');
+        const result = await pool.query('SELECT 1 FROM replit_object_fallback WHERE id = $1', [objectName]);
+        return result.rows.length > 0;
+      }
+
       const result = await client.exists(objectName);
       return result.ok && result.value;
     } catch (error) {
