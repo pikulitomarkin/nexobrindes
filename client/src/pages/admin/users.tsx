@@ -214,37 +214,27 @@ export default function AdminUsers() {
   // Mutations
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
-      // First create the user
-      const userResponse = await fetch("/api/users", {
+      const payload = {
+        userCode: data.username,
+        password: data.password,
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        whatsapp: data.whatsapp || null,
+        cpfCnpj: data.cpfCnpj || null,
+        address: data.address || null,
+        vendorId: data.vendorId || null,
+      };
+      const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          role: "client"
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!userResponse.ok) throw new Error("Erro ao criar usuário cliente");
-
-      const user = await userResponse.json();
-
-      // Then create client profile
-      const clientResponse = await fetch("/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          whatsapp: data.whatsapp,
-          cpfCnpj: data.cpfCnpj,
-          address: data.address,
-          vendorId: data.vendorId,
-        }),
-      });
-
-      if (!clientResponse.ok) throw new Error("Erro ao criar perfil do cliente");
-      return user;
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Erro ao criar cliente");
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -256,6 +246,9 @@ export default function AdminUsers() {
         title: "Sucesso!",
         description: "Cliente criado com sucesso",
       });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 
