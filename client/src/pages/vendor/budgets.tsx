@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function VendorBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const openingForEditRef = useRef(false);
   const [editingDescriptionIndex, setEditingDescriptionIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
@@ -1020,6 +1021,11 @@ export default function VendorBudgets() {
       // Remaining amount excludes shipping - shipping is paid upfront with down payment
       const newRemainingAmount = Math.max(0, subtotalItems - newDownPayment);
 
+      // Marcar modo edição e ref ANTES de abrir o dialog para evitar reset no onOpenChange (closure pode estar desatualizada)
+      setIsEditMode(true);
+      setEditingBudgetId(budget.id);
+      openingForEditRef.current = true;
+
       setVendorBudgetForm({
         title: fullBudget.title,
         description: fullBudget.description || "",
@@ -1045,8 +1051,6 @@ export default function VendorBudgets() {
         discountValue: toNumber(fullBudget.discountValue)
       });
 
-      setIsEditMode(true);
-      setEditingBudgetId(budget.id);
       setIsBudgetDialogOpen(true);
 
       // Avisar o usuário se existir algum item abaixo do mínimo já carregado
@@ -1245,11 +1249,17 @@ export default function VendorBudgets() {
         </div>
         <Dialog open={isBudgetDialogOpen} onOpenChange={(open) => {
           setIsBudgetDialogOpen(open);
-          if (open && !isEditMode) {
-            // Reset form when opening for new budget
+          if (open && !editingBudgetId && !openingForEditRef.current) {
+            // Só reseta ao abrir para novo orçamento (não edição)
+            // openingForEditRef evita reset quando onOpenChange roda com closure desatualizada
             resetBudgetForm();
             setBudgetProductSearch("");
             setBudgetCategoryFilter("all");
+          }
+          if (open) openingForEditRef.current = false; // Limpar após abrir
+          if (!open) {
+            setIsEditMode(false);
+            setEditingBudgetId(null);
           }
         }}>
           <DialogTrigger asChild>
@@ -2176,10 +2186,11 @@ export default function VendorBudgets() {
                       </div>
                       <div>
                         <Label>Prazo Estimado de Entrega</Label>
-                        <Input
-                          placeholder="Ex: 15 dias"
+                        <DateInput
                           value={vendorBudgetForm.deliveryDeadline}
-                          onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: e.target.value })}
+                          onChange={(v) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: v })}
+                          placeholder="DD/MM/AAAA"
+                          showCalendar={true}
                         />
                       </div>
                     </div>

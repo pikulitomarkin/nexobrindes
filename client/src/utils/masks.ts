@@ -17,14 +17,15 @@ export const formatPhoneForDisplay = (value: string | null | undefined): string 
   return phoneMask(value.replace(/\D/g, ''));
 };
 
-// Função para aplicar máscara de valor monetário
+// Função para aplicar máscara de valor monetário (formato BR: vírgula para centavos)
 export const currencyMask = (value: string): string => {
   if (!value) return '';
   
-  // Remove tudo exceto números e vírgula
-  let numbers = value.replace(/[^\d,]/g, '');
+  // Aceita vírgula ou ponto como separador decimal (converte ponto para vírgula)
+  const normalized = value.replace(/\.(?=\d{1,2}$)/, ',');
+  let numbers = normalized.replace(/[^\d,]/g, '');
   
-  // Garante apenas uma vírgula
+  // Garante apenas uma vírgula (decimal)
   const parts = numbers.split(',');
   if (parts.length > 2) {
     numbers = parts[0] + ',' + parts.slice(1).join('');
@@ -42,12 +43,25 @@ export const currencyMask = (value: string): string => {
   return 'R$ ' + finalParts.join(',');
 };
 
-// Função para converter valor com máscara para número
+// Função para converter valor com máscara para número (aceita BR: 1.234,56 ou 5,50 ou 5.50)
 export const parseCurrencyValue = (value: string): number => {
   if (!value) return 0;
   
-  // Remove R$, pontos e espaços, substitui vírgula por ponto
-  const cleanValue = value.replace(/[R$\s.]/g, '').replace(',', '.');
+  let cleanValue: string;
+  const withoutPrefix = value.replace(/[R$\s]/g, '');
+  const hasComma = withoutPrefix.includes(',');
+  const hasDot = withoutPrefix.includes('.');
+  
+  if (hasComma) {
+    // Formato BR: vírgula é decimal; pontos são milhares
+    cleanValue = withoutPrefix.replace(/\./g, '').replace(',', '.');
+  } else if (hasDot && /\.\d{1,2}$/.test(withoutPrefix)) {
+    // Ponto como decimal (ex: 5.50) - já está no formato para parseFloat
+    cleanValue = withoutPrefix;
+  } else {
+    // Sem separador decimal ou ponto como milhar
+    cleanValue = withoutPrefix.replace(/\./g, '');
+  }
   
   return parseFloat(cleanValue) || 0;
 };

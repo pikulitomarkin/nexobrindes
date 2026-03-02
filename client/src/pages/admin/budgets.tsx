@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export default function AdminBudgets() {
   const [budgetCategoryFilter, setBudgetCategoryFilter] = useState("all");
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const openingForEditRef = useRef(false);
   const [editingDescriptionIndex, setEditingDescriptionIndex] = useState<number | null>(null);
   const [viewBudgetDialogOpen, setViewBudgetDialogOpen] = useState(false);
   const [budgetToView, setBudgetToView] = useState<any>(null);
@@ -1153,6 +1154,11 @@ export default function AdminBudgets() {
       // Remaining amount excludes shipping - shipping is paid upfront with down payment
       const newRemainingAmount = Math.max(0, subtotalItems - newDownPayment);
 
+      // Marcar modo edição e ref ANTES de abrir o dialog para evitar reset no onOpenChange (closure pode estar desatualizada)
+      setIsEditMode(true);
+      setEditingBudgetId(budget.id);
+      openingForEditRef.current = true;
+
       setAdminBudgetForm({
         title: fullBudget.title,
         description: fullBudget.description || "",
@@ -1179,8 +1185,6 @@ export default function AdminBudgets() {
         discountValue: toNumber(fullBudget.discountValue)
       });
 
-      setIsEditMode(true);
-      setEditingBudgetId(budget.id);
       setIsCreateDialogOpen(true);
     } catch (error) {
       toast({
@@ -1335,11 +1339,17 @@ export default function AdminBudgets() {
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
-          if (open && !isEditMode) {
-            // Reset form when opening for new budget
+          if (open && !editingBudgetId && !openingForEditRef.current) {
+            // Só reseta ao abrir para novo orçamento (não edição)
+            // openingForEditRef evita reset quando onOpenChange roda com closure desatualizada
             resetAdminBudgetForm();
             setBudgetProductSearch("");
             setBudgetCategoryFilter("all");
+          }
+          if (open) openingForEditRef.current = false; // Limpar após abrir
+          if (!open) {
+            setIsEditMode(false);
+            setEditingBudgetId(null);
           }
         }}>
           <DialogTrigger asChild>
@@ -2261,10 +2271,11 @@ export default function AdminBudgets() {
                       </div>
                       <div>
                         <Label>Prazo Estimado de Entrega</Label>
-                        <Input
-                          placeholder="Ex: 15 dias"
+                        <DateInput
                           value={adminBudgetForm.deliveryDeadline}
-                          onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: e.target.value })}
+                          onChange={(v) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: v })}
+                          placeholder="DD/MM/AAAA"
+                          showCalendar={true}
                         />
                       </div>
                     </div>

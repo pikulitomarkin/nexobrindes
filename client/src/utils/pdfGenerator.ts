@@ -568,6 +568,7 @@ export class PDFGenerator {
     // Calculate subtotal
     const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
     const shippingCost = parseFloat(data.budget.shippingCost || '0');
+    const interestValue = parseFloat(data.budget.interestValue || '0');
 
     // Caixa de resumo financeiro - alinhada à direita
     const boxWidth = 85;
@@ -577,6 +578,7 @@ export class PDFGenerator {
     let linesCount = 2; // Subtotal + Total
     if (data.budget.hasDiscount) linesCount++;
     if (shippingCost > 0) linesCount++;
+    if (interestValue > 0) linesCount++;
     const boxHeight = linesCount * lineHeight + 18;
 
     // Borda da caixa
@@ -620,6 +622,13 @@ export class PDFGenerator {
       boxY += lineHeight;
     }
 
+    // Juros (cartão) se existir
+    if (interestValue > 0) {
+      this.doc.text('Juros:', labelX, boxY);
+      this.doc.text(`+ R$ ${interestValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, valueX, boxY, { align: 'right' });
+      boxY += lineHeight;
+    }
+
     // Linha separadora dentro da caixa
     this.doc.setDrawColor(200, 200, 200);
     this.doc.setLineWidth(0.3);
@@ -627,7 +636,7 @@ export class PDFGenerator {
     boxY += 3;
 
     // Total
-    const finalTotal = subtotal - discountAmount + shippingCost;
+    const finalTotal = subtotal - discountAmount + shippingCost + interestValue;
     this.doc.setFontSize(11);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(30, 30, 30);
@@ -684,18 +693,26 @@ export class PDFGenerator {
 
             this.doc.setFont('helvetica', 'bold');
             this.doc.setTextColor(80, 80, 80);
-            this.doc.text('Restante:', this.margin, this.currentY);
+            this.doc.text('Valor Restante:', this.margin, this.currentY);
             this.doc.setFont('helvetica', 'normal');
             this.doc.setTextColor(30, 30, 30);
 
-            // Recalculating actual remaining extracting standard fixed shipping logic
-            const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
-            const discountA = data.budget.hasDiscount ?
-              (data.budget.discountType === 'percentage' ? (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100 : parseFloat(data.budget.discountValue || '0')) : 0;
-            const totalComDesconto = subtotal - discountA;
-            const actualRemaining = totalComDesconto - parseFloat(data.budget.downPayment);
+            // Usar remainingAmount do servidor quando disponível; senão calcular corretamente (subtotal - desconto + frete + juros - entrada)
+            const savedRemaining = parseFloat(data.budget.remainingAmount || '0');
+            let displayRemaining: number;
+            if (savedRemaining > 0) {
+              displayRemaining = savedRemaining;
+            } else {
+              const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+              const discountA = data.budget.hasDiscount ?
+                (data.budget.discountType === 'percentage' ? (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100 : parseFloat(data.budget.discountValue || '0')) : 0;
+              const shipping = parseFloat(data.budget.shippingCost || '0');
+              const interest = parseFloat(data.budget.interestValue || '0');
+              const totalFinal = subtotal - discountA + shipping + interest;
+              displayRemaining = Math.max(0, totalFinal - parseFloat(data.budget.downPayment));
+            }
 
-            this.doc.text(`R$ ${actualRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
+            this.doc.text(`R$ ${displayRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
             this.currentY += 6;
           }
         }

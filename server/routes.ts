@@ -1011,7 +1011,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           installments: paymentInfo?.installments || 1,
           downPayment: paymentInfo?.downPayment || "0.00",
           remainingAmount: paymentInfo?.remainingAmount || "0.00",
-          shippingCost: paymentInfo?.shippingCost || "0.00"
+          shippingCost: paymentInfo?.shippingCost || "0.00",
+          interestRate: paymentInfo?.interestRate || null,
+          interestValue: paymentInfo?.interestValue || "0.00"
         },
         branch: branchInfo,
         items: enrichedItems,
@@ -8848,7 +8850,9 @@ Para mais detalhes, entre em contato conosco!`;
           installments: paymentInfo?.installments || 1,
           downPayment: paymentInfo?.downPayment || "0.00",
           remainingAmount: paymentInfo?.remainingAmount || "0.00",
-          shippingCost: paymentInfo?.shippingCost || "0.00"
+          shippingCost: paymentInfo?.shippingCost || "0.00",
+          interestRate: paymentInfo?.interestRate || null,
+          interestValue: paymentInfo?.interestValue || "0.00"
         },
         branch: branchInfo,
         items: enrichedItems,
@@ -9734,16 +9738,22 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid but not yet fully sent to production
-      // ONLY show orders with productStatus = 'in_store' (ready for production)
+      // Show paid orders when: (a) product in store, OR (b) has minimum payment (entrada+frete)
+      // BUG #6 fix: pedido pago deve ir para logística - não exigir in_store quando já tem pagamento mínimo
       const paidOrders = orders.filter(order => {
         // Check payment status - order must have received some payment
         const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0; // Any payment received
 
-        // For dropshipping workflow: only show orders with product in store
+        const downPayment = parseFloat(order.downPayment || '0');
+        const shippingCost = parseFloat(order.shippingCost || '0');
+        const hasMinimumPayment = paidValue >= (downPayment + shippingCost) || paidValue >= totalValue;
+
         const productStatus = order.productStatus || 'to_buy';
         const isProductInStore = productStatus === 'in_store';
+        // Mostrar quando: produto na loja OU pagamento mínimo recebido (permite fluxo pós-pagamento)
+        const readyForLogistics = isProductInStore || hasMinimumPayment;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -9773,9 +9783,9 @@ Para mais detalhes, entre em contato conosco!`;
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
 
-        // Order is valid if it's paid, has external producers, NOT ALL producers have been sent POs yet, AND product is in store
+        // Order is valid if it's paid, has external producers, NOT ALL producers have been sent POs yet, AND ready for logistics
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
-        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs && isProductInStore;
+        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs && readyForLogistics;
 
         if (isValid) {
           console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);

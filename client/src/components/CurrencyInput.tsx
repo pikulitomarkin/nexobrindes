@@ -11,10 +11,11 @@ interface CurrencyInputProps extends Omit<React.ComponentProps<typeof Input>, "v
  * Input monetário que aceita centavos no formato brasileiro (vírgula).
  * Preserva "5," durante a digitação para permitir "5,50".
  */
-export function CurrencyInput({ value, onChange, placeholder = "0,00", ...props }: CurrencyInputProps) {
+export function CurrencyInput({ value, onChange, placeholder = "0,00", maxLength, ...props }: CurrencyInputProps) {
   const [localDisplay, setLocalDisplay] = useState<string | null>(null);
   const isFocusedRef = useRef(false);
 
+  // Nunca limitar caracteres - valores monetários podem ser longos (ex: R$ 1.234,56)
   const displayValue = localDisplay ?? (value > 0 ? formatCurrencyForInput(value) : "");
 
   useEffect(() => {
@@ -30,8 +31,12 @@ export function CurrencyInput({ value, onChange, placeholder = "0,00", ...props 
     const clean = raw.replace(/[R$\s.]/g, "");
     const parts = clean.split(",");
 
-    // Preserva estado intermediário: "5," ou "5,0" (usuário digitando centavos)
-    if (parts.length === 2 && parts[1].length < 2) {
+    // Preserva estado intermediário para permitir digitar centavos:
+    // - "5" (sem vírgula ainda, usuário pode digitar ",50")
+    // - "5," ou "5,0" ou "5,5" (digitando centavos)
+    const hasIncompleteDecimals = parts.length === 2 && parts[1].length < 2;
+    const hasOnlyInteger = parts.length === 1 && clean.length > 0;
+    if (hasIncompleteDecimals || hasOnlyInteger) {
       setLocalDisplay(masked);
       return;
     }
