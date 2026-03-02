@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { ShoppingCart, Clock, CheckCircle, Package, LogOut, Eye, User, CreditCard, Calendar, Phone, Mail, Filter } from "lucide-react";
@@ -180,19 +181,17 @@ export default function ClientDashboard() {
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">De:</span>
-                    <Input
-                      type="date"
+                    <DateInput
                       value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      onChange={setCustomStartDate}
                       className="w-40"
                     />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">Até:</span>
-                    <Input
-                      type="date"
+                    <DateInput
                       value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      onChange={setCustomEndDate}
                       className="w-40"
                     />
                   </div>

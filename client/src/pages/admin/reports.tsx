@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -785,30 +786,22 @@ export default function AdminReports() {
               <>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Data Inicial</label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={dateRange?.from ? dateRange.from.toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      const newDate = new Date(e.target.value);
-                      setDateRange(prev => ({
-                        from: newDate,
-                        to: prev?.to || new Date()
-                      }));
-                    }}
+                    onChange={(iso) => setDateRange(prev => ({
+                      from: new Date(iso + 'T12:00:00'),
+                      to: prev?.to || new Date(iso + 'T12:00:00')
+                    }))}
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Data Final</label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={dateRange?.to ? dateRange.to.toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      const newDate = new Date(e.target.value);
-                      setDateRange(prev => ({
-                        from: prev?.from || new Date(),
-                        to: newDate
-                      }));
-                    }}
+                    onChange={(iso) => setDateRange(prev => ({
+                      from: prev?.from || new Date(iso + 'T12:00:00'),
+                      to: new Date(iso + 'T12:00:00')
+                    }))}
                   />
                 </div>
               </>

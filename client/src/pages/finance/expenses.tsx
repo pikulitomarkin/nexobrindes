@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -179,11 +180,10 @@ export default function FinanceExpenses() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="expense-date">Data <span className="text-red-500">*</span></Label>
-                  <Input
+                  <DateInput
                     id="expense-date"
-                    type="date"
                     value={expenseData.date}
-                    onChange={(e) => setExpenseData(prev => ({ ...prev, date: e.target.value }))}
+                    onChange={(date) => setExpenseData(prev => ({ ...prev, date }))}
                   />
                 </div>
                 <div>

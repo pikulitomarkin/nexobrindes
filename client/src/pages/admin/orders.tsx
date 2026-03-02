@@ -27,7 +27,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Eye, Edit, Send, Package, AlertCircle, Check, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { phoneMask, currencyMask, parseCurrencyValue, formatCurrencyForInput } from "@/utils/masks";
+import { currencyMask, parseCurrencyValue, formatCurrencyForInput } from "@/utils/masks";
+import { CurrencyInput } from "@/components/CurrencyInput";
+import { DateInput } from "@/components/DateInput";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export default function AdminOrders() {
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
@@ -580,12 +583,10 @@ export default function AdminOrders() {
                     </div>
                     <div>
                       <Label htmlFor="edit-contact-phone">Telefone</Label>
-                      <Input
+                      <PhoneInput
                         id="edit-contact-phone"
                         value={editingOrder.contactPhone || ""}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, contactPhone: phoneMask(e.target.value) })}
-                        placeholder="(11) 99999-9999"
-                        maxLength={15}
+                        onChange={(v) => setEditingOrder({ ...editingOrder, contactPhone: v })}
                       />
                     </div>
                     <div>
@@ -618,13 +619,10 @@ export default function AdminOrders() {
                     </div>
                     <div>
                       <Label htmlFor="edit-downPayment">Valor de Entrada (R$)</Label>
-                      <Input
+                      <CurrencyInput
                         id="edit-downPayment"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={parseFloat(editingOrder.downPayment || "0").toFixed(2)}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, downPayment: e.target.value })}
+                        value={parseFloat(editingOrder.downPayment || "0")}
+                        onChange={(downPayment) => setEditingOrder({ ...editingOrder, downPayment })}
                       />
                     </div>
                     <div>
@@ -685,11 +683,10 @@ export default function AdminOrders() {
                     </div>
                     <div>
                       <Label htmlFor="edit-deadline">Prazo de Entrega</Label>
-                      <Input
+                      <DateInput
                         id="edit-deadline"
-                        type="date"
                         value={editingOrder.deadline ? new Date(editingOrder.deadline).toISOString().split('T')[0] : ""}
-                        onChange={(e) => setEditingOrder({ ...editingOrder, deadline: e.target.value ? new Date(e.target.value) : null })}
+                        onChange={(iso) => setEditingOrder({ ...editingOrder, deadline: iso ? new Date(iso + "T12:00:00") : null })}
                       />
                     </div>
                   </div>
@@ -706,18 +703,10 @@ export default function AdminOrders() {
                 ) : (
                   <div>
                     <Label htmlFor="edit-shipping-cost">Custo do Frete</Label>
-                    <Input
+                    <CurrencyInput
                       id="edit-shipping-cost"
-                      value={formatCurrencyForInput(parseFloat(editingOrder.shippingCost) || 0)}
-                      onChange={(e) => {
-                        const rawValue = e.target.value;
-                        if (rawValue === '' || rawValue === 'R$ ') {
-                          setEditingOrder({ ...editingOrder, shippingCost: 0 });
-                        } else {
-                          const shippingCost = parseCurrencyValue(rawValue);
-                          setEditingOrder({ ...editingOrder, shippingCost });
-                        }
-                      }}
+                      value={parseFloat(editingOrder.shippingCost) || 0}
+                      onChange={(shippingCost) => setEditingOrder({ ...editingOrder, shippingCost })}
                       placeholder="R$ 0,00"
                     />
                   </div>

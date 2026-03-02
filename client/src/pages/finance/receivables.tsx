@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -439,11 +440,10 @@ export default function FinanceReceivables() {
                     </div>
                     <div>
                       <Label htmlFor="due-date">Data de Vencimento *</Label>
-                      <Input
+                      <DateInput
                         id="due-date"
-                        type="date"
                         value={newReceivableData.dueDate}
-                        onChange={(e) => setNewReceivableData(prev => ({ ...prev, dueDate: e.target.value }))}
+                        onChange={(dueDate) => setNewReceivableData(prev => ({ ...prev, dueDate }))}
                       />
                     </div>
                   </div>

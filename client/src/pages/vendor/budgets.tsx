@@ -14,7 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
-import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { CurrencyInput } from "@/components/CurrencyInput";
+import { PhoneInput } from "@/components/PhoneInput";
+import { DateInput } from "@/components/DateInput";
 // Import Badge component
 import { Badge } from "@/components/ui/badge";
 import { calculatePriceFromCost as calcPriceFromCost, getProductSalePrice } from "@/lib/pricingCalc";
@@ -1285,15 +1288,12 @@ export default function VendorBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="budget-validUntil">Válido Até *</Label>
-                  <Input
+                  <DateInput
                     id="budget-validUntil"
-                    type="date"
                     value={vendorBudgetForm.validUntil}
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
+                    onChange={(selectedDate) => {
                       const today = new Date().toISOString().split('T')[0];
-
-                      if (selectedDate < today) {
+                      if (selectedDate && selectedDate < today) {
                         toast({
                           title: "Data Inválida",
                           description: "A data 'Válido Até' não pode ser anterior à data de hoje.",
@@ -1301,7 +1301,6 @@ export default function VendorBudgets() {
                         });
                         return;
                       }
-
                       setVendorBudgetForm({ ...vendorBudgetForm, validUntil: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -1427,12 +1426,10 @@ export default function VendorBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="budget-contact-phone">Telefone</Label>
-                  <Input
+                  <PhoneInput
                     id="budget-contact-phone"
                     value={vendorBudgetForm.contactPhone}
-                    onChange={(e) => setVendorBudgetForm({ ...vendorBudgetForm, contactPhone: phoneMask(e.target.value) })}
-                    placeholder="(11) 99999-9999"
-                    maxLength={15}
+                    onChange={(v) => setVendorBudgetForm({ ...vendorBudgetForm, contactPhone: v })}
                   />
                 </div>
                 <div>
@@ -1592,12 +1589,9 @@ export default function VendorBudgets() {
                             <div className="grid grid-cols-1 gap-3">
                               <div>
                                 <Label>Valor Unitário (R$)</Label>
-                                <Input
-                                  value={item.itemCustomizationValue > 0 ? currencyMask(item.itemCustomizationValue.toString().replace('.', ',')) : ''}
-                                  onChange={(e) => {
-                                    const value = parseCurrencyValue(e.target.value);
-                                    updateBudgetItem(index, 'itemCustomizationValue', value);
-                                  }}
+                                <CurrencyInput
+                                  value={Number(item.itemCustomizationValue) || 0}
+                                  onChange={(value) => updateBudgetItem(index, 'itemCustomizationValue', value)}
                                   placeholder="0,00"
                                 />
                               </div>
@@ -1702,12 +1696,9 @@ export default function VendorBudgets() {
                                   </div>
                                   <div>
                                     <Label>Valor Unitário (R$)</Label>
-                                    <Input
-                                      value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
-                                      onChange={(e) => {
-                                        const value = parseCurrencyValue(e.target.value);
-                                        updateBudgetItem(index, 'generalCustomizationValue', value);
-                                      }}
+                                    <CurrencyInput
+                                      value={Number(item.generalCustomizationValue) || 0}
+                                      onChange={(value) => updateBudgetItem(index, 'generalCustomizationValue', value)}
                                       placeholder="0,00"
                                     />
                                   </div>
@@ -2121,16 +2112,10 @@ export default function VendorBudgets() {
                     <div className="space-y-3">
                       <div>
                         <Label htmlFor="down-payment">Valor de Entrada (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="down-payment"
-                          value={vendorBudgetForm.downPayment > 0 ? currencyMask(vendorBudgetForm.downPayment.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const downPayment = parseCurrencyValue(e.target.value);
-                            setVendorBudgetForm({
-                              ...vendorBudgetForm,
-                              downPayment,
-                            });
-                          }}
+                          value={Number(vendorBudgetForm.downPayment) || 0}
+                          onChange={(downPayment) => setVendorBudgetForm({ ...vendorBudgetForm, downPayment })}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2180,16 +2165,10 @@ export default function VendorBudgets() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="shipping-cost">Valor do Frete (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="shipping-cost"
-                          value={vendorBudgetForm.shippingCost > 0 ? currencyMask(vendorBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const shippingCost = parseCurrencyValue(e.target.value);
-                            setVendorBudgetForm({
-                              ...vendorBudgetForm,
-                              shippingCost,
-                            });
-                          }}
+                          value={Number(vendorBudgetForm.shippingCost) || 0}
+                          onChange={(shippingCost) => setVendorBudgetForm({ ...vendorBudgetForm, shippingCost })}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2290,21 +2269,30 @@ export default function VendorBudgets() {
                       const itemsSubtotal = vendorBudgetForm.items.reduce((total, item) => {
                         return total + (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
                       }, 0);
-                      const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
-                        const minBase = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
-                        const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                        const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
-                        const minUnitPrice = minBase + customUnit + genUnit;
-                        return total + (minUnitPrice * (parseInt(item.quantity) || 1));
-                      }, 0);
                       let discountAmt = 0;
                       if (vendorBudgetForm.discountType === 'percentage') {
                         discountAmt = (itemsSubtotal * (parseFloat(vendorBudgetForm.discountPercentage) || 0)) / 100;
                       } else {
                         discountAmt = parseFloat(vendorBudgetForm.discountValue) || 0;
                       }
+                      // Só exibir aviso quando há desconto aplicado E o total com desconto fica abaixo do mínimo
+                      if (discountAmt <= 0 || vendorBudgetForm.items.length === 0) return null;
+
+                      const minimumTotal = vendorBudgetForm.items.reduce((total, item: any) => {
+                        const hasValidMin = item.minimumPrice > 0;
+                        let minUnitPrice: number;
+                        if (hasValidMin) {
+                          const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                          const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                          minUnitPrice = item.minimumPrice + customUnit + genUnit;
+                        } else {
+                          // Sem preço mínimo definido: usar preço atual (não há restrição de mínimo)
+                          minUnitPrice = parseFloat(item.unitPrice) || 0;
+                        }
+                        return total + (minUnitPrice * (parseInt(item.quantity) || 1));
+                      }, 0);
                       const discountedTotal = itemsSubtotal - discountAmt;
-                      if (discountedTotal < minimumTotal && vendorBudgetForm.items.length > 0) {
+                      if (discountedTotal < minimumTotal) {
                         return (
                           <p className="text-xs text-orange-600 mt-1 font-semibold">
                             ⚠️ Desconto abaixo do preço mínimo - Requer autorização do administrador
@@ -3346,12 +3334,11 @@ export default function VendorBudgets() {
             {/* Input for Delivery Date */}
             <div>
               <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
-              <Input
+              <DateInput
                 id="convert-delivery-date"
-                type="date"
                 value={convertDeliveryDate}
-                onChange={(e) => setConvertDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+                onChange={setConvertDeliveryDate}
+                min={new Date().toISOString().split('T')[0]}
               />
             </div>
 

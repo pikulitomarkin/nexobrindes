@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/PhoneInput";
 import { 
   Dialog,
   DialogContent,
@@ -218,7 +219,7 @@ export default function PartnerClients() {
                       <FormItem>
                         <FormLabel>Telefone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} data-testid="input-client-phone" />
+                          <PhoneInput {...field} data-testid="input-client-phone" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -232,7 +233,7 @@ export default function PartnerClients() {
                       <FormItem>
                         <FormLabel>WhatsApp</FormLabel>
                         <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} data-testid="input-client-whatsapp" />
+                          <PhoneInput {...field} data-testid="input-client-whatsapp" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

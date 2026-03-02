@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/PhoneInput";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { User, Lock, MapPin, Phone, Mail, Eye, EyeOff, Building2, FileText } from "lucide-react";
@@ -379,11 +380,10 @@ export default function ClientProfile() {
                       <Label htmlFor="phone">Telefone</Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
+                        <PhoneInput
                           id="phone"
                           value={profileForm.phone}
-                          onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                          placeholder="(11) 99999-9999"
+                          onChange={(v) => setProfileForm({ ...profileForm, phone: v })}
                           className="pl-10"
                         />
                       </div>
@@ -392,11 +392,10 @@ export default function ClientProfile() {
                       <Label htmlFor="whatsapp">WhatsApp</Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
+                        <PhoneInput
                           id="whatsapp"
                           value={profileForm.whatsapp}
-                          onChange={(e) => setProfileForm({ ...profileForm, whatsapp: e.target.value })}
-                          placeholder="(11) 99999-9999"
+                          onChange={(v) => setProfileForm({ ...profileForm, whatsapp: v })}
                           className="pl-10"
                         />
                       </div>

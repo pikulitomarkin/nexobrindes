@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/PhoneInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -735,11 +736,7 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>Telefone</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="(11) 99999-9999"
-                                {...field}
-                                data-testid="input-phone"
-                              />
+                              <PhoneInput {...field} data-testid="input-phone" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -752,11 +749,7 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>WhatsApp</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="(11) 99999-9999"
-                                {...field}
-                                data-testid="input-whatsapp"
-                              />
+                              <PhoneInput {...field} data-testid="input-whatsapp" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

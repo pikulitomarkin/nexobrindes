@@ -13,7 +13,10 @@ import { Plus, FileText, Send, Eye, Search, ShoppingCart, Calculator, Package, P
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { CustomizationSelector } from "@/components/customization-selector";
-import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { CurrencyInput } from "@/components/CurrencyInput";
+import { DateInput } from "@/components/DateInput";
+import { PhoneInput } from "@/components/PhoneInput";
 // Import Badge from shadcn/ui for the logistics dashboard
 import { Badge } from "@/components/ui/badge";
 
@@ -842,15 +845,12 @@ export default function VendorOrders() {
                 </div>
                 <div>
                   <Label htmlFor="order-deadline">Prazo de Produção *</Label>
-                  <Input
+                  <DateInput
                     id="order-deadline"
-                    type="date"
                     value={vendorOrderForm.deadline}
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
+                    onChange={(selectedDate) => {
                       const today = new Date().toISOString().split('T')[0];
-
-                      if (selectedDate < today) {
+                      if (selectedDate && selectedDate < today) {
                         toast({
                           title: "Data Inválida",
                           description: "O prazo de produção não pode ser anterior à data de hoje.",
@@ -858,7 +858,6 @@ export default function VendorOrders() {
                         });
                         return;
                       }
-
                       setVendorOrderForm({ ...vendorOrderForm, deadline: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -984,12 +983,10 @@ export default function VendorOrders() {
                 </div>
                 <div>
                   <Label htmlFor="order-contact-phone">Telefone</Label>
-                  <Input
+                  <PhoneInput
                     id="order-contact-phone"
                     value={vendorOrderForm.contactPhone}
-                    onChange={(e) => setVendorOrderForm({ ...vendorOrderForm, contactPhone: phoneMask(e.target.value) })}
-                    placeholder="(11) 99999-9999"
-                    maxLength={15}
+                    onChange={(v) => setVendorOrderForm({ ...vendorOrderForm, contactPhone: v })}
                   />
                 </div>
                 <div>
@@ -1276,13 +1273,10 @@ export default function VendorOrders() {
                                   </div>
                                   <div>
                                     <Label htmlFor={`general-customization-value-${index}`}>Valor Unitário (R$)</Label>
-                                    <Input
+                                    <CurrencyInput
                                       id={`general-customization-value-${index}`}
-                                      value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
-                                      onChange={(e) => {
-                                        const value = parseCurrencyValue(e.target.value);
-                                        updateOrderItem(index, 'generalCustomizationValue', value);
-                                      }}
+                                      value={Number(item.generalCustomizationValue) || 0}
+                                      onChange={(value) => updateOrderItem(index, 'generalCustomizationValue', value)}
                                       placeholder="R$ 0,00"
                                     />
                                   </div>
@@ -1638,11 +1632,10 @@ export default function VendorOrders() {
                     <div className="space-y-3">
                       <div>
                         <Label htmlFor="down-payment">Valor de Entrada (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="down-payment"
-                          value={vendorOrderForm.downPayment > 0 ? currencyMask(vendorOrderForm.downPayment.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const downPayment = parseCurrencyValue(e.target.value);
+                          value={Number(vendorOrderForm.downPayment) || 0}
+                          onChange={(downPayment) => {
                             const total = calculateTotalWithShipping();
                             setVendorOrderForm({
                               ...vendorOrderForm,
@@ -1699,11 +1692,10 @@ export default function VendorOrders() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="shipping-cost">Valor do Frete (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="shipping-cost"
-                          value={vendorOrderForm.shippingCost > 0 ? currencyMask(vendorOrderForm.shippingCost.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const shippingCost = parseCurrencyValue(e.target.value);
+                          value={Number(vendorOrderForm.shippingCost) || 0}
+                          onChange={(shippingCost) => {
                             const total = calculateOrderTotal() + shippingCost;
                             setVendorOrderForm({
                               ...vendorOrderForm,

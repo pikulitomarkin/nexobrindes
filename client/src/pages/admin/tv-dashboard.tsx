@@ -385,18 +385,35 @@ export default function TvDashboard() {
     value: count,
   }));
 
-  const topClientsData = clients
-    .map((client: any) => {
-      const clientSales = confirmedSales.filter((o: any) => String(o.clientId) === String(client.id));
-      return {
-        name: client.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
-        pedidos: clientSales.length,
-        valor: clientSales.reduce((sum: number, o: any) => sum + parseFloat(o.totalValue || '0'), 0),
-      };
-    })
+  // Principais Clientes: agregar por clientId (cadastrados) OU contactName (não cadastrados)
+  const clientsById = new Map(clients.map((c: any) => [String(c.id), c]));
+  const clientSalesMap: { [key: string]: { name: string; pedidos: number; valor: number } } = {};
+
+  confirmedSales.forEach((sale: any) => {
+    const clientId = sale.clientId ? String(sale.clientId) : null;
+    const contactName = (sale.contactName || '').trim() || 'Cliente não informado';
+    const clientKey = clientId || `contact:${contactName}`;
+
+    const displayName = clientId
+      ? (clientsById.get(clientId)?.name || sale.contactName || contactName)
+      : contactName;
+
+    if (!clientSalesMap[clientKey]) {
+      clientSalesMap[clientKey] = { name: displayName, pedidos: 0, valor: 0 };
+    }
+    clientSalesMap[clientKey].pedidos += 1;
+    clientSalesMap[clientKey].valor += parseFloat(sale.totalValue || '0');
+  });
+
+  const topClientsData = Object.values(clientSalesMap)
     .filter((c: any) => c.pedidos > 0)
     .sort((a: any, b: any) => b.valor - a.valor)
-    .slice(0, 8);
+    .slice(0, 8)
+    .map((c: any) => ({
+      name: c.name?.split(' ').slice(0, 2).join(' ') || 'N/A',
+      pedidos: c.pedidos,
+      valor: c.valor,
+    }));
 
   const dailySalesData: { [key: string]: number } = {};
   const fifteenDaysAgo = new Date();
@@ -931,6 +948,15 @@ export default function TvDashboard() {
       case 'top_clients':
         return (
           <div className="h-[520px] flex flex-col">
+            {topClientsData.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <Award className="h-24 w-24 mx-auto text-gray-400 mb-4" />
+                  <p className="text-2xl text-gray-400">Nenhuma venda com cliente identificado no período</p>
+                  <p className="text-gray-500 mt-2 text-sm">Orçamentos convertidos vinculados a clientes ou com nome de contato aparecerão aqui</p>
+                </div>
+              </div>
+            ) : (
             <div className="flex-1 grid grid-cols-4 gap-6 p-4">
               {topClientsData.map((client, index) => (
                 <div
@@ -967,6 +993,7 @@ export default function TvDashboard() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         );
 

@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -1501,11 +1502,10 @@ export default function FinancePayables() {
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
               <Label htmlFor="dueDate">Data de Vencimento</Label>
-              <Input
+              <DateInput
                 id="dueDate"
-                type="date"
                 value={newPayableData.dueDate}
-                onChange={(e) => setNewPayableData(prev => ({ ...prev, dueDate: e.target.value }))}
+                onChange={(dueDate) => setNewPayableData(prev => ({ ...prev, dueDate }))}
               />
             </div>
             <div className="space-y-2 col-span-2">

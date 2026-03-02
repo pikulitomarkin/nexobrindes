@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -463,11 +464,10 @@ export default function FinanceReconciliation() {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="expense-date">Data</Label>
-                  <Input
+                  <DateInput
                     id="expense-date"
-                    type="date"
                     value={expenseData.date}
-                    onChange={(e) => setExpenseData(prev => ({ ...prev, date: e.target.value }))}
+                    onChange={(date) => setExpenseData(prev => ({ ...prev, date }))}
                   />
                 </div>
                 <div>

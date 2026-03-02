@@ -11,8 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, ShoppingCart, Package, MessageSquare, Phone, Mail, Minus, Trash2, List, Grid3X3, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { phoneMask } from "@/utils/masks";
-
 interface CartItem {
   productId: string;
   productName: string;

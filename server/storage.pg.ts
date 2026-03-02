@@ -287,12 +287,19 @@ export class PgStorage implements IStorage {
       return { ...order, items: [] } as any;
     }));
 
-    // Also get converted budgets and map them to Order format
+    // Also get converted budgets that DON'T have a corresponding order (legacy data)
+    // When we convert BUD→PED, we create an order with budgetId. Including both would duplicate.
     const convertedBudgets = await pg.select().from(schema.budgets)
       .where(eq(schema.budgets.status, 'converted'))
       .orderBy(desc(schema.budgets.createdAt));
 
-    const budgetOrders = await Promise.all(convertedBudgets.map(async (budget) => {
+    const orderBudgetIds = new Set(
+      (await pg.select({ budgetId: schema.orders.budgetId }).from(schema.orders))
+        .map(o => o.budgetId).filter(Boolean) as string[]
+    );
+    const legacyConvertedBudgets = convertedBudgets.filter(b => !orderBudgetIds.has(b.id));
+
+    const budgetOrders = await Promise.all(legacyConvertedBudgets.map(async (budget) => {
       const items = await this.getBudgetItems(budget.id);
 
       // Map budget fields to order format
@@ -885,31 +892,12 @@ export class PgStorage implements IStorage {
   }
 
   async getOrdersByClient(clientId: string): Promise<Order[]> {
-    // Buscar budgets convertidos (que são os pedidos reais) pelo clientId
-    const budgetsAsOrders = await pg.select().from(schema.budgets)
-      .where(and(
-        eq(schema.budgets.clientId, clientId),
-        eq(schema.budgets.status, 'converted')
-      ))
-      .orderBy(desc(schema.budgets.createdAt));
+    // Buscar pedidos reais (PED) da tabela orders - não budgets convertidos (evita duplicação)
+    const orders = await pg.select().from(schema.orders)
+      .where(eq(schema.orders.clientId, clientId))
+      .orderBy(desc(schema.orders.createdAt));
 
-    // Mapear budgets para o formato Order
-    return budgetsAsOrders.map((b: any) => ({
-      id: b.id,
-      orderNumber: b.budgetNumber || b.id.substring(0, 8),
-      clientId: b.clientId,
-      vendorId: b.vendorId,
-      status: b.orderStatus || 'pending',
-      totalValue: b.totalValue,
-      paidValue: b.paidValue || '0',
-      createdAt: b.createdAt,
-      updatedAt: b.updatedAt,
-      branchId: b.branchId,
-      notes: b.description,
-      deliveryDate: b.deliveryDeadline,
-      shippingAddress: null,
-      refundAmount: null,
-    })) as Order[];
+    return orders as Order[];
   }
 
   // ==================== PRODUCTION ORDERS ====================
@@ -2350,16 +2338,23 @@ export class PgStorage implements IStorage {
       .orderBy(desc(schema.accountsReceivable.createdAt));
 
     // Also generate accounts receivable from converted budgets that don't have AR entries
+    // IMPORTANTE: Excluir budgets que já têm um PED (order) correspondente - senão duplica no financeiro
     const convertedBudgets = await pg.select().from(schema.budgets)
       .where(eq(schema.budgets.status, 'converted'));
+
+    const orderBudgetIds = new Set(
+      (await pg.select({ budgetId: schema.orders.budgetId }).from(schema.orders))
+        .map(o => o.budgetId).filter(Boolean) as string[]
+    );
+    const legacyConvertedBudgets = convertedBudgets.filter(b => !orderBudgetIds.has(b.id));
 
     // Get payment info for budgets
     const paymentInfos = await pg.select().from(schema.budgetPaymentInfo);
     const paymentInfoMap = new Map(paymentInfos.map(pi => [pi.budgetId, pi]));
 
-    // Create virtual AR entries for converted budgets
+    // Create virtual AR entries only for legacy converted budgets (sem PED correspondente)
     const budgetARs: AccountsReceivable[] = [];
-    for (const budget of convertedBudgets) {
+    for (const budget of legacyConvertedBudgets) {
       // Skip if already has AR entry
       if (existingAR.some(ar => ar.orderId === budget.id)) continue;
 

@@ -1516,6 +1516,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user (admin - for finance and other generic roles)
+  app.patch("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, email, phone, username } = req.body;
+
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: "Nome deve ter pelo menos 2 caracteres" });
+      }
+
+      const updatedUser = await storage.updateUser(id, {
+        name: name.trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        ...(username?.trim() && { username: username.trim() }),
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Erro ao atualizar usuário" });
+    }
+  });
+
+  // Delete user (admin - for finance and other generic roles)
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      // Block deletion of users with special roles (use their specific APIs)
+      if (["client", "vendor", "partner", "producer", "admin"].includes(user.role || "")) {
+        return res.status(400).json({
+          error: `Use a tela específica para excluir ${user.role === "client" ? "clientes" : user.role === "vendor" ? "vendedores" : user.role === "partner" ? "sócios" : user.role === "producer" ? "produtores" : "este tipo de usuário"}`
+        });
+      }
+
+      await storage.deleteUser(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Erro ao excluir usuário" });
+    }
+  });
+
   // Change user password
   app.put("/api/users/:id/change-password", async (req, res) => {
     try {
@@ -8577,9 +8631,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
+      // Regra: approved/admin_approved sempre permitem. draft permite apenas se nenhum item abaixo do mínimo.
       const allowedStatuses = ['approved', 'admin_approved'];
-      if (budget.status && !allowedStatuses.includes(budget.status)) {
-        return res.status(400).json({ error: `Orçamento com status '${budget.status}' não pode ser convertido. Status permitidos: aprovado, aprovado pelo admin.` });
+      const needsApproval = await checkBudgetNeedsApproval(id, storage);
+
+      if (budget.status && allowedStatuses.includes(budget.status)) {
+        // approved ou admin_approved: OK
+      } else if (budget.status === 'draft' && !needsApproval) {
+        // draft sem itens abaixo do mínimo: OK
+      } else if (budget.status === 'draft' && needsApproval) {
+        return res.status(400).json({
+          error: "Este orçamento possui itens com preço abaixo do mínimo. Envie para aprovação do administrador antes de converter em pedido."
+        });
+      } else if (budget.status && !allowedStatuses.includes(budget.status)) {
+        return res.status(400).json({
+          error: `Orçamento com status '${budget.status}' não pode ser convertido. Status permitidos: aprovado, aprovado pelo admin, ou rascunho (quando todos os itens estão no preço mínimo).`
+        });
       }
 
       // CRITICAL FIX: Convert deliveryDate string to Date object for Drizzle

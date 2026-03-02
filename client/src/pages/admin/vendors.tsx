@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { phoneMask } from "@/utils/masks";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const vendorFormSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -420,7 +420,7 @@ export default function AdminVendors() {
                       <FormItem>
                         <FormLabel>Telefone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(11) 99999-9999" {...field} onChange={(e) => field.onChange(phoneMask(e.target.value))} />
+                          <PhoneInput {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -966,7 +966,7 @@ export default function AdminVendors() {
                     <FormItem>
                       <FormLabel>Telefone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-9999" {...field} onChange={(e) => field.onChange(phoneMask(e.target.value))} />
+                        <PhoneInput {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

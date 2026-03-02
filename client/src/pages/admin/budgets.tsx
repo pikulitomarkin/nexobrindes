@@ -15,7 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { PDFGenerator } from "@/utils/pdfGenerator";
 import { CustomizationSelector } from "@/components/customization-selector";
-import { phoneMask, currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { currencyMask, parseCurrencyValue } from "@/utils/masks";
+import { CurrencyInput } from "@/components/CurrencyInput";
+import { DateInput } from "@/components/DateInput";
+import { PhoneInput } from "@/components/PhoneInput";
 // Import Badge component
 import { Badge } from "@/components/ui/badge";
 import { calculatePriceFromCost as calcPriceFromCost, getProductSalePrice } from "@/lib/pricingCalc";
@@ -1375,15 +1378,12 @@ export default function AdminBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="admin-budget-validUntil">Válido Até *</Label>
-                  <Input
+                  <DateInput
                     id="admin-budget-validUntil"
-                    type="date"
                     value={adminBudgetForm.validUntil}
-                    onChange={(e) => {
-                      const selectedDate = e.target.value;
+                    onChange={(selectedDate) => {
                       const today = new Date().toISOString().split('T')[0];
-
-                      if (selectedDate < today) {
+                      if (selectedDate && selectedDate < today) {
                         toast({
                           title: "Data Inválida",
                           description: "A data 'Válido Até' não pode ser anterior à data de hoje.",
@@ -1391,7 +1391,6 @@ export default function AdminBudgets() {
                         });
                         return;
                       }
-
                       setAdminBudgetForm({ ...adminBudgetForm, validUntil: selectedDate });
                     }}
                     min={new Date().toISOString().split('T')[0]}
@@ -1516,12 +1515,10 @@ export default function AdminBudgets() {
                 </div>
                 <div>
                   <Label htmlFor="admin-budget-contact-phone">Telefone</Label>
-                  <Input
+                  <PhoneInput
                     id="admin-budget-contact-phone"
                     value={adminBudgetForm.contactPhone}
-                    onChange={(e) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: phoneMask(e.target.value) })}
-                    placeholder="(11) 99999-9999"
-                    maxLength={15}
+                    onChange={(v) => setAdminBudgetForm({ ...adminBudgetForm, contactPhone: v })}
                   />
                 </div>
                 <div>
@@ -1700,22 +1697,18 @@ export default function AdminBudgets() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <Label className="text-xs">Valor Unitário (R$)</Label>
-                                <Input
-                                  value={item.itemCustomizationValue > 0 ? currencyMask(item.itemCustomizationValue.toString().replace('.', ',')) : ''}
-                                  onChange={(e) => {
-                                    const value = parseCurrencyValue(e.target.value);
-                                    updateAdminBudgetItem(index, 'itemCustomizationValue', value);
-                                  }}
+                                <CurrencyInput
+                                  value={Number(item.itemCustomizationValue) || 0}
+                                  onChange={(value) => updateAdminBudgetItem(index, 'itemCustomizationValue', value)}
                                   placeholder="0,00"
                                   className="h-8 text-sm"
                                 />
                               </div>
                               <div>
                                 <Label className="text-xs">Total da Personalização (R$)</Label>
-                                <Input
-                                  value={currencyMask((item.quantity * (item.itemCustomizationValue || 0)).toFixed(2).replace('.', ','))}
-                                  onChange={(e) => {
-                                    const totalValue = parseCurrencyValue(e.target.value);
+                                <CurrencyInput
+                                  value={(item.quantity || 0) * (Number(item.itemCustomizationValue) || 0)}
+                                  onChange={(totalValue) => {
                                     const unitValue = item.quantity > 0 ? totalValue / item.quantity : 0;
                                     updateAdminBudgetItem(index, 'itemCustomizationValue', unitValue);
                                   }}
@@ -1805,12 +1798,9 @@ export default function AdminBudgets() {
                                   </div>
                                   <div>
                                     <Label className="text-xs">Valor Unit. (R$)</Label>
-                                    <Input
-                                      value={item.generalCustomizationValue > 0 ? currencyMask(item.generalCustomizationValue.toString().replace('.', ',')) : ''}
-                                      onChange={(e) => {
-                                        const value = parseCurrencyValue(e.target.value);
-                                        updateAdminBudgetItem(index, 'generalCustomizationValue', value);
-                                      }}
+                                    <CurrencyInput
+                                      value={Number(item.generalCustomizationValue) || 0}
+                                      onChange={(value) => updateAdminBudgetItem(index, 'generalCustomizationValue', value)}
                                       placeholder="0,00"
                                       className="h-8 text-sm"
                                     />
@@ -2207,16 +2197,10 @@ export default function AdminBudgets() {
                     <div className="space-y-3">
                       <div>
                         <Label htmlFor="admin-down-payment">Valor de Entrada (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="admin-down-payment"
-                          value={adminBudgetForm.downPayment > 0 ? currencyMask(adminBudgetForm.downPayment.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const downPayment = parseCurrencyValue(e.target.value);
-                            setAdminBudgetForm({
-                              ...adminBudgetForm,
-                              downPayment,
-                            });
-                          }}
+                          value={Number(adminBudgetForm.downPayment) || 0}
+                          onChange={(downPayment) => setAdminBudgetForm({ ...adminBudgetForm, downPayment })}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2266,16 +2250,10 @@ export default function AdminBudgets() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="admin-shipping-cost">Valor do Frete (R$) *</Label>
-                        <Input
+                        <CurrencyInput
                           id="admin-shipping-cost"
-                          value={adminBudgetForm.shippingCost > 0 ? currencyMask(adminBudgetForm.shippingCost.toString().replace('.', ',')) : ''}
-                          onChange={(e) => {
-                            const shippingCost = parseCurrencyValue(e.target.value);
-                            setAdminBudgetForm({
-                              ...adminBudgetForm,
-                              shippingCost,
-                            });
-                          }}
+                          value={Number(adminBudgetForm.shippingCost) || 0}
+                          onChange={(shippingCost) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost })}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2397,21 +2375,30 @@ export default function AdminBudgets() {
                           const itemsSubtotal = adminBudgetForm.items.reduce((total, item) => {
                             return total + (parseFloat(item.unitPrice) || 0) * (parseInt(item.quantity) || 1);
                           }, 0);
-                          const minimumTotal = adminBudgetForm.items.reduce((total, item: any) => {
-                            const minBase = item.minimumPrice > 0 ? item.minimumPrice : (item.basePriceWithMargin || item.unitPrice);
-                            const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
-                            const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
-                            const minUnitPrice = minBase + customUnit + genUnit;
-                            return total + (minUnitPrice * (parseInt(item.quantity) || 1));
-                          }, 0);
                           let discountAmt = 0;
                           if (adminBudgetForm.discountType === 'percentage') {
                             discountAmt = (itemsSubtotal * (parseFloat(adminBudgetForm.discountPercentage) || 0)) / 100;
                           } else {
                             discountAmt = parseFloat(adminBudgetForm.discountValue) || 0;
                           }
+                          // Só exibir aviso quando há desconto aplicado E o total com desconto fica abaixo do mínimo
+                          if (discountAmt <= 0 || adminBudgetForm.items.length === 0) return null;
+
+                          const minimumTotal = adminBudgetForm.items.reduce((total, item: any) => {
+                            const hasValidMin = item.minimumPrice > 0;
+                            let minUnitPrice: number;
+                            if (hasValidMin) {
+                              const customUnit = item.hasItemCustomization ? (parseFloat(item.itemCustomizationValue) || 0) : 0;
+                              const genUnit = item.hasGeneralCustomization ? (parseFloat(item.generalCustomizationValue) || 0) : 0;
+                              minUnitPrice = item.minimumPrice + customUnit + genUnit;
+                            } else {
+                              // Sem preço mínimo definido: usar preço atual (não há restrição de mínimo)
+                              minUnitPrice = parseFloat(item.unitPrice) || 0;
+                            }
+                            return total + (minUnitPrice * (parseInt(item.quantity) || 1));
+                          }, 0);
                           const discountedTotal = itemsSubtotal - discountAmt;
-                          if (discountedTotal < minimumTotal && adminBudgetForm.items.length > 0) {
+                          if (discountedTotal < minimumTotal) {
                             return (
                               <p className="text-xs text-orange-600 mt-1 font-semibold">
                                 ⚠️ Desconto abaixo do preço mínimo - Orçamento será enviado para autorização
@@ -3266,12 +3253,11 @@ export default function AdminBudgets() {
             {/* Input for Delivery Date */}
             <div>
               <Label htmlFor="convert-delivery-date">Data de Entrega *</Label>
-              <Input
+              <DateInput
                 id="convert-delivery-date"
-                type="date"
                 value={convertDeliveryDate}
-                onChange={(e) => setConvertDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+                onChange={setConvertDeliveryDate}
+                min={new Date().toISOString().split('T')[0]}
               />
             </div>
 

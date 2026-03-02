@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -443,17 +444,15 @@ export default function FinanceCommissionPayouts() {
             <div className="flex flex-col md:flex-row items-center gap-4">
               <div className="flex items-center gap-2 w-full md:w-auto">
                 <span className="text-sm text-gray-500 whitespace-nowrap">Período:</span>
-                <Input
-                  type="date"
+                <DateInput
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   className="w-full md:w-[150px]"
                 />
                 <span className="text-sm text-gray-500">até</span>
-                <Input
-                  type="date"
+                <DateInput
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={setEndDate}
                   className="w-full md:w-[150px]"
                 />
                 {(startDate || endDate || selectedUser !== "all") && (

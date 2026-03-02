@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/DateInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -322,11 +323,10 @@ export default function ProducerOrders() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="deadline">Nova Data de Entrega</Label>
-              <Input
+              <DateInput
                 id="deadline"
-                type="date"
                 value={newDeadline}
-                onChange={(e) => setNewDeadline(e.target.value)}
+                onChange={setNewDeadline}
               />
             </div>
             <div>

@@ -4,6 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -731,11 +732,10 @@ export default function ProducerOrderDetails() {
             {(selectedStatus === 'completed' || selectedStatus === 'rejected' || selectedStatus === 'shipped') && (
               <div>
                 <Label htmlFor="delivery-date">Data de Entrega (Opcional)</Label>
-                <Input
+                <DateInput
                   id="delivery-date"
-                  type="date"
                   value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  onChange={setDeliveryDate}
                 />
               </div>
             )}
@@ -769,11 +769,10 @@ export default function ProducerOrderDetails() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="new-deadline">Nova Data de Entrega</Label>
-              <Input
+              <DateInput
                 id="new-deadline"
-                type="date"
                 value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
+                onChange={setDeliveryDate}
               />
             </div>
             <div>
