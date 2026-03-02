@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
 import {
   Dialog,
   DialogContent,
@@ -310,12 +311,19 @@ export default function AdminUsers() {
 
   const createVendorMutation = useMutation({
     mutationFn: async (data: VendorFormValues) => {
+      const payload = {
+        ...data,
+        userCode: data.username,
+      };
       const response = await fetch("/api/vendors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error("Erro ao criar vendedor");
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Erro ao criar vendedor");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -328,6 +336,9 @@ export default function AdminUsers() {
         title: "Sucesso!",
         description: "Vendedor criado com sucesso",
       });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1045,7 +1056,7 @@ export default function AdminUsers() {
                             <FormItem>
                               <FormLabel>CPF/CNPJ</FormLabel>
                               <FormControl>
-                                <Input placeholder="123.456.789-00" {...field} />
+                                <CpfCnpjInput value={field.value ?? ""} onChange={field.onChange} placeholder="123.456.789-00 ou 00.000.000/0001-00" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

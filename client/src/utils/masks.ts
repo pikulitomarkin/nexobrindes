@@ -100,3 +100,25 @@ export const formatDateToBR = (isoOrYyyyMmDd: string): string => {
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 };
+
+// ==================== CPF/CNPJ ====================
+
+/** Aplica máscara CPF (11 dígitos) ou CNPJ (14 dígitos) durante a digitação */
+export const cpfCnpjMask = (value: string): string => {
+  if (!value) return '';
+  const numbers = value.replace(/\D/g, '').slice(0, 14);
+  if (numbers.length <= 11) {
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`;
+  }
+  const base = `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}`;
+  return numbers.length <= 12 ? base : `${base}-${numbers.slice(12, 14)}`;
+};
+
+/** Formata valor existente para exibição CPF ou CNPJ */
+export const formatCpfCnpjForDisplay = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return cpfCnpjMask(value.replace(/\D/g, ''));
+};

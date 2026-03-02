@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
+import { formatCpfCnpjForDisplay } from "@/utils/masks";
 import { 
   Dialog,
   DialogContent,
@@ -395,7 +397,7 @@ export default function PartnerClients() {
                   {client.cpfCnpj && (
                     <div className="flex items-center text-gray-600">
                       <FileText className="w-4 h-4 mr-2" />
-                      <span>{client.cpfCnpj}</span>
+                      <span>{formatCpfCnpjForDisplay(client.cpfCnpj)}</span>
                     </div>
                   )}
 

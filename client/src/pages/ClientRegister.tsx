@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -390,9 +391,10 @@ export default function ClientRegister() {
                           <FormItem>
                             <FormLabel>CPF/CNPJ</FormLabel>
                             <FormControl>
-                              <Input
+                              <CpfCnpjInput
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
                                 placeholder="123.456.789-00 ou 00.000.000/0001-00"
-                                {...field}
                                 data-testid="input-cpf"
                               />
                             </FormControl>

@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
+import { formatCpfCnpjForDisplay } from "@/utils/masks";
 import { 
   Dialog,
   DialogContent,
@@ -255,7 +257,7 @@ export default function AdminBranches() {
                     <FormItem>
                       <FormLabel>CNPJ</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: 00.000.000/0000-00" {...field} data-testid="input-cnpj" />
+                        <CpfCnpjInput value={field.value ?? ""} onChange={field.onChange} placeholder="00.000.000/0001-00" data-testid="input-cnpj" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -406,7 +408,7 @@ export default function AdminBranches() {
                     {branch.cnpj && (
                       <div className="flex items-center text-sm text-gray-600">
                         <Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>CNPJ: {branch.cnpj}</span>
+                        <span>CNPJ: {formatCpfCnpjForDisplay(branch.cnpj)}</span>
                       </div>
                     )}
                     {branch.address && (

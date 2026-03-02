@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { formatCpfCnpjForDisplay } from "@/utils/masks";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { User, Lock, MapPin, Phone, Mail, Eye, EyeOff, Building2, FileText } from "lucide-react";
@@ -277,7 +278,7 @@ export default function ClientProfile() {
                       <Label htmlFor="cpfCnpj">CPF/CNPJ</Label>
                       <Input
                         id="cpfCnpj"
-                        value={clientData?.cpfCnpj || "Não informado"}
+                        value={formatCpfCnpjForDisplay(clientData?.cpfCnpj) || "Não informado"}
                         disabled
                         className="bg-gray-50"
                         placeholder="Não pode ser alterado"

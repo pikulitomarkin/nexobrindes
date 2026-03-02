@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/PhoneInput";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
+import { formatCpfCnpjForDisplay } from "@/utils/masks";
 import { 
   Dialog,
   DialogContent,
@@ -354,7 +356,7 @@ export default function VendorClients() {
                       <FormItem>
                         <FormLabel>CPF/CNPJ</FormLabel>
                         <FormControl>
-                          <Input placeholder="123.456.789-00" {...field} />
+                          <CpfCnpjInput value={field.value ?? ""} onChange={field.onChange} placeholder="123.456.789-00 ou 00.000.000/0001-00" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -796,7 +798,7 @@ export default function VendorClients() {
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600 truncate">{client.email || '—'}</td>
                     <td className="px-4 py-4 text-sm text-gray-600">{client.phone || '—'}</td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{client.cpfCnpj || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">{client.cpfCnpj ? formatCpfCnpjForDisplay(client.cpfCnpj) : '—'}</td>
                     <td className="px-4 py-4 text-sm whitespace-nowrap">
                       <div className="flex space-x-2">
                         <Button 
@@ -967,7 +969,7 @@ export default function VendorClients() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">CPF/CNPJ:</label>
-                          <p className="text-sm text-gray-900">{client.cpfCnpj || client.cpf_cnpj || 'N/A'}</p>
+                          <p className="text-sm text-gray-900">{formatCpfCnpjForDisplay(client.cpfCnpj || client.cpf_cnpj || '') || 'N/A'}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600">Inscrição Estadual:</label>
