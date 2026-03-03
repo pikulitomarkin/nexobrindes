@@ -364,9 +364,9 @@ export default function LogisticsProducers() {
                       <p className="font-mono font-bold text-gray-900">{producer.username}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         title="Ver produtos do produtor"
                         onClick={() => {
                           setSelectedProducerId(producer.id);
@@ -375,9 +375,9 @@ export default function LogisticsProducers() {
                       >
                         <Package2 className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         title="Ver pedidos em produção"
                         onClick={() => {
                           setSelectedProducerId(producer.id);
@@ -462,7 +462,7 @@ export default function LogisticsProducers() {
                         <div>
                           <span className="text-gray-500">Dimensões:</span>
                           <p className="font-medium text-xs">
-                            {product.width && product.height && product.depth 
+                            {product.width && product.height && product.depth
                               ? `${product.width}×${product.height}×${product.depth}cm`
                               : 'N/A'
                             }
@@ -543,17 +543,23 @@ export default function LogisticsProducers() {
                           {order.product}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            order.status === 'ready' ? 'bg-green-100 text-green-800' :
-                            order.status === 'production' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'accepted' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {order.status === 'ready' ? 'Pronto' :
-                             order.status === 'production' ? 'Em Produção' :
-                             order.status === 'accepted' ? 'Aceito' :
-                             order.status}
-                          </span>
+                          {(() => {
+                            const statusMap: Record<string, { label: string; css: string }> = {
+                              pending: { label: 'Pendente', css: 'bg-yellow-100 text-yellow-800' },
+                              accepted: { label: 'Aceito', css: 'bg-blue-100 text-blue-800' },
+                              production: { label: 'Em Produção', css: 'bg-purple-100 text-purple-800' },
+                              ready: { label: 'Pronto', css: 'bg-green-100 text-green-800' },
+                              shipped: { label: 'Despachado', css: 'bg-cyan-100 text-cyan-800' },
+                              delivered: { label: 'Entregue', css: 'bg-emerald-100 text-emerald-800' },
+                              cancelled: { label: 'Cancelado', css: 'bg-red-100 text-red-800' },
+                            };
+                            const s = statusMap[order.status] ?? { label: order.status, css: 'bg-gray-100 text-gray-800' };
+                            return (
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${s.css}`}>
+                                {s.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'N/A'}

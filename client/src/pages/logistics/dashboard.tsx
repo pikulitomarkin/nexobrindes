@@ -686,9 +686,10 @@ export default function LogisticsDashboard() {
     ? filteredPaidOrders.filter((o: any) => (o.productStatus || 'to_buy') === 'in_store')
     : filteredPaidOrders;
 
-  // No Dashboard, excluir production orders 'pending' da tabela de produção para evitar
-  // duplicidade com a tabela de cima (elas já aparecem em 'Aguardando Produção')
-  const productionOrdersToShow = currentSection === 'dashboard'
+  // No Dashboard e em Acompanhar Produção, excluir production orders 'pending':
+  // 'pending' significa que ainda não foi confirmado o envio ao produtor.
+  // Essas ordens já aparecem na seção 'Aguardando Produção' (via paidOrders).
+  const productionOrdersToShow = (currentSection === 'dashboard' || currentSection === 'production-tracking')
     ? filteredProductionOrders.filter((o: any) => o.status !== 'pending')
     : filteredProductionOrders;
 
@@ -787,32 +788,49 @@ export default function LogisticsDashboard() {
             </Card>
           ) : null}
 
-          {(currentSection === 'dashboard' || currentSection === 'paid-orders' || currentSection === 'production-tracking' || currentSection === 'shipments') && (
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700">Total em Acompanhamento</p>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-900">
-                        {(paidOrders?.length || 0) + (Array.from(new Set(productionOrders?.map(o => o.orderId))).length || 0)}
-                      </p>
-                      <p className="text-xs text-blue-600">Pedidos únicos</p>
+          {(currentSection === 'dashboard' || currentSection === 'paid-orders' || currentSection === 'production-tracking' || currentSection === 'shipments') && (() => {
+            // Calcular contadores contextuais por aba:
+            // - Despachos: apenas shipped + delivered
+            // - Outras: pedidos pagos aguardando + em produção (excluindo pending)
+            const shippedCount = productionOrders?.filter((o: any) => o.status === 'shipped').length || 0;
+            const deliveredCount = productionOrders?.filter((o: any) => o.status === 'delivered').length || 0;
+            const activeProductionCount = productionOrders?.filter((o: any) => o.status !== 'pending').length || 0;
+            const uniqueActiveProductionOrders = Array.from(new Set(
+              productionOrders?.filter((o: any) => o.status !== 'pending').map((o: any) => o.orderId) || []
+            )).length;
+
+            const isShipments = currentSection === 'shipments';
+            const uniqueCount = isShipments
+              ? Array.from(new Set(productionOrders?.filter((o: any) => ['shipped', 'delivered'].includes(o.status)).map((o: any) => o.orderId) || [])).length
+              : (paidOrders?.length || 0) + uniqueActiveProductionOrders;
+            const totalLines = isShipments
+              ? shippedCount + deliveredCount
+              : ordersToShow.length + activeProductionCount;
+            const label = isShipments ? 'Em Despacho/Entrega' : 'Total em Acompanhamento';
+
+            return (
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">{label}</p>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-900">{uniqueCount}</p>
+                        <p className="text-xs text-blue-600">Pedidos únicos</p>
+                      </div>
+                      <div className="text-center border-l border-blue-300 pl-2">
+                        <p className="text-xl font-bold text-blue-700">{totalLines}</p>
+                        <p className="text-xs text-blue-600">Total linhas</p>
+                      </div>
                     </div>
-                    <div className="text-center border-l border-blue-300 pl-2">
-                      <p className="text-xl font-bold text-blue-700">
-                        {paidOrdersCount + (productionOrders?.length || 0)}
-                      </p>
-                      <p className="text-xs text-blue-600">Total linhas</p>
+                    <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                      <ShoppingCart className="h-6 w-6 text-white" />
                     </div>
                   </div>
-                  <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                    <ShoppingCart className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       )}
 
@@ -1020,7 +1038,7 @@ export default function LogisticsDashboard() {
           <CardHeader className="bg-green-50">
             <CardTitle className="text-green-800 flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Pedidos Pagos - Aguardando Produção ({paidOrdersCount})
+              Pedidos Pagos - Aguardando Produção ({ordersToShow.length})
             </CardTitle>
             <p className="text-sm text-green-700 mt-2">
               Pedidos que receberam pagamento e estão prontos para serem enviados à produção
@@ -1191,7 +1209,7 @@ export default function LogisticsDashboard() {
           <CardHeader className="bg-purple-50">
             <CardTitle className="text-purple-800 flex items-center gap-2">
               <Factory className="h-5 w-5" />
-              Pedidos em Produção - Acompanhamento ({productionOrders?.length || 0})
+              Pedidos em Produção - Acompanhamento ({productionOrdersToShow.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
