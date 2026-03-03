@@ -223,10 +223,10 @@ export default function FinanceReceivables() {
 
   const filteredReceivables = mockReceivables.filter((receivable: any) => {
     const matchesStatus = statusFilter === "all" || receivable.status === statusFilter;
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       receivable.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       receivable.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBranch = branchFilter === "all" || 
+    const matchesBranch = branchFilter === "all" ||
       receivable.branchId === branchFilter ||
       (branchFilter === 'matriz' && (!receivable.branchId || receivable.branchId === 'matriz'));
     return matchesStatus && matchesSearch && matchesBranch;
@@ -256,7 +256,7 @@ export default function FinanceReceivables() {
     const receivedAmount = parseFloat(r.paidAmount || r.receivedAmount || "0");
     return sum + Math.max(0, originalAmount - receivedAmount);
   }, 0);
-  
+
   const totalReceived = mockReceivables.reduce((sum, r) => sum + parseFloat(r.paidAmount || r.receivedAmount || "0"), 0);
   const awaitingEntryCount = mockReceivables.filter(r => r.status === 'pending' || r.status === 'partial').length;
   const partiallyPaidCount = mockReceivables.filter(r => r.status === 'partial').length;
@@ -561,9 +561,9 @@ export default function FinanceReceivables() {
                       </td>
                       <td className="panel-table td space-x-1">
                         <div className="flex space-x-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="h-7 px-2 panel-button"
                             onClick={() => {
                               setSelectedReceivable(receivable);
@@ -574,8 +574,8 @@ export default function FinanceReceivables() {
                             Ver
                           </Button>
                           {receivable.status !== 'paid' && (
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               className={`h-7 px-2 panel-button ${!isMinimumMet && minimumPayment > 0 ? 'bg-red-100 text-red-800 hover:bg-red-200' : ''}`}
                               onClick={() => {
@@ -583,8 +583,8 @@ export default function FinanceReceivables() {
                                 // Suggest minimum payment if not met, otherwise remaining amount
                                 const receivedSoFar = parseFloat(receivable.receivedAmount || receivable.paidAmount || "0");
                                 const remainingAmount = Math.max(0, parseFloat(receivable.amount) - receivedSoFar);
-                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
-                                  minimumPayment.toString() : 
+                                const suggestedAmount = !isMinimumMet && minimumPayment > 0 ?
+                                  minimumPayment.toString() :
                                   remainingAmount.toString();
                                 setPaymentData({
                                   ...paymentData,
@@ -654,10 +654,10 @@ export default function FinanceReceivables() {
                       <div key={idx} className="flex justify-between text-sm py-2 border-b last:border-b-0">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{item.productName}</p>
-                          <p className="text-xs text-gray-500">Qtd: {item.quantity}</p>
+                          <p className="text-xs text-gray-500">Qtd: {Math.round(parseFloat(item.quantity || '0'))}</p>
                         </div>
                         <p className="text-sm text-gray-700">
-                          R$ {(parseFloat(item.totalPrice || item.unitPrice || 0) * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {parseFloat(item.totalPrice || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     ))}
@@ -710,7 +710,7 @@ export default function FinanceReceivables() {
                   Fechar
                 </Button>
                 {selectedReceivable.status !== 'paid' && (
-                  <Button 
+                  <Button
                     className="gradient-bg text-white"
                     onClick={() => {
                       setIsDetailsDialogOpen(false);
@@ -719,8 +719,8 @@ export default function FinanceReceivables() {
                       const paidAmount = parseFloat(selectedReceivable.paidAmount || 0);
                       const isMinimumMet = paidAmount >= minimumPayment;
                       const remainingAmount = Math.max(0, parseFloat(selectedReceivable.amount) - paidAmount);
-                      const suggestedAmount = !isMinimumMet && minimumPayment > 0 ? 
-                        minimumPayment.toString() : 
+                      const suggestedAmount = !isMinimumMet && minimumPayment > 0 ?
+                        minimumPayment.toString() :
                         remainingAmount.toString();
                       setPaymentData({
                         ...paymentData,
@@ -763,8 +763,8 @@ export default function FinanceReceivables() {
               </div>
               <div>
                 <Label htmlFor="payment-method">Método</Label>
-                <Select 
-                  value={paymentData.method} 
+                <Select
+                  value={paymentData.method}
                   onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
                 >
                   <SelectTrigger>

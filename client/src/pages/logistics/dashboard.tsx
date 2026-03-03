@@ -292,7 +292,7 @@ export default function LogisticsDashboard() {
     // and order.orderId is the main order ID
     const productionOrderId = order.id;
     const orderId = order.orderId;
-    
+
     if (!productionOrderId || !orderId) {
       toast({
         title: "Erro",
@@ -301,7 +301,7 @@ export default function LogisticsDashboard() {
       });
       return;
     }
-    
+
     confirmDeliveryMutation.mutate({ productionOrderId, orderId });
   };
 
@@ -551,6 +551,8 @@ export default function LogisticsDashboard() {
     });
   }, [expandedPaidOrders, searchTerm, dateRange, selectedStatuses, priorityFilter, sortBy]);
 
+
+
   // Expandir pedidos em produção por produtor, similar aos pedidos pagos
   const expandProductionOrdersByProducer = (orders: any[]) => {
     // Como os pedidos em produção já são separados por produtor, apenas adicionar info de agrupamento
@@ -642,6 +644,8 @@ export default function LogisticsDashboard() {
     });
   }, [expandedProductionOrders, searchTerm, dateRange, selectedStatuses, statusFilter, priorityFilter, sortBy]);
 
+
+
   if (isLoadingPaidOrders || isLoadingProductionOrders) {
     return (
       <div className="p-8">
@@ -675,6 +679,18 @@ export default function LogisticsDashboard() {
   };
 
   const currentSection = getCurrentSection();
+
+  // Aba Dashboard: só pedidos com productStatus 'in_store' (estoque confirmado → pronto para enviar ao produtor)
+  // Aba Pedidos (paid-orders): todos os pedidos pagos, independente do productStatus
+  const ordersToShow = currentSection === 'dashboard'
+    ? filteredPaidOrders.filter((o: any) => (o.productStatus || 'to_buy') === 'in_store')
+    : filteredPaidOrders;
+
+  // No Dashboard, excluir production orders 'pending' da tabela de produção para evitar
+  // duplicidade com a tabela de cima (elas já aparecem em 'Aguardando Produção')
+  const productionOrdersToShow = currentSection === 'dashboard'
+    ? filteredProductionOrders.filter((o: any) => o.status !== 'pending')
+    : filteredProductionOrders;
 
   // Função para renderizar o título e descrição baseado na seção
   const getSectionInfo = () => {
@@ -956,11 +972,10 @@ export default function LogisticsDashboard() {
                             }
                           }}
                         />
-                        <Label 
+                        <Label
                           htmlFor={`status-${status.value}`}
-                          className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                            isSelected ? status.color : 'text-gray-600'
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${isSelected ? status.color : 'text-gray-600'
+                            }`}
                         >
                           {status.label}
                         </Label>
@@ -1026,7 +1041,7 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPaidOrders?.map((order: any) => {
+                  {ordersToShow?.map((order: any) => {
                     // Determinar estilos de agrupamento
                     const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
                     const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
@@ -1083,6 +1098,20 @@ export default function LogisticsDashboard() {
                               {order.producerItems.length} itens deste produtor
                             </div>
                           )}
+                          {/* Badge de status de estoque — visível na aba Pedidos para orientar o operador */}
+                          {currentSection === 'paid-orders' && (
+                            <div className="mt-1">
+                              {(order.productStatus || 'to_buy') === 'to_buy' && (
+                                <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">⚠ Aguardando Compra</span>
+                              )}
+                              {order.productStatus === 'purchased' && (
+                                <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">📦 Comprado</span>
+                              )}
+                              {order.productStatus === 'in_store' && (
+                                <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">✅ Na Loja</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="space-y-1">
@@ -1100,8 +1129,8 @@ export default function LogisticsDashboard() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {(order.lastPaymentDate || order.paidAt || order.createdAt) ? 
-                            new Date(order.lastPaymentDate || order.paidAt || order.createdAt).toLocaleDateString('pt-BR') : 
+                          {(order.lastPaymentDate || order.paidAt || order.createdAt) ?
+                            new Date(order.lastPaymentDate || order.paidAt || order.createdAt).toLocaleDateString('pt-BR') :
                             'N/A'
                           }
                         </td>
@@ -1180,7 +1209,7 @@ export default function LogisticsDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredProductionOrders?.map((order: any) => {
+                  {productionOrdersToShow?.map((order: any) => {
                     // Determinar estilos de agrupamento
                     const isFirstInGroup = order.isGrouped && order.groupIndex === 0;
                     const isLastInGroup = order.isGrouped && order.groupIndex === order.groupTotal - 1;
@@ -1242,8 +1271,8 @@ export default function LogisticsDashboard() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {(order.deadline || order.deliveryDeadline) ? 
-                            new Date(order.deadline || order.deliveryDeadline).toLocaleDateString('pt-BR') : 
+                          {(order.deadline || order.deliveryDeadline) ?
+                            new Date(order.deadline || order.deliveryDeadline).toLocaleDateString('pt-BR') :
                             'N/A'
                           }
                         </td>
@@ -1784,86 +1813,85 @@ export default function LogisticsDashboard() {
 
                         return (
                           <div key={`${item.id || index}-${item.productName || 'item'}`}
-                               className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Package className="h-4 w-4 text-gray-500" />
-                                    <span className="font-medium">{item.productName}</span>
-                                    {isCurrentProducer && (
-                                      <Badge className="bg-purple-100 text-purple-800 border-purple-300">
-                                        🎯 Produtor Atual
-                                      </Badge>
-                                    )}
-                                    {isExternal && !isCurrentProducer && (
-                                      <Badge variant="outline" className="text-orange-700 border-orange-300">
-                                        Produção Externa
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <span className="text-gray-500">Quantidade:</span>
-                                      <p className="font-medium">{Math.round(parseFloat(item.quantity || 0))}</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500">Especificações:</span>
-                                      <p className="font-medium">
-                                        {item.productWidth && item.productHeight && item.productDepth ?
-                                          `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
-                                          'Não informado'
-                                        }
-                                      </p>
-                                    </div>
-
-                                    {/* Produtor do Item */}
-                                    <div className="col-span-2">
-                                      <span className="text-gray-500">Produtor:</span>
-                                      <p className={`font-medium ${
-                                        isCurrentProducer ? 'text-purple-700' :
-                                        isExternal ? 'text-orange-700' : 'text-gray-700'
-                                      }`}>
-                                        {isExternal ? (item.producerName || 'Produtor não identificado') : 'Produção Interna'}
-                                        {isCurrentProducer && ' (ATUAL)'}
-                                      </p>
-                                    </div>
-
-                                    {/* Personalização do Item */}
-                                    {item.hasItemCustomization && (
-                                      <div className="col-span-2 bg-blue-50 p-2 rounded">
-                                        <span className="text-blue-700 font-medium">Personalização do Item:</span>
-                                        <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
-                                        {item.additionalCustomizationNotes && (
-                                          <p className="text-sm text-blue-500 mt-1">Obs: {item.additionalCustomizationNotes}</p>
-                                        )}
-                                        {item.customizationPhoto && (
-                                          <div className="mt-2">
-                                            <img
-                                              src={item.customizationPhoto}
-                                              alt="Personalização"
-                                              className="w-16 h-16 object-cover rounded border"
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-
-                                    {/* Personalização Geral */}
-                                    {item.hasGeneralCustomization && (
-                                      <div className="col-span-2 bg-green-50 p-2 rounded">
-                                        <span className="text-green-700 font-medium">Personalização Geral:</span>
-                                        <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>
-                                      </div>
-                                    )}
-                                  </div>
+                            className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Package className="h-4 w-4 text-gray-500" />
+                                  <span className="font-medium">{item.productName}</span>
+                                  {isCurrentProducer && (
+                                    <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                                      🎯 Produtor Atual
+                                    </Badge>
+                                  )}
+                                  {isExternal && !isCurrentProducer && (
+                                    <Badge variant="outline" className="text-orange-700 border-orange-300">
+                                      Produção Externa
+                                    </Badge>
+                                  )}
                                 </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-gray-500">
-                                    Valor: Confidencial
-                                  </p>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-500">Quantidade:</span>
+                                    <p className="font-medium">{Math.round(parseFloat(item.quantity || 0))}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Especificações:</span>
+                                    <p className="font-medium">
+                                      {item.productWidth && item.productHeight && item.productDepth ?
+                                        `${item.productWidth}×${item.productHeight}×${item.productDepth}cm` :
+                                        'Não informado'
+                                      }
+                                    </p>
+                                  </div>
+
+                                  {/* Produtor do Item */}
+                                  <div className="col-span-2">
+                                    <span className="text-gray-500">Produtor:</span>
+                                    <p className={`font-medium ${isCurrentProducer ? 'text-purple-700' :
+                                      isExternal ? 'text-orange-700' : 'text-gray-700'
+                                      }`}>
+                                      {isExternal ? (item.producerName || 'Produtor não identificado') : 'Produção Interna'}
+                                      {isCurrentProducer && ' (ATUAL)'}
+                                    </p>
+                                  </div>
+
+                                  {/* Personalização do Item */}
+                                  {item.hasItemCustomization && (
+                                    <div className="col-span-2 bg-blue-50 p-2 rounded">
+                                      <span className="text-blue-700 font-medium">Personalização do Item:</span>
+                                      <p className="text-blue-600">{item.itemCustomizationDescription || 'Personalização especial'}</p>
+                                      {item.additionalCustomizationNotes && (
+                                        <p className="text-sm text-blue-500 mt-1">Obs: {item.additionalCustomizationNotes}</p>
+                                      )}
+                                      {item.customizationPhoto && (
+                                        <div className="mt-2">
+                                          <img
+                                            src={item.customizationPhoto}
+                                            alt="Personalização"
+                                            className="w-16 h-16 object-cover rounded border"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Personalização Geral */}
+                                  {item.hasGeneralCustomization && (
+                                    <div className="col-span-2 bg-green-50 p-2 rounded">
+                                      <span className="text-green-700 font-medium">Personalização Geral:</span>
+                                      <p className="text-green-600">{item.generalCustomizationName || 'Personalização geral'}</p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-500">
+                                  Valor: Confidencial
+                                </p>
+                              </div>
                             </div>
+                          </div>
                         );
                       })}
                     </div>

@@ -697,20 +697,16 @@ export class PDFGenerator {
             this.doc.setFont('helvetica', 'normal');
             this.doc.setTextColor(30, 30, 30);
 
-            // Usar remainingAmount do servidor quando disponível; senão calcular corretamente (subtotal - desconto + frete + juros - entrada)
-            const savedRemaining = parseFloat(data.budget.remainingAmount || '0');
-            let displayRemaining: number;
-            if (savedRemaining > 0) {
-              displayRemaining = savedRemaining;
-            } else {
-              const subtotal = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
-              const discountA = data.budget.hasDiscount ?
-                (data.budget.discountType === 'percentage' ? (subtotal * parseFloat(data.budget.discountPercentage || '0')) / 100 : parseFloat(data.budget.discountValue || '0')) : 0;
-              const shipping = parseFloat(data.budget.shippingCost || '0');
-              const interest = parseFloat(data.budget.interestValue || '0');
-              const totalFinal = subtotal - discountA + shipping + interest;
-              displayRemaining = Math.max(0, totalFinal - parseFloat(data.budget.downPayment));
-            }
+            // Restante = (Subtotal − Desconto) − Entrada
+            // O frete NÃO entra no cálculo do restante; é exibido em linha separada
+            const subtotalForRemaining = data.items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+            const discountForRemaining = data.budget.hasDiscount
+              ? (data.budget.discountType === 'percentage'
+                ? (subtotalForRemaining * parseFloat(data.budget.discountPercentage || '0')) / 100
+                : parseFloat(data.budget.discountValue || '0'))
+              : 0;
+            const downPaymentVal = parseFloat(data.budget.downPayment || '0');
+            const displayRemaining = Math.max(0, subtotalForRemaining - discountForRemaining - downPaymentVal);
 
             this.doc.text(`R$ ${displayRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, this.margin + labelOffset, this.currentY);
             this.currentY += 6;
