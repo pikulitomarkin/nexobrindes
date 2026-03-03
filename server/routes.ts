@@ -18,6 +18,21 @@ const upload = multer({
   }
 });
 
+/**
+ * Nome do produtor para exibição: SEMPRE usar o campo name do usuário (nunca username).
+ * O username é o código de login (ex: PRO12345678), não o nome cadastrado.
+ */
+function getProducerDisplayName(user: { name?: string | null; username?: string } | undefined): string | null {
+  if (!user) return null;
+  // Usar explicitamente name - nunca username (código de login)
+  const name = user.name;
+  if (typeof name === 'string') {
+    const trimmed = name.trim();
+    return trimmed || null;
+  }
+  return null;
+}
+
 // Mock requireAuth middleware for demonstration purposes
 // In a real application, this would verify JWT tokens or session
 const requireAuth = async (req: any, res: any, next: any) => {
@@ -3936,7 +3951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...order,
         clientName: clientName,
         vendorName: vendor?.name || 'Vendedor',
-        producerName: producer?.name || null,
+        producerName: getProducerDisplayName(producer),
         budgetPhotos: budgetPhotos,
         budgetItems: budgetItems,
         trackingCode: order.trackingCode || productionOrder?.trackingCode || null,
@@ -4030,7 +4045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...order,
             clientName: clientName, // Never use fallback 'Unknown'
             vendorName: vendor?.name || 'Vendedor',
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
             hasUnreadNotes: hasUnreadNotes
@@ -4437,7 +4452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             deliveryType: order?.deliveryType || 'delivery',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             order: order ? {
               ...order,
               clientName: clientName,
@@ -4487,7 +4502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             producerValue: po.producerValue,
             deliveryDate: po.deliveryDeadline,
             notes: po.notes,
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             lastNoteAt: po.lastNoteAt,
           };
         });
@@ -5460,7 +5475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             ...order,
             clientName: client?.name || 'Unknown',
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             hasUnreadNotes: hasUnreadNotes,
             budgetPhotos: budgetPhotos,
             budgetItems: budgetItems,
@@ -7446,12 +7461,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DEPRECATED: Get all products (producer is chosen at budget item level)
+  // Get products by producer (filtered by producerId)
   app.get("/api/products/producer/:producerId", async (req, res) => {
     try {
-      // Retorna todos os produtos globais - produtor é agora selecionado por item no orçamento
-      const result = await storage.getProducts({ limit: 9999 });
-      res.json(result.products);
+      const { producerId } = req.params;
+      const products = await storage.getProductsByProducer(producerId);
+      res.json(products);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch products" });
     }
@@ -9365,14 +9380,14 @@ Para mais detalhes, entre em contato conosco!`;
     try {
       const users = await storage.getUsers();
       const producers = users.filter(user => user.role === 'producer');
-      const productsResult = await storage.getProducts({ limit: 9999 });
 
       const producerStats = await Promise.all(
         producers.map(async (producer) => {
           const productionOrders = await storage.getProductionOrdersByProducer(producer.id);
-          const producerProducts = productsResult.products.filter(p => p.producerId === producer.id);
+          const producerProducts = await storage.getProductsByProducer(producer.id);
 
           return {
+            producerId: producer.id,
             id: producer.id,
             name: producer.name,
             specialty: producer.specialty || 'Não especificado',
@@ -9381,6 +9396,7 @@ Para mais detalhes, entre em contato conosco!`;
             ).length,
             completedOrders: productionOrders.filter(po => po.status === 'completed').length,
             totalProducts: producerProducts.length,
+            activeProducts: producerProducts.filter(p => p.isActive).length,
             isActive: producer.isActive
           };
         })
@@ -9465,7 +9481,7 @@ Para mais detalhes, entre em contato conosco!`;
                 const producer = await storage.getUser(item.producerId);
                 return {
                   ...item,
-                  producerName: producer?.name || null
+                  producerName: getProducerDisplayName(producer)
                 };
               }
               return item;
@@ -9738,60 +9754,41 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid but not yet fully sent to production
-      // Show paid orders when: (a) product in store, OR (b) has minimum payment (entrada+frete)
-      // BUG #6 fix: pedido pago deve ir para logística - não exigir in_store quando já tem pagamento mínimo
+      // BUG NOVO #3 fix: qualquer pagamento recebido (paidValue > 0) é suficiente para
+      // o pedido aparecer no Dashboard — não exigir productStatus='in_store' nem pagamento mínimo
       const paidOrders = orders.filter(order => {
-        // Check payment status - order must have received some payment
         const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
-        const isPaid = paidValue > 0; // Any payment received
+        const isPaid = paidValue > 0;
 
-        const downPayment = parseFloat(order.downPayment || '0');
-        const shippingCost = parseFloat(order.shippingCost || '0');
-        const hasMinimumPayment = paidValue >= (downPayment + shippingCost) || paidValue >= totalValue;
-
-        const productStatus = order.productStatus || 'to_buy';
-        const isProductInStore = productStatus === 'in_store';
-        // Mostrar quando: produto na loja OU pagamento mínimo recebido (permite fluxo pós-pagamento)
-        const readyForLogistics = isProductInStore || hasMinimumPayment;
+        if (!isPaid) return false;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
         let uniqueProducers = new Set<string>();
 
-        if (order.budgetId) {
-          // For budget-based orders, check budget items
-          const budgetItems = order.items || [];
-          for (const item of budgetItems) {
-            if (item.producerId && item.producerId !== 'internal') {
-              hasExternalProducers = true;
-              uniqueProducers.add(item.producerId);
-            }
-          }
-        } else if (order.items) {
-          // For direct orders, check order items
-          for (const item of order.items) {
-            if (item.producerId && item.producerId !== 'internal') {
-              hasExternalProducers = true;
-              uniqueProducers.add(item.producerId);
-            }
+        const items = order.items || [];
+        for (const item of items) {
+          if (item.producerId && item.producerId !== 'internal') {
+            hasExternalProducers = true;
+            uniqueProducers.add(item.producerId);
           }
         }
+
+        if (!hasExternalProducers) return false;
 
         // Count how many unique producers already have production orders that were SENT (not pending)
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
 
-        // Order is valid if it's paid, has external producers, NOT ALL producers have been sent POs yet, AND ready for logistics
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
-        const isValid = isPaid && hasExternalProducers && notAllProducersHaveSentPOs && readyForLogistics;
 
-        if (isValid) {
-          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
+        if (notAllProducersHaveSentPOs) {
+          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - productStatus: ${order.productStatus || 'to_buy'} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
         }
 
-        return isValid;
+        return notAllProducersHaveSentPOs;
       });
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
@@ -9806,7 +9803,7 @@ Para mais detalhes, entre em contato conosco!`;
                 const producer = await storage.getUser(item.producerId);
                 return {
                   ...item,
-                  producerName: producer?.name || null
+                  producerName: getProducerDisplayName(producer)
                 };
               }
               return item;
@@ -9956,7 +9953,7 @@ Para mais detalhes, entre em contato conosco!`;
             deliveryType: order?.deliveryType || 'delivery',
             clientPhone: clientPhone,
             clientEmail: clientEmail,
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             order: order ? {
               ...order,
               clientName: clientName,
@@ -10047,7 +10044,7 @@ Para mais detalhes, entre em contato conosco!`;
             clientPhone,
             clientEmail,
             vendorName: vendor?.name || 'Vendedor',
-            producerName: producer?.name || null,
+            producerName: getProducerDisplayName(producer),
             shippingAddress: finalShippingAddress,
             deliveryType: order.deliveryType || 'delivery'
           };

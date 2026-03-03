@@ -423,7 +423,8 @@ export default function LogisticsDashboard() {
             if (!itemsByProducer.has(item.producerId)) {
               itemsByProducer.set(item.producerId, {
                 producerId: item.producerId,
-                producerName: item.producerName || `Produtor ${item.producerId.slice(-6)}`,
+                // Usar nome do produtor da API (campo name cadastrado), nunca username ou ID
+                producerName: item.producerName || 'Produtor não identificado',
                 items: []
               });
             }
@@ -1822,7 +1823,7 @@ export default function LogisticsDashboard() {
                                         isCurrentProducer ? 'text-purple-700' :
                                         isExternal ? 'text-orange-700' : 'text-gray-700'
                                       }`}>
-                                        {isExternal ? (item.producerName || `Produtor ${item.producerId?.slice(-6)}`) : 'Produção Interna'}
+                                        {isExternal ? (item.producerName || 'Produtor não identificado') : 'Produção Interna'}
                                         {isCurrentProducer && ' (ATUAL)'}
                                       </p>
                                     </div>

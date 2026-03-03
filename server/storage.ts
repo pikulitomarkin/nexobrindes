@@ -2774,8 +2774,9 @@ export class MemStorage implements IStorage {
   }
 
   async getProductsByProducer(producerId: string): Promise<any[]> {
+    // Apenas produtos efetivamente vinculados a este produtor (não incluir 'internal')
     return Array.from(this.products.values()).filter(p =>
-      p.isActive && (p.producerId === producerId || p.producerId === 'internal')
+      p.isActive && p.producerId === producerId
     );
   }
 

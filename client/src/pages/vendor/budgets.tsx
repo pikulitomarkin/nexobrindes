@@ -2125,7 +2125,7 @@ export default function VendorBudgets() {
                         <CurrencyInput
                           id="down-payment"
                           value={Number(vendorBudgetForm.downPayment) || 0}
-                          onChange={(downPayment) => setVendorBudgetForm({ ...vendorBudgetForm, downPayment })}
+                          onChange={(downPayment) => setVendorBudgetForm(prev => ({ ...prev, downPayment }))}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2178,7 +2178,7 @@ export default function VendorBudgets() {
                         <CurrencyInput
                           id="shipping-cost"
                           value={Number(vendorBudgetForm.shippingCost) || 0}
-                          onChange={(shippingCost) => setVendorBudgetForm({ ...vendorBudgetForm, shippingCost })}
+                          onChange={(shippingCost) => setVendorBudgetForm(prev => ({ ...prev, shippingCost }))}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2188,7 +2188,7 @@ export default function VendorBudgets() {
                         <Label>Prazo Estimado de Entrega</Label>
                         <DateInput
                           value={vendorBudgetForm.deliveryDeadline}
-                          onChange={(v) => setVendorBudgetForm({ ...vendorBudgetForm, deliveryDeadline: v })}
+                          onChange={(v) => setVendorBudgetForm(prev => ({ ...prev, deliveryDeadline: v }))}
                           placeholder="DD/MM/AAAA"
                           showCalendar={true}
                         />

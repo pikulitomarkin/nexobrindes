@@ -1317,7 +1317,7 @@ export class PgStorage implements IStorage {
     limit?: number;
     search?: string;
     category?: string;
-    producer?: string; // Deprecated - não filtra mais por produtor. Produtor agora é escolhido por item no orçamento
+    producer?: string;
   }): Promise<{ products: Product[]; total: number; page: number; totalPages: number; }> {
     const page = options?.page || 1;
     const limit = options?.limit || 50;
@@ -1341,18 +1341,37 @@ export class PgStorage implements IStorage {
       conditions.push(eq(schema.products.category, options.category));
     }
 
-    // MUDANÇA: Remover filtro de produtor - produtos são agora globais
-    // Produtor é escolhido no nível do item do orçamento (budgetItems.producerId)
+    if (options?.producer) {
+      if (options.producer === 'internal') {
+        conditions.push(
+          or(
+            eq(schema.products.producerId, 'internal'),
+            isNull(schema.products.producerId)
+          ) as any
+        );
+      } else {
+        conditions.push(eq(schema.products.producerId, options.producer));
+      }
+    }
 
     const products = await pg.select().from(schema.products)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
 
-    // Enrich products info
+    // Enrich with producer names
+    const producerIds = [...new Set(products.map(p => p.producerId).filter(id => id && id !== 'internal'))];
+    const producerMap = new Map<string, string>();
+    for (const pid of producerIds) {
+      const user = await this.getUser(pid as string);
+      if (user) producerMap.set(pid as string, user.name);
+    }
+
     const enrichedProducts = products.map(product => ({
       ...product,
-      producerName: 'Será definido no orçamento'
+      producerName: product.producerId === 'internal' || !product.producerId
+        ? 'Interno'
+        : producerMap.get(product.producerId) || 'Produtor desconhecido'
     }));
 
     const totalResults = await pg.select({ count: sql<number>`count(*)` }).from(schema.products)
@@ -1572,8 +1591,15 @@ export class PgStorage implements IStorage {
   }
 
   async getProductsByProducer(producerId: string): Promise<Product[]> {
+    // Apenas produtos efetivamente vinculados a este produtor (producerId igual ao id do produtor)
+    if (!producerId || producerId === 'internal') {
+      return [];
+    }
     return await pg.select().from(schema.products)
-      .where(eq(schema.products.producerId, producerId));
+      .where(and(
+        eq(schema.products.producerId, producerId),
+        eq(schema.products.isActive, true)
+      ));
   }
 
   async getProductsGroupedByProducer(): Promise<{ [key: string]: Product[] }> {

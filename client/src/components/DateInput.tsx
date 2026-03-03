@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -24,7 +24,8 @@ interface DateInputProps extends Omit<React.ComponentProps<typeof Input>, "value
 
 /**
  * Input de data no formato brasileiro DD/MM/AAAA.
- * Valor interno e onChange usam YYYY-MM-DD para compatibilidade com API.
+ * Usa abordagem focus/blur desacoplada (igual ao CurrencyInput) para
+ * evitar que re-renders externos interfiram na digitação.
  */
 export function DateInput({
   value,
@@ -36,48 +37,55 @@ export function DateInput({
   className,
   ...props
 }: DateInputProps) {
-  const [localDisplay, setLocalDisplay] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [localValue, setLocalValue] = useState("");
   const [open, setOpen] = useState(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const localValueRef = useRef(localValue);
+  localValueRef.current = localValue;
 
-  const displayValue = localDisplay ?? (value ? formatDateToBR(value) : "");
+  const formattedExternal = value ? formatDateToBR(value) : "";
 
-  useEffect(() => {
-    if (!open && localDisplay !== null) {
-      setLocalDisplay(null);
-    }
-  }, [value, open]);
+  const handleFocus = () => {
+    setLocalValue(formattedExternal);
+    localValueRef.current = formattedExternal;
+    setFocused(true);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const masked = dateMask(raw);
+    const masked = dateMask(e.target.value);
+    setLocalValue(masked);
+    localValueRef.current = masked;
 
-    if (raw.length < 10) {
-      setLocalDisplay(masked);
-      return;
-    }
-
-    const iso = parseDateBR(masked);
-    if (iso) {
-      setLocalDisplay(null);
-      onChange(iso);
-    } else {
-      setLocalDisplay(masked);
+    if (masked.length === 10) {
+      const iso = parseDateBR(masked);
+      if (iso) {
+        onChangeRef.current(iso);
+      }
     }
   };
 
   const handleBlur = () => {
-    const iso = localDisplay ? parseDateBR(localDisplay) : value;
-    setLocalDisplay(null);
-    if (iso) onChange(iso);
+    const current = localValueRef.current;
+    setFocused(false);
+    if (current && current.length === 10) {
+      const iso = parseDateBR(current);
+      if (iso) onChangeRef.current(iso);
+    }
   };
 
   const handleSelect = (date: Date | undefined) => {
     if (!date) return;
     const iso = format(date, "yyyy-MM-dd");
-    setLocalDisplay(null);
-    onChange(iso);
+    setLocalValue("");
+    localValueRef.current = "";
+    setFocused(false);
+    onChangeRef.current(iso);
     setOpen(false);
   };
+
+  const displayValue = focused ? localValue : formattedExternal;
 
   const selectedDate = value ? new Date(value + "T12:00:00") : undefined;
   const minDate = min ? new Date(min + "T00:00:00") : undefined;
@@ -90,6 +98,7 @@ export function DateInput({
       inputMode="numeric"
       value={displayValue}
       onChange={handleChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
       placeholder={placeholder}
       className={cn(showCalendar && "pr-9", className)}

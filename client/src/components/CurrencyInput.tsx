@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { currencyMask, parseCurrencyValue, formatCurrencyForInput } from "@/utils/masks";
 
@@ -8,61 +8,46 @@ interface CurrencyInputProps extends Omit<React.ComponentProps<typeof Input>, "v
 }
 
 /**
- * Input monetário que aceita centavos no formato brasileiro (vírgula).
- * Preserva "5," durante a digitação para permitir "5,50".
+ * Input monetário brasileiro (vírgula decimal).
+ * Totalmente desacoplado do pai durante foco — usa refs para evitar
+ * closures stale e re-renders que truncam a digitação.
  */
 export function CurrencyInput({ value, onChange, placeholder = "0,00", maxLength, ...props }: CurrencyInputProps) {
-  const [localDisplay, setLocalDisplay] = useState<string | null>(null);
-  const isFocusedRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
+  const [localValue, setLocalValue] = useState("");
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const localValueRef = useRef(localValue);
+  localValueRef.current = localValue;
 
-  // Nunca limitar caracteres - valores monetários podem ser longos (ex: R$ 1.234,56)
-  const displayValue = localDisplay ?? (value > 0 ? formatCurrencyForInput(value) : "");
-
-  useEffect(() => {
-    if (!isFocusedRef.current && localDisplay !== null) {
-      setLocalDisplay(null);
-    }
-  }, [value]);
+  const formattedExternal = value > 0 ? formatCurrencyForInput(value) : "";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const masked = currencyMask(raw);
-
-    const clean = raw.replace(/[R$\s.]/g, "");
-    const parts = clean.split(",");
-
-    // Preserva estado intermediário para permitir digitar centavos:
-    // - "5" (sem vírgula ainda, usuário pode digitar ",50")
-    // - "5," ou "5,0" ou "5,5" (digitando centavos)
-    const hasIncompleteDecimals = parts.length === 2 && parts[1].length < 2;
-    const hasOnlyInteger = parts.length === 1 && clean.length > 0;
-    if (hasIncompleteDecimals || hasOnlyInteger) {
-      setLocalDisplay(masked);
-      return;
-    }
-
-    const num = parseCurrencyValue(masked);
-    setLocalDisplay(null);
-    onChange(num);
-  };
-
-  const handleBlur = () => {
-    isFocusedRef.current = false;
-    const num = localDisplay !== null ? parseCurrencyValue(localDisplay) : value;
-    setLocalDisplay(null);
-    onChange(num);
+    const masked = currencyMask(e.target.value);
+    setLocalValue(masked);
+    localValueRef.current = masked;
   };
 
   const handleFocus = () => {
-    isFocusedRef.current = true;
+    setLocalValue(formattedExternal);
+    localValueRef.current = formattedExternal;
+    setFocused(true);
+  };
+
+  const handleBlur = () => {
+    const num = parseCurrencyValue(localValueRef.current);
+    setFocused(false);
+    onChangeRef.current(num);
   };
 
   return (
     <Input
       {...props}
+      ref={inputRef}
       type="text"
       inputMode="decimal"
-      value={displayValue}
+      value={focused ? localValue : formattedExternal}
       onChange={handleChange}
       onBlur={handleBlur}
       onFocus={handleFocus}

@@ -2210,7 +2210,7 @@ export default function AdminBudgets() {
                         <CurrencyInput
                           id="admin-down-payment"
                           value={Number(adminBudgetForm.downPayment) || 0}
-                          onChange={(downPayment) => setAdminBudgetForm({ ...adminBudgetForm, downPayment })}
+                          onChange={(downPayment) => setAdminBudgetForm(prev => ({ ...prev, downPayment }))}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2263,7 +2263,7 @@ export default function AdminBudgets() {
                         <CurrencyInput
                           id="admin-shipping-cost"
                           value={Number(adminBudgetForm.shippingCost) || 0}
-                          onChange={(shippingCost) => setAdminBudgetForm({ ...adminBudgetForm, shippingCost })}
+                          onChange={(shippingCost) => setAdminBudgetForm(prev => ({ ...prev, shippingCost }))}
                           placeholder="R$ 0,00"
                           required
                         />
@@ -2273,7 +2273,7 @@ export default function AdminBudgets() {
                         <Label>Prazo Estimado de Entrega</Label>
                         <DateInput
                           value={adminBudgetForm.deliveryDeadline}
-                          onChange={(v) => setAdminBudgetForm({ ...adminBudgetForm, deliveryDeadline: v })}
+                          onChange={(v) => setAdminBudgetForm(prev => ({ ...prev, deliveryDeadline: v }))}
                           placeholder="DD/MM/AAAA"
                           showCalendar={true}
                         />
