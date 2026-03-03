@@ -1346,10 +1346,10 @@ export default function AdminBudgets() {
             setBudgetProductSearch("");
             setBudgetCategoryFilter("all");
           }
-          if (open) openingForEditRef.current = false; // Limpar após abrir
           if (!open) {
             setIsEditMode(false);
             setEditingBudgetId(null);
+            openingForEditRef.current = false; // Limpar apenas ao fechar (não ao abrir)
           }
         }}>
           <DialogTrigger asChild>
