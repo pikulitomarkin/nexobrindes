@@ -1935,6 +1935,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Order ${id} has ${allItems.length} total items`);
 
+      // Verify that the order has passed the stock verification stage
+      if (order.productStatus !== 'in_store') {
+        const statusMsg = order.productStatus === 'to_buy' ? 'Aguardando Compra' :
+          order.productStatus === 'purchased' ? 'Comprado' :
+            order.productStatus || 'Desconhecido';
+        return res.status(400).json({
+          error: `O pedido precisa ter todos os itens 'Na Loja' antes de ser enviado à produção. Status atual: ${statusMsg}`
+        });
+      }
+
       // If no items found, return error
       if (!allItems || allItems.length === 0) {
         return res.status(400).json({ error: "Nenhum item encontrado no pedido" });
@@ -9754,14 +9764,16 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid but not yet fully sent to production
-      // BUG NOVO #3 fix: qualquer pagamento recebido (paidValue > 0) é suficiente para
-      // o pedido aparecer no Dashboard — não exigir productStatus='in_store' nem pagamento mínimo
+      // ETAPA 2: O pedido só aparece no Dashboard (Envio Manual) se estiver "Na Loja"
       const paidOrders = orders.filter(order => {
-        const totalValue = parseFloat(order.totalValue || '0');
         const paidValue = parseFloat(order.paidValue || '0');
         const isPaid = paidValue > 0;
 
         if (!isPaid) return false;
+
+        // Regra de Negócio: O pedido SÓ vai para o Dashboard após todos os itens 
+        // passarem pela Aba Pedidos (onde recebem o status 'in_store')
+        if (order.productStatus !== 'in_store') return false;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -9785,7 +9797,7 @@ Para mais detalhes, entre em contato conosco!`;
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
 
         if (notAllProducersHaveSentPOs) {
-          console.log(`Valid paid order: ${order.orderNumber} - Paid: R$ ${paidValue} / Total: R$ ${totalValue} - productStatus: ${order.productStatus || 'to_buy'} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
+          console.log(`Valid paid order for Dashboard: ${order.orderNumber} - Paid: R$ ${paidValue} - productStatus: ${order.productStatus} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
         }
 
         return notAllProducersHaveSentPOs;
@@ -9883,7 +9895,10 @@ Para mais detalhes, entre em contato conosco!`;
   // Get production orders for logistics tracking
   app.get("/api/logistics/production-orders", async (req, res) => {
     try {
-      const productionOrders = await storage.getProductionOrders();
+      const allProductionOrders = await storage.getProductionOrders();
+      // ETAPA 3: Acompanhar Produção
+      // Apenas pedidos que já foram enviados manualmente ao produtor (status != 'pending')
+      const productionOrders = allProductionOrders.filter(po => po.status !== 'pending');
 
       const enrichedOrders = await Promise.all(
         productionOrders.map(async (po) => {
