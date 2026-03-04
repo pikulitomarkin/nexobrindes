@@ -883,12 +883,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isValid;
       });
 
-      // Remove duplicates based on productId, producerId, quantity, and unitPrice
+      // Remove duplicates based on productId, producerId, quantity, unitPrice, and notes/customizations
       const uniqueValidItems = [];
       const seenItemKeys = new Set();
 
       for (const item of validItems) {
-        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+        const notesFlag = item.notes ? item.notes.substring(0, 10) : '';
+        const custom1 = item.itemCustomizationDescription ? item.itemCustomizationDescription.substring(0, 10) : '';
+        const custom2 = item.generalCustomizationName ? item.generalCustomizationName.substring(0, 10) : '';
+        const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}-${notesFlag}-${custom1}-${custom2}`;
+
         if (!seenItemKeys.has(itemKey)) {
           seenItemKeys.add(itemKey);
           uniqueValidItems.push(item);
@@ -8382,7 +8386,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Remove duplicate items before processing
           const seenItems = new Set();
           const uniqueItems = budgetData.items.filter(item => {
-            const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}`;
+            const notesFlag = item.notes ? item.notes.substring(0, 10) : '';
+            const custom1 = item.itemCustomizationDescription ? item.itemCustomizationDescription.substring(0, 10) : '';
+            const custom2 = item.generalCustomizationName ? item.generalCustomizationName.substring(0, 10) : '';
+            const itemKey = `${item.productId}-${item.producerId || 'internal'}-${item.quantity}-${item.unitPrice}-${notesFlag}-${custom1}-${custom2}`;
+
             if (seenItems.has(itemKey)) {
               console.log(`[UPDATE BUDGET] Removing duplicate: ${item.productName} (${itemKey})`);
               return false;
@@ -8658,12 +8666,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Orçamento não encontrado" });
       }
 
-      // Regra: approved/admin_approved sempre permitem. draft permite apenas se nenhum item abaixo do mínimo.
-      const allowedStatuses = ['approved', 'admin_approved'];
+      // Regra: approved/admin_approved/sent sempre permitem. draft permite apenas se nenhum item abaixo do mínimo.
+      const allowedStatuses = ['approved', 'admin_approved', 'sent'];
       const needsApproval = await checkBudgetNeedsApproval(id, storage);
 
       if (budget.status && allowedStatuses.includes(budget.status)) {
-        // approved ou admin_approved: OK
+        // approved, admin_approved ou sent: OK
       } else if (budget.status === 'draft' && !needsApproval) {
         // draft sem itens abaixo do mínimo: OK
       } else if (budget.status === 'draft' && needsApproval) {
@@ -8672,7 +8680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else if (budget.status && !allowedStatuses.includes(budget.status)) {
         return res.status(400).json({
-          error: `Orçamento com status '${budget.status}' não pode ser convertido. Status permitidos: aprovado, aprovado pelo admin, ou rascunho (quando todos os itens estão no preço mínimo).`
+          error: `Orçamento com status '${budget.status}' não pode ser convertido. Status permitidos: enviado, aprovado, aprovado pelo admin, ou rascunho (quando todos os itens estão no preço mínimo).`
         });
       }
 
