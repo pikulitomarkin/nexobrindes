@@ -2228,11 +2228,10 @@ export class PgStorage implements IStorage {
     const items = await pg.select().from(schema.budgetItems)
       .where(eq(schema.budgetItems.budgetId, order.budgetId));
 
-    const externalItems = items.filter(item => item.producerId && item.producerId !== 'internal');
+    // Verifica TODOS os itens (internos e externos) — sem filtrar por producerId
+    if (items.length === 0) return true;
 
-    if (externalItems.length === 0) return true;
-
-    return externalItems.every(item => item.purchaseStatus === 'in_store');
+    return items.every(item => item.purchaseStatus === 'in_store');
   }
 
   // ==================== BUDGET PHOTOS ====================

@@ -1944,18 +1944,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let allItemsInStoreForProduction = false;
       if (order.budgetId) {
         const checkItems = await storage.getBudgetItems(order.budgetId);
-        const externalCheckItems = checkItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
-        allItemsInStoreForProduction = externalCheckItems.length === 0 || externalCheckItems.every((item: any) => item.purchaseStatus === 'in_store');
+        // TODOS os itens (internos e externos) devem estar 'in_store'
+        allItemsInStoreForProduction = checkItems.length === 0 || checkItems.every((item: any) => item.purchaseStatus === 'in_store');
       }
       if (!allItemsInStoreForProduction) {
-        // Determinar status atual baseado nos items
         const checkItems = order.budgetId ? await storage.getBudgetItems(order.budgetId) : [];
-        const externalItems = checkItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
-        const allPurchased = externalItems.every((item: any) => item.purchaseStatus === 'purchased' || item.purchaseStatus === 'in_store');
-        const statusMsg = externalItems.length === 0 ? 'Sem itens externos' :
-          allPurchased ? 'Comprado' : 'Aguardando Compra';
+        const pendingItems = checkItems.filter((item: any) => item.purchaseStatus !== 'in_store');
         return res.status(400).json({
-          error: `O pedido precisa ter todos os itens 'Na Loja' antes de ser enviado à produção. Status atual: ${statusMsg}`
+          error: `O pedido precisa ter todos os itens 'Na Loja' antes de ser enviado à produção. ${pendingItems.length} item(s) ainda não estão na loja.`
         });
       }
 
@@ -2006,10 +2002,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[PRODUCTION DEBUG] Processing ${itemsByProducer.size} producers`);
 
       if (itemsByProducer.size === 0) {
-        const errorMsg = producerId ?
-          `Nenhum item encontrado para o produtor especificado (${producerId})` :
-          `Nenhum item de produção externa encontrado`;
-        return res.status(400).json({ error: errorMsg });
+        if (producerId) {
+          return res.status(400).json({ error: `Nenhum item encontrado para o produtor especificado (${producerId})` });
+        }
+        // Pedido só com itens internos (estoque próprio) — sem produtor externo
+        // Atualiza o status do pedido para 'production' para rastrear na Aba Acompanhar Produção
+        await storage.updateOrder(order.id, { status: 'production' });
+        console.log(`[SEND-TO-PRODUCTION] Pedido interno ${order.orderNumber} atualizado para status 'production'`);
+        return res.json({
+          success: true,
+          message: 'Pedido com itens internos enviado para produção/despacho',
+          orders: [],
+          isInternalOnly: true
+        });
       }
 
       // If a specific producer was requested, make sure ONLY that producer is being processed
@@ -3151,8 +3156,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { producerId } = req.params;
       console.log(`Fetching production orders for producer: ${producerId}`);
 
-      const productionOrders = await storage.getProductionOrdersByProducer(producerId);
-      console.log(`Found ${productionOrders.length} production orders for producer ${producerId}`);
+      const allProductionOrdersForProducer = await storage.getProductionOrdersByProducer(producerId);
+      // IMPORTANTE: Somente exibir ordens que foram enviadas manualmente (status != 'pending')
+      // Ordens com status 'pending' são criadas durante a conversão do orçamento e não devem
+      // aparecer na visão do produtor antes do envio manual pelo Dashboard da logística.
+      const productionOrders = allProductionOrdersForProducer.filter(po => po.status !== 'pending');
+      console.log(`Found ${productionOrders.length} non-pending production orders for producer ${producerId} (total: ${allProductionOrdersForProducer.length})`);
 
       // Enrich with order and client information
       const enrichedOrders = await Promise.all(
@@ -9688,14 +9697,12 @@ Para mais detalhes, entre em contato conosco!`;
 
         const budgetItems = await storage.getBudgetItems(order.budgetId);
 
-        // Verificar se todos os itens externos já estão em 'in_store'
-        const externalItems = budgetItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
-        if (externalItems.length > 0) {
-          const allExternalInStore = externalItems.every((item: any) => item.purchaseStatus === 'in_store');
-          if (allExternalInStore) {
-            // Todos os itens já estão na loja — pedido vai para o Dashboard (envio manual)
-            continue;
-          }
+        // Verificar se TODOS os itens já estão em 'in_store' (inclui internos e externos)
+        // Se todos estiverem na loja, o pedido já foi para o Dashboard
+        const allItemsInStoreDI = budgetItems.length > 0 && budgetItems.every((item: any) => item.purchaseStatus === 'in_store');
+        if (allItemsInStoreDI) {
+          // Todos os itens já estão na loja — pedido migrou para o Dashboard (envio manual)
+          continue;
         }
 
         let clientName = order.contactName;
@@ -9712,9 +9719,9 @@ Para mais detalhes, entre em contato conosco!`;
 
         let itemCount = 0;
         for (const item of budgetItems) {
-          if (!item.producerId || item.producerId === 'internal') continue;
-
-          const producer = await storage.getUser(item.producerId);
+          // MOSTRAR TODOS OS ITENS: internos e externos
+          const isInternal = !item.producerId || item.producerId === 'internal';
+          const producer = isInternal ? null : await storage.getUser(item.producerId);
           const product = await storage.getProduct(item.productId);
 
           const purchaseStatus = item.purchaseStatus || 'to_buy';
@@ -9750,7 +9757,7 @@ Para mais detalhes, entre em contato conosco!`;
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
             producerId: item.producerId,
-            producerName: producer?.name || 'Produtor',
+            producerName: producer?.name || ((!item.producerId || item.producerId === 'internal') ? 'Estoque Interno' : 'Produtor Externo'),
             productCode: product?.friendlyCode || product?.externalCode || product?.compositeCode || product?.code || item.productCode || null,
             purchaseStatus: purchaseStatus,
             deliveryDeadline: order.deliveryDeadline || order.deadline,
@@ -9767,7 +9774,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         if (itemCount === 0 && budgetItems.length > 0) {
-          console.log(`[DROPSHIPPING-ITEMS] Order ${order.orderNumber}: ${budgetItems.length} budget items, mas nenhum com producerId externo. ProducerIds:`, budgetItems.map((i: any) => i.producerId));
+          console.log(`[DROPSHIPPING-ITEMS] Order ${order.orderNumber}: ${budgetItems.length} budget items, mas nenhum foi adicionado. ProducerIds:`, budgetItems.map((i: any) => i.producerId));
         }
       }
 
@@ -9871,8 +9878,8 @@ Para mais detalhes, entre em contato conosco!`;
       let updatedCount = 0;
 
       for (const item of items) {
-        // Only update items with external producers that are still pending
-        if (item.producerId && item.producerId !== 'internal' && (!item.purchaseStatus || item.purchaseStatus === 'pending')) {
+        // Atualizar TODOS os itens (internos e externos) que ainda estão 'pending'
+        if (!item.purchaseStatus || item.purchaseStatus === 'pending') {
           await storage.updateBudgetItemPurchaseStatus(item.id, 'to_buy');
           updatedCount++;
         }
@@ -9944,13 +9951,13 @@ Para mais detalhes, entre em contato conosco!`;
         if (!order.budgetId) return null;
 
         const budgetItemsForCheck = await storage.getBudgetItems(order.budgetId);
-        const externalItemsForCheck = budgetItemsForCheck.filter((item: any) => item.producerId && item.producerId !== 'internal');
-        const allExternalItemsInStore = externalItemsForCheck.length > 0 && 
-          externalItemsForCheck.every((item: any) => item.purchaseStatus === 'in_store');
+        // Regra: TODOS os itens (internos e externos) devem estar 'in_store' para ir ao Dashboard
+        const allItemsInStoreDash = budgetItemsForCheck.length > 0 &&
+          budgetItemsForCheck.every((item: any) => item.purchaseStatus === 'in_store');
 
-        if (!allExternalItemsInStore) return null;
+        if (!allItemsInStoreDash) return null;
 
-        // Check if order has items with external producers
+        // Identificar produtores externos únicos neste pedido
         let hasExternalProducers = false;
         let uniqueProducers = new Set<string>();
 
@@ -9962,12 +9969,20 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        if (!hasExternalProducers) return null;
-
         // Count how many unique producers already have production orders that were SENT (not pending)
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
         const sentPOs = existingPOs.filter(po => po.status !== 'pending');
         const producersWithSentPOs = new Set(sentPOs.map(po => po.producerId));
+
+        if (uniqueProducers.size === 0) {
+          // Pedido só com itens internos (sem produtor externo)
+          // Aparece no Dashboard enquanto não houver PO enviada para este pedido
+          if (sentPOs.length === 0) {
+            console.log(`Valid paid order for Dashboard (internal-only): ${order.orderNumber} - Paid: R$ ${paidValue} - All items in_store`);
+            return Object.assign({}, order, { items, hasExternalProducers, uniqueProducers, paidValue });
+          }
+          return null;
+        }
 
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
 
@@ -10165,8 +10180,60 @@ Para mais detalhes, entre em contato conosco!`;
       // Filter out null entries
       const validOrders = enrichedOrders.filter(order => order !== null);
 
-      console.log(`Returning ${validOrders.length} enriched production orders`);
-      res.json(validOrders);
+      // Incluir pedidos apenas com itens internos (sem produção externa) que estão em 'production'
+      // Esses pedidos não possuem production_orders e são rastreados pelo status do próprio pedido
+      const allOrdersForInternal = await storage.getOrders();
+      const orderIdsWithPO = new Set(allProductionOrders.map((po: any) => po.orderId));
+      const internalProductionItems = allOrdersForInternal.filter((o: any) => o.status === 'production' && !orderIdsWithPO.has(o.id));
+
+      const enrichedInternalOrders = await Promise.all(
+        internalProductionItems.map(async (o: any) => {
+          let clientName = o.contactName;
+          let clientAddress = null;
+          let clientPhone = o.contactPhone;
+          let clientEmail = o.contactEmail;
+
+          if (o.clientId) {
+            let clientRecord = await storage.getClient(o.clientId);
+            if (!clientRecord) clientRecord = await storage.getClientByUserId(o.clientId);
+            if (clientRecord) {
+              if (!clientName) clientName = clientRecord.name;
+              clientAddress = clientRecord.enderecoEntregaLogradouro
+                ? `${clientRecord.enderecoEntregaLogradouro}, ${clientRecord.enderecoEntregaNumero || 's/n'}${clientRecord.enderecoEntregaComplemento ? ` - ${clientRecord.enderecoEntregaComplemento}` : ''}, ${clientRecord.enderecoEntregaBairro || ''}, ${clientRecord.enderecoEntregaCidade || ''}, CEP: ${clientRecord.enderecoEntregaCep || ''}`
+                : clientRecord.address;
+              clientPhone = clientPhone || clientRecord.phone;
+              clientEmail = clientEmail || clientRecord.email;
+            }
+          }
+          if (!clientName) clientName = 'Nome não informado';
+          const finalAddr = o.deliveryType === 'pickup' ? 'Sede Principal - Retirada no Local'
+            : (o.shippingAddress || clientAddress || 'Endereço não informado');
+
+          return {
+            id: `internal-${o.id}`,
+            orderId: o.id,
+            producerId: null,
+            producerName: 'Estoque Interno',
+            status: 'production',
+            isInternalOnly: true,
+            orderNumber: o.orderNumber,
+            product: o.product,
+            clientName,
+            clientAddress: finalAddr,
+            shippingAddress: finalAddr,
+            deliveryType: o.deliveryType || 'delivery',
+            clientPhone,
+            clientEmail,
+            deadline: o.deadline,
+            deliveryDeadline: o.deliveryDeadline,
+            order: { ...o, clientName, clientAddress: finalAddr, shippingAddress: finalAddr, clientPhone, clientEmail, deliveryType: o.deliveryType || 'delivery' }
+          };
+        })
+      );
+
+      const allResults = [...validOrders, ...enrichedInternalOrders];
+      console.log(`Returning ${allResults.length} production orders (${validOrders.length} external + ${enrichedInternalOrders.length} internal)`);
+      res.json(allResults);
     } catch (error) {
       console.error("Error fetching production orders:", error);
       res.status(500).json({ error: "Failed to fetch production orders" });
