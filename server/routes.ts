@@ -1940,10 +1940,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Order ${id} has ${allItems.length} total items`);
 
       // Verify that the order has passed the stock verification stage
-      if (order.productStatus !== 'in_store') {
-        const statusMsg = order.productStatus === 'to_buy' ? 'Aguardando Compra' :
-          order.productStatus === 'purchased' ? 'Comprado' :
-            order.productStatus || 'Desconhecido';
+      // Verificar diretamente nos budget_items (coluna productStatus não existe na tabela orders)
+      let allItemsInStoreForProduction = false;
+      if (order.budgetId) {
+        const checkItems = await storage.getBudgetItems(order.budgetId);
+        const externalCheckItems = checkItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
+        allItemsInStoreForProduction = externalCheckItems.length === 0 || externalCheckItems.every((item: any) => item.purchaseStatus === 'in_store');
+      }
+      if (!allItemsInStoreForProduction) {
+        // Determinar status atual baseado nos items
+        const checkItems = order.budgetId ? await storage.getBudgetItems(order.budgetId) : [];
+        const externalItems = checkItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
+        const allPurchased = externalItems.every((item: any) => item.purchaseStatus === 'purchased' || item.purchaseStatus === 'in_store');
+        const statusMsg = externalItems.length === 0 ? 'Sem itens externos' :
+          allPurchased ? 'Comprado' : 'Aguardando Compra';
         return res.status(400).json({
           error: `O pedido precisa ter todos os itens 'Na Loja' antes de ser enviado à produção. Status atual: ${statusMsg}`
         });
@@ -7881,8 +7891,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate that the order has gone through the correct workflow
       // Products must be in_store before marking as delivered
-      if (order.productStatus !== 'in_store') {
-        console.log(`Order ${id} cannot be delivered - products not in store yet (status: ${order.productStatus})`);
+      // Verificar diretamente nos budget_items (coluna productStatus não existe na tabela orders)
+      let productsInStore = false;
+      if (order.budgetId) {
+        const checkItems = await storage.getBudgetItems(order.budgetId);
+        const externalItems = checkItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
+        productsInStore = externalItems.length === 0 || externalItems.every((item: any) => item.purchaseStatus === 'in_store');
+      }
+      if (!productsInStore) {
+        console.log(`Order ${id} cannot be delivered - products not in store yet`);
         return res.status(400).json({
           error: "Os produtos ainda não estão na loja. Complete a etapa de compra primeiro."
         });
@@ -9445,15 +9462,33 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid and have external producers (dropshipping candidates)
-      const dropshippingOrders = orders.filter(order => {
+      const dropshippingOrdersPromises = orders.map(async (order) => {
         // Order must be cancelled to be excluded
-        if (order.status === 'cancelled') return false;
+        if (order.status === 'cancelled') return null;
 
         // Check payment status - order must have received some payment
-        const paidValue = parseFloat(order.paidValue || '0');
-        const isPaid = paidValue > 0;
+        let paidValue = parseFloat(order.paidValue || '0');
 
-        if (!isPaid) return false;
+        if (paidValue <= 0) {
+          // Fallback 1: verificar tabela de pagamentos
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const confirmedPayments = payments.filter((p: any) => p.status === 'confirmed');
+          paidValue = confirmedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+        }
+
+        if (paidValue <= 0) {
+          // Fallback 2: verificar contas a receber
+          try {
+            const receivables = await storage.getAccountsReceivable();
+            const orderReceivable = receivables.find((r: any) => r.orderId === order.id);
+            if (orderReceivable) {
+              const receivedAmount = parseFloat(orderReceivable.receivedAmount || '0');
+              if (receivedAmount > 0) paidValue = receivedAmount;
+            }
+          } catch (arError) { /* silently continue */ }
+        }
+
+        if (paidValue <= 0) return null;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -9467,7 +9502,7 @@ Para mais detalhes, entre em contato conosco!`;
         }
 
         // Order must have external producers
-        if (!hasExternalProducers) return false;
+        if (!hasExternalProducers) return null;
 
         // Check if already fully sent to production
         let uniqueProducers = new Set<string>();
@@ -9484,8 +9519,11 @@ Para mais detalhes, entre em contato conosco!`;
         // Exclude if ALL producers have been sent POs already
         const allProducersHaveSentPOs = uniqueProducers.size > 0 && uniqueProducers.size === producersWithSentPOs.size;
 
-        return !allProducersHaveSentPOs;
+        return !allProducersHaveSentPOs ? order : null;
       });
+
+      const resolvedDropshippingOrders = await Promise.all(dropshippingOrdersPromises);
+      const dropshippingOrders = resolvedDropshippingOrders.filter(Boolean);
 
       console.log(`Found ${dropshippingOrders.length} dropshipping orders`);
 
@@ -9523,13 +9561,24 @@ Para mais detalhes, entre em contato conosco!`;
             }
           }
 
+          // Calcular productStatus baseado nos budget items (coluna não existe na tabela orders)
+          const budgetItemsForStatus = order.budgetId ? await storage.getBudgetItems(order.budgetId) : [];
+          const externalItemsForStatus = budgetItemsForStatus.filter((item: any) => item.producerId && item.producerId !== 'internal');
+          let computedProductStatus = 'to_buy';
+          if (externalItemsForStatus.length > 0) {
+            const allInStore = externalItemsForStatus.every((item: any) => item.purchaseStatus === 'in_store');
+            const allPurchased = externalItemsForStatus.every((item: any) => item.purchaseStatus === 'purchased' || item.purchaseStatus === 'in_store');
+            if (allInStore) computedProductStatus = 'in_store';
+            else if (allPurchased) computedProductStatus = 'purchased';
+          }
+
           return {
             ...order,
             items: enrichedItems,
             clientName: clientName,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
-            productStatus: order.productStatus || 'to_buy'
+            productStatus: computedProductStatus
           };
         })
       );
@@ -9589,27 +9638,66 @@ Para mais detalhes, entre em contato conosco!`;
       const orders = await storage.getOrders();
       const allItems: any[] = [];
 
+      // Carregar contas a receber uma vez para evitar N consultas no loop
+      let allReceivables: any[] = [];
+      try {
+        allReceivables = await storage.getAccountsReceivable();
+      } catch (arError) {
+        console.error('[DROPSHIPPING-ITEMS] Erro ao carregar contas a receber:', arError);
+      }
+
       for (const order of orders) {
         if (order.status === 'cancelled') continue;
 
-        // Verifica o paidValue no pedido OU soma dos pagamentos para ter a info correta (pagamento parcial também conta)
+        // Verifica o paidValue no pedido OU soma dos pagamentos OU contas a receber
         let paidValue = parseFloat(order.paidValue || '0');
 
         if (paidValue <= 0) {
-          // Se o order.paidValue for 0, busca na tabela de pagamentos para garantir a sincronia de Parciais
+          // Fallback 1: busca na tabela de pagamentos para garantir a sincronia de Parciais
           const payments = await storage.getPaymentsByOrder(order.id);
           const confirmedPayments = payments.filter((p: any) => p.status === 'confirmed');
           const totalPaid = confirmedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
           paidValue = totalPaid;
         }
 
-        // Se após a verificação o pedido continuar zerado, pula
-        if (paidValue <= 0) continue;
+        if (paidValue <= 0) {
+          // Fallback 2: verificar contas a receber (accounts receivable) para pagamento parcial
+          const orderReceivable = allReceivables.find((r: any) => r.orderId === order.id);
+          if (orderReceivable) {
+            const receivedAmount = parseFloat(orderReceivable.receivedAmount || '0');
+            if (receivedAmount > 0) {
+              paidValue = receivedAmount;
+              console.log(`[DROPSHIPPING-ITEMS] Order ${order.orderNumber}: paidValue recuperado via contas a receber = R$ ${paidValue}`);
+            }
+          }
+        }
 
-        if (!order.budgetId) continue;
-        if (order.productStatus === 'in_store') continue;
+        // Se após todas as verificações o pedido continuar zerado, pula
+        if (paidValue <= 0) {
+          continue;
+        }
+
+        if (!order.budgetId) {
+          console.log(`[DROPSHIPPING-ITEMS] Order ${order.orderNumber} skipped: sem budgetId`);
+          continue;
+        }
+
+        // Verificar se TODOS os itens externos já estão na loja (in_store)
+        // Se sim, o pedido já foi encaminhado para o Dashboard e não precisa mais aparecer aqui
+        // NOTA: NÃO usamos order.productStatus pois essa coluna não existe na tabela orders do DB
 
         const budgetItems = await storage.getBudgetItems(order.budgetId);
+
+        // Verificar se todos os itens externos já estão em 'in_store'
+        const externalItems = budgetItems.filter((item: any) => item.producerId && item.producerId !== 'internal');
+        if (externalItems.length > 0) {
+          const allExternalInStore = externalItems.every((item: any) => item.purchaseStatus === 'in_store');
+          if (allExternalInStore) {
+            // Todos os itens já estão na loja — pedido vai para o Dashboard (envio manual)
+            continue;
+          }
+        }
+
         let clientName = order.contactName;
         let clientPhone = order.contactPhone;
 
@@ -9622,6 +9710,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
+        let itemCount = 0;
         for (const item of budgetItems) {
           if (!item.producerId || item.producerId === 'internal') continue;
 
@@ -9674,8 +9763,15 @@ Para mais detalhes, entre em contato conosco!`;
             productHeight: item.productHeight,
             productDepth: item.productDepth
           });
+          itemCount++;
+        }
+
+        if (itemCount === 0 && budgetItems.length > 0) {
+          console.log(`[DROPSHIPPING-ITEMS] Order ${order.orderNumber}: ${budgetItems.length} budget items, mas nenhum com producerId externo. ProducerIds:`, budgetItems.map((i: any) => i.producerId));
         }
       }
+
+      console.log(`[DROPSHIPPING-ITEMS] Total: ${allItems.length} itens de ${orders.length} pedidos`);
 
       // Sort by purchase status priority: to_buy first, then purchased, then in_store
       const statusPriority: Record<string, number> = {
@@ -9734,12 +9830,12 @@ Para mais detalhes, entre em contato conosco!`;
           // Check if all items are now in_store
           const allInStore = await storage.checkAllItemsInStore(order.id);
 
-          if (allInStore && order.productStatus !== 'in_store') {
-            // Update order productStatus to 'in_store' when all items are in store
-            // This makes the order appear in the production queue (Dashboard)
-            await storage.updateOrder(order.id, { productStatus: 'in_store' });
+          if (allInStore) {
+            // Todos os itens estão na loja — pedido está pronto para o Dashboard (envio manual)
+            // NOTA: Não atualizamos order.productStatus pois essa coluna não existe na tabela orders.
+            // O Dashboard verifica diretamente os budget_items.
             allItemsReady = true;
-            console.log(`Order ${order.orderNumber} automatically moved to 'in_store' - all items ready for production queue`);
+            console.log(`Order ${order.orderNumber} - all items in_store - ready for production queue (Dashboard)`);
           }
         }
       }
@@ -9811,7 +9907,7 @@ Para mais detalhes, entre em contato conosco!`;
       }
 
       // Filter orders that are paid but not yet fully sent to production
-      // ETAPA 2: O pedido só aparece no Dashboard (Envio Manual) se estiver "Na Loja"
+      // ETAPA 2: O pedido só aparece no Dashboard (Envio Manual) se TODOS os itens estiverem "Na Loja"
       const paidOrdersFilteredPromises = orders.map(async (order) => {
         let paidValue = parseFloat(order.paidValue || '0');
 
@@ -9821,13 +9917,38 @@ Para mais detalhes, entre em contato conosco!`;
           paidValue = confirmedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
         }
 
+        if (paidValue <= 0) {
+          // Fallback: verificar contas a receber
+          try {
+            const receivables = await storage.getAccountsReceivable();
+            const orderReceivable = receivables.find((r: any) => r.orderId === order.id);
+            if (orderReceivable) {
+              const receivedAmount = parseFloat(orderReceivable.receivedAmount || '0');
+              if (receivedAmount > 0) {
+                paidValue = receivedAmount;
+              }
+            }
+          } catch (arError) {
+            // silently continue
+          }
+        }
+
         const isPaid = paidValue > 0;
 
         if (!isPaid) return null;
 
         // Regra de Negócio: O pedido SÓ vai para o Dashboard após todos os itens 
         // passarem pela Aba Pedidos (onde recebem o status 'in_store')
-        if (order.productStatus !== 'in_store') return null;
+        // NOTA: Verificamos diretamente nos budget_items, pois a coluna productStatus
+        // não existe na tabela orders do banco de dados.
+        if (!order.budgetId) return null;
+
+        const budgetItemsForCheck = await storage.getBudgetItems(order.budgetId);
+        const externalItemsForCheck = budgetItemsForCheck.filter((item: any) => item.producerId && item.producerId !== 'internal');
+        const allExternalItemsInStore = externalItemsForCheck.length > 0 && 
+          externalItemsForCheck.every((item: any) => item.purchaseStatus === 'in_store');
+
+        if (!allExternalItemsInStore) return null;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -9851,7 +9972,7 @@ Para mais detalhes, entre em contato conosco!`;
         const notAllProducersHaveSentPOs = uniqueProducers.size > producersWithSentPOs.size;
 
         if (notAllProducersHaveSentPOs) {
-          console.log(`Valid paid order for Dashboard: ${order.orderNumber} - Paid: R$ ${paidValue} - productStatus: ${order.productStatus} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
+          console.log(`Valid paid order for Dashboard: ${order.orderNumber} - Paid: R$ ${paidValue} - All items in_store - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
           // Adicionamos os items dentro da order para o processamento a seguir funcionar
           return Object.assign({}, order, { items, hasExternalProducers, uniqueProducers, paidValue });
         }
