@@ -8,6 +8,9 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -30,11 +33,23 @@ export async function setupVite(app: Express, server: Server) {
     ...viteConfig,
     configFile: false,
     customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
+      info(msg, options) {
+        viteLogger.info(msg, options);
       },
+      error(msg, options) {
+        viteLogger.error(msg, options);
+      },
+      warn(msg, options) {
+        viteLogger.warn(msg, options);
+      },
+      warnOnce(msg, options) {
+        viteLogger.warnOnce(msg, options);
+      },
+      clearScreen() { },
+      hasErrorLogged(error) {
+        return viteLogger.hasErrorLogged(error);
+      },
+      hasWarned: false,
     },
     server: serverOptions,
     appType: "custom",
@@ -46,7 +61,7 @@ export async function setupVite(app: Express, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
+        __dirname,
         "..",
         "client",
         "index.html",
@@ -68,7 +83,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "..", "public");
+  const distPath = path.resolve(__dirname, "..", "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(

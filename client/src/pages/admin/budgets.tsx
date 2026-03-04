@@ -1064,7 +1064,7 @@ export default function AdminBudgets() {
           costPrice: costPrice,
           priceSource: costPrice > 0 ? 'computed' : 'manual',
           totalPrice: toNumber(item.totalPrice),
-          notes: item.notes || "",
+          notes: item.notes || (product?.description ? product.description.replace(/<[^>]+>/g, '').trim() : ""),
           // Item Customization - use exact saved values without fallback logic
           hasItemCustomization: Boolean(item.hasItemCustomization),
           selectedCustomizationId: item.selectedCustomizationId || "",

@@ -921,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productWidth: item.productWidth,
             productHeight: item.productHeight,
             productDepth: item.productDepth,
-            notes: item.notes,
+            notes: item.notes || (product?.description ? product.description.replace(/<[^>]+>/g, '').trim() : ''),
             product: {
               name: product?.name || item.productName || 'Produto não encontrado',
               friendlyCode: product?.friendlyCode || '',
@@ -8816,7 +8816,7 @@ Para mais detalhes, entre em contato conosco!`;
             itemCustomizationValue: item.itemCustomizationValue,
             itemCustomizationDescription: item.itemCustomizationDescription || '',
             customizationPhoto: item.customizationPhoto || '',
-            notes: item.notes,
+            notes: item.notes || (product?.description ? product.description.replace(/<[^>]+>/g, '').trim() : ''),
             product: {
               name: product?.name || 'Produto não encontrado',
               friendlyCode: product?.friendlyCode || '',
@@ -9554,6 +9554,32 @@ Para mais detalhes, entre em contato conosco!`;
     }
   });
 
+  // Temporary debug endpoint to inspect an order
+  app.get("/api/debug-order/:number", async (req, res) => {
+    try {
+      const { number } = req.params;
+      const orders = await storage.getOrders();
+      const order = orders.find(o => o.orderNumber === number);
+
+      if (!order) return res.status(404).json({ error: "Order not found" });
+
+      let budgetItems = [];
+      if (order.budgetId) {
+        budgetItems = await storage.getBudgetItems(order.budgetId);
+
+        // Enrich budget items with product info for debugging
+        budgetItems = await Promise.all(budgetItems.map(async item => {
+          const product = await storage.getProduct(item.productId);
+          return { ...item, _product: product };
+        }));
+      }
+
+      res.json({ order, budgetItems });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Get individual items for dropshipping (product-level tracking)
   app.get("/api/logistics/dropshipping-items", async (req, res) => {
     try {
@@ -9630,7 +9656,7 @@ Para mais detalhes, entre em contato conosco!`;
             orderStatus: order.status,
             hasCustomization: item.hasItemCustomization || false,
             customizationDescription: item.itemCustomizationDescription,
-            notes: item.notes,
+            notes: item.notes || (product?.description ? product.description.replace(/<[^>]+>/g, '').trim() : ''),
             productWidth: item.productWidth,
             productHeight: item.productHeight,
             productDepth: item.productDepth
