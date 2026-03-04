@@ -663,7 +663,7 @@ export default function LogisticsDashboard() {
 
   // Ajustar contadores para a nova estrutura
   const paidOrdersCount = expandedPaidOrders?.filter(o => o.currentProducerId).length || 0; // Conta apenas linhas com produtores
-  const uniquePaidOrdersCount = paidOrders?.length || 0; // Pedidos únicos pagos
+  const uniquePaidOrdersCount = new Set(expandedPaidOrders?.map((o: any) => o.id) || []).size; // Pedidos únicos pagos (deduplica por id)
   const inProductionCount = expandedProductionOrders?.filter((o: any) => o.status === 'production')?.length || 0;
   const readyToShipCount = expandedProductionOrders?.filter((o: any) => o.status === 'ready')?.length || 0;
 
@@ -680,18 +680,13 @@ export default function LogisticsDashboard() {
 
   const currentSection = getCurrentSection();
 
-  // Aba Dashboard: só pedidos com productStatus 'in_store' (estoque confirmado → pronto para enviar ao produtor)
-  // Aba Pedidos (paid-orders): todos os pedidos pagos, independente do productStatus
-  const ordersToShow = currentSection === 'dashboard'
-    ? filteredPaidOrders.filter((o: any) => (o.productStatus || 'to_buy') === 'in_store')
-    : filteredPaidOrders;
+  // Todos os pedidos pagos filtrados são exibidos tanto no Dashboard quanto na aba Pedidos.
+  // A API /api/logistics/paid-orders já garante que só retorna pedidos válidos aguardando produção.
+  const ordersToShow = filteredPaidOrders;
 
-  // No Dashboard e em Acompanhar Produção, excluir production orders 'pending':
-  // 'pending' significa que ainda não foi confirmado o envio ao produtor.
-  // Essas ordens já aparecem na seção 'Aguardando Produção' (via paidOrders).
-  const productionOrdersToShow = (currentSection === 'dashboard' || currentSection === 'production-tracking')
-    ? filteredProductionOrders.filter((o: any) => o.status !== 'pending')
-    : filteredProductionOrders;
+  // Em Acompanhar Produção mostramos TODAS as ordens de produção (incluindo pending),
+  // pois 'pending' significa que o envio ao produtor foi realizado e aguarda confirmação.
+  const productionOrdersToShow = filteredProductionOrders;
 
   // Função para renderizar o título e descrição baseado na seção
   const getSectionInfo = () => {
@@ -800,12 +795,20 @@ export default function LogisticsDashboard() {
             )).length;
 
             const isShipments = currentSection === 'shipments';
+            const isProductionTracking = currentSection === 'production-tracking';
+            const uniquePaidCount = new Set(expandedPaidOrders?.map((o: any) => o.id) || []).size;
+            // Em Acompanhamento de Produção: contar apenas ordens de produção (não os pedidos pagos aguardando)
+            // Nas demais seções: somar pedidos pagos + ordens de produção ativas
             const uniqueCount = isShipments
               ? Array.from(new Set(productionOrders?.filter((o: any) => ['shipped', 'delivered'].includes(o.status)).map((o: any) => o.orderId) || [])).length
-              : (paidOrders?.length || 0) + uniqueActiveProductionOrders;
+              : isProductionTracking
+                ? Array.from(new Set(productionOrders?.map((o: any) => o.orderId) || [])).length
+                : uniquePaidCount + uniqueActiveProductionOrders;
             const totalLines = isShipments
               ? shippedCount + deliveredCount
-              : ordersToShow.length + activeProductionCount;
+              : isProductionTracking
+                ? productionOrdersToShow.length
+                : ordersToShow.length + activeProductionCount;
             const label = isShipments ? 'Em Despacho/Entrega' : 'Total em Acompanhamento';
 
             return (

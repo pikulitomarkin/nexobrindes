@@ -3406,6 +3406,28 @@ export class MemStorage implements IStorage {
       unitPrice: parseFloat(itemData.unitPrice.toString()),
       totalPrice: parseFloat(itemData.totalPrice.toString()),
       productName: productName,
+      // Descrição no PDF (notes)
+      notes: itemData.notes || null,
+      // Item Customization
+      hasItemCustomization: itemData.hasItemCustomization || false,
+      selectedCustomizationId: itemData.selectedCustomizationId || null,
+      itemCustomizationValue: itemData.itemCustomizationValue !== undefined ? parseFloat(itemData.itemCustomizationValue.toString()) : 0,
+      itemCustomizationDescription: itemData.itemCustomizationDescription || null,
+      additionalCustomizationNotes: itemData.additionalCustomizationNotes || null,
+      customizationPhoto: itemData.customizationPhoto || null,
+      // General Customization
+      hasGeneralCustomization: itemData.hasGeneralCustomization || false,
+      generalCustomizationName: itemData.generalCustomizationName || null,
+      generalCustomizationValue: itemData.generalCustomizationValue !== undefined ? parseFloat(itemData.generalCustomizationValue.toString()) : 0,
+      // Product dimensions
+      productWidth: itemData.productWidth || null,
+      productHeight: itemData.productHeight || null,
+      productDepth: itemData.productDepth || null,
+      // Item discount
+      hasItemDiscount: itemData.hasItemDiscount || false,
+      itemDiscountType: itemData.itemDiscountType || 'percentage',
+      itemDiscountPercentage: itemData.itemDiscountPercentage ? parseFloat(itemData.itemDiscountPercentage.toString()) : 0,
+      itemDiscountValue: itemData.itemDiscountValue ? parseFloat(itemData.itemDiscountValue.toString()) : 0,
       createdAt: new Date()
     };
 
