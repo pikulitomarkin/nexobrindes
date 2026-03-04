@@ -9591,8 +9591,21 @@ Para mais detalhes, entre em contato conosco!`;
 
       for (const order of orders) {
         if (order.status === 'cancelled') continue;
-        const paidValue = parseFloat(order.paidValue || '0');
+
+        // Verifica o paidValue no pedido OU soma dos pagamentos para ter a info correta (pagamento parcial também conta)
+        let paidValue = parseFloat(order.paidValue || '0');
+
+        if (paidValue <= 0) {
+          // Se o order.paidValue for 0, busca na tabela de pagamentos para garantir a sincronia de Parciais
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const confirmedPayments = payments.filter((p: any) => p.status === 'confirmed');
+          const totalPaid = confirmedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+          paidValue = totalPaid;
+        }
+
+        // Se após a verificação o pedido continuar zerado, pula
         if (paidValue <= 0) continue;
+
         if (!order.budgetId) continue;
         if (order.productStatus === 'in_store') continue;
 
@@ -9799,15 +9812,22 @@ Para mais detalhes, entre em contato conosco!`;
 
       // Filter orders that are paid but not yet fully sent to production
       // ETAPA 2: O pedido só aparece no Dashboard (Envio Manual) se estiver "Na Loja"
-      const paidOrders = orders.filter(order => {
-        const paidValue = parseFloat(order.paidValue || '0');
+      const paidOrdersFilteredPromises = orders.map(async (order) => {
+        let paidValue = parseFloat(order.paidValue || '0');
+
+        if (paidValue <= 0) {
+          const payments = await storage.getPaymentsByOrder(order.id);
+          const confirmedPayments = payments.filter((p: any) => p.status === 'confirmed');
+          paidValue = confirmedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+        }
+
         const isPaid = paidValue > 0;
 
-        if (!isPaid) return false;
+        if (!isPaid) return null;
 
         // Regra de Negócio: O pedido SÓ vai para o Dashboard após todos os itens 
         // passarem pela Aba Pedidos (onde recebem o status 'in_store')
-        if (order.productStatus !== 'in_store') return false;
+        if (order.productStatus !== 'in_store') return null;
 
         // Check if order has items with external producers
         let hasExternalProducers = false;
@@ -9821,7 +9841,7 @@ Para mais detalhes, entre em contato conosco!`;
           }
         }
 
-        if (!hasExternalProducers) return false;
+        if (!hasExternalProducers) return null;
 
         // Count how many unique producers already have production orders that were SENT (not pending)
         const existingPOs = productionOrdersByOrder.get(order.id) || [];
@@ -9832,10 +9852,15 @@ Para mais detalhes, entre em contato conosco!`;
 
         if (notAllProducersHaveSentPOs) {
           console.log(`Valid paid order for Dashboard: ${order.orderNumber} - Paid: R$ ${paidValue} - productStatus: ${order.productStatus} - Producers: ${uniqueProducers.size} total, ${producersWithSentPOs.size} sent`);
+          // Adicionamos os items dentro da order para o processamento a seguir funcionar
+          return Object.assign({}, order, { items, hasExternalProducers, uniqueProducers, paidValue });
         }
 
-        return notAllProducersHaveSentPOs;
+        return null;
       });
+
+      const resolvedPaidOrders = await Promise.all(paidOrdersFilteredPromises);
+      const paidOrders = resolvedPaidOrders.filter(Boolean);
 
       console.log(`Found ${paidOrders.length} paid orders ready for production`);
 
